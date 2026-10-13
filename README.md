@@ -5,7 +5,8 @@ Use it with Claude Code, with other AI agents, or as notes to read.
 
 | Folder | What it has | Who uses it |
 | --- | --- | --- |
-| [`plugins/workflow/skills/`](plugins/workflow/skills/) | Six skills in the open `SKILL.md` format | Anyone |
+| [`plugins/workflow/skills/`](plugins/workflow/skills/) | Seven skills in the open `SKILL.md` format | Anyone |
+| [`plugins/workflow/skills/project-setup/templates/`](plugins/workflow/skills/project-setup/templates/) | Templates: constitution, repo `AGENTS.md`, user `AGENTS.md`, OpenSpec config | Anyone |
 | [`global/`](global/) | My personal rules (`AGENTS.md`) and Claude Code settings | Me. Copy what you like. |
 | [`docs/tips/`](docs/tips/) | How I work, and why | Anyone |
 
@@ -13,6 +14,7 @@ Use it with Claude Code, with other AI agents, or as notes to read.
 
 | Skill | What it does |
 | --- | --- |
+| `project-setup` | Set up a repo for agents: `constitution/`, `AGENTS.md`, and the OpenSpec wiring. It asks only for facts the repo does not have. |
 | `dev-pr` | Branch, commit, rebase, validate, and open a PR into the integration branch. |
 | `ticket-delivery` | Check the work against an issue's acceptance criteria. Then branch, commit, and open a PR. |
 | `backlog-sequencer` | Sync a `status:blocked` label from "Depends on #N" text. Suggest priority labels. |
@@ -22,6 +24,28 @@ Use it with Claude Code, with other AI agents, or as notes to read.
 
 `sdd-plan` and `sdd-build` need OpenSpec in the repo (`openspec init`). The other skills need only
 `git` and the GitHub CLI (`gh`).
+
+## Set up a new repo
+
+Run `/workflow:project-setup` in the repo. In another tool, tell your agent:
+
+```text
+Follow plugins/workflow/skills/project-setup/SKILL.md from github.com/brawblan/ai-workflow.
+Use the templates next to it.
+```
+
+The skill reads the repo first. Then it asks you only for the missing facts, and writes:
+
+```text
+AGENTS.md              how to work in the repo (every tool loads it)
+CLAUDE.md              @AGENTS.md
+constitution/
+  README.md            index
+  mission.md           vision, audience, tone, scope, non-goals
+  principles.md        MUST rules (or a pointer to openspec/config.yaml)
+  tech-stack.md        approved technology, ownership, deploy limits, gates
+  roadmap.md           phases and milestones, in order
+```
 
 ## Install for Claude Code
 
