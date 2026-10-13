@@ -22,11 +22,14 @@
       }
     ]
   },
+  "enabledPlugins": {
+    "workflow@brawblan": true
+  },
   "extraKnownMarketplaces": {
     "brawblan": {
       "source": {
-        "source": "directory",
-        "path": "/Users/brandonblankenstein/Repos/ai-workflow"
+        "source": "github",
+        "repo": "brawblan/ai-workflow"
       }
     }
   },
@@ -40,8 +43,5 @@
     "claude-sonnet-5-5": {
       "effortLevel": "high"
     }
-  },
-  "enabledPlugins": {
-    "workflow@brawblan": true
   }
 }

@@ -58,14 +58,16 @@ flowchart LR
   GH[(GitHub: brawblan/ai-workflow)]
   subgraph Device[Each of my devices]
     Clone[~/Repos/ai-workflow] -- symlinks --> Cfg[~/.claude/CLAUDE.md, AGENTS.md, settings.json]
-    Clone -- local marketplace --> Plugin[workflow plugin]
+    Plugin[workflow plugin]
   end
   Clone -- git push --> GH
   GH -- git pull --> Clone
+  GH -- plugin marketplace update --> Plugin
   GH -- /plugin install --> Others[Coworkers and friends]
 ```
 
-The clone feeds both the global files and the plugin, so one `git pull` updates both.
+`global/settings.json` declares the `brawblan` marketplace (GitHub source) and enables the plugin.
+So a new device needs only the clone and `install.sh`.
 
 ### New device
 
@@ -81,10 +83,10 @@ The clone feeds both the global files and the plugin, so one `git pull` updates 
    ~/Repos/ai-workflow/install.sh
    ```
 
-3. In Claude Code, add the clone as a marketplace, and install the plugin:
+3. Start Claude Code. It reads the marketplace from the linked `settings.json`.
+   If `/plugin` does not show `workflow@brawblan`, run:
 
    ```
-   /plugin marketplace add ~/Repos/ai-workflow
    /plugin install workflow@brawblan
    ```
 
@@ -94,7 +96,9 @@ The clone feeds both the global files and the plugin, so one `git pull` updates 
 2. If you changed a skill, increase `version` in
    [`plugins/workflow/.claude-plugin/plugin.json`](plugins/workflow/.claude-plugin/plugin.json).
 3. Run `claude plugin validate .` from the repo root.
-4. Commit and push.
+4. To test a skill before you push, run `claude --plugin-dir plugins/workflow`.
+5. Commit and push.
+6. Run `/plugin marketplace update brawblan`, also on this device.
 
 ### Get changes on another device
 
