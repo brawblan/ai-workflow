@@ -47,7 +47,10 @@ people write code, docs, and reviews. -->
 
 - <non-goal> — <reason>
 
-## Success measures
+## Success measures (optional)
+
+<!-- Guide: How you know the mission works, for example a number you watch after launch. Agents
+seldom need it. If the user has no measures yet, remove the section. Do not leave a TODO. -->
 
 - <measure, with a target if you have one>
 

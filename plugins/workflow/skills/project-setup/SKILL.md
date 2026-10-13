@@ -72,7 +72,7 @@ Question bank (ask only the ones that the survey did not answer):
 
 | File | Questions |
 | --- | --- |
-| Mission | What changes for the user when this works? Who is the primary user, and who is not? What are 3 non-goals? What is the product voice? What is the engineering tone (strict or relaxed)? How do you measure success? |
+| Mission | What changes for the user when this works? Who is the primary user, and who is not? What are 3 non-goals? What is the product voice? What is the engineering tone (strict or relaxed)? (Optional) How will you know it works? |
 | Principles | Which rules must every change follow (security, tests, data isolation, accessibility, ownership)? What are the merge gates? What is exempt from the test rule? |
 | Tech stack | Which tools are approved but not in the manifests yet? Which tools are not allowed? What are the deploy limits (cost, regions, one project per environment)? Which environments exist? |
 | Roadmap | What is the goal of the current phase? What ends the phase? Which epics or issues are in it, in order? What comes next? |
