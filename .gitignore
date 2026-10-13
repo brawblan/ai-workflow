@@ -1,0 +1,11 @@
+# Machine-only and secret files. Never commit these.
+settings.local.json
+.credentials*
+*.credentials*
+.env
+.env.*
+*.pem
+*.key
+
+# OS and editor files
+.DS_Store

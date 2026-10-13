@@ -1,0 +1,16 @@
+{
+  "name": "brawblan",
+  "owner": {
+    "name": "Brandon Blankenstein"
+  },
+  "metadata": {
+    "description": "Brandon Blankenstein's AI workflow: PR delivery, spec-driven development, backlog upkeep, and STE writing."
+  },
+  "plugins": [
+    {
+      "name": "workflow",
+      "source": "./plugins/workflow",
+      "description": "Skills for PR delivery, spec-driven development with OpenSpec, backlog sequencing, and Simplified Technical English writing."
+    }
+  ]
+}

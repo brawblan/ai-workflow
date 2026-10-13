@@ -1,0 +1,47 @@
+{
+  "model": "opus",
+  "hooks": {
+    "Notification": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Glass.aiff"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Pop.aiff"
+          }
+        ]
+      }
+    ]
+  },
+  "extraKnownMarketplaces": {
+    "brawblan": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/brandonblankenstein/Repos/ai-workflow"
+      }
+    }
+  },
+  "effortLevel": "high",
+  "theme": "auto",
+  "agentPushNotifEnabled": true,
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "high"
+    },
+    "claude-sonnet-5-5": {
+      "effortLevel": "high"
+    }
+  },
+  "enabledPlugins": {
+    "workflow@brawblan": true
+  }
+}

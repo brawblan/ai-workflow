@@ -1,0 +1,10 @@
+{
+  "name": "workflow",
+  "version": "0.1.0",
+  "description": "Skills for PR delivery, spec-driven development with OpenSpec, backlog sequencing, and Simplified Technical English writing.",
+  "author": {
+    "name": "Brandon Blankenstein"
+  },
+  "repository": "https://github.com/brawblan/ai-workflow",
+  "license": "MIT"
+}
