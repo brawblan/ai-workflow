@@ -16,7 +16,7 @@ gates:
   G5: always
 checks: [K1, K2, K3, K4, K5, K6, K7, K8, K9, K13, K14, K15]
 limits:
-  pr_changed_lines: 400
+  pr_changed_lines: 600
 outputs: [plan, pr]
 ---
 

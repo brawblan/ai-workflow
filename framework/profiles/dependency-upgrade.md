@@ -56,10 +56,26 @@ outputs: [pr]
 | The upgrade needs more than the size limit | Stop. Open a refactor-migration ticket. |
 | The new version has a known security issue | Stop. Report it. Do not merge. |
 
-## Open question
+## Patch-version waiver
 
-May the repo waive G4 for patch versions that pass all checks? See [the framework README](../README.md).
-The current default is no.
+By default, a human approves each upgrade (G4). A repo MAY add a waiver to skip G4 when all of these
+conditions are true:
+
+1. The upgrade changes only the patch version (for example 2.4.1 to 2.4.3).
+2. All checks pass.
+3. No security notice applies to the new version.
+4. The investigator found no breaking change.
+
+Minor and major versions always need G4. Example waiver in the profile override:
+
+```yaml
+waivers:
+  - gate: G4
+    scope: patch-versions
+    reason: High volume, low risk, full check coverage.
+    owner: <github-username>
+    until: <date>
+```
 
 ## Evidence
 

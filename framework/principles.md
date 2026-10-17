@@ -57,7 +57,7 @@ The words MUST, SHOULD, and MAY have the meanings in RFC 2119.
 
 ## P4. Context is a budget
 
-- **Rule:** The always-loaded instruction file SHOULD be under 150 lines. It MUST contain only facts
+- **Rule:** The always-loaded instruction file SHOULD be under 300 lines. It MUST contain only facts
   that the agent cannot find in the repo. Other knowledge MUST load on demand (skills, linked docs).
 - **Reason:** Performance decreases as context grows, and generated context files did not help.
 - **Evidence:** A1–A9, A12, A15, H6.

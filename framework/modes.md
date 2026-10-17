@@ -66,9 +66,12 @@ implementer (separation rule 3). Verify and Learn are the same in all modes.
 5. A stage driver can change during an item, for example from `agent` to `pair` after 3 failed loops.
    The change is recorded in the decision log.
 
-## Open question
+## Solo developer
 
 A solo developer is often the only human. In human-centric mode, that human implements and also
-approves G4. Gate rule 3 says that the approver cannot be the role that made the work. The proposed
-default: a solo human MAY pass G4 only after an agent reviewer reports and all checks pass. The repo
-config states `owners.solo: true`. [TO CONFIRM]
+approves G4. This is the only exception to gate rule 3. All of these conditions MUST be true:
+
+1. The repo config states `owners.solo: true`.
+2. An agent reviewer in a fresh session reported on the PR.
+3. All checks (G3) passed.
+4. The PR records that the solo exception applied.

@@ -1,4 +1,8 @@
-# The agent workflow framework
+# Cornerstone: the agent workflow framework
+
+> "The stone which the builders refused is become the head stone of the corner." (Psalm 118:22)
+>
+> The principles are the cornerstone. Each profile, adapter, and generated file aligns to them.
 
 Status: draft v0 (2026-10-17). Evidence: [docs/research/dossier.md](../docs/research/dossier.md).
 
@@ -52,16 +56,19 @@ higher layer.
 
 The generator is a design only in v0. See [generator/design.md](generator/design.md).
 
+## Decisions
+
+| # | Decision | Where |
+| --- | --- | --- |
+| D1 | The framework name is Cornerstone. The CLI is `stone`. The repo stays `ai-workflow`. | This file, [generator/design.md](generator/design.md) |
+| D2 | A repo MAY add a waiver to skip G4 for dependency patch versions. Minor and major versions always need G4. | [profiles/dependency-upgrade.md](profiles/dependency-upgrade.md) |
+| D3 | `cornerstone-setup` is the entry skill. It runs `project-setup` as its Shape step. `project-setup` stays usable alone. | [generator/design.md](generator/design.md) |
+| D4 | Default limits: 600 changed lines for a PR, 300 lines for the instruction file. A profile can tighten them. | [principles.md](principles.md), [customization.md](customization.md) |
+| D5 | A solo developer MAY pass G4 on their own human-centric work, after an agent review and with all checks passing. | [modes.md](modes.md#solo-developer) |
+
 ## Open questions
 
-1. The framework name. The working name for the CLI is `aiwf` [TO CONFIRM].
-2. May a repo waive G4 for dependency patch versions that pass all checks? Default: no.
-3. Does the `framework-setup` skill replace `project-setup`, or does `project-setup` become one step
-   of it?
-4. Size limits: are 400 changed lines for a PR and 150 lines for the instruction file correct
-   defaults?
-5. Can a solo developer pass G4 on their own human-centric work after an agent review? See
-   [modes.md](modes.md#open-question).
+None at this time.
 
 ## Relation to the plugin in this repo
 

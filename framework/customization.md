@@ -9,8 +9,8 @@ defines where specificity goes and which layer wins.
 | --- | --- | --- | --- |
 | 1 | Framework core | `framework/` in this repo | Principles, gates, profiles |
 | 2 | Adapter | `framework/adapters/<name>.md` and its templates | File paths and formats for one harness |
-| 3 | Repo config | `.ai-workflow/config.yaml` in the target repo | Commands, paths, limits, owners |
-| 4 | Profile override | `.ai-workflow/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
+| 3 | Repo config | `.cornerstone/config.yaml` in the target repo | Commands, paths, limits, owners |
+| 4 | Profile override | `.cornerstone/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
 | 5 | Task | The ticket fields | Acceptance criteria, non-goals, a mode, a waiver |
 
 A later layer wins over an earlier layer, with these limits:
@@ -23,7 +23,7 @@ A later layer wins over an earlier layer, with these limits:
 5. Any layer MAY change the [mode](modes.md) or single stage drivers. A mode change never changes
    the gates.
 
-## Repo config (`.ai-workflow/config.yaml`)
+## Repo config (`.cornerstone/config.yaml`)
 
 ```yaml
 framework_version: 0.1.0           # tag of brawblan/ai-workflow
@@ -43,10 +43,10 @@ commands:                          # exactly as a person types them
 paths:
   source: [src/]
   tests: [tests/]                  # protected for the implementer
-  checks: [.github/workflows/, .ai-workflow/checks/]
+  checks: [.github/workflows/, .cornerstone/checks/]
   plans: docs/plans/
 limits:
-  pr_changed_lines: 400
+  pr_changed_lines: 600
   function_lines: 60
   cyclomatic: 10
   mutation_score_changed_code: 0.6
@@ -62,7 +62,7 @@ waivers: []
 The generator fills the facts that it can find. It asks a human for the rest. It writes
 `TODO(<owner>)` for an unknown value. It does not guess.
 
-## Profile override (`.ai-workflow/profiles/<profile>.yaml`)
+## Profile override (`.cornerstone/profiles/<profile>.yaml`)
 
 ```yaml
 extends: single-ticket
@@ -87,5 +87,5 @@ profile default applies.
 
 ## Hand-written components
 
-A repo can add its own rules, skills, roles, or hooks. Put them in `.ai-workflow/local/`. Add each one
+A repo can add its own rules, skills, roles, or hooks. Put them in `.cornerstone/local/`. Add each one
 to the manifest with `source: repo`. The lifecycle rules apply to them too.

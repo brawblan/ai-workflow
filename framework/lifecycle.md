@@ -5,7 +5,7 @@ remove components that no longer help the current model (P5).
 
 ## Manifest
 
-The generator writes a manifest in the target repo. Default path: `.ai-workflow/manifest.yaml`.
+The generator writes a manifest in the target repo. Default path: `.cornerstone/manifest.yaml`.
 
 ```yaml
 framework_version: 0.1.0

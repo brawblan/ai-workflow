@@ -18,11 +18,10 @@ waiver with a reason.
    remove G3. Spike code never merges (check K16), so G3 does not apply to it.
 2. G5 is always on for each destructive action, in each profile. See P9.
 3. A gate approver cannot be the role that made the work. An agent cannot approve G1, G2, G4, or G5.
+   The only exception is the [solo developer](modes.md#solo-developer) rule for G4.
 4. A gate decision is recorded where the work is: a label, a PR review, or a CI status.
 5. Before a human passes G2 or G4, the agent states its confidence and the open risks (P11).
 6. The [mode](modes.md) does not change the gates. Only the profile and recorded waivers change them.
-   For a solo developer in human-centric mode, see the
-   [open question in modes.md](modes.md#open-question).
 
 ## Gate selection by profile
 
@@ -35,7 +34,7 @@ waiver with a reason.
 | [debugging](profiles/debugging.md) | check | — | yes | human | if needed |
 | [code-audit](profiles/code-audit.md) | human (scope) | — | — | human (which findings become tickets) | if needed |
 | [refactor-migration](profiles/refactor-migration.md) | human | human | yes | human | if needed |
-| [dependency-upgrade](profiles/dependency-upgrade.md) | — | — | yes | human, or waived for patch versions | if needed |
+| [dependency-upgrade](profiles/dependency-upgrade.md) | — | — | yes | human (a repo waiver MAY skip it for patch versions) | if needed |
 | [spike](profiles/spike.md) | human (question and time box) | — | — | human (reads findings) | if needed |
 
 "If needed" means: G5 applies when the work includes a release or a destructive action. G5 is never

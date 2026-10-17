@@ -25,7 +25,7 @@ Status: draft v0. Facts marked `[TO CONFIRM]` must be tested on the current Clau
 The implementer must not change tests or checks (P2). This applies to a human implementer too. Use
 two layers:
 
-1. **Local hook.** The run script sets `AIWF_ROLE=implementer`. A `PreToolUse` hook reads the role and
+1. **Local hook.** The run script sets `STONE_ROLE=implementer`. A `PreToolUse` hook reads the role and
    the target path. It exits with code 2 if the path is protected. In a `pair` session, the hook
    uses the role of the human (default: implementer).
 2. **CI check K6.** Each commit has the trailers `Role: <role>` and `Actor: human|agent`. A commit
@@ -42,7 +42,7 @@ the trailers for human commits.
       {
         "matcher": "Edit|Write",
         "hooks": [
-          { "type": "command", "command": ".ai-workflow/hooks/protect-paths.py" }
+          { "type": "command", "command": ".cornerstone/hooks/protect-paths.py" }
         ]
       }
     ]
@@ -90,7 +90,7 @@ the trailers for human commits.
 
 | Skill | Framework place | Change needed |
 | --- | --- | --- |
-| `project-setup` | full-project, Shape | Read the profile and the repo config. |
+| `project-setup` | full-project, Shape | Becomes the Shape step of `cornerstone-setup`. Stays usable alone. |
 | `sdd-plan` | Plan (OpenSpec) | Move to the OpenSpec section of [spec-tools.md](spec-tools.md). |
 | `sdd-build` | Build (OpenSpec) | Split: implementer and tester run in separate sessions. |
 | `ticket-delivery` | Verify, Deliver | Use the tester and reviewer output as evidence. Do not self-verify. |
