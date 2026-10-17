@@ -8,7 +8,11 @@ harness feature.
 | harness | The software that runs the model, gives it tools, and controls the loop. | agent tool, IDE |
 | model | The language model that the harness calls. | AI, LLM (in rules) |
 | session | One run of a harness with one context. A fresh session has no context from another session. | chat, conversation |
-| role | A named job for an agent, with its own instructions, tools, and permissions. | persona, sub-agent (in the core) |
+| role | A named job in the workflow, with its own instructions, tools, and permissions. A human or an agent can fill it. | persona, sub-agent (in the core) |
+| actor | A human or an agent that fills a role. | user, bot |
+| driver | The actor that does the work in one stage: `agent`, `human`, `pair`, or `checks`. | owner (of a stage) |
+| pair | A human and an agent in the same session. The human decides each change. Counts as one actor. | co-pilot, assist |
+| mode | A preset of stage drivers: agent-centric, hybrid, or human-centric. | autonomy level |
 | instruction file | The file that the harness loads into every session (repo level or user level). | memory, rules file |
 | skill | A folder with a procedure that loads only when a task needs it. | command, prompt |
 | hook | A script that the harness runs at a set event (for example before a file edit). | callback |

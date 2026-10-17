@@ -7,6 +7,7 @@ triggers: [command]                 # command | label:<name> | schedule:<cron> |
 stages: [intake, shape, plan, build, test, verify, review, deliver, learn]
 roles: [shaper, planner, implementer, tester, reviewer]
 plan_form: plan-artifact            # plan-artifact | decision-log | none
+mode: hybrid                        # agent-centric | hybrid | human-centric (default preset, see modes.md)
 gates:
   G1: human                         # human | check | skip
   G2: human                         # human | skip

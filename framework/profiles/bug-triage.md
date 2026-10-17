@@ -7,6 +7,7 @@ triggers: [ci:issue-opened, schedule:daily, command]
 stages: [intake, shape, review, learn]
 roles: [investigator]
 plan_form: none
+mode: agent-centric
 gates:
   G1: skip
   G2: skip

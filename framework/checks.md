@@ -12,7 +12,7 @@ checks for the profile in CI. Each check SHOULD also run on the developer's mach
 | K3 | Unit tests | A unit test fails. | yes | pytest, vitest |
 | K4 | Integration tests | Components fail to work together. | by profile | pytest, testcontainers |
 | K5 | Acceptance tests | Behavior does not match the acceptance criteria. | by profile | playwright, pytest |
-| K6 | Protected paths | The implementer's commits change a test, check, CI, or check-config path. | yes | script in the generator output |
+| K6 | Protected paths | An implementer commit changes a test, check, CI, or check-config path. Each commit has a `Role:` trailer. A commit with no trailer counts as an implementer commit. Human and agent commits follow the same rule. | yes | script in the generator output |
 | K7 | Change size | The diff is over the profile's size limit and has no waiver. | yes | script in the generator output |
 | K8 | Architecture fitness | A dependency breaks a layer, boundary, or cycle rule. | by profile | import-linter, dependency-cruiser, ArchUnit |
 | K9 | Complexity caps | A function is over the cyclomatic, cognitive, nesting, parameter, or length limit. | yes | ruff (mccabe), radon, eslint complexity |

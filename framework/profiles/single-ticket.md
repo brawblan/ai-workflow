@@ -7,6 +7,7 @@ triggers: [command, label:agent-ready]
 stages: [intake, shape, build, test, verify, review, deliver, learn]
 roles: [shaper, implementer, tester, reviewer]
 plan_form: decision-log
+mode: agent-centric
 gates:
   G1: check
   G2: skip

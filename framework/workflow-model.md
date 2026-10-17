@@ -1,7 +1,8 @@
 # Workflow model
 
 The workflow model has stages, roles, and artifacts. A [profile](profiles/README.md) selects the
-stages, roles, [gates](gates.md), and [checks](checks.md) for one type of work.
+stages, roles, [gates](gates.md), and [checks](checks.md) for one type of work. A
+[mode](modes.md) selects who drives each stage: an agent, a human, or a pair.
 
 ## Stages
 
@@ -13,6 +14,8 @@ flowchart LR
 ```
 
 Caption: work moves left to right. A gate stops the work until its approver passes it.
+
+The "Role" column names the role. The [mode](modes.md#presets) decides if a human or an agent fills it.
 
 | Stage | Goal | Input | Output artifact | Role |
 | --- | --- | --- | --- | --- |
@@ -44,7 +47,12 @@ Caption: work moves left to right. A gate stops the work until its approver pass
 | reviewer | Find defects and scope drift. Report only gaps that affect correctness or the ticket. | Ticket, plan, diff, check output, decision log | Review findings | Change any file |
 | investigator | Read, run, and report. Used for triage, debugging analysis, audits, and spikes. | Code, logs, issues | Findings report | Change files outside its scratch area |
 
+Roles are actor-neutral. The "Must not" column applies to a human in the role too. See the
+[separation rule for all actors](modes.md#separation-rule-for-all-actors).
+
 ### Session rules
+
+These rules apply to each stage that an agent drives.
 
 - Each role runs in its own session. The implementer, tester, and reviewer MUST NOT share a session.
 - The pipeline starts each role. A role does not start another role, except an investigator that

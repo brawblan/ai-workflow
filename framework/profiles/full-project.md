@@ -7,6 +7,7 @@ triggers: [command]
 stages: [intake, shape, plan, verify, review, deliver, learn]   # the walking skeleton runs as an app-slice
 roles: [shaper, planner, reviewer]
 plan_form: plan-artifact
+mode: hybrid
 gates:
   G1: human
   G2: human

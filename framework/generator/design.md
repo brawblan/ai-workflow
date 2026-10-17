@@ -58,14 +58,17 @@ repo config.
 2. Load and validate the repo config. Stop on the first error. Print the field and the fix.
 3. Resolve each profile: framework profile, then the repo override. Apply the rules in
    [customization.md](../customization.md). Stop if a waiver removes G3 or G5.
-4. Build the component list from the profiles, the adapters, and `.ai-workflow/local/`.
-5. Render each component to memory.
-6. Compare each rendered block with the file on disk:
+4. Resolve the mode for each profile (repo config, then profile override, then profile default).
+   The ticket mode applies at run time, not at render time. So render the components for each mode
+   in `modes_allowed` in the repo config. The default is all three modes.
+5. Build the component list from the profiles, the modes, the adapters, and `.ai-workflow/local/`.
+6. Render each component to memory.
+7. Compare each rendered block with the file on disk:
    - Same hash: skip.
    - The disk block changed since the last render: report drift. Do not overwrite. Exit code 2.
    - Otherwise: write the new block.
-7. Write the manifest. Keep `added`, `owner`, and `review_by` for existing components.
-8. Print a summary: files written, files skipped, drift found.
+8. Write the manifest. Keep `added`, `owner`, and `review_by` for existing components.
+9. Print a summary: files written, files skipped, drift found.
 
 ## Errors and logging
 

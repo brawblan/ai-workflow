@@ -7,6 +7,7 @@ triggers: [command]
 stages: [intake, shape, build, review, learn]
 roles: [shaper, investigator]
 plan_form: none
+mode: human-centric
 gates:
   G1: human
   G2: skip

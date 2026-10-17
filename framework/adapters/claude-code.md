@@ -22,14 +22,18 @@ Status: draft v0. Facts marked `[TO CONFIRM]` must be tested on the current Clau
 
 ## Protected paths
 
-The implementer must not change tests or checks (P2). Use two layers:
+The implementer must not change tests or checks (P2). This applies to a human implementer too. Use
+two layers:
 
 1. **Local hook.** The run script sets `AIWF_ROLE=implementer`. A `PreToolUse` hook reads the role and
-   the target path. It exits with code 2 if the path is protected.
-2. **CI check K6.** Each role commit has a trailer `Agent-Role: <role>`. K6 fails if a commit with
-   `Agent-Role: implementer` changes a protected path.
+   the target path. It exits with code 2 if the path is protected. In a `pair` session, the hook
+   uses the role of the human (default: implementer).
+2. **CI check K6.** Each commit has the trailers `Role: <role>` and `Actor: human|agent`. A commit
+   with no `Role:` trailer counts as an implementer commit. K6 fails if an implementer commit
+   changes a protected path.
 
-The CI check is the source of truth. The hook gives faster feedback.
+The CI check is the source of truth. The hook gives faster feedback. A git commit template can add
+the trailers for human commits.
 
 ```json
 {
@@ -45,6 +49,21 @@ The CI check is the source of truth. The hook gives faster feedback.
   }
 }
 ```
+
+## Modes
+
+| Driver | How it runs in Claude Code |
+| --- | --- |
+| `agent` in CI | `claude-code-action` job, one job for each role |
+| `agent` on a computer | A run script calls `claude -p` once for each role |
+| `pair` | An interactive Claude Code session. The human approves each edit (manual permission mode). |
+| `human` | No Claude Code session changes files. Claude Code can still run the tester and the reviewer. |
+
+| Mode | Files that the generator adds |
+| --- | --- |
+| agent-centric | CI workflows for each role, label triggers, the run script |
+| hybrid | The run script, skills to start each agent stage, CI workflows for Test and Review |
+| human-centric | Skills to start the tester and the reviewer on the current branch, the commit template with trailers |
 
 ## Gates on GitHub
 

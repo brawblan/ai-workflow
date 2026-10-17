@@ -11,7 +11,7 @@ defines where specificity goes and which layer wins.
 | 2 | Adapter | `framework/adapters/<name>.md` and its templates | File paths and formats for one harness |
 | 3 | Repo config | `.ai-workflow/config.yaml` in the target repo | Commands, paths, limits, owners |
 | 4 | Profile override | `.ai-workflow/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
-| 5 | Task | The ticket fields | Acceptance criteria, non-goals, a waiver |
+| 5 | Task | The ticket fields | Acceptance criteria, non-goals, a mode, a waiver |
 
 A later layer wins over an earlier layer, with these limits:
 
@@ -20,6 +20,8 @@ A later layer wins over an earlier layer, with these limits:
 3. A later layer MUST record a waiver to remove a gate, remove a check, or loosen a limit. A waiver
    has a reason, an owner, and an end date.
 4. No layer can remove G3 or G5 (see [gates.md](gates.md)).
+5. Any layer MAY change the [mode](modes.md) or single stage drivers. A mode change never changes
+   the gates.
 
 ## Repo config (`.ai-workflow/config.yaml`)
 
@@ -50,6 +52,10 @@ limits:
   mutation_score_changed_code: 0.6
 owners:
   default: <github-username>
+  solo: false                      # true if one human fills all human roles (see modes.md)
+modes_allowed: [agent-centric, hybrid, human-centric]   # the generator renders files for these
+modes:                             # optional: change the default preset of a profile
+  single-ticket: agent-centric
 waivers: []
 ```
 
@@ -60,6 +66,9 @@ The generator fills the facts that it can find. It asks a human for the rest. It
 
 ```yaml
 extends: single-ticket
+mode: hybrid
+drivers:                           # optional: change single stages of the preset
+  plan: pair
 checks_add: [K8]
 limits:
   pr_changed_lines: 250
@@ -69,6 +78,12 @@ waivers:
     owner: <github-username>
     until: 2027-01-31
 ```
+
+## Task layer (ticket fields)
+
+A ticket MAY set the mode for one item, for example with a field or a label `mode:human-centric`. If
+the ticket sets no mode, the profile override or the repo config decides. If neither sets one, the
+profile default applies.
 
 ## Hand-written components
 

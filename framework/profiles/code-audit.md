@@ -7,6 +7,7 @@ triggers: [command, schedule:monthly]
 stages: [intake, shape, review, learn]
 roles: [investigator, reviewer]
 plan_form: none
+mode: agent-centric
 gates:
   G1: human
   G2: skip

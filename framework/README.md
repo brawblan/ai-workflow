@@ -18,6 +18,8 @@ goes, the part goes.
 flowchart TB
   P[Principles<br/>principles.md] --> M[Workflow model<br/>stages, roles, gates, checks]
   M --> PR[Profiles<br/>profiles/*.md]
+  M --> MO[Modes<br/>agent-centric, hybrid, human-centric]
+  MO --> PR
   PR --> A[Adapters<br/>adapters/*.md]
   A --> G[Generator<br/>generator/design.md]
   G --> R[(Target repo<br/>generated files + manifest)]
@@ -33,6 +35,7 @@ higher layer.
 | Principles | [principles.md](principles.md) | The evidence changes. Seldom. |
 | Vocabulary | [vocabulary.md](vocabulary.md) | A new neutral concept is necessary. |
 | Workflow model | [workflow-model.md](workflow-model.md), [gates.md](gates.md), [checks.md](checks.md) | A stage, role, gate, or check type changes. |
+| Modes | [modes.md](modes.md) | The stage drivers of a preset change. |
 | Profiles | [profiles/](profiles/README.md) | A workflow type is added or tuned. |
 | Lifecycle | [lifecycle.md](lifecycle.md) | The eval or sunset rules change. |
 | Customization | [customization.md](customization.md) | The override rules change. |
@@ -41,7 +44,7 @@ higher layer.
 
 ## How to use it (target state)
 
-1. Pick the profiles that a repo needs.
+1. Pick the profiles that a repo needs, and the modes that it allows.
 2. Run the generator in the repo with one harness adapter.
 3. Fill the repo config with the facts that the generator cannot find.
 4. Work with the generated skills, roles, hooks, and CI checks.
@@ -57,6 +60,8 @@ The generator is a design only in v0. See [generator/design.md](generator/design
    of it?
 4. Size limits: are 400 changed lines for a PR and 150 lines for the instruction file correct
    defaults?
+5. Can a solo developer pass G4 on their own human-centric work after an agent review? See
+   [modes.md](modes.md#open-question).
 
 ## Relation to the plugin in this repo
 

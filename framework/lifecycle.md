@@ -64,7 +64,8 @@ Default eval folder: `evals/<component-id>/` with `scenarios.yaml` and a grader 
 
 ## Metrics for each profile
 
-Collect these for each merged item. Compare them before and after a workflow change.
+Collect these for each merged item. Record the mode and the stage drivers with each item. Compare
+the metrics before and after a workflow change, and between modes for the same profile.
 
 | Metric | Meaning |
 | --- | --- |

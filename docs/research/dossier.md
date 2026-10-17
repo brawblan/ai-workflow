@@ -151,6 +151,19 @@ the workflow profiles where it applies, and the framework principle that it supp
 | H5 | The harness controls the model. The harness from the model's maker is often the best. | [S2] | ALL | P12 |
 | H6 | Disable tools that you do not need. Skills are not free. | [S2] | ALL | P4, P5 |
 
+### I. Modes (who drives the work)
+
+| ID | Finding | Source | Applies to | Supports |
+| --- | --- | --- | --- | --- |
+| I1 | Run AI in many places: chat, local, container, server, a GitHub issue, Slack. Most teams need several. | [S2] | ALL | modes |
+| I2 | Software factories: humans focus on the inputs, and agents do the rest. | [S2] [S12] | ST DU BT | agent-centric |
+| I3 | Work alone, or pair? Heavy processes are less necessary. | [S2] | ALL | modes |
+| I4 | Treat the AI as a pair programmer. The human enforces TDD, catches design drift, and rejects shortcuts. | [S23] | AS RM SP | human-centric, pair |
+| I5 | One team wrote no code by hand for five months. Humans set priorities and validated outcomes. | [S12] | ALL | agent-centric |
+| I6 | Developers felt faster with AI but were slower in a controlled study. Measure each mode; do not assume. | [S16] [S17] | ALL | P5, mode metrics |
+| I7 | Ticket in, draft PR out, with three gates before human attention. | [S3] | ST AS | agent-centric, hybrid |
+| I8 | Workflows suit well-defined tasks. Agents suit open-ended tasks. Start with the simplest option. | [S6] | ALL | preset choice |
+
 ## 2. Conflicts and resolutions
 
 | # | Conflict | Resolution in the framework |
@@ -162,6 +175,7 @@ the workflow profiles where it applies, and the framework principle that it supp
 | 5 | Avoid memories [S2] **against** write structured notes [S8] [S7]. | Notes are allowed only as versioned repo files (plan, progress, decision log). Hidden harness memory is not a source of truth. |
 | 6 | Minimal merge gates [S12] **against** three gates before human attention [S3]. | The profile and the repo risk decide. Gate G3 (checks) is always on. The human PR gate is optional only for profiles with low risk and only when the repo config allows it. |
 | 7 | Developers feel faster [S16] **against** measured slowdown [S16] [S17]. | Measure outcomes. The framework tracks lead time, rework, escaped defects, review time, and cost for each merged PR. |
+| 8 | Write no code by hand [S2] [S12] **against** the human as an active pair [S23]. | Both are valid. They are presets. The [mode](../../framework/modes.md) selects the driver of each stage. The gates do not change with the mode. |
 
 ## 3. Gap analysis of this repo (brawblan/ai-workflow, v0.2.1)
 

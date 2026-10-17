@@ -10,7 +10,7 @@ The words MUST, SHOULD, and MAY have the meanings in RFC 2119.
 | ID | Principle | One-line rule |
 | --- | --- | --- |
 | P1 | Checks decide | Deterministic checks, not agent claims, decide if work is done. |
-| P2 | Separate the writer from the judge | The role that writes code does not write its tests or approve it. |
+| P2 | Separate the writer from the judge | The actor (human or agent) that writes code does not write its tests or approve it. |
 | P3 | Judgment goes into the inputs | A human makes the ticket good. Then the prompt can be simple. |
 | P4 | Context is a budget | Load the minimum. Load the rest only when a task needs it. |
 | P5 | Each component earns its place | Each rule, skill, role, and hook has an eval, an owner, and a review date. |
@@ -33,15 +33,16 @@ The words MUST, SHOULD, and MAY have the meanings in RFC 2119.
 
 ## P2. Separate the writer from the judge
 
-- **Rule:** The implementer role MUST NOT write or change tests, checks, or check configuration. A
-  tester role writes the tests in a fresh session from the spec and the diff. A reviewer role
-  reviews in a fresh session. The pipeline MUST start these roles. A prompt that only asks for
-  them is not sufficient.
-- **Reason:** Tests from the same session prove only that the code agrees with that session's reading
-  of the task.
+- **Rule:** The actor in the implementer role MUST NOT write or change tests, checks, or check
+  configuration. This applies to a human and to an agent. A different actor writes the tests from
+  the spec and the diff. A different actor reviews. When an agent fills the tester or reviewer
+  role, it runs in a fresh session. The pipeline MUST start these roles. A prompt that only asks
+  for them is not sufficient.
+- **Reason:** Tests from the same actor prove only that the code agrees with that actor's reading
+  of the task. This bias applies to people too.
 - **Evidence:** B2, B3, B5, B9, B10, B15, E12, F6. Risk: B6.
 - **Enforce:** A protected-path check fails the build if an implementer commit changes a test or a
-  check path. Checks are read-only in the agent environment where the harness allows it. Mutation
+  check path. A commit with no role trailer counts as an implementer commit. Checks are read-only in the agent environment where the harness allows it. Mutation
   score measures the tester.
 
 ## P3. Judgment goes into the inputs

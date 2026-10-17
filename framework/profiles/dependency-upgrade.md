@@ -7,6 +7,7 @@ triggers: [ci:dependency-pr, schedule:weekly, command]
 stages: [intake, build, test, verify, review, deliver, learn]
 roles: [investigator, implementer, tester, reviewer]
 plan_form: decision-log
+mode: agent-centric
 gates:
   G1: skip
   G2: skip

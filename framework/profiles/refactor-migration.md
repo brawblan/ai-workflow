@@ -7,6 +7,7 @@ triggers: [command]
 stages: [intake, shape, plan, build, test, verify, review, deliver, learn]
 roles: [shaper, planner, tester, implementer, reviewer]
 plan_form: plan-artifact
+mode: hybrid
 gates:
   G1: human
   G2: human
