@@ -14,8 +14,8 @@ to write files. The core does not change when an adapter changes (P12).
 ## What a harness adapter MUST provide
 
 1. A mapping table with one row for each concept below.
-2. For each row: the target path, the file format, the support level (full, partial, none), and the
-   fallback if the support is not full.
+2. For each row, give the target path, the file format, and the support level (full, partial, none).
+   If the support is not full, give the fallback.
 3. A template folder: `framework/adapters/<name>/templates/`. The generator renders these files.
 4. A list of the facts that can change with harness versions. Mark each one `[TO CONFIRM]` until a
    test proves it.
@@ -40,8 +40,8 @@ only its model profile. Use [model-profile-template.yaml](model-profile-template
 
 1. The exact model IDs that it covers.
 2. A source URL and a read date for each source.
-3. For each idiom: the area, one sentence of guidance, the source, the components that it affects,
-   and an eval (or empty, if not measured yet).
+3. For each idiom, give the area, one sentence of guidance, the source, and the affected components.
+   Add an eval. If no eval exists yet, leave the field empty.
 4. A status: `proposed`, `active`, or `retired`. Only an `active` profile can be the default in a
    target repo. A profile becomes `active` when the [adapter-refresh](../profiles/adapter-refresh.md)
    evals support it.

@@ -12,7 +12,7 @@ These are in [`global/AGENTS.md`](../../global/AGENTS.md):
 - Write one instruction per sentence, in the imperative. Put the condition first.
 - Use the active voice and simple tenses. Keep the articles (a, an, the).
 - Each word has one meaning.
-- Do not use idioms or vague words (simply, just, easily, various, robust, leverage).
+- Do not use idioms or vague words (simply, just, easily, various, robust, leverage). <!-- ste-ignore -->
 - Use lists and tables more than paragraphs.
 
 The full rule set is in
@@ -34,7 +34,7 @@ Give each important term one meaning. Put a table in the repo, for example `docs
 | --- | --- | --- |
 | tenant | One customer organization on the platform. | org, customer, account |
 | remove | Take out an item. The item can come back. | delete |
-| delete | Destroy stored data. The data cannot come back. | remove, erase |
+| delete | Destroy stored data. The data cannot come back. | remove, erase | <!-- ste-ignore -->
 
 The `ste-writing` skill reads this file when it exists.
 
