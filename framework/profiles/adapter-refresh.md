@@ -42,8 +42,8 @@ profiles in line with each vendor's current models and guidance.
    active model profile, and each vendor's release notes. It compares them with the `sources.read`
    dates.
 2. If nothing changed, stop. Write one line in the run log.
-3. **Plan.** The investigator writes the guidance diff. It lists each new, changed, or removed idiom,
-   with the source and a short quote (2 sentences or fewer).
+3. **Plan.** The investigator writes the guidance diff: each new, changed, or removed idiom, with the
+   source and a quote of 2 sentences or fewer.
 4. **Build.** Start the implementer in a fresh session. It writes a new model profile with
    `status: proposed`, or updates the current one. It does not change the core framework files.
 5. **Test.** Start the tester in a fresh session. For each new or changed idiom, it runs the evals of

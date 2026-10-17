@@ -1,6 +1,6 @@
 # Generator design
 
-Status: design. `stone check` and `stone check-writing` are built (see [stone/](../../stone/README.md)). The other commands are not built yet.
+Status: design. `stone check` is built (see [stone/](../../stone/README.md)). The other commands are not built yet.
 
 ## Goal
 
@@ -33,7 +33,6 @@ repo config.
 | `stone init` | Make `.cornerstone/config.yaml` with `TODO(<owner>)` values. |
 | `stone render` | Write all files from the inputs. Safe to run again. |
 | `stone check` | Validate the config, the profiles, and the manifest. Report drift between files and templates. **Built in v0.1 (no manifest or drift yet).** |
-| `stone check-writing` | Run K17 on files, on the changed lines since a base, or on a PR body. **Built in v0.1.** |
 | `stone review` | List the components past `review_by`. Exit code 1 if there are any. |
 | `stone eval <component-id>` | Run the component's eval with and without the component. (Later version.) |
 | `stone refresh <harness>` | Start the adapter-refresh profile for one harness. Framework repo only. (Later version.) |

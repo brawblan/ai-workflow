@@ -43,7 +43,7 @@ The rule: structure changes and behavior changes never go in the same commit.
 4. A human approves the plan (G2).
 5. For each task, start the implementer in a fresh session. It makes one structural step. All
    characterization tests MUST pass after each step.
-6. For a migration, run differential tests (K12). The old and the new code get the same inputs. They
+6. For a migration, run differential tests (K12): the old and the new code get the same inputs and
    must give the same outputs.
 7. For many files with the same change, fan out one session for each file or group. Test the
    prompt on 2 or 3 files first.

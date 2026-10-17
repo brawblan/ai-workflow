@@ -65,8 +65,8 @@ The words MUST, SHOULD, and MAY have the meanings in RFC 2119.
 
 ## P5. Each component earns its place
 
-- **Rule:** Each generated component MUST have a manifest entry. The entry has a purpose, an eval,
-  an owner, the tested models, and a review date. At the review date, the owner MUST remove the
+- **Rule:** Each generated component MUST have a manifest entry with a purpose, an eval, an owner,
+  the models it was tested on, and a review date. At the review date, the owner MUST remove the
   component or record new evidence that it helps.
 - **Reason:** What helps one model can hurt the next. Effects are seldom measured, and people feel
   faster when they are not.

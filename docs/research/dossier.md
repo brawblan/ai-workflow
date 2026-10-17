@@ -50,7 +50,7 @@ the workflow profiles where it applies, and the framework principle that it supp
 | --- | --- | --- | --- | --- |
 | B1 | Give the agent a check that it can run: tests, a build, a screenshot. Without a check, "looks done" is the only signal. | [S10] | ALL | P1 |
 | B2 | Verification must be outside the generation loop. Run the checks in a container. Mount the checks read-only, so the agent cannot change them. | [S1] | AS ST DB RM DU | P1, P2 |
-| B3 | If the AI writes the code and all the tests, the tests prove little. They show only that the code agrees with the AI's own reading of the task. | [S1] | AS ST DB RM | P2 |
+| B3 | If the AI writes the code and all the tests, the tests prove only that the code agrees with the AI's own reading of the task. | [S1] | AS ST DB RM | P2 |
 | B4 | In 26 prompt conditions with about 160 runs each, no technique name in the prompt made a large difference. TDD prompts gave more tests, but weak tests. | [S4] | ALL | P5, P6 |
 | B5 | Agents almost never built two independent implementations for differential tests. They often copied the same bug into both. | [S4] | DB RM | P2 |
 | B6 | Runs that used an independent sub-agent audit scored worse. Agents seldom did a fresh-context re-derivation when a skill only asked for it. | [S4] | ALL | P2 (risk) |
@@ -59,9 +59,9 @@ the workflow profiles where it applies, and the framework principle that it supp
 | B9 | In a long-running harness, the prompt forbids the coding agent to remove or edit tests. The agent changes only a `passes` field. | [S7] | FP AS | P2 |
 | B10 | Use a writer and a reviewer in separate sessions. A fresh context reviews better because it is not biased toward its own code. One session can write tests and another can write code. | [S10] | ALL | P2 |
 | B11 | A reviewer that you tell to find gaps always finds some. Tell it to report only gaps that affect correctness or the requirements. | [S10] | ALL | P2, P10 |
-| B12 | Agents fail in specific ways. They claim tests ran when they did not, and change files outside the scope. They weaken or remove assertions, hide errors, and add fixes nobody asked for. | [S3] [S23] | ALL | P1, P6 |
+| B12 | Agents fail in specific ways: they claim tests ran when they did not, change files outside the scope, weaken or delete assertions, hide errors, and add fixes nobody asked for. | [S3] [S23] | ALL | P1, P6 |
 | B13 | Mutation testing shows weak tests: if a small code change does not fail a test, the test is too weak. | [S1] [S27] | AS ST RM CA | P6 |
-| B14 | Choose the test technique by what you can state. Examples: an example (unit), a rule for all inputs (property), or an input format (fuzzing). Also a second implementation (differential), or a relation between inputs (metamorphic). | [S1] | DB RM CA | P6 |
+| B14 | Choose the test technique by what you can state: an example (unit), a rule for all inputs (property), an input format (fuzzing), a second implementation (differential), or a relation between inputs (metamorphic). | [S1] | DB RM CA | P6 |
 | B15 | Write tests in a different session from the code. | [S1] | AS ST DB RM | P2 |
 
 ### C. Structure and deterministic checks
