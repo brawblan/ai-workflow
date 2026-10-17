@@ -9,6 +9,8 @@ Use it with Claude Code, with other AI agents, or as notes to read.
 | [`plugins/workflow/skills/project-setup/templates/`](plugins/workflow/skills/project-setup/templates/) | Templates: constitution, repo `AGENTS.md`, user `AGENTS.md`, OpenSpec config | Anyone |
 | [`global/`](global/) | My personal rules (`AGENTS.md`) and Claude Code settings | Me. Copy what you like. |
 | [`docs/tips/`](docs/tips/) | How I work, and why | Anyone |
+| [`framework/`](framework/README.md) | Draft: the tool-neutral workflow framework (principles, profiles, gates, adapters) | Anyone |
+| [`docs/research/`](docs/research/dossier.md) | The cited research behind the framework | Anyone |
 
 ## The skills
 
