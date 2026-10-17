@@ -54,7 +54,7 @@ higher layer.
 4. Work with the generated skills, roles, hooks, and CI checks.
 5. Every 6 months, or when the model changes, run the lifecycle review.
 
-The generator is a design only in v0. See [generator/design.md](generator/design.md).
+The generator is mostly a design. The [`stone`](../stone/README.md) CLI has `stone check`. See [generator/design.md](generator/design.md).
 
 ## Decisions
 
