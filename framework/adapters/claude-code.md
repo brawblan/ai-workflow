@@ -2,6 +2,8 @@
 
 Status: draft v0. Facts marked `[TO CONFIRM]` must be tested on the current Claude Code version.
 
+Model profiles for this harness: [claude-code/models/](claude-code/models/claude-5.yaml).
+
 ## Mapping
 
 | Concept | Target | Support | Notes |
@@ -15,7 +17,7 @@ Status: draft v0. Facts marked `[TO CONFIRM]` must be tested on the current Clau
 | Select the role for a headless run | `[TO CONFIRM]` flag or setting that loads one agent file | partial | Fallback: pass the role file text with the prompt. |
 | Hook before a file edit | `PreToolUse` hook with matcher `Edit\|Write` in `.claude/settings.json`. Exit code 2 blocks the edit. | full | |
 | Hook before the session ends | `Stop` hook that runs the checks | full | Do not loop forever. The harness caps repeated blocks. |
-| Model for each role | `model` field in the role file | full | |
+| Model for each role | `model` field in the role file, from `defaults.role_models` in the model profile | full | |
 | Permissions | `permissions` allow and deny lists in `.claude/settings.json`, and sandbox mode | full | |
 | CI trigger | `anthropics/claude-code-action`, pinned to a commit SHA | full | |
 | CI authentication | Repository secret `[CLAUDE_CODE_OAUTH_TOKEN]`, made with `claude setup-token` | full | Uses the subscription, not an API key. `[TO CONFIRM]` usage limits for CI. |

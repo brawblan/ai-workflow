@@ -35,6 +35,7 @@ waiver with a reason.
 | [code-audit](profiles/code-audit.md) | human (scope) | — | — | human (which findings become tickets) | if needed |
 | [refactor-migration](profiles/refactor-migration.md) | human | human | yes | human | if needed |
 | [dependency-upgrade](profiles/dependency-upgrade.md) | — | — | yes | human (a repo waiver MAY skip it for patch versions) | if needed |
+| [adapter-refresh](profiles/adapter-refresh.md) | — | — | yes | human | if needed |
 | [spike](profiles/spike.md) | human (question and time box) | — | — | human (reads findings) | if needed |
 
 "If needed" means: G5 applies when the work includes a release or a destructive action. G5 is never

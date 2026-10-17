@@ -44,12 +44,13 @@ higher layer.
 | Lifecycle | [lifecycle.md](lifecycle.md) | The eval or sunset rules change. |
 | Customization | [customization.md](customization.md) | The override rules change. |
 | Adapters | [adapters/](adapters/contract.md) | A harness or a spec tool changes. Often. |
+| Model profiles | `adapters/<harness>/models/` | A vendor releases a model or new guidance. Most often. |
 | Generator | [generator/design.md](generator/design.md) | The file output changes. |
 
 ## How to use it (target state)
 
 1. Pick the profiles that a repo needs, and the modes that it allows.
-2. Run the generator in the repo with one harness adapter.
+2. Run the generator in the repo with one harness adapter and one model profile.
 3. Fill the repo config with the facts that the generator cannot find.
 4. Work with the generated skills, roles, hooks, and CI checks.
 5. Every 6 months, or when the model changes, run the lifecycle review.
@@ -65,6 +66,9 @@ The generator is a design only in v0. See [generator/design.md](generator/design
 | D3 | `cornerstone-setup` is the entry skill. It runs `project-setup` as its Shape step. `project-setup` stays usable alone. | [generator/design.md](generator/design.md) |
 | D4 | Default limits: 600 changed lines for a PR, 300 lines for the instruction file. A profile can tighten them. | [principles.md](principles.md), [customization.md](customization.md) |
 | D5 | A solo developer MAY pass G4 on their own human-centric work, after an agent review and with all checks passing. | [modes.md](modes.md#solo-developer) |
+| D6 | Model idioms live in a model profile under each harness adapter, not in the adapter itself. | [adapters/contract.md](adapters/contract.md#what-a-model-profile-must-provide) |
+| D7 | A scheduled adapter-refresh profile watches vendor releases and opens a refresh PR with eval results. | [profiles/adapter-refresh.md](profiles/adapter-refresh.md) |
+| D8 | All vendor adapters stay in the repo. A target repo selects one harness and one model profile. | [customization.md](customization.md) |
 
 ## Open questions
 

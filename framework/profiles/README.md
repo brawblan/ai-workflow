@@ -15,6 +15,7 @@ file has YAML frontmatter that the generator reads, and a body that people read.
 | [code-audit](code-audit.md) | Find defects, risks, and improvements in an area | agent-centric | none | G1 (scope) G4 (findings) | no | Reads K8 K9 K10 results |
 | [refactor-migration](refactor-migration.md) | Change structure, keep behavior | hybrid | Plan artifact | G1 G2 G3 G4 | yes | K8 K10 K12 |
 | [dependency-upgrade](dependency-upgrade.md) | Upgrade one dependency | agent-centric | Decision log | G3 G4 | yes | K4 K5 |
+| [adapter-refresh](adapter-refresh.md) | Update a model profile after a vendor release (framework repo only) | agent-centric | Decision log | G3 G4 | yes, adapter files only | Evals with and without each idiom |
 | [spike](spike.md) | Answer one question with throwaway code | human-centric | none | G1 (question) G4 (findings) | throwaway only | K16 |
 
 Baseline checks for each profile that changes code: K1 K2 K3 K6 K7 K9 K13 K14. See

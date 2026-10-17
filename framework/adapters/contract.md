@@ -9,6 +9,7 @@ to write files. The core does not change when an adapter changes (P12).
 | --- | --- | --- |
 | Harness adapter | Instruction file, skills, roles, hooks, sessions, triggers | [claude-code.md](claude-code.md) |
 | Spec-tool adapter | Plan artifact, progress file, plan approval | [spec-tools.md](spec-tools.md) (plain, OpenSpec) |
+| Model profile | The idioms of one model family inside one harness: prompt style, plan use, effort, role models, limits | [claude-code/models/claude-5.yaml](claude-code/models/claude-5.yaml) |
 
 ## What a harness adapter MUST provide
 
@@ -31,6 +32,22 @@ to write files. The core does not change when an adapter changes (P12).
 | Model choice for each role | optional | One model for all roles |
 | Permission allowlist and sandbox | partial or better | Run in a container with no secrets |
 | CI trigger (issue label, PR event, schedule) | full | none |
+
+## What a model profile MUST provide
+
+A model profile changes more often than a harness adapter. A new model from the same vendor changes
+only its model profile. Use [model-profile-template.yaml](model-profile-template.yaml).
+
+1. The exact model IDs that it covers.
+2. A source URL and a read date for each source.
+3. For each idiom: the area, one sentence of guidance, the source, the components that it affects,
+   and an eval (or empty, if not measured yet).
+4. A status: `proposed`, `active`, or `retired`. Only an `active` profile can be the default in a
+   target repo. A profile becomes `active` when the [adapter-refresh](../profiles/adapter-refresh.md)
+   evals support it.
+
+Path: `framework/adapters/<harness>/models/<model-family>.yaml`. All vendor adapters and model
+profiles stay in the repo. A target repo selects one of each in its config.
 
 ## What a spec-tool adapter MUST provide
 

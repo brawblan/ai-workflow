@@ -8,7 +8,7 @@ defines where specificity goes and which layer wins.
 | Order | Layer | Where | Example content |
 | --- | --- | --- | --- |
 | 1 | Framework core | `framework/` in this repo | Principles, gates, profiles |
-| 2 | Adapter | `framework/adapters/<name>.md` and its templates | File paths and formats for one harness |
+| 2 | Adapter and model profile | `framework/adapters/<name>.md`, its templates, and `framework/adapters/<name>/models/` | File paths for one harness. Idioms and role models for one model family. |
 | 3 | Repo config | `.cornerstone/config.yaml` in the target repo | Commands, paths, limits, owners |
 | 4 | Profile override | `.cornerstone/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
 | 5 | Task | The ticket fields | Acceptance criteria, non-goals, a mode, a waiver |
@@ -28,6 +28,7 @@ A later layer wins over an earlier layer, with these limits:
 ```yaml
 framework_version: 0.1.0           # tag of brawblan/ai-workflow
 harness: <harness-adapter-name>    # a file name in framework/adapters/
+model_profile: <model-family>      # a file in framework/adapters/<harness>/models/
 spec_tool: plain                   # plain, or a spec-tool adapter name
 profiles: [single-ticket, bug-triage, debugging]
 branches:

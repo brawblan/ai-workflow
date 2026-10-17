@@ -10,7 +10,7 @@ and the repo config. The same inputs MUST give the same files.
 | Item | Value |
 | --- | --- |
 | Trigger | A person runs the CLI, or the `cornerstone-setup` skill runs it |
-| Inputs | `framework/` (this repo, at a version tag), `.cornerstone/config.yaml`, profile overrides |
+| Inputs | `framework/` (this repo, at a version tag), the selected harness adapter and model profile, `.cornerstone/config.yaml`, profile overrides |
 | Outputs | Instruction file, skills, roles, hooks, CI workflows, check scripts, templates, `.cornerstone/manifest.yaml` |
 | Owner | brawblan |
 
@@ -35,6 +35,7 @@ repo config.
 | `stone check` | Validate the config, the profiles, and the manifest. Report drift between files and templates. |
 | `stone review` | List the components past `review_by`. Exit code 1 if there are any. |
 | `stone eval <component-id>` | Run the component's eval with and without the component. (Later version.) |
+| `stone refresh <harness>` | Start the adapter-refresh profile for one harness. Framework repo only. (Later version.) |
 
 ## Constraints
 

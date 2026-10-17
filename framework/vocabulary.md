@@ -28,6 +28,9 @@ harness feature.
 | component | Any rule, skill, role, hook, check, or CI job that the generator makes. | asset |
 | manifest | The file in the target repo that lists each component and its lifecycle data. | registry |
 | adapter | The mapping from the neutral core to one harness or one tool. | plugin, driver |
+| model profile | The idioms and defaults of one model family inside one harness adapter. | model config |
+| idiom | One piece of vendor guidance for a model, with a source and an eval. | tip, trick |
+| vendor | The company that releases a model or a harness. | provider |
 | trigger | The event that starts a profile (a command, a label, a schedule, a CI event). | entry point |
 | protected path | A path that a role must not change (for example tests for the implementer). | locked file |
 | waiver | A recorded reason to skip a gate or a limit for one item. | exception, override |

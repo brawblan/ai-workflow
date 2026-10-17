@@ -129,7 +129,9 @@ The words MUST, SHOULD, and MAY have the meanings in RFC 2119.
 ## P12. Neutral core, thin adapters
 
 - **Rule:** Files in `framework/` outside `adapters/` MUST NOT name a harness, a model, or a spec
-  tool. Each harness or tool detail MUST be in an adapter.
+  tool. Each harness or tool detail MUST be in an adapter. Each model idiom MUST be in a model
+  profile with a source and a read date. When a vendor releases a new model, the adapter-refresh
+  profile updates the model profile. The core does not change.
 - **Reason:** Harnesses and tools change faster than principles.
-- **Evidence:** A13, A14, E7, E10, E11, H5.
+- **Evidence:** A13, A14, E7, E10, E11, G5, H5.
 - **Enforce:** A text check on `framework/` for harness and tool names, with `adapters/` excluded.

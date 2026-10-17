@@ -1,0 +1,79 @@
+# Model profile: Claude 5 family in Claude Code.
+# Status is "proposed": no idiom has an eval yet. The adapter-refresh profile adds evals.
+
+id: claude-5
+vendor: anthropic
+harness: claude-code
+models: [claude-opus-5-5, claude-sonnet-5-5]   # from global/settings.json in this repo
+status: proposed
+reviewed: 2026-10-17
+sources:
+  - url: https://code.claude.com/docs/en/best-practices
+    read: 2026-10-17
+  - url: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
+    read: 2026-10-17
+  - url: https://anthropic.com/engineering/effective-context-engineering-for-ai-agents
+    read: 2026-10-17
+
+defaults:
+  role_models:                     # all roles use the model in global/settings.json until evals show a cheaper fit
+    shaper: claude-opus-5-5
+    planner: claude-opus-5-5
+    implementer: claude-opus-5-5
+    tester: claude-opus-5-5
+    reviewer: claude-opus-5-5
+    investigator: claude-opus-5-5
+  effort:
+    planner: high
+    implementer: high
+  instruction_file_max_lines: 300
+
+idioms:
+  - id: verify-loop
+    area: tests
+    guidance: Give the agent a check that it can run, and ask for the check output as evidence.
+    source: https://code.claude.com/docs/en/best-practices
+    affects: [role.implementer, role.tester]
+    eval: ""
+
+  - id: plan-only-when-unsure
+    area: planning
+    guidance: Skip a plan when the diff fits in one sentence. Plan when the approach is unclear or many files change.
+    source: https://code.claude.com/docs/en/best-practices
+    affects: [role.planner]
+    eval: ""
+
+  - id: prune-instruction-file
+    area: instructions
+    guidance: Keep only lines whose removal causes mistakes. Use emphasis such as IMPORTANT on one line at most.
+    source: https://code.claude.com/docs/en/best-practices
+    affects: [instruction.repo]
+    eval: ""
+
+  - id: fresh-context-review
+    area: sessions
+    guidance: Review in a fresh context. Tell the reviewer to report only gaps that affect correctness or the requirements.
+    source: https://code.claude.com/docs/en/best-practices
+    affects: [role.reviewer]
+    eval: ""
+
+  - id: hooks-over-rules
+    area: tools
+    guidance: Use a hook for an action that must happen each time. Instructions are advisory.
+    source: https://code.claude.com/docs/en/best-practices
+    affects: [hook.protect-paths, hook.stop-checks]
+    eval: ""
+
+  - id: concise-skills
+    area: skills
+    guidance: Write only what the model does not know. Keep SKILL.md under 500 lines and references one level deep.
+    source: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
+    affects: [skill]
+    eval: ""
+
+  - id: detail-by-model-size
+    area: skills
+    guidance: A smaller model can need more detail. A larger model can need less explanation. Test each skill on each model in role_models.
+    source: https://platform.claude.com/docs/en/agents-and-tools/agent-skills/best-practices
+    affects: [skill]
+    eval: ""

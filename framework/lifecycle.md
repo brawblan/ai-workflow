@@ -31,6 +31,7 @@ components:
 | --- | --- |
 | `review_by` date passes | Review the component (procedure below). |
 | The model changes for a role | Run all evals for components that the role uses. |
+| A vendor releases a new model, or a model profile changes | Run the [adapter-refresh](profiles/adapter-refresh.md) profile. |
 | The harness version changes in a major way | Run all evals. |
 | An eval fails 2 runs in a row | Review the component. |
 | A human edits a generated file | The generator reports drift. The owner decides: keep the edit in the repo config, or discard it. |
