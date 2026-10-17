@@ -1,8 +1,6 @@
 # Cornerstone: the agent workflow framework
 
-> "The stone which the builders refused is become the head stone of the corner." (Psalm 118:22)
->
-> The principles are the cornerstone. Each profile, adapter, and generated file aligns to them.
+The principles are the cornerstone. Each profile, adapter, and generated file aligns to them.
 
 Status: draft v0 (2026-10-17). Evidence: [docs/research/dossier.md](../docs/research/dossier.md).
 
