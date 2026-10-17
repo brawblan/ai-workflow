@@ -176,6 +176,7 @@ the workflow profiles where it applies, and the framework principle that it supp
 | 6 | Minimal merge gates [S12] **against** three gates before human attention [S3]. | The profile and the repo risk decide. Gate G3 (checks) is always on. The human PR gate is optional only for profiles with low risk and only when the repo config allows it. |
 | 7 | Developers feel faster [S16] **against** measured slowdown [S16] [S17]. | Measure outcomes. The framework tracks lead time, rework, escaped defects, review time, and cost for each merged PR. |
 | 8 | Write no code by hand [S2] [S12] **against** the human as an active pair [S23]. | Both are valid. They are presets. The [mode](../../framework/modes.md) selects the driver of each stage. The gates do not change with the mode. |
+| 9 | Controlled language such as ASD-STE100 removes ambiguity [S1] **against** explicit text has limited, model-tied effects [S1] [S4]. | STE applies to human-facing text, where the reader is a person. Agent-facing text uses STE only where an eval shows a gain. Review time, rework, and a quarterly blind A/B decide if STE stays. See [writing.md](../../framework/writing.md). |
 
 ## 3. Gap analysis of this repo (brawblan/ai-workflow, v0.2.1)
 

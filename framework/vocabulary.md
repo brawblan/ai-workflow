@@ -34,3 +34,6 @@ harness feature.
 | trigger | The event that starts a profile (a command, a label, a schedule, a CI event). | entry point |
 | protected path | A path that a role must not change (for example tests for the implementer). | locked file |
 | waiver | A recorded reason to skip a gate or a limit for one item. | exception, override |
+| writing standard | The rules for human-facing text. The default is ASD-STE100 (STE). | style guide |
+| human-facing text | Text whose main reader is a person (PR body, plan, report, reply). | docs (in general) |
+| project dictionary | A repo file that gives each domain term one meaning. | glossary |

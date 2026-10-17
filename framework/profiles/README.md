@@ -18,8 +18,8 @@ file has YAML frontmatter that the generator reads, and a body that people read.
 | [adapter-refresh](adapter-refresh.md) | Update a model profile after a vendor release (framework repo only) | agent-centric | Decision log | G3 G4 | yes, adapter files only | Evals with and without each idiom |
 | [spike](spike.md) | Answer one question with throwaway code | human-centric | none | G1 (question) G4 (findings) | throwaway only | K16 |
 
-Baseline checks for each profile that changes code: K1 K2 K3 K6 K7 K9 K13 K14. See
-[checks.md](../checks.md).
+Baseline checks for each profile that changes code: K1 K2 K3 K6 K7 K9 K13 K14 K17. Each profile
+that only writes reports or labels runs K17. See [checks.md](../checks.md).
 
 Each profile can run in each mode. The default mode is a starting point. See [modes.md](../modes.md)
 for the stage drivers of each mode, and [customization.md](../customization.md) to change the mode.

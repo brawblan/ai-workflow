@@ -14,7 +14,7 @@ gates:
   G3: skip
   G4: human
   G5: if-needed
-checks: [K13, K16]
+checks: [K13, K16, K17]
 limits: {}
 outputs: [report]
 ---

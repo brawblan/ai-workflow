@@ -98,4 +98,4 @@ the trailers for human commits.
 | `ticket-delivery` | Verify, Deliver | Use the tester and reviewer output as evidence. Do not self-verify. |
 | `dev-pr` | Deliver | Add the PR evidence sections (K14). |
 | `backlog-sequencer` | Intake | No change. |
-| `ste-writing` | Cross-cutting | Add an eval. |
+| `ste-writing` | Writing standard ([writing.md](../writing.md)) | Load it in each role that writes human-facing text. Add the blind A/B eval. K17 covers the measurable rules. |

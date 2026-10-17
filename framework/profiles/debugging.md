@@ -14,7 +14,7 @@ gates:
   G3: required
   G4: human
   G5: if-needed
-checks: [K1, K2, K3, K6, K7, K9, K12, K13, K14]
+checks: [K1, K2, K3, K6, K7, K9, K12, K13, K14, K17]
 limits:
   pr_changed_lines: 200
 outputs: [pr]
@@ -61,7 +61,7 @@ the fix.
 | --- | --- |
 | The defect cannot be reproduced in a test | Stop. Record what was tried. A human decides. |
 | The fix needs a design change | Stop. Open an [app-slice](app-slice.md) or [refactor-migration](refactor-migration.md) ticket. |
-| The fix weakens or deletes an assertion | K6 fails or the reviewer flags it. Reject the change. |
+| The fix weakens or removes an assertion | K6 fails or the reviewer flags it. Reject the change. |
 
 ## Evidence
 

@@ -42,6 +42,7 @@ higher layer.
 | Modes | [modes.md](modes.md) | The stage drivers of a preset change. |
 | Profiles | [profiles/](profiles/README.md) | A workflow type is added or tuned. |
 | Lifecycle | [lifecycle.md](lifecycle.md) | The eval or sunset rules change. |
+| Writing | [writing.md](writing.md) | The evidence for the writing standard changes. |
 | Customization | [customization.md](customization.md) | The override rules change. |
 | Adapters | [adapters/](adapters/contract.md) | A harness or a spec tool changes. Often. |
 | Model profiles | `adapters/<harness>/models/` | A vendor releases a model or new guidance. Most often. |
@@ -69,6 +70,9 @@ The generator is a design only in v0. See [generator/design.md](generator/design
 | D6 | Model idioms live in a model profile under each harness adapter, not in the adapter itself. | [adapters/contract.md](adapters/contract.md#what-a-model-profile-must-provide) |
 | D7 | A scheduled adapter-refresh profile watches vendor releases and opens a refresh PR with eval results. | [profiles/adapter-refresh.md](profiles/adapter-refresh.md) |
 | D8 | All vendor adapters stay in the repo. A target repo selects one harness and one model profile. | [customization.md](customization.md) |
+| D9 | Human-facing text follows ASD-STE100. Agent-facing text uses STE only where an eval shows a gain. | [writing.md](writing.md#scope) |
+| D10 | Check K17 tests the measurable STE rules and warns for 2 weeks, then blocks. The writing skill covers the rest. | [writing.md](writing.md#enforcement) |
+| D11 | STE stays only while review time, rework, and a quarterly blind A/B show that it helps. | [writing.md](writing.md#evidence-p5) |
 
 ## Open questions
 

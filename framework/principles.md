@@ -66,7 +66,7 @@ The words MUST, SHOULD, and MAY have the meanings in RFC 2119.
 ## P5. Each component earns its place
 
 - **Rule:** Each generated component MUST have a manifest entry with a purpose, an eval, an owner,
-  the models it was tested on, and a review date. At the review date, the owner MUST delete the
+  the models it was tested on, and a review date. At the review date, the owner MUST remove the
   component or record new evidence that it helps.
 - **Reason:** What helps one model can hurt the next. Effects are seldom measured, and people feel
   faster when they are not.
@@ -123,8 +123,9 @@ The words MUST, SHOULD, and MAY have the meanings in RFC 2119.
   MUST attach the evidence for each acceptance criterion. It MUST state its confidence and the
   open risks.
 - **Reason:** A reviewer checks evidence faster than they repeat the work.
-- **Evidence:** A10, D3, F7.
-- **Enforce:** PR template sections. A check that the sections are not empty.
+- **Evidence:** A10, D3, D7, F7, H1.
+- **Enforce:** PR template sections. A check that the sections are not empty (K14). Human-facing
+  text follows the [writing standard](writing.md) (K17).
 
 ## P12. Neutral core, thin adapters
 

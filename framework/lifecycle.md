@@ -40,13 +40,13 @@ components:
 
 1. Run the component's eval with the component and without it.
 2. Compare the results. Use the same tasks and the same model.
-3. If the component does not improve the result, delete it.
+3. If the component does not improve the result, remove it.
 4. If the component improves the result, set `review_by` to 6 months later.
 5. If the component is a rule or a skill, read `why_not_a_check` again. If a check can now do the
    job, replace the component with a check.
 6. Record the result in the manifest and in the PR that changes it.
 
-> CAUTION: Do not delete a check only because its eval is missing. A check is its own test. Review a
+> CAUTION: Do not remove a check only because its eval is missing. A check is its own test. Review a
 > check for false positives and for cost instead.
 
 ## Eval design
@@ -59,6 +59,7 @@ components:
 | Consistency | Report pass^k (all k trials pass) for roles in CI. | G7 |
 | Cost | Record tokens and time for each run. A component that adds cost with no gain fails. | G3 |
 | Transcripts | Read some transcripts at each review. A score alone can hide a bad grader. | G6 |
+| Human readers | For a component that changes human-facing text, use a blind A/B rating by a human. See [writing.md](writing.md#evidence-p5). | G8 |
 | Models | Run the eval on each model that the repo uses for that role. | G5 |
 
 Default eval folder: `evals/<component-id>/` with `scenarios.yaml` and a grader script.

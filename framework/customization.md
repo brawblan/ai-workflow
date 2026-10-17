@@ -57,6 +57,11 @@ owners:
 modes_allowed: [agent-centric, hybrid, human-centric]   # the generator renders files for these
 modes:                             # optional: change the default preset of a profile
   single-ticket: agent-centric
+writing:
+  standard: ste                    # see writing.md
+  dictionary: docs/style/ste.md    # optional project dictionary
+  max_words_procedure: 20
+  max_words_description: 25
 waivers: []
 ```
 
