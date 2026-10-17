@@ -1,0 +1,32 @@
+# Model profile template.
+# Copy to framework/adapters/<harness>/models/<model-family>.yaml.
+# A model profile holds the idioms of one model family: how its vendor says to prompt and use it.
+# Each idiom has a source and the date the source was read. An idiom with no eval is a proposal only.
+
+id: <model-family>                 # for example: <vendor>-<family>
+vendor: <vendor>
+harness: <harness-adapter-name>
+models: [<model-id>]               # the exact model IDs that this profile covers
+status: proposed                   # proposed | active | retired
+reviewed: <YYYY-MM-DD>             # last refresh
+sources:
+  - url: <vendor release notes or best-practice page>
+    read: <YYYY-MM-DD>
+
+defaults:                          # values that the generator renders into role files and limits
+  role_models:                     # model for each role; empty = harness default
+    planner: <model-id>
+    implementer: <model-id>
+    tester: <model-id>
+    reviewer: <model-id>
+  effort:                          # reasoning effort, if the harness supports it
+    planner: <low | medium | high>
+  instruction_file_max_lines: 300
+
+idioms:
+  - id: <short-id>
+    area: instructions             # instructions | planning | effort | prompts | tools | sessions | tests | skills
+    guidance: <One sentence. What to do with this model.>
+    source: <url>
+    affects: [<component ids or kinds>]
+    eval: <evals/<id>/ or empty>   # empty = not measured yet
