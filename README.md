@@ -11,7 +11,7 @@ Use it with Claude Code, with other AI agents, or as notes to read.
 | [`docs/tips/`](docs/tips/) | How I work, and why | Anyone |
 | [`framework/`](framework/README.md) | Draft: Cornerstone, the tool-neutral workflow framework (principles, modes, profiles, gates, adapters) | Anyone |
 | [`docs/research/`](docs/research/dossier.md) | The cited research behind the framework | Anyone |
-| [`stone/`](stone/README.md) | The Cornerstone CLI: `stone check` validates the framework | Anyone |
+| [`stone/`](stone/README.md) | The Cornerstone CLI: `stone check` and the K17 writing check | Anyone |
 
 ## The skills
 

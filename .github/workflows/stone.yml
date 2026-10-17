@@ -1,4 +1,4 @@
-# Cornerstone checks on this repo: unit tests and stone check.
+# Cornerstone checks on this repo: unit tests, stone check, and K17 (writing standard).
 name: stone
 
 on:
@@ -14,6 +14,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0 # K17 needs the base branch to find the changed lines
 
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
@@ -27,3 +29,19 @@ jobs:
 
       - name: stone check
         run: stone check --format github
+
+      # K17 warns for 2 weeks after this workflow merges, then blocks (framework/writing.md).
+      # To block, change --mode warn to --mode block in both K17 steps.
+      - name: K17 on changed lines
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: stone check-writing --diff "origin/${BASE_REF}" --mode warn --format github
+
+      - name: K17 on the PR body
+        if: github.event_name == 'pull_request'
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
+          stone check-writing "$RUNNER_TEMP/pr-body.md" --mode warn --format github
