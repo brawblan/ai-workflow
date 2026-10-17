@@ -1,0 +1,29 @@
+# Cornerstone checks on this repo: unit tests and stone check.
+name: stone
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  stone:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Install stone
+        run: pip install ./stone
+
+      - name: Unit tests
+        run: python -m unittest discover -s stone/tests
+
+      - name: stone check
+        run: stone check --format github
