@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from stone import __version__, evidence_check, framework_check, render, specs, writing_check
+from stone import __version__, evals, evidence_check, framework_check, render, specs, writing_check
 from stone.findings import report
 
 
@@ -58,6 +58,23 @@ def _parser() -> argparse.ArgumentParser:
     evidence.add_argument("--mode", choices=["warn", "block"], default="warn",
                           help="warn: report only (the first 2 weeks). block: fail on findings.")
     evidence.add_argument("--format", choices=["text", "github"], default="text")
+
+    run = commands.add_parser("eval", help="Run the eval of one component, with it and without it.")
+    run.add_argument("component", help="The component ID, for example role.tester.")
+    run.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    run.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
+    run.add_argument("--scenario", action="append", metavar="ID",
+                     help="Run only this scenario. Repeat for more. Default: all.")
+    run.add_argument("--variant", choices=["with", "without", "both"], default="both")
+    run.add_argument("--trials", type=int, default=1, help="Runs for each scenario and variant.")
+    run.add_argument("--model", help="Default: the role model in the model profile.")
+    run.add_argument("--budget", default="5", help="The cost limit for each run. Default: 5.")
+    run.add_argument("--timeout", type=int, default=1800, help="Seconds for each run.")
+    run.add_argument("--run-config", type=Path,
+                     help="The harness command file. Default: the eval.yaml of the adapter.")
+    run.add_argument("--keep", action="store_true", help="Keep the workspace of each run.")
+    run.add_argument("--check-only", action="store_true",
+                     help="Validate the scenarios and list the runs. Start no run.")
     return parser
 
 
@@ -74,6 +91,8 @@ def main(argv: list[str] | None = None) -> int:
         return _spec(args.root, args.spec_command, getattr(args, "plan", ""))
     if args.command == "check-evidence":
         return _check_evidence(args.body, args.section, args.mode, args.format)
+    if args.command == "eval":
+        return _eval(args)
 
     rules_path = args.rules or args.root / writing_check.DEFAULT_RULES
     dictionary = args.dictionary or args.root / writing_check.DEFAULT_DICTIONARY
@@ -116,6 +135,28 @@ def _check_evidence(body: str, sections: list[str] | None, mode: str, fmt: str) 
     blocking = report(findings, fmt, warn_only=mode == "warn")
     print(f"K14: {len(findings)} finding(s), mode {mode}.")
     return 1 if blocking else 0
+
+
+def _eval(args: argparse.Namespace) -> int:
+    if args.trials < 1:
+        print("stone eval: --trials must be 1 or more.")
+        return 2
+    try:
+        runs, result = evals.run_eval(
+            args.root, args.component, framework=args.framework, scenario_ids=args.scenario,
+            variant=args.variant, trials=args.trials, model=args.model, budget=args.budget,
+            timeout=args.timeout, run_config=args.run_config, keep=args.keep,
+            check_only=args.check_only)
+    except (evals.EvalError, render.RenderError) as error:
+        print(f"stone eval: {error}")
+        return 2
+    if args.check_only:
+        print("stone eval: the scenarios are valid.")
+        return 0
+    failed = [run for run in runs if run.variant == "with" and not run.passed()]
+    print(f"stone eval: {len(runs)} run(s), {len(failed)} failed with the component. "
+          f"Results: {result}")
+    return 1 if failed else 0
 
 
 def _render(root: Path, framework: Path | None, dry_run: bool) -> int:

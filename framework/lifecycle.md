@@ -89,6 +89,84 @@ If the specs do not help, stop the deltas. The applied specs stay as documentati
 
 Default eval folder: `evals/<component-id>/` with `scenarios.yaml` and a grader script.
 
+### Scenario format
+
+The folder name comes from the `eval` field of the component in the adapter component list.
+
+```yaml
+component: role.tester
+role: tester
+task: Write tests for this ticket.     # added before each prompt, in both variants
+scenarios:
+  - id: T1
+    title: Tests for each criterion of a pure function
+    fixture: fixtures/slugify          # copied to a new git repo, committed as the base
+    change: fixtures/slugify.diff      # optional: committed as an implementer commit
+    prompt: |
+      Ticket SLUG-1: ...
+    expect:
+      - {check: unchanged, paths: [src/]}
+      - {check: grader, name: kills_mutants, min: 2}
+      - {check: commit_trailer, trailer: "Role: tester", kind: contract}
+```
+
+| Check | Passes if |
+| --- | --- |
+| `file_exists`, `file_absent` | A file matches the glob `path`, or no file matches it. |
+| `unchanged` | The run changed no file under `paths`. |
+| `only_changed` | The run changed files only under `paths`. |
+| `matches` | The regex `pattern` is in `path`. The path `@report` is the final text of the run. |
+| `sections_in_order` | The headings of `path` contain each name in `sections`, in that order. |
+| `json_valid` | `path` is a JSON object with each key in `required`. |
+| `command` | The command `run` exits with the code `exit` (default 0). |
+| `commit_trailer` | A commit of the run has the line `trailer`. |
+| `spec_delta_valid` | `path` is a spec delta with no format error. |
+| `grader` | `grade.py <name> --workspace <path> --args <json>` prints `{"pass": true}` as its last line. |
+
+Each check has a `kind`:
+
+- `outcome` (default): the check tests behavior. A run without the component can pass it.
+- `contract`: the check tests the output format of the component. A run without the component
+  cannot know it.
+
+The two variants get the same prompt, tools, and hook. The only difference is the component file.
+The report gives the outcome pass rate and the contract pass rate in different columns. Use the
+outcome rate to compare the variants.
+
+### Runner
+
+`stone eval <component-id>` does these steps for each scenario, variant, and trial (D26):
+
+```mermaid
+flowchart LR
+  A[Copy the fixture to a temp git repo] --> B[Render the repo config]
+  B --> C[Remove the component file for 'without']
+  C --> D[Commit the change of the scenario]
+  D --> E[Start the harness: adapter eval.yaml]
+  E --> F[Run the checks and grade.py]
+  F --> G[Record pass, tokens, cost, and time]
+```
+
+- The workspace is in the system temp folder, so that no instruction file in a parent folder goes
+  into the run.
+- The harness adapter gives the command for each variant in `eval.yaml`. The core has no harness
+  name (P12). The `output` map of `eval.yaml` uses these names: `report` (the final text),
+  `cost_usd`, `input_tokens`, `output_tokens`, and `turns`. The table shows "—" for a name that is
+  not in the map.
+- The runner reads the last JSON object of the harness output. If `eval.yaml` has `output_where`,
+  it reads the last object with those keys and values.
+- The setup commits the fixture on `main`. Then the work continues on the branch
+  `feature/eval-work`, because a role does not commit to the default branch.
+- Git in the workspace does not read the global or the system git config. Thus each machine gives
+  the same result. Add a `.gitignore` to each fixture for the files that a build or a test writes,
+  for example a bytecode cache. If not, `unchanged` and `only_changed` count those files.
+- A run stops at `--timeout`, with each process that the harness started.
+- The runner cannot yet remove a component that is merged into a shared file. For that component,
+  use `--variant with`.
+- The runner writes the transcripts and `runs.jsonl` to `.cornerstone/eval-runs/`. Do not commit
+  them. It writes the result table to `evals/results/`. Add the table to the PR.
+- Use `--check-only` to validate the scenarios without a run.
+
 ## Metrics for each profile
 
 Collect these for each merged item. Record the mode and the stage drivers with each item. Compare

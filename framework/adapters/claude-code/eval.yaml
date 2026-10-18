@@ -1,0 +1,32 @@
+# How `stone eval` starts one headless role run in this harness (lifecycle.md, "Eval design").
+# stone fills $role, $model, $budget, and $prompt. An argument that is only $tools becomes the
+# tool list of the role. The two variants differ only in --agent: the role file is also removed
+# from the workspace for "without". The hook and the tools stay the same in both variants.
+
+run:
+  with: [claude, -p, --agent, $role, --model, $model, --output-format, stream-json, --verbose,
+         --permission-mode, acceptEdits, --setting-sources, project, --max-budget-usd, $budget,
+         --allowedTools, $tools, --, $prompt]
+  without: [claude, -p, --model, $model, --output-format, stream-json, --verbose,
+            --permission-mode, acceptEdits, --setting-sources, project, --max-budget-usd, $budget,
+            --allowedTools, $tools, --, $prompt]
+
+env:   # the protected-path hook reads the role from STONE_ROLE in both variants
+  with: {STONE_ROLE: $role}
+  without: {STONE_ROLE: $role}
+
+tools:   # the same lists as the role files, plus the commands that the role runs
+  planner: [Read, Grep, Glob, Write]
+  tester: [Read, Grep, Glob, Edit, Write, "Bash(python -m unittest*)", "Bash(git diff*)",
+           "Bash(git log*)", "Bash(git show*)", "Bash(git add*)", "Bash(git commit*)",
+           "Bash(git status*)"]
+
+output_where: {type: result}   # use the last JSON object with these keys and values
+
+output:   # dotted paths in the last JSON object of the output (the "result" event).
+          # stone reads these names: report, cost_usd, input_tokens, output_tokens, turns.
+  report: result
+  cost_usd: total_cost_usd
+  input_tokens: usage.input_tokens
+  output_tokens: usage.output_tokens
+  turns: num_turns
