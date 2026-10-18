@@ -22,7 +22,7 @@ checks for the profile in CI. Each check SHOULD also run on the developer's mach
 | K13 | Secret scan | A secret or token is in the diff. | yes | gitleaks, platform secret scanning |
 | K14 | PR evidence | A required PR section (evidence, decision log, review findings, confidence) is missing or empty. | yes | `stone check-evidence` |
 | K15 | Instruction size | The instruction file is over the line limit (`instruction_file_max_lines` in the model profile). The adapter names the instruction file. | yes | script in the generator output |
-| K16 | No merge to main | A branch from a spike targets the main branch. | spike profile | branch protection, script |
+| K16 | No merge to main | A spike branch targets the main or the integration branch. | spike profile | branch protection, script |
 | K17 | Writing standard | New or changed human-facing text breaks a measurable rule. See [writing.md](writing.md#what-k17-tests). | yes, also for profiles that only write reports | script in the generator output |
 | K18 | Persona references | The personas file breaks the format in [workflow-model.md](workflow-model.md#personas), or a plan names a persona or a job story that the file does not have. | by profile | `stone check` |
 | K19 | Spec replay | A spec delta breaks the format in [workflow-model.md](workflow-model.md#specs). Two applied deltas have the same `apply_order`. A spec is not the same as a replay of the applied deltas. | by profile | `stone check` |
@@ -35,14 +35,18 @@ K4, K5, K8, K10, K11, and K12 run a repo tool. The repo config gives the command
 
 K16 is the control that stops spike code from merging. The protected-path hook trusts the branch
 name (D25). On a branch with the `spike/` prefix, the investigator can write any file except the
-harness and Cornerstone files. K16 fails a pull request from that branch into the main branch.
+harness and Cornerstone files. K16 fails a pull request from that branch into the main branch or
+the integration branch (D33). Thus spike code cannot get to the main branch through the integration
+branch.
 
 - `stone render` writes K16 as a CI job for each profile that lists K16 (D30).
+- Render needs `branches.main` and `branches.integration`. The two can be the same branch.
 - The job runs from the base branch, so a commit on the spike branch cannot change or remove it.
 - K16 blocks from the start. A warning does not stop a merge, and D25 depends on K16.
-- Make the K16 job a required status check on the main branch.
-- K16 reads only the branch name. If a person renames a spike branch, K16 does not see it. Gate G4
-  is then the control.
+- Make the K16 job a required status check on the main branch and on the integration branch.
+- K16 reads only the head branch name. It does not find spike commits on a branch with a different
+  name (D33). Examples: a renamed spike branch, or a spike branch merged into a feature branch. Gate
+  G4 is then the control. Do not merge a spike branch into a different branch.
 
 ## Choose a test technique by what you can state
 

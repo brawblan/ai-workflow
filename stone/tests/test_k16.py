@@ -1,8 +1,10 @@
-"""Tests for K16: no merge to main from a spike branch (roadmap 6e, D30).
+"""Tests for K16: no merge to main from a spike branch (roadmap 6e, D30, D33).
 
 Each test renders into a temporary repo with the real framework in this repo. The behavior tests
 take the `run:` script out of the rendered workflow and run it with bash, as the CI runner does.
 This file is self-contained on purpose: sibling PRs add other render tests at the same time.
+The `test_d33_cN_` tests cover criterion N of the D33 ticket: K16 also blocks a spike PR into
+branches.integration.
 """
 
 from __future__ import annotations
@@ -252,6 +254,7 @@ class K16WorkflowShapeTest(K16Base):
         self.assertEqual(env["HEAD_REF"].replace(" ", ""), "${{github.head_ref}}")
         self.assertEqual(env["BASE_REF"].replace(" ", ""), "${{github.base_ref}}")
         self.assertEqual(env["MAIN_BRANCH"], "main")
+        self.assertEqual(env["INTEGRATION_BRANCH"], "dev")
 
     def test_ac2_no_github_expression_outside_env(self) -> None:
         # The only expressions in the file are the two env values.
@@ -304,7 +307,8 @@ class K16BehaviorTest(K16Base):
     def run_step(self, head: str, base: str) -> subprocess.CompletedProcess:
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"),
                "HEAD_REF": head, "BASE_REF": base,
-               "MAIN_BRANCH": str(self.step["env"]["MAIN_BRANCH"])}
+               "MAIN_BRANCH": str(self.step["env"]["MAIN_BRANCH"]),
+               "INTEGRATION_BRANCH": str(self.step["env"]["INTEGRATION_BRANCH"])}
         return subprocess.run([BASH, "-e", "-c", self.step["run"]], cwd=self.work, env=env,
                               capture_output=True, text=True)
 
@@ -328,7 +332,8 @@ class K16BehaviorTest(K16Base):
                                                       "new branch")), line)
 
     def test_ac3_spike_into_another_base_passes(self) -> None:
-        for base in ("dev", "feature/x", "spike/other"):
+        # `dev` is the integration branch here, so a spike PR into it fails (D33).
+        for base in ("feature/x", "spike/other", "develop"):
             with self.subTest(base=base):
                 run = self.run_step("spike/can-x-do-y", base)
                 self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
@@ -364,11 +369,12 @@ class K16BehaviorTest(K16Base):
         names = ["spike/$(touch pwn)", "spike/`touch pwn`", 'spike/";touch pwn;"',
                  "spike/${IFS}x$(touch${IFS}pwn)", "feature/$(touch pwn)"]
         for head in names:
-            for base in (self.main_branch, "dev"):
+            for base in (self.main_branch, "dev", "feature/y"):
                 with self.subTest(head=head, base=base):
                     run = self.run_step(head, base)
                     self.assertFalse((self.work / "pwn").exists(), (head, base))
-                    want_fail = head.startswith("spike/") and base == self.main_branch
+                    # `dev` is the integration branch, so a spike PR into it fails too (D33).
+                    want_fail = head.startswith("spike/") and base in (self.main_branch, "dev")
                     self.assertEqual(run.returncode != 0, want_fail, run.stdout + run.stderr)
 
     def test_ac3_shell_text_in_the_base_name_does_not_run(self) -> None:
@@ -632,7 +638,8 @@ class K16QuotedMainBranchTest(K16Base):
                 self.configure_main(config_value)
                 self.render()
                 # Near names: the name without its special text, and the YAML-quoted text.
-                for head, base in (("feature/x", name), ("spike/x", "dev"),
+                # `dev` is the integration branch, so the other base is feature/y (D33).
+                for head, base in (("feature/x", name), ("spike/x", "feature/y"),
                                    ("spike/x", "rel"), ("spike/x", config_value),
                                    ("spike/x", name + " ")):
                     run = self.run_step(head, base)
@@ -643,9 +650,385 @@ class K16QuotedMainBranchTest(K16Base):
         self.work = Path(self.folder.name) / "work"
         self.work.mkdir(exist_ok=True)
         env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"),
-               "HEAD_REF": head, "BASE_REF": base, "MAIN_BRANCH": step["env"]["MAIN_BRANCH"]}
+               "HEAD_REF": head, "BASE_REF": base, "MAIN_BRANCH": step["env"]["MAIN_BRANCH"],
+               "INTEGRATION_BRANCH": step["env"]["INTEGRATION_BRANCH"]}
         return subprocess.run([BASH, "-e", "-c", step["run"]], cwd=self.work, env=env,
                               capture_output=True, text=True)
+
+
+# D33: K16 also blocks a spike PR into branches.integration.
+
+SPIKE_HEAD = "spike/can-x-do-y"
+
+
+def run_k16(step: dict[str, Any], work: Path, head: str,
+            base: str) -> subprocess.CompletedProcess:
+    """Run the rendered step with bash. All four values come from the env, as on the runner."""
+    work.mkdir(exist_ok=True)
+    env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"), "HEAD_REF": head, "BASE_REF": base,
+           "MAIN_BRANCH": str(step["env"]["MAIN_BRANCH"]),
+           "INTEGRATION_BRANCH": str(step["env"]["INTEGRATION_BRANCH"])}
+    return subprocess.run([BASH, "-e", "-c", step["run"]], cwd=work, env=env,
+                          capture_output=True, text=True)
+
+
+def error_lines(run: subprocess.CompletedProcess) -> list[str]:
+    return [line for line in (run.stdout + run.stderr).splitlines() if line.startswith("::error")]
+
+
+class D33Base(K16Base):
+    def render_branches(self, main: str, integration: str) -> None:
+        self.configure(["spike"], f"branches: {{integration: {integration}, main: {main}}}")
+        result, _ = self.render()
+        self.assertEqual(result.exit_code, 0)
+
+    def run_step(self, head: str, base: str) -> subprocess.CompletedProcess:
+        return run_k16(self.k16_step(), Path(self.folder.name) / "work", head, base)
+
+    def assert_fails_naming(self, head: str, base: str) -> None:
+        run = self.run_step(head, base)
+        output = run.stdout + run.stderr
+        self.assertNotEqual(run.returncode, 0, (head, base, output))
+        lines = error_lines(run)
+        self.assertEqual(len(lines), 1, output)
+        self.assertIn(head, lines[0])
+        self.assertIn(base, lines[0])
+
+    def assert_passes(self, head: str, base: str) -> None:
+        run = self.run_step(head, base)
+        output = run.stdout + run.stderr
+        self.assertEqual(run.returncode, 0, (head, base, output))
+        self.assertEqual(error_lines(run), [], (head, base, output))
+
+
+@unittest.skipIf(BASH is None, "bash is not installed")
+class D33DistinctBranchesTest(D33Base):
+    """branches.main is `trunk` and branches.integration is `develop`: two different branches."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.render_branches("trunk", "develop")
+
+    def test_d33_c1_spike_into_main_fails_with_one_error_naming_head_and_base(self) -> None:
+        self.assert_fails_naming(SPIKE_HEAD, "trunk")
+
+    def test_d33_c1_deep_spike_into_main_fails(self) -> None:
+        self.assert_fails_naming("spike/a/b/c", "trunk")
+
+    def test_d33_c2_spike_into_integration_fails_with_one_error_naming_head_and_base(self) -> None:
+        self.assert_fails_naming(SPIKE_HEAD, "develop")
+
+    def test_d33_c2_deep_spike_into_integration_fails(self) -> None:
+        self.assert_fails_naming("spike/a/b/c", "develop")
+
+    def test_d33_c2_error_tells_the_person_what_to_do(self) -> None:
+        line = error_lines(self.run_step(SPIKE_HEAD, "develop"))[0]
+        self.assertTrue(any(word in line for word in ("Close", "close", "Rebuild", "rebuild",
+                                                      "new branch")), line)
+
+    def test_d33_c4_spike_into_a_feature_or_spike_branch_passes(self) -> None:
+        for base in ("feature/x", "spike/other", "fix/y"):
+            with self.subTest(base=base):
+                self.assert_passes(SPIKE_HEAD, base)
+
+    def test_d33_c4_near_names_of_the_integration_branch_pass(self) -> None:
+        for base in ("develop ", " develop", "Develop", "develop/x", "develop2", "dev",
+                     "main", ""):
+            with self.subTest(base=base):
+                self.assert_passes(SPIKE_HEAD, base)
+
+    def test_d33_c5_non_spike_head_into_main_or_integration_passes(self) -> None:
+        for head in ("feature/x", "fix/y", "chore/z", "develop", "spike", "my-spike/x",
+                     "spikes/x", "feature/spike/x"):
+            for base in ("trunk", "develop"):
+                with self.subTest(head=head, base=base):
+                    self.assert_passes(head, base)
+
+    def test_d33_c5_shell_text_in_the_names_does_not_run(self) -> None:
+        heads = ["spike/$(touch pwn)", "spike/`touch pwn`", 'spike/";touch pwn;"',
+                 "feature/$(touch pwn)"]
+        work = Path(self.folder.name) / "work"
+        for head in heads:
+            for base in ("trunk", "develop", "feature/y", "$(touch pwn)"):
+                with self.subTest(head=head, base=base):
+                    run = self.run_step(head, base)
+                    self.assertFalse((work / "pwn").exists(), (head, base))
+                    want_fail = head.startswith("spike/") and base in ("trunk", "develop")
+                    self.assertEqual(run.returncode != 0, want_fail, run.stdout + run.stderr)
+
+
+@unittest.skipIf(BASH is None, "bash is not installed")
+class D33SameBranchTest(D33Base):
+    """branches.main and branches.integration name the same branch (D33 allows it)."""
+
+    def test_d33_c3_spike_into_the_shared_branch_fails(self) -> None:
+        for name in ("main", "trunk"):
+            with self.subTest(branch=name):
+                self.tearDown()
+                self.setUp()
+                self.render_branches(name, name)
+                self.assertEqual(self.k16_step()["env"]["MAIN_BRANCH"], name)
+                self.assertEqual(self.k16_step()["env"]["INTEGRATION_BRANCH"], name)
+                self.assert_fails_naming(SPIKE_HEAD, name)
+
+    def test_d33_c3_spike_into_a_different_branch_passes(self) -> None:
+        for name in ("main", "trunk"):
+            with self.subTest(branch=name):
+                self.tearDown()
+                self.setUp()
+                self.render_branches(name, name)
+                for base in ("dev", "develop", "feature/x", "spike/other", name + "/x"):
+                    self.assert_passes(SPIKE_HEAD, base)
+
+    def test_d33_c3_non_spike_into_the_shared_branch_passes(self) -> None:
+        self.render_branches("main", "main")
+        for head in ("feature/x", "fix/y", "dev"):
+            with self.subTest(head=head):
+                self.assert_passes(head, "main")
+
+
+class D33IntegrationFromConfigTest(D33Base):
+    def test_d33_c7_step_env_has_the_four_values(self) -> None:
+        self.render_branches("trunk", "develop")
+        env = self.k16_step()["env"]
+        self.assertEqual(set(env), {"HEAD_REF", "BASE_REF", "MAIN_BRANCH", "INTEGRATION_BRANCH"})
+        self.assertEqual(env["INTEGRATION_BRANCH"], "develop")
+        self.assertEqual(env["MAIN_BRANCH"], "trunk")
+
+    def test_d33_c7_integration_value_comes_from_the_config(self) -> None:
+        for value in ("staging", "release/v1.0", "integration-k16-unique"):
+            with self.subTest(integration=value):
+                self.tearDown()
+                self.setUp()
+                self.render_branches("main", value)
+                self.assertEqual(self.k16_step()["env"]["INTEGRATION_BRANCH"], value)
+
+    def test_d33_c7_names_are_not_inlined_into_the_run_script(self) -> None:
+        self.render_branches("main-k16-unique", "integration-k16-unique")
+        run = self.k16_step()["run"]
+        self.assertNotIn("integration-k16-unique", run)
+        self.assertNotIn("main-k16-unique", run)
+        self.assertIn("INTEGRATION_BRANCH", run)
+
+    def test_d33_c7_only_expressions_are_head_ref_and_base_ref(self) -> None:
+        self.render_branches("trunk", "develop")
+        text = self.read(K16)
+        self.assertEqual(len(re.findall(r"\$\{\{", text)), 2)
+        env = self.k16_step()["env"]
+        self.assertEqual(env["HEAD_REF"].replace(" ", ""), "${{github.head_ref}}")
+        self.assertEqual(env["BASE_REF"].replace(" ", ""), "${{github.base_ref}}")
+        self.assertNotIn("${{", self.k16_step()["run"])
+
+    def test_d33_c7_permissions_empty_and_no_uses_or_checkout(self) -> None:
+        self.render_branches("trunk", "develop")
+        workflow = self.workflow()
+        self.assertEqual(workflow["permissions"], {})
+        for name, job in workflow["jobs"].items():
+            with self.subTest(job=name):
+                self.assertIn(job.get("permissions", {}), ({}, None))
+        self.assertEqual([step for step in self.steps() if "uses" in step], [])
+        text = self.read(K16)
+        self.assertNotIn("checkout", text.replace("checks out no code", ""))
+        self.assertNotIn("git clone", text)
+
+    def test_d33_c9_second_render_writes_nothing(self) -> None:
+        self.render_branches("trunk", "develop")
+        result, _ = self.render(today=TODAY + dt.timedelta(days=30))
+        self.assertEqual(result.wrote, [])
+        self.assertEqual(result.drift, [])
+
+    def test_d33_c9_new_integration_value_updates_the_workflow(self) -> None:
+        self.render_branches("main", "dev")
+        self.render_branches("main", "staging")
+        result, _ = self.render()
+        self.assertEqual(result.wrote, [])
+        self.configure(["spike"], "branches: {integration: release, main: main}")
+        result, _ = self.render()
+        self.assertEqual(result.drift, [])
+        self.assertIn(K16, result.wrote)
+        self.assertEqual(self.k16_step()["env"]["INTEGRATION_BRANCH"], "release")
+        self.assertEqual(self.k16_step()["env"]["MAIN_BRANCH"], "main")
+
+    @unittest.skipIf(BASH is None, "bash is not installed")
+    def test_d33_c9_updated_workflow_blocks_the_new_integration_branch(self) -> None:
+        self.render_branches("main", "dev")
+        self.render_branches("main", "staging")
+        self.assert_fails_naming(SPIKE_HEAD, "staging")
+        self.assert_passes(SPIKE_HEAD, "dev")
+
+
+QUOTED_INTEGRATION_NAMES = dict(QUOTED_MAIN_NAMES)
+QUOTED_INTEGRATION_NAMES["shell command"] = ("int$(touch pwn)", "'int$(touch pwn)'")
+QUOTED_INTEGRATION_NAMES["backticks"] = ("int`touch pwn`", "'int`touch pwn`'")
+
+
+class D33QuotedIntegrationBranchTest(D33Base):
+    def configure_integration(self, config_value: str) -> None:
+        self.configure(["spike"], f"branches: {{integration: {config_value}, main: main}}")
+
+    def test_d33_c6_config_fixture_holds_the_exact_name(self) -> None:
+        # Guard the test data: the config YAML must hold the name that the test expects.
+        for label, (name, config_value) in QUOTED_INTEGRATION_NAMES.items():
+            with self.subTest(case=label):
+                self.assertEqual(yaml.safe_load(f"integration: {config_value}")["integration"],
+                                 name)
+
+    def test_d33_c6_render_writes_valid_yaml_with_the_exact_integration_branch(self) -> None:
+        for label, (name, config_value) in QUOTED_INTEGRATION_NAMES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_integration(config_value)
+                result, _ = self.render()
+                self.assertEqual(result.exit_code, 0)
+                workflow = self.workflow()
+                self.assertIsInstance(workflow, dict)
+                self.assertEqual(set(triggers(workflow)), {"pull_request_target"})
+                self.assertEqual(workflow["permissions"], {})
+                env = self.k16_step()["env"]
+                self.assertIsInstance(env["INTEGRATION_BRANCH"], str)
+                self.assertEqual(env["INTEGRATION_BRANCH"], name)
+                self.assertEqual(env["MAIN_BRANCH"], "main")
+                self.assertEqual(env["HEAD_REF"].replace(" ", ""), "${{github.head_ref}}")
+                self.assertEqual(env["BASE_REF"].replace(" ", ""), "${{github.base_ref}}")
+                self.assertEqual(len(re.findall(r"\$\{\{", self.read(K16))), 2)
+
+    def test_d33_c6_cli_render_exits_0(self) -> None:
+        for label, (_, config_value) in QUOTED_INTEGRATION_NAMES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_integration(config_value)
+                code, out = self.cli_render()
+                self.assertEqual(code, 0, out)
+                self.assertTrue((self.root / K16).is_file())
+
+    def test_d33_c6_second_render_writes_nothing(self) -> None:
+        for label, (_, config_value) in QUOTED_INTEGRATION_NAMES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_integration(config_value)
+                self.render()
+                result, _ = self.render()
+                self.assertEqual(result.wrote, [])
+                self.assertEqual(result.drift, [])
+
+    @unittest.skipIf(BASH is None, "bash is not installed")
+    def test_d33_c6_spike_into_the_quoted_integration_fails(self) -> None:
+        for label, (name, config_value) in QUOTED_INTEGRATION_NAMES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_integration(config_value)
+                self.render()
+                self.assert_fails_naming(SPIKE_HEAD, name)
+                work = Path(self.folder.name) / "work"
+                self.assertFalse((work / "pwn").exists())
+                self.assertFalse((work / "x").exists())
+
+    @unittest.skipIf(BASH is None, "bash is not installed")
+    def test_d33_c6_near_names_pass_with_the_quoted_integration(self) -> None:
+        for label, (name, config_value) in QUOTED_INTEGRATION_NAMES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_integration(config_value)
+                self.render()
+                # Near names: a prefix of the name, the YAML-quoted text, and added spaces.
+                for head, base in (("feature/x", name), ("spike/x", "feature/y"),
+                                   ("spike/x", name[:3]), ("spike/x", config_value),
+                                   ("spike/x", name + " "), ("spike/x", " " + name)):
+                    self.assert_passes(head, base)
+                self.assertFalse((Path(self.folder.name) / "work" / "pwn").exists())
+
+
+class D33NeedsIntegrationBranchTest(K16Base):
+    CASES = {
+        "branches without integration": "branches: {main: main}",
+        "integration is a TODO value": "branches: {integration: TODO(owner), main: main}",
+        "integration is null": "branches: {integration: null, main: main}",
+        "integration is ~": "branches: {integration: ~, main: main}",
+        "integration has no value": "branches:\n  main: main\n  integration:",
+        "integration is an empty string": 'branches: {integration: "", main: main}',
+        "integration is an empty single-quoted string": "branches: {integration: '', main: main}",
+        "integration is only spaces": 'branches: {integration: "   ", main: main}',
+        "integration is spaces and a tab": 'branches: {integration: "  \\t ", main: main}',
+    }
+    BOTH_MISSING = {
+        "no branches section": "",
+        "both null": "branches: {integration: null, main: null}",
+        "both empty": 'branches: {integration: "", main: ""}',
+        "both TODO": "branches: {integration: TODO(owner), main: TODO(owner)}",
+    }
+
+    def reset(self, profiles: list[str], branches: str) -> None:
+        self.tearDown()
+        self.setUp()
+        self.configure(profiles, branches)
+
+    def test_d33_c8_render_raises_and_names_branches_integration(self) -> None:
+        for label, branches in self.CASES.items():
+            with self.subTest(case=label):
+                self.reset(["spike"], branches)
+                with contextlib.redirect_stderr(io.StringIO()):
+                    with self.assertRaises(render.RenderError) as caught:
+                        render.render(self.root, FRAMEWORK, today=TODAY)
+                self.assertIn("branches.integration", str(caught.exception))
+                self.assertEqual(self.written_files(), [])
+
+    def test_d33_c8_cli_exits_1_and_names_branches_integration(self) -> None:
+        for label, branches in self.CASES.items():
+            with self.subTest(case=label):
+                self.reset(["spike"], branches)
+                code, out = self.cli_render()
+                self.assertEqual(code, 1, out)
+                self.assertIn("branches.integration", out)
+                self.assertEqual(self.written_files(), [])
+                self.assertFalse((self.root / K16).exists())
+
+    def test_d33_c8_with_single_ticket_also_writes_nothing(self) -> None:
+        for label, branches in self.CASES.items():
+            with self.subTest(case=label):
+                self.reset(["single-ticket", "spike"], branches)
+                code, out = self.cli_render()
+                self.assertEqual(code, 1, out)
+                self.assertIn("branches.integration", out)
+                self.assertEqual(self.written_files(), [])
+
+    def test_d33_c8_missing_integration_does_not_change_existing_files(self) -> None:
+        for label, branches in self.CASES.items():
+            with self.subTest(case=label):
+                self.reset(["spike"], MAIN_AND_DEV)
+                self.render()
+                before = {path: self.read(path) for path in self.written_files()}
+                self.configure(["spike"], branches)
+                code, out = self.cli_render()
+                self.assertEqual(code, 1, out)
+                self.assertEqual({path: self.read(path) for path in self.written_files()},
+                                 before)
+                self.assertEqual(self.k16_step()["env"]["INTEGRATION_BRANCH"], "dev")
+
+    def test_d33_c8_main_also_missing_names_branches_main(self) -> None:
+        for label, branches in self.BOTH_MISSING.items():
+            with self.subTest(case=label):
+                self.reset(["spike"], branches)
+                with contextlib.redirect_stderr(io.StringIO()):
+                    with self.assertRaises(render.RenderError) as caught:
+                        render.render(self.root, FRAMEWORK, today=TODAY)
+                self.assertIn("branches.main", str(caught.exception))
+                self.assertEqual(self.written_files(), [])
+                code, out = self.cli_render()
+                self.assertEqual(code, 1, out)
+                self.assertIn("branches.main", out)
+                self.assertEqual(self.written_files(), [])
+
+    def test_d33_c8_profile_without_k16_does_not_need_branches_integration(self) -> None:
+        # code-audit is not here: its reviewer role needs branches.integration without K16.
+        self.reset(["bug-triage"], "branches: {main: main}")
+        result, _ = self.render()
+        self.assertEqual(result.exit_code, 0)
+        self.assertFalse((self.root / K16).exists())
 
 
 if __name__ == "__main__":

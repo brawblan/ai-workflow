@@ -2,7 +2,8 @@ framework_version: 0.8.0
 components:
 - id: check.k16
   kind: ci-job
-  purpose: K16. Fail a pull request from a spike branch into the main branch (D30).
+  purpose: K16. Fail a pull request from a spike branch into the main or integration
+    branch (D30, D33).
   principle:
   - P2
   - P6
@@ -14,7 +15,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .github/workflows/cornerstone-k16.yml
-  hash: fa3b5459615dd3152b4d78c95a91c30d06a84e13eede24fd521935e018aa5ce5
+  hash: bac6ded88fd656f15353a6430b312cd272dfea9721934426d9553c62571fac9f
 - id: hook.protect-paths
   kind: hook
   purpose: Block an edit to a path that the current role must not change.

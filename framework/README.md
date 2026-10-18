@@ -93,6 +93,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D30 | `stone render` writes K16 as a CI job for each profile that lists K16. The job runs from the base branch, so a spike branch cannot change it. K16 blocks from the start, not after 2 weeks: D25 depends on it, and a warning does not stop a merge (dossier F2, F11). | [checks.md](checks.md#k16-and-the-spike-branch), [profiles/spike.md](profiles/spike.md) |
 | D31 | `stone render` writes one CI workflow for each profile trigger that is not `command`. The workflow starts the first role of the profile with the profile steps. That role gets a read-only token, a tool allowlist, and no edit, shell, or web tools. It returns a report. A second job posts the report with its own minimum token. Event text goes to a step only through `env` (dossier F8 to F10). If two selected profiles use one label, each run also needs the label `profile:<id>`. | [generator/design.md](generator/design.md#trigger-workflows) |
 | D32 | A trigger role gets read rules only for the checkout and the event folder. A read rule with no path lets the role read any file, such as the process environment with the harness secret. The report is public, and an encoded secret in a job output is not redacted. So the path limit, not the secret scrub, protects the secret (dossier F9, F12). | [generator/design.md](generator/design.md#trigger-workflows), the adapter doc |
+| D33 | K16 fails a PR from a `spike/` branch into `branches.main` or `branches.integration`. Without the second branch, spike code gets to main through the integration branch. Render needs both names, and they can be the same branch. K16 does not find spike commits on a branch with a different name. A squash, a rebase, or a cherry-pick gives new commit IDs, so a commit check is not reliable. A partial check gives false confidence. A commit check also needs a read token, and K16 now has no permissions (D30, dossier F11). So the spike profile says not to merge a spike branch into a different branch, and gate G4 is the control. | [checks.md](checks.md#k16-and-the-spike-branch), [profiles/spike.md](profiles/spike.md) |
 
 ## Open questions
 
@@ -147,7 +148,8 @@ Do these items in order. Each item is one PR or more.
      The same steps serve K4, K5, K8, and K11. Two weeks after the merge, remove `continue-on-error`
      from the step templates.
    - 6e. Done: K16 (no merge to main) for spike, which blocks from the start (D30). Golden-file tests
-     for spike, bug-triage, and code-audit.
+     for spike, bug-triage, and code-audit. K16 also blocks a spike PR into the integration branch.
+     It does not find spike commits on a branch with a different name (D33).
    - 6f. Done: golden-file tests for debugging, dependency-upgrade, and adapter-refresh.
    - 6g. Trigger workflows: `label:<name>`, `schedule:<cron>`, and `ci:<event>`. Untrusted event
      text goes to a step only through `env`. The adapter names the secret. Done: the label, schedule,
