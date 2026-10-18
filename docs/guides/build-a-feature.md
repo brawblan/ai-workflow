@@ -8,7 +8,7 @@ decision. You approve the plan before an agent writes code.
 | Profile | [app-slice](../../framework/profiles/app-slice.md) |
 | Default mode | hybrid: you own the plan, an agent does the build |
 | Gates | G1, G2 (plan), G3, G4 |
-| Status | Partial. The pipeline does not set `passes` in the progress file yet. You set it by hand. |
+| Status | Works today. You start each role by hand, and you set `passes` by hand. |
 
 ## Flow
 
@@ -31,6 +31,16 @@ feature ticket must name its personas, for example `Personas: farmer, worker`.
 
 Add the `agent-ready` label when the ticket is ready. That label is G1.
 
+`stone render` also writes
+the workflow `cornerstone-app-slice-label.yml`. The label then starts the shaper in CI. The shaper
+has read-only tools. It checks the ticket against the Definition of Ready and posts a report on the
+issue. It does not start another role.
+
+Add the secret `CLAUDE_CODE_OAUTH_TOKEN` first. See the
+[adapter](../../framework/adapters/claude-code.md#trigger-workflows).
+If the repo selects more than one profile with the label `agent-ready`, add the label
+`profile:<id>` before it.
+
 ### 2. Write the plan (G2)
 
 Start the planner with the ready issue: `STONE_ROLE=planner claude --agent planner`. It writes
@@ -52,6 +62,20 @@ For each task in the progress file, follow [Run the roles](run-the-roles.md):
    the job stories, and the integration tests for the task.
 3. Run `commands.all_checks`. If they pass, set `"passes": true` for the task.
 
+The G3 workflow also runs a step for each check of this profile that has a command in
+`.cornerstone/config.yaml`. If a command has no value, render skips the step and warns.
+
+| Check | Command key |
+| --- | --- |
+| K4 integration tests | `test_integration` |
+| K5 acceptance tests | `test_acceptance` |
+| K8 architecture fitness | `architecture` |
+| K10 mutation score on the changed code | `mutation`, and `limits.mutation_score_changed_code` |
+
+The K10 command gets the variables `BASE_REF` and `MUTATION_SCORE_MIN`. See
+[customization](../../framework/customization.md#commands-for-the-by-profile-checks). These steps
+warn for 2 weeks after render adds them (`continue-on-error`). Then they block.
+
 ### 4. Review and deliver
 
 1. Start the reviewer with the plan and the branch. It reports scope drift from the plan, and
@@ -67,7 +91,9 @@ For each task in the progress file, follow [Run the roles](run-the-roles.md):
      --trailer "Role: generator" --trailer "Actor: human"
    ```
 
-3. A human approves each PR (G4).
+3. Put the line `Profile: app-slice` in each PR body, for check K7. Add the sections Evidence,
+   Decision log, Review findings, and Confidence, for check K14.
+4. A human approves each PR (G4).
 
 | Failure | Action |
 | --- | --- |
@@ -77,10 +103,9 @@ For each task in the progress file, follow [Run the roles](run-the-roles.md):
 | K19 reports the same `apply_order` after a merge | Run `stone spec sync`. Commit its output with `Role: generator`. |
 | Apply or sync says that a requirement exists, after a merge | Another branch added the same ID. In your delta, change the ID of the ADDED requirement to a free number. Then run `stone spec sync`. |
 
-## When the profile ships
+## Not built yet
 
-| Step | Today | Target |
-| --- | --- | --- |
-| Progress | You set `passes` by hand | The pipeline sets `passes` after the checks pass |
-| Architecture | Your CI rules | Fitness checks (K8) |
-| Test quality | Not measured | Mutation score on the changed code (K10) |
+- A pipeline that sets `passes` in the progress file. The planner writes `"passes": false`. You
+  change it by hand.
+- A run script that starts each role in order. The label workflow starts the shaper only.
+- K18 and K19 give warnings, not errors.
