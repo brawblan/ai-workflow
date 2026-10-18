@@ -44,6 +44,10 @@ The output is an answer, not code. The code stays on a spike branch and never me
 > CAUTION: K16 blocks a PR from a `spike/` branch to the main branch. To keep spike code, rebuild it
 > with a profile that has a Build stage and gate G3.
 
+The hook trusts the `spike/` prefix, so the investigator can write code on that branch (D25). K16 is
+the control that stops this code from merging. Make the K16 job a required status check on the main
+branch. See [K16 and the spike branch](../checks.md#k16-and-the-spike-branch).
+
 ## Exit criteria
 
 - The report answers the question, or says why it cannot.

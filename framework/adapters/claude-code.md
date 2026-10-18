@@ -154,6 +154,12 @@ Limits that stay:
 | G4 | Required PR review |
 | G5 | A deployment environment with required reviewers |
 
+`stone render` writes K16 to `.github/workflows/cornerstone-k16.yml` for each profile that lists K16
+(D30). The job runs on `pull_request_target`, so GitHub runs the workflow file from the base branch.
+A spike branch cannot change or remove it. The job checks out no code and has `permissions: {}`
+(dossier F11). It gets the branch names only through `env`. Add the `k16` job as a required status
+check on the main branch.
+
 ## Role files (generated)
 
 | Role | Tools | Default model |

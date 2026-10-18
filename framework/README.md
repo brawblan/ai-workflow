@@ -89,6 +89,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D26 | `stone eval` runs a component eval with and without the component, in a temp git repo. The harness adapter gives the run command in `eval.yaml`. Checks are code first. An `outcome` check tests behavior, and a `contract` check tests the format of the component. The variants get the same prompt and tools. Runs are local, not in CI. | [lifecycle.md](lifecycle.md#eval-design), [generator/design.md](generator/design.md) |
 | D27 | K7 is a script that `stone render` writes, with the limit of each selected profile in it. The limit is the profile limit, or `limits.pr_changed_lines` if that is smaller. CI does not know the profile of a PR, so the PR body names it on a `Profile: <id>` line. With no line, or with an unknown profile, the smallest limit applies. A `Waiver (P10)` section with text passes, with a notice. The G3 step reads the body through `env` and starts in `--mode warn`. | [checks.md](checks.md), [customization.md](customization.md) |
 | D28 | Check K15 is a script that `stone render` writes for a profile with K15. The limit is `instruction_file_max_lines` in the model profile, and the adapter names the instruction file. A component with `ci_step` adds its step to the G3 workflow only if the component renders. The K15 step starts in `--mode warn`. | [checks.md](checks.md), [generator/design.md](generator/design.md) |
+| D30 | `stone render` writes K16 as a CI job for each profile that lists K16. The job runs from the base branch, so a spike branch cannot change it. K16 blocks from the start, not after 2 weeks: D25 depends on it, and a warning does not stop a merge (dossier F2, F11). | [checks.md](checks.md#k16-and-the-spike-branch), [profiles/spike.md](profiles/spike.md) |
 | D31 | `stone render` writes one CI workflow for each profile trigger that is not `command`. The workflow starts the first role of the profile with the profile steps. That role gets a read-only token, a tool allowlist, and no edit, shell, or web tools. It returns a report. A second job posts the report with its own minimum token. Event text goes to a step only through `env` (dossier F8 to F10). If two selected profiles use one label, each run also needs the label `profile:<id>`. | [generator/design.md](generator/design.md#trigger-workflows) |
 
 ## Open questions
@@ -138,7 +139,8 @@ Do these items in order. Each item is one PR or more.
    - 6c. Done: K15 (instruction size) for full-project, and a golden-file test for full-project
      (D28). Two weeks after the merge, change K15 to `--mode block` in the G3 step template.
    - 6d. K10 and K12 as repo commands for refactor-migration. Golden-file test for it.
-   - 6e. K16 (no merge to main) for spike. Golden-file tests for spike, bug-triage, and code-audit.
+   - 6e. Done: K16 (no merge to main) for spike, which blocks from the start (D30). Golden-file tests
+     for spike, bug-triage, and code-audit.
    - 6f. Done: golden-file tests for debugging, dependency-upgrade, and adapter-refresh.
    - 6g. Trigger workflows: `label:<name>`, `schedule:<cron>`, and `ci:<event>`. Untrusted event
      text goes to a step only through `env`. The adapter names the secret. Part 1 done: the label
