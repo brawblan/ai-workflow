@@ -1,7 +1,7 @@
 ---
 id: single-ticket
 name: Single ticket
-version: 0.1.0
+version: 0.2.0
 purpose: Deliver one small, clear change as one PR.
 triggers: [command, label:agent-ready]
 stages: [intake, shape, build, test, verify, review, deliver, learn]
@@ -14,7 +14,7 @@ gates:
   G3: required
   G4: human
   G5: if-needed
-checks: [K1, K2, K3, K6, K7, K9, K13, K14, K17]
+checks: [K1, K2, K3, K6, K7, K9, K13, K14, K17, K18]
 limits:
   pr_changed_lines: 600
 outputs: [pr]
@@ -40,7 +40,8 @@ outputs: [pr]
 3. Start the implementer in a fresh session. Give it the ticket only.
 4. The implementer changes the code and writes the decision log.
 5. Start the tester in a fresh session. Give it the ticket and the diff.
-6. The tester writes tests for each acceptance criterion and writes the test report.
+6. The tester writes tests for each acceptance criterion and writes the test report. If the ticket
+   names personas, the tester writes the acceptance tests from their job stories.
 7. Run the checks (G3). If a check fails, send the output to the implementer. Stop after 3 loops.
 8. Start the reviewer in a fresh session. Give it the ticket, the diff, the check output, and the
    decision log.
@@ -64,4 +65,4 @@ outputs: [pr]
 
 ## Evidence
 
-Dossier IDs: B1, B10, B15, D1, D3, D4, E12, H4.
+Dossier IDs: B1, B10, B15, D1, D3, D4, D13, E12, H4.

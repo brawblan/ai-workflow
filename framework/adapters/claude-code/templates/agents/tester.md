@@ -17,6 +17,8 @@ not the implementation.
 
 1. Read the ticket first. Read the diff after you list the behavior to test.
 2. Write at least one test for each acceptance criterion. Add edge cases that the ticket implies.
+   If the ticket names personas, read their job stories in `constitution/personas.md`. Write each
+   acceptance test as the persona does the job.
 3. Run `$command_test_unit`. A failing test is a finding, not a reason to change the test.
 4. Commit with the trailers `Role: tester` and `Actor: agent`.
 5. Write the test report: tests added, behavior covered, gaps, and each failing test.

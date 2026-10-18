@@ -49,6 +49,18 @@ components:
 > CAUTION: Do not remove a check only because its eval is missing. A check is its own test. Review a
 > check for false positives and for cost instead.
 
+## Personas
+
+A persona is not a component, but it can also go out of date. At each lifecycle review, and at G2
+for a plan that names a persona, do these steps:
+
+1. List each persona in the personas file with `evidence: assumed`.
+2. Show the list to the human who approves. A plan that serves only assumed personas is a risk
+   (P11). Record it in the plan's risks section.
+3. The human decides: validate the persona with real users, or keep it as assumed and accept the
+   risk.
+4. When research confirms a persona, set `evidence: validated` and add the source in the file.
+
 ## Eval design
 
 | Item | Rule | Source |
