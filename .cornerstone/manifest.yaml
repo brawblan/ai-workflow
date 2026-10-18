@@ -1,0 +1,120 @@
+framework_version: 0.1.0
+components:
+- id: check.k6
+  kind: check
+  purpose: K6. Fail if an implementer commit changes a protected path.
+  principle:
+  - P2
+  - P6
+  source: framework
+  owner: brawblan
+  eval: ''
+  models_tested: []
+  added: '2026-10-17'
+  review_by: '2027-04-17'
+  files:
+  - .cornerstone/checks/protected_paths.py
+  hash: 72a81068c250e9f1ef32f75d68f51757c91f5fd654e3d440654f5d2e083a2e6d
+- id: ci-job.checks
+  kind: ci-job
+  purpose: G3. Run K6 and the repo checks on each pull request.
+  principle:
+  - P1
+  - P6
+  source: framework
+  owner: brawblan
+  eval: evals/ci-job-checks/
+  models_tested: []
+  added: '2026-10-17'
+  review_by: '2027-04-17'
+  files:
+  - .github/workflows/cornerstone-checks.yml
+  hash: 45f1748e523737899b578302c0320c46c71b8674e31019cb9cf9e84c617a6596
+- id: hook.protect-paths
+  kind: hook
+  purpose: Block an edit to a path that the current role must not change.
+  principle:
+  - P2
+  - P6
+  source: framework
+  owner: brawblan
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-17'
+  review_by: '2027-04-17'
+  files:
+  - .cornerstone/hooks/protect-paths.py
+  hash: 2da7cca95f84e4a4862414fe338795b643d7688ce03232ee8b01eab1792b086e
+- id: hook.settings
+  kind: hook
+  purpose: Register the protected-path hook in the harness settings. Other keys stay
+    as they are.
+  principle:
+  - P6
+  source: framework
+  owner: brawblan
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-17'
+  review_by: '2027-04-17'
+  files:
+  - .claude/settings.json
+  hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+- id: role.implementer
+  kind: role
+  purpose: Change the code to meet the ticket. Write the decision log.
+  principle:
+  - P2
+  - P8
+  source: framework
+  owner: brawblan
+  eval: evals/role-implementer/
+  models_tested: []
+  added: '2026-10-17'
+  review_by: '2027-04-17'
+  files:
+  - .claude/agents/implementer.md
+  hash: bd0c13df5278b49906cf32f16c3d8f99187dbc9e32b651857ecdc778f709a3fb
+- id: role.reviewer
+  kind: role
+  purpose: Find defects and scope drift in a fresh session.
+  principle:
+  - P2
+  - P11
+  source: framework
+  owner: brawblan
+  eval: evals/role-reviewer/
+  models_tested: []
+  added: '2026-10-17'
+  review_by: '2027-04-17'
+  files:
+  - .claude/agents/reviewer.md
+  hash: 2a821ff259b781ee289fcc25813a79797a6449812d1b17ceab8f79c79998f92a
+- id: role.shaper
+  kind: role
+  purpose: Interview the human until the ticket meets the Definition of Ready.
+  principle:
+  - P3
+  source: framework
+  owner: brawblan
+  eval: evals/role-shaper/
+  models_tested: []
+  added: '2026-10-17'
+  review_by: '2027-04-17'
+  files:
+  - .claude/agents/shaper.md
+  hash: 35daf671da39c324ee1a86efef4f48f61df3f48c21fee9d4d6477a30cd2aadd1
+- id: role.tester
+  kind: role
+  purpose: Write independent tests from the ticket and the diff.
+  principle:
+  - P2
+  source: framework
+  owner: brawblan
+  eval: evals/role-tester/
+  models_tested: []
+  added: '2026-10-17'
+  review_by: '2027-04-17'
+  files:
+  - .claude/agents/tester.md
+  hash: 35a6975aee565537399638087caa2417b84b45e97746edba25c72b2cd0779d3a
