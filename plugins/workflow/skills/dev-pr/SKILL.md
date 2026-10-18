@@ -80,6 +80,16 @@ silently.
 - `git push -u origin <branch-name>`
 - Open the PR **into `<base>`** — never directly into a release or production branch (for example
   `staging` or `main`) unless the repo docs say that `<base>` is that branch.
+- If the repo has `.cornerstone/config.yaml`, put a `Profile: <id>` line at the top of the PR
+  body. Check K7 reads this line to find the size limit. Without it, K7 uses the smallest limit
+  of the selected profiles. Find the id as follows:
+  - If `profiles` in the config has one id, use it.
+  - If it has more than one, use the profile that the ticket or the plan names.
+  - If neither names one, ask the user. Do not guess.
+- If the repo has the K7 script (for example `.cornerstone/checks/change_size.py`), run it before
+  you open the PR: `python <script> origin/<base> --body <file with the PR body>`.
+- If the diff is over the limit, tell the user. Split the PR, or add a `Waiver (P10)` section
+  with the reason, the owner, and the end date. Write the waiver only if the user approves it.
 - If the repo has a PR template, use all of its sections. Otherwise use: **Summary**, **Why this
   change**, **Validation run**, **Risks**, **Rollback plan**, **Environment/config changes**,
   **Follow-up issues**. Keep scope focused to one concern; call out any deliberately-deferred

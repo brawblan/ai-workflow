@@ -7,7 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from stone.writing_check import Rules, changed_lines, check_text, load_rules, run
+from stone.writing_check import (DEFAULT_EXCLUDE, Rules, changed_lines, check_text, load_rules,
+                                 run)
 
 RULES_MD = """# Rules
 
@@ -162,6 +163,73 @@ class ChangedLinesTest(unittest.TestCase):
         findings = run(self.root, [], "main", rules(), [])
         self.assertEqual(sorted((f.path, f.line) for f in findings),
                          [("doc.md", 4), ("new.md", 3)])
+
+
+class DefaultExcludeTest(unittest.TestCase):
+    """AC9: role files in a `.claude/` folder at any depth are out of K17 scope (writing.md)."""
+
+    TEXT = "# Role\n\nJust erase the cache.\n"  # two K17 errors: Rule 5 and Rule 1
+
+    def setUp(self) -> None:
+        self._folder = tempfile.TemporaryDirectory()
+        self.addCleanup(self._folder.cleanup)
+        self.root = Path(self._folder.name)
+
+    def write(self, name: str) -> None:
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(self.TEXT, encoding="utf-8")
+
+    def paths_with_errors(self, *names: str) -> list[str]:
+        for name in names:
+            self.write(name)
+        findings = run(self.root, list(names), None, rules(), DEFAULT_EXCLUDE)
+        return sorted({f.path for f in findings if f.severity == "error"})
+
+    def test_ac9_nested_claude_folder_gives_no_finding(self) -> None:
+        self.assertEqual(self.paths_with_errors("pkg/.claude/agents/x.md"), [])
+
+    def test_ac9_deeply_nested_claude_folder_gives_no_finding(self) -> None:
+        name = "stone/tests/golden/debugging/.claude/agents/tester.md"
+        self.assertEqual(self.paths_with_errors(name), [])
+
+    def test_ac9_root_claude_folder_still_gives_no_finding(self) -> None:
+        self.assertEqual(self.paths_with_errors(".claude/agents/x.md"), [])
+
+    def test_ac9_nested_claude_folder_given_as_a_folder_gives_no_finding(self) -> None:
+        self.write("pkg/.claude/agents/x.md")
+        findings = run(self.root, ["pkg"], None, rules(), DEFAULT_EXCLUDE)
+        self.assertEqual(findings, [])
+
+    def test_ac9_same_text_in_docs_gives_a_finding(self) -> None:
+        self.assertEqual(self.paths_with_errors("docs/x.md"), ["docs/x.md"])
+
+    def test_ac9_same_text_in_both_places_flags_only_docs(self) -> None:
+        found = self.paths_with_errors("pkg/.claude/agents/x.md", "docs/x.md")
+        self.assertEqual(found, ["docs/x.md"])
+
+    def test_ac9_claude_notes_file_name_is_still_checked(self) -> None:
+        name = "notclaude/.claude-notes.md"
+        self.assertEqual(self.paths_with_errors(name), [name])
+
+    def test_ac9_folder_name_that_only_ends_in_claude_is_still_checked(self) -> None:
+        for name in ("pkg/my.claude/x.md", "pkg/.claude-old/x.md"):
+            with self.subTest(name=name):
+                self.assertEqual(self.paths_with_errors(name), [name])
+
+    def test_ac9_nested_claude_folder_is_skipped_in_diff_mode(self) -> None:
+        def git(*args: str) -> None:
+            subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                            "-c", "commit.gpgsign=false", *args],
+                           cwd=self.root, check=True, capture_output=True)
+        git("init", "-q", "-b", "main")
+        (self.root / "README.md").write_text("# Readme\n", encoding="utf-8")
+        git("add", "-A")
+        git("commit", "-q", "-m", "base")
+        self.write("pkg/.claude/agents/x.md")
+        self.write("docs/x.md")
+        findings = run(self.root, [], "main", rules(), DEFAULT_EXCLUDE)
+        self.assertEqual(sorted({f.path for f in findings}), ["docs/x.md"])
 
 
 if __name__ == "__main__":

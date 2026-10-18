@@ -13,7 +13,7 @@ checks for the profile in CI. Each check SHOULD also run on the developer's mach
 | K4 | Integration tests | Components fail to work together. | by profile | pytest, testcontainers |
 | K5 | Acceptance tests | Behavior does not match the acceptance criteria. | by profile | playwright, pytest |
 | K6 | Protected paths | An implementer commit changes a test, check, CI, or check-config path. Each commit has a `Role:` trailer. A commit with no trailer counts as an implementer commit. Human and agent commits follow the same rule. | yes | script in the generator output |
-| K7 | Change size | The diff is over the profile's size limit and has no waiver. | yes | script in the generator output |
+| K7 | Change size | The diff is over the size limit of the PR profile, and the PR has no waiver. The PR body names the profile on a `Profile: <id>` line. With no such line, the smallest limit of the selected profiles applies. A waiver is a `Waiver (P10)` section with text. | yes | script in the generator output |
 | K8 | Architecture fitness | A dependency breaks a layer, boundary, or cycle rule. | by profile | import-linter, dependency-cruiser, ArchUnit |
 | K9 | Complexity caps | A function is over the cyclomatic, cognitive, nesting, parameter, or length limit. | yes | ruff (mccabe), radon, eslint complexity |
 | K10 | Mutation score | Too many mutants survive in the changed code. | by profile | mutmut, Stryker (incremental), pitest |
@@ -21,7 +21,7 @@ checks for the profile in CI. Each check SHOULD also run on the developer's mach
 | K12 | Differential tests | Two independent implementations give different outputs. | by profile | custom harness, `git bisect run` |
 | K13 | Secret scan | A secret or token is in the diff. | yes | gitleaks, platform secret scanning |
 | K14 | PR evidence | A required PR section (evidence, decision log, review findings, confidence) is missing or empty. | yes | `stone check-evidence` |
-| K15 | Instruction size | The instruction file is over the line limit. | yes | script in the generator output |
+| K15 | Instruction size | The instruction file is over the line limit (`instruction_file_max_lines` in the model profile). The adapter names the instruction file. | yes | script in the generator output |
 | K16 | No merge to main | A branch from a spike targets the main branch. | spike profile | branch protection, script |
 | K17 | Writing standard | New or changed human-facing text breaks a measurable rule. See [writing.md](writing.md#what-k17-tests). | yes, also for profiles that only write reports | script in the generator output |
 | K18 | Persona references | The personas file breaks the format in [workflow-model.md](workflow-model.md#personas), or a plan names a persona or a job story that the file does not have. | by profile | `stone check` |

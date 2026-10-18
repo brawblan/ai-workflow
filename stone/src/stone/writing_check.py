@@ -14,9 +14,10 @@ from stone.markdown import Block, prose_blocks, table_rows
 CHECK = "K17"
 DEFAULT_RULES = Path("plugins/workflow/skills/ste-writing/references/ste.md")
 DEFAULT_DICTIONARY = Path("docs/style/ste.md")
-# Agent-facing text is out of scope (writing.md, "Scope").
+# Agent-facing text is out of scope (writing.md, "Scope"). Golden files are rendered templates.
 DEFAULT_EXCLUDE = ["*SKILL.md", "*/skills/*", "AGENTS.md", "*/AGENTS.md", "CLAUDE.md",
-                   "*/CLAUDE.md", ".claude/*", "*/templates/*", ".git/*"]
+                   "*/CLAUDE.md", ".claude/*", "*/.claude/*", "*/templates/*", "*/golden/*",
+                   ".git/*"]
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(\[])")
 WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’/_-]*")
 PROGRESSIVE = re.compile(r"\b(?:am|is|are|was|were|be|been)\s+([a-z]+ing)\b", re.I)

@@ -1,6 +1,10 @@
 # Components that `stone render` writes for this harness: one template and one target path each.
 # A role is rendered only if a selected profile uses it. A component with `when` is rendered only if
 # a selected profile has that gate (not `skip`) or that check. Other components are always rendered.
+# ci_step: a step template for the G3 workflow. The workflow has it at `$ci_step_<id>` (dots become
+# underscores) only if the component is rendered. Otherwise render removes that placeholder line.
+# A component with `trigger` is rendered once for each selected profile with that trigger type, as
+# `<id>.<profile>` (D31). `parts` are fragments that render puts in the template at a `$name` line.
 # eval: the planned eval folder (lifecycle.md).
 
 components:
@@ -84,11 +88,50 @@ components:
     target: .cornerstone/checks/protected_paths.py
     eval: ""
 
+  - id: check.k7
+    kind: check
+    purpose: K7. Fail if the diff is over the size limit of the PR profile and has no waiver.
+    principle: [P10]
+    when: {check: K7}
+    template: checks/change_size.py
+    target: .cornerstone/checks/change_size.py
+    eval: evals/check-k7/
+
+  - id: check.k15
+    kind: check
+    purpose: K15. Fail if the instruction file is over the line limit of the model profile.
+    principle: [P4, P6]
+    when: {check: K15}
+    template: checks/instruction_size.py
+    target: .cornerstone/checks/instruction_size.py
+    ci_step: workflows/steps/instruction-size.yml
+    eval: evals/check-k15/
+
   - id: ci-job.checks
     kind: ci-job
-    purpose: G3. Run K6, K14, and the repo checks on each pull request.
+    purpose: G3. Run K6, K7, K14, and the repo checks on each pull request.
     principle: [P1, P6]
     when: {gate: G3}
     template: workflows/cornerstone-checks.yml
     target: .github/workflows/cornerstone-checks.yml
     eval: evals/ci-job-checks/
+
+  - id: trigger.label
+    kind: ci-job
+    trigger: label
+    purpose: Start the first role of the profile when a human adds the trigger label to an issue.
+    principle: [P6, P9]
+    template: workflows/trigger-label.yml
+    parts: {run_role: workflows/parts/run-role.yml}
+    target: .github/workflows/cornerstone-$profile-label.yml
+    eval: evals/trigger-label/
+
+  - id: trigger.schedule
+    kind: ci-job
+    trigger: schedule
+    purpose: Start the first role of the profile on its schedule. Post its report as an issue.
+    principle: [P6, P9]
+    template: workflows/trigger-schedule.yml
+    parts: {run_role: workflows/parts/run-role.yml}
+    target: .github/workflows/cornerstone-$profile-schedule.yml
+    eval: evals/trigger-schedule/

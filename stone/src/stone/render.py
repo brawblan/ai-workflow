@@ -6,6 +6,7 @@ import calendar
 import datetime as dt
 import hashlib
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from stone import framework_check
+from stone import framework_check, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -24,9 +25,11 @@ REVIEW_MONTHS = 6
 CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches"}
 PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
                     "protected_json": "paths.tests and paths.checks"}
+MODEL_VALUES = {"instruction_file_max_lines"}  # template values from `defaults` in the model profile
 FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "docs/reports/"}
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
+DEFAULT_PR_LINES = 600  # D4, customization.md
 
 
 class RenderError(Exception):
@@ -130,6 +133,19 @@ def needed(entry: dict[str, Any], profiles: list[dict[str, Any]]) -> bool:
     return bool(profiles)
 
 
+def size_limits(config: dict[str, Any], profiles: list[dict[str, Any]]) -> dict[str, int]:
+    """Return the K7 limit of each selected profile with K7 (D27). The repo limit only tightens."""
+    repo = _get(config, "limits.pr_changed_lines")
+    if repo is not None and (isinstance(repo, bool) or not isinstance(repo, int) or repo < 1):
+        raise RenderError(f"{CONFIG}: 'limits.pr_changed_lines' must be a whole number above 0.")
+    limits = {}
+    for profile in profiles:
+        if "K7" in profile["checks"]:
+            own = (profile.get("limits") or {}).get("pr_changed_lines", DEFAULT_PR_LINES)
+            limits[profile["id"]] = min(own, repo) if repo else own
+    return limits
+
+
 def one_folder(value: Any, key: str = "plans") -> str:
     """Return a path as one folder that ends with '/'. Templates add the file name to it."""
     if isinstance(value, list):
@@ -181,29 +197,100 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
               f"'{model_profile.get('status')}', not 'active'", file=sys.stderr)
     adapter_roles = {entry["role"] for entry in registry if entry["kind"] == "role"}
     profiles = load_profiles(framework, config["profiles"], adapter_roles)
-    role_models = model_profile["defaults"]["role_models"]
+    defaults = model_profile["defaults"]
+    model_values = {name: str(defaults[name]) for name in MODEL_VALUES
+                    if defaults.get(name) not in (None, "")}
+
+    # A component with `ci_step` adds a step to the G3 workflow, only if it is rendered.
+    steps: dict[str, str | None] = {step_name(entry["id"]): None
+                                    for entry in registry if entry.get("ci_step")}
+    limits_json = json.dumps(size_limits(config, profiles), sort_keys=True)
+    base_values = {**template_values(config, ""), **model_values,
+                   "size_limits_json": limits_json}
+    for entry in registry:
+        if entry.get("ci_step") and needed(entry, profiles):
+            steps[step_name(entry["id"])] = substitute(harness, entry["ci_step"], base_values,
+                                                       steps, config)
 
     components = []
     for entry in registry:
-        if not needed(entry, profiles):
+        if "trigger" in entry or not needed(entry, profiles):
             continue
-        model = role_models.get(entry.get("role", ""), "")
-        values = template_values(config, model)
-        template = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
-        try:
-            content = Template(template).substitute(values)
-        except ValueError as error:
-            raise RenderError(f"The template {entry['template']} is not valid: {error}.") from None
-        except KeyError as error:
-            name = error.args[0]
-            prefix, _, key = name.partition("_")
-            hint = PLACEHOLDER_HINT.get(name, f"{CONFIG_SECTION.get(prefix, prefix)}.{key}")
-            raise RenderError(f"The template {entry['template']} needs '${name}'. Add {hint} "
-                              f"to {CONFIG}, without a TODO value.") from None
+        model = defaults["role_models"].get(entry.get("role", ""), "")
+        values = {**template_values(config, model), **model_values,
+                  "size_limits_json": limits_json,
+                  **{name: step for name, step in steps.items() if step is not None}}
+        content = substitute(harness, entry["template"], values, steps, config)
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
+    try:
+        components.extend(trigger_components(framework, harness, registry, profiles, config,
+                                             defaults["role_models"]))
+    except triggers.TriggerError as error:
+        raise RenderError(str(error)) from None
     return components
+
+
+def trigger_components(framework: Path, harness: Path, registry: list[dict[str, Any]],
+                       profiles: list[dict[str, Any]], config: dict[str, Any],
+                       role_models: dict[str, str]) -> list[Component]:
+    """Return one workflow for each profile trigger that is not `command` (D31)."""
+    entries = {entry["trigger"]: entry for entry in registry if "trigger" in entry}
+    found = triggers.profile_triggers(profiles)
+    components, targets = [], []
+    for trigger in triggers.supported(found, set(entries)):
+        entry = entries[trigger.key]
+        values = template_values(config, "")
+        values.update(triggers.values(trigger, found, role_models))
+        text = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
+        for name, part in (entry.get("parts") or {}).items():
+            text = triggers.insert_block(
+                text, name, (harness / "templates" / part).read_text(encoding="utf-8"))
+        steps = triggers.flow_steps(framework, trigger.profile["id"]).replace("$", "$$")
+        text = triggers.insert_block(text, "profile_steps", steps)
+        component_id = f"{entry['id']}.{trigger.profile['id']}"
+        target = fill(entry["target"], entry["template"], values, config)
+        targets.append((trigger.text, target))
+        components.append(Component(component_id, entry["kind"], entry["purpose"],
+                                    entry["principle"], entry["eval"],
+                                    {target: fill(text, entry["template"], values, config)}))
+    triggers.check_targets(targets)
+    return components
+
+
+def step_name(component_id: str) -> str:
+    """Return the placeholder of a component's G3 step: `check.k15` gives `ci_step_check_k15`."""
+    return "ci_step_" + re.sub(r"[^a-z0-9]", "_", component_id.lower())
+
+
+def substitute(harness: Path, template_name: str, values: dict[str, str],
+               steps: dict[str, str | None], config: dict[str, Any]) -> str:
+    """Fill one template. Remove the placeholder line of each step that is not rendered."""
+    template = (harness / "templates" / template_name).read_text(encoding="utf-8")
+    for name, step in steps.items():
+        if step is None:
+            template = template.replace(f"${name}\n", "").replace(f"${{{name}}}\n", "")
+    return fill(template, template_name, values, config)
+
+
+def fill(template: str, template_name: str, values: dict[str, str],
+         config: dict[str, Any]) -> str:
+    """Substitute the values into a template text. Name the missing fact in the error."""
+    try:
+        return Template(template).substitute(values)
+    except ValueError as error:
+        raise RenderError(f"The template {template_name} is not valid: {error}.") from None
+    except KeyError as error:
+        name = error.args[0]
+        if name in MODEL_VALUES:
+            raise RenderError(f"The template {template_name} needs '${name}'. Add "
+                              f"defaults.{name} to the model profile "
+                              f"{config['model_profile']}.") from None
+        prefix, _, key = name.partition("_")
+        hint = PLACEHOLDER_HINT.get(name, f"{CONFIG_SECTION.get(prefix, prefix)}.{key}")
+        raise RenderError(f"The template {template_name} needs '${name}'. Add {hint} "
+                          f"to {CONFIG}, without a TODO value.") from None
 
 
 def add_months(day: dt.date, months: int) -> dt.date:

@@ -87,6 +87,9 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D24 | Version 1 supports all 10 profiles. `stone render` writes each component that a selected profile needs, and a trigger workflow for each trigger that is not `command`. Each role has one role file for all profiles. The pipeline gives the profile steps to the role at run time. A profile is supported when the adapter has a role file for each of its roles. A component with `when` renders only for a profile with that gate or check. | [generator/design.md](generator/design.md), [profiles/README.md](profiles/README.md) |
 | D25 | The investigator writes only in `paths.reports` (default `docs/reports/`). On a `spike/` branch it can write any file, except the harness and Cornerstone files, because K16 stops the merge. So it has the Edit and Write tools, and the hook limits the paths. | [workflow-model.md](workflow-model.md#roles) |
 | D26 | `stone eval` runs a component eval with and without the component, in a temp git repo. The harness adapter gives the run command in `eval.yaml`. Checks are code first. An `outcome` check tests behavior, and a `contract` check tests the format of the component. The variants get the same prompt and tools. Runs are local, not in CI. | [lifecycle.md](lifecycle.md#eval-design), [generator/design.md](generator/design.md) |
+| D27 | K7 is a script that `stone render` writes, with the limit of each selected profile in it. The limit is the profile limit, or `limits.pr_changed_lines` if that is smaller. CI does not know the profile of a PR, so the PR body names it on a `Profile: <id>` line. With no line, or with an unknown profile, the smallest limit applies. A `Waiver (P10)` section with text passes, with a notice. The G3 step reads the body through `env` and starts in `--mode warn`. | [checks.md](checks.md), [customization.md](customization.md) |
+| D28 | Check K15 is a script that `stone render` writes for a profile with K15. The limit is `instruction_file_max_lines` in the model profile, and the adapter names the instruction file. A component with `ci_step` adds its step to the G3 workflow only if the component renders. The K15 step starts in `--mode warn`. | [checks.md](checks.md), [generator/design.md](generator/design.md) |
+| D31 | `stone render` writes one CI workflow for each profile trigger that is not `command`. The workflow starts the first role of the profile with the profile steps. That role gets a read-only token, a tool allowlist, and no edit, shell, or web tools. It returns a report. A second job posts the report with its own minimum token. Event text goes to a step only through `env` (dossier F8 to F10). If two selected profiles use one label, each run also needs the label `profile:<id>`. | [generator/design.md](generator/design.md#trigger-workflows) |
 
 ## Open questions
 
@@ -133,13 +136,16 @@ Do these items in order. Each item is one PR or more.
 6. Version 1: support all 10 profiles (D24). Items 6b to 6h can run in parallel after 6a.
    - 6a. Done in stone 0.8: profile support from the adapter role files, the `when` filter, and the
      investigator role with its hook rule (D24, D25).
-   - 6b. K7 (change size) as a generated check in the G3 workflow. All code profiles need it.
-   - 6c. K15 (instruction size) for full-project. Golden-file test for full-project.
+   - 6b. Done: K7 (change size) as a generated check in the G3 workflow (D27). Two weeks after the
+     merge, change K7 to `--mode block` in the G3 workflow template.
+   - 6c. Done: K15 (instruction size) for full-project, and a golden-file test for full-project
+     (D28). Two weeks after the merge, change K15 to `--mode block` in the G3 step template.
    - 6d. K10 and K12 as repo commands for refactor-migration. Golden-file test for it.
    - 6e. K16 (no merge to main) for spike. Golden-file tests for spike, bug-triage, and code-audit.
-   - 6f. Golden-file tests for debugging, dependency-upgrade, and adapter-refresh.
+   - 6f. Done: golden-file tests for debugging, dependency-upgrade, and adapter-refresh.
    - 6g. Trigger workflows: `label:<name>`, `schedule:<cron>`, and `ci:<event>`. Untrusted event
-     text goes to a step only through `env`. The adapter names the secret.
+     text goes to a step only through `env`. The adapter names the secret. Part 1 done: the label
+     and schedule workflows (D31). Part 2: `ci:issue-opened` and `ci:dependency-pr`.
    - 6h. Update the guides from "When the profile ships" to "Today" for each profile.
 
    Exit criteria for version 1:
