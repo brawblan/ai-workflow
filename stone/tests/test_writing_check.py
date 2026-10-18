@@ -169,14 +169,18 @@ class ChangedLinesTest(unittest.TestCase):
 
 
 class ClaudeFolderTest(unittest.TestCase):
-    """AC12: K17 skips Markdown under a `.claude/` folder at any depth. Agent text is out of scope."""
+    """AC12: K17 skips Markdown under a `.claude/` folder at any depth. Agent text is out of scope.
+
+    D28: K17 also skips every file under a `golden/` folder.
+    """
 
     BAD = "# Doc\n\nJust erase the cache.\n"
     SKIPPED = [".claude/agents/a.md",
                "plugins/x/.claude/a.md",
                "stone/tests/golden/x/expected/.claude/agents/a.md"]
+    GOLDEN = ["stone/tests/golden/x/expected/docs/c.md"]
     TESTED = ["docs/b.md",
-              "stone/tests/golden/x/expected/docs/c.md",
+              "plugins/x/docs/c.md",
               "docs/claude/d.md",
               "docs/.claude-notes/e.md"]
 
@@ -193,7 +197,7 @@ class ClaudeFolderTest(unittest.TestCase):
         subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
                         "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty",
                         "-m", "base"], cwd=self.root, check=True, capture_output=True)
-        for name in self.SKIPPED + self.TESTED:
+        for name in self.SKIPPED + self.GOLDEN + self.TESTED:
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(self.BAD, encoding="utf-8")
@@ -210,13 +214,23 @@ class ClaudeFolderTest(unittest.TestCase):
             with self.subTest(path=name):
                 self.assertNotIn(name, found_paths)
 
+    def test_ac12_diff_skips_golden_folders(self) -> None:
+        found_paths = self.paths(run(self.root, [], "main", rules(), DEFAULT_EXCLUDE))
+        for name in self.GOLDEN:
+            with self.subTest(path=name):
+                self.assertNotIn(name, found_paths)
+
     def test_ac12_diff_still_tests_other_files(self) -> None:
         found_paths = self.paths(run(self.root, [], "main", rules(), DEFAULT_EXCLUDE))
         self.assertEqual(found_paths, set(self.TESTED))
 
     def test_ac12_folder_path_skips_nested_claude_folder(self) -> None:
+        findings = run(self.root, ["plugins/x"], None, rules(), DEFAULT_EXCLUDE)
+        self.assertEqual(self.paths(findings), {"plugins/x/docs/c.md"})
+
+    def test_ac12_folder_path_skips_golden_folder(self) -> None:
         findings = run(self.root, ["stone/tests/golden"], None, rules(), DEFAULT_EXCLUDE)
-        self.assertEqual(self.paths(findings), {"stone/tests/golden/x/expected/docs/c.md"})
+        self.assertEqual(self.paths(findings), set())
 
     def cli_block(self) -> tuple[int, str]:
         out = io.StringIO()

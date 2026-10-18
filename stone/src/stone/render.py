@@ -25,6 +25,7 @@ REVIEW_MONTHS = 6
 CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches", "limit": "limits"}
 PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
                     "protected_json": "paths.tests and paths.checks"}
+MODEL_VALUES = {"instruction_file_max_lines"}  # template values from `defaults` in the model profile
 FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "docs/reports/"}
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
@@ -207,21 +208,34 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
               f"'{model_profile.get('status')}', not 'active'", file=sys.stderr)
     adapter_roles = {entry["role"] for entry in registry if entry["kind"] == "role"}
     profiles = load_profiles(framework, config["profiles"], adapter_roles)
-    role_models = model_profile["defaults"]["role_models"]
+    defaults = model_profile["defaults"]
+    model_values = {name: str(defaults[name]) for name in MODEL_VALUES
+                    if defaults.get(name) not in (None, "")}
+
+    # A component with `ci_step` adds a step to the G3 workflow, only if it is rendered.
+    steps: dict[str, str | None] = {step_name(entry["id"]): None
+                                    for entry in registry if entry.get("ci_step")}
     limits_json = json.dumps(size_limits(config, profiles), sort_keys=True)
+    base_values = {**template_values(config, ""), **model_values,
+                   "size_limits_json": limits_json}
+    for entry in registry:
+        if entry.get("ci_step") and needed(entry, profiles):
+            steps[step_name(entry["id"])] = substitute(harness, entry["ci_step"], base_values,
+                                                       steps, config)
 
     components = []
     for entry in registry:
         if not needed(entry, profiles):
             continue
-        model = role_models.get(entry.get("role", ""), "")
-        values = template_values(config, model)
-        values["size_limits_json"] = limits_json
+        model = defaults["role_models"].get(entry.get("role", ""), "")
+        values = {**template_values(config, model), **model_values,
+                  "size_limits_json": limits_json,
+                  **{name: step for name, step in steps.items() if step is not None}}
         for block in BLOCKS:
             values.setdefault(block, "")
         if entry.get("steps"):
-            values["check_steps"] = render_steps(harness, entry["steps"], profiles, values)
-        content = substitute(harness, entry["template"], values)
+            values["check_steps"] = render_steps(harness, entry["steps"], profiles, values, config)
+        content = substitute(harness, entry["template"], values, steps, config)
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
@@ -229,7 +243,7 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
 
 
 def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict[str, Any]],
-                 values: dict[str, str]) -> str:
+                 values: dict[str, str], config: dict[str, Any]) -> str:
     """Return the optional steps that a selected profile needs, as one block of lines (D29).
 
     A step with a `command` needs that key in `commands` of the repo config. If the key has no
@@ -252,25 +266,39 @@ def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict
                       "command and render again.", file=sys.stderr)
                 continue
             step_values["step_command"] = values[f"command_{command}"]
-        blocks.append("\n" + substitute(harness, step["template"], step_values).rstrip("\n"))
+        text = substitute(harness, step["template"], step_values, {}, config)
+        blocks.append("\n" + text.rstrip("\n"))
     return "\n".join(blocks)
 
 
-def substitute(harness: Path, name: str, values: dict[str, str]) -> str:
-    """Fill the placeholders of one template. A line with only an empty block goes away."""
-    template = (harness / "templates" / name).read_text(encoding="utf-8")
+def step_name(component_id: str) -> str:
+    """Return the placeholder of a component's G3 step: `check.k15` gives `ci_step_check_k15`."""
+    return "ci_step_" + re.sub(r"[^a-z0-9]", "_", component_id.lower())
+
+
+def substitute(harness: Path, template_name: str, values: dict[str, str],
+               steps: dict[str, str | None], config: dict[str, Any]) -> str:
+    """Fill one template. Remove the line of each step that is not rendered, or empty block."""
+    template = (harness / "templates" / template_name).read_text(encoding="utf-8")
+    for name, step in steps.items():
+        if step is None:
+            template = template.replace(f"${name}\n", "").replace(f"${{{name}}}\n", "")
     for block in BLOCKS:
         if not values.get(block):
             template = re.sub(rf"^\$(?:{block}|\{{{block}\}})\n", "", template, flags=re.M)
     try:
         return Template(template).substitute(values)
     except ValueError as error:
-        raise RenderError(f"The template {name} is not valid: {error}.") from None
+        raise RenderError(f"The template {template_name} is not valid: {error}.") from None
     except KeyError as error:
-        key_name = error.args[0]
-        prefix, _, key = key_name.partition("_")
-        hint = PLACEHOLDER_HINT.get(key_name, f"{CONFIG_SECTION.get(prefix, prefix)}.{key}")
-        raise RenderError(f"The template {name} needs '${key_name}'. Add {hint} "
+        name = error.args[0]
+        if name in MODEL_VALUES:
+            raise RenderError(f"The template {template_name} needs '${name}'. Add "
+                              f"defaults.{name} to the model profile "
+                              f"{config['model_profile']}.") from None
+        prefix, _, key = name.partition("_")
+        hint = PLACEHOLDER_HINT.get(name, f"{CONFIG_SECTION.get(prefix, prefix)}.{key}")
+        raise RenderError(f"The template {template_name} needs '${name}'. Add {hint} "
                           f"to {CONFIG}, without a TODO value.") from None
 
 
