@@ -43,10 +43,16 @@ OPTIONS = re.compile(r"\boptions?\b", re.I)
 OPTION_LABEL = re.compile(r"(?:^|(?<=[\s(*]))(?:\(([a-e1-9])\)|([a-e])[).:](?=[\s*]|$)|"
                           r"option\s+([a-e1-9])\b)", re.I)
 # The text before a word that says that the word has no value: "No default", "not recommended".
+# A value that says that there is no value: "none", "n/a", "tbd". "no discount" is a value.
+EMPTY = re.compile(r"^\W*(none|n/a|tbd)\b", re.I)
 NEGATED = re.compile(r"\b(no|not|without)\s+(an?\s+)?$", re.I)
 SPLIT = re.compile(r";|,|\bor\b|\s/\s", re.I)
 # A change heading of a delta that adds or changes a requirement: "## ADDED cart.R3: A title".
 CHANGE = re.compile(r"^## (?:ADDED|MODIFIED)\s+(\S+?):?(?:\s|$)")
+# A list item that gives a recommendation or a default, not an option: "- Recommendation: (b)",
+# "- I recommend (b)", "- Default until G2: (a)". "- Raise ExpiredCode (recommended)" is an option.
+PART_ITEM = re.compile(r"^\W*(\w+\s+){0,2}?(recommend|suggest|prefer|default|the plan uses)", re.I)
+OPEN_NOTE = re.compile(r"\bopen question\b|\bnot (yet )?(decided|approved)\b", re.I)
 TABLE_RULE = re.compile(r"^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-*:?\s*$")  # | --- | :-: |
 
 
@@ -228,6 +234,7 @@ def _says(lines: list[str], words: re.Pattern[str]) -> bool:
 
     "Default: (a)" and "I recommend B" give a value. "No default", "Recommendation: none", and
     "Default until G2: none" do not: the value is the text after the first ":", if there is one.
+    A word in a question ("What must the default be?") does not count.
     A line that ends in ":" after the word takes its value from the next line with text, if that
     line does not give a different part (options, a recommendation, or a default).
     """
@@ -241,9 +248,15 @@ def _says(lines: list[str], words: re.Pattern[str]) -> bool:
                 after = next((n for n in lines[index + 1:] if n.strip()), "")
                 part = OPTIONS.search(after) or RECOMMENDS.search(after) or DEFAULTS.search(after)
                 rest = "" if part else after.strip(" \t*_-")
-            if rest and not NONE.match(rest):
+            if rest and not EMPTY.match(rest) and not _asks_about(line, match.end()):
                 return True
     return False
+
+
+def _asks_about(line: str, start: int) -> bool:
+    """The sentence of the line from `start` ends in "?": "What must the default be?" asks."""
+    end = re.search(r"[.!?;]", line[start:])
+    return bool(end) and end[0] == "?"
 
 
 def _option_count(lines: list[str]) -> int:
@@ -252,7 +265,8 @@ def _option_count(lines: list[str]) -> int:
     - the different option labels, for example "(a)", "B.", or "Option 2";
     - the parts of the text after the word "option" or "options" up to a recommendation or a
       default, split at ";", ",", "or", and " / ";
-    - the list items after a line that ends in "options:", except a recommendation or a default.
+    - the list items after a line with the word that ends in ":", except an item that starts with
+      a recommendation or a default.
     """
     labels = {next(group for group in match.groups() if group).lower()
               for line in lines for match in OPTION_LABEL.finditer(line)}
@@ -264,16 +278,16 @@ def _option_count(lines: list[str]) -> int:
         rest = line[match.end():]
         end = RECOMMENDS.search(rest) or DEFAULTS.search(rest)
         rest = (rest[:end.start()] if end else rest).strip(" \t*_:")
-        if rest and not NONE.match(rest):
+        if rest and not EMPTY.match(rest):
             best = max(best, sum(1 for part in SPLIT.split(rest) if re.search(r"\w", part)))
-        elif not rest and line.rstrip(" \t*_").endswith(":"):
+        if line.rstrip(" \t*_").endswith(":"):  # "Options:", "The options are:", "Options for X:"
             items = 0
             for after in lines[index + 1:]:
                 if not after.strip():
                     continue
                 if not LIST_ITEM.match(after):
                     break
-                if not (RECOMMENDS.search(after) or DEFAULTS.search(after)):
+                if not PART_ITEM.match(LIST_ITEM.sub("", after, count=1)):
                     items += 1
             best = max(best, items)
     return best
@@ -283,7 +297,8 @@ def _expired_requirements(workspace: Path, glob: str, pattern: re.Pattern[str]) 
     """Return the ADDED or MODIFIED sections with the pattern, in each delta of the glob.
 
     The grader reads the "## ADDED|MODIFIED" sections from the text, so a delta that is not valid
-    (for example, a requirement with no scenario) is also read.
+    (for example, a requirement with no scenario) is also read. A line that asks, or that says that
+    the behavior is an open question, does not count.
     """
     found = []
     for path in sorted(workspace.glob(glob)):
@@ -296,8 +311,8 @@ def _expired_requirements(workspace: Path, glob: str, pattern: re.Pattern[str]) 
                     found.append(f"{name} ({path.name})")
                 match = CHANGE.match(line)
                 name, section = (match[1] if match else ""), [line]
-            else:
-                section.append(line)
+            elif "?" not in line and not OPEN_NOTE.search(line):
+                section.append(line)  # a note that the behavior is open does not write a default
     return found
 
 

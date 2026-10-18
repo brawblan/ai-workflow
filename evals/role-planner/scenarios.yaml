@@ -66,7 +66,7 @@ scenarios:
       - {check: grader, name: open_question, path: "docs/plans/SHOP-14*.md",
          delta: "docs/plans/SHOP-14*.spec.md",
          pattern: "expir|end date|last day|\\bends\\b|out of date|no longer valid",
-         delta_pattern: "expir|end date|last day|\\bend(s|ed)\\b|out of date|no longer valid",
+         delta_pattern: "expir|end date|last day|\\bended\\b|out of date|no longer valid",
          kind: contract}
 
   - id: P4
