@@ -81,10 +81,12 @@ def load_scenarios(folder: Path) -> dict[str, Any]:
         raise EvalError(f"{path}: the file must be a mapping with 'component', 'role', and "
                         "'scenarios'. Fix the file.")
     problems = [f"no '{key}'" for key in ("component", "role", "scenarios") if not data.get(key)]
-    if data.get("scenarios") and not isinstance(data["scenarios"], list):
+    scenarios = data.get("scenarios") or []
+    if not isinstance(scenarios, list):
         problems.append("'scenarios' must be a list")
+        scenarios = []
     seen: set[str] = set()
-    for number, scenario in enumerate(data.get("scenarios") or [], 1):
+    for number, scenario in enumerate(scenarios, 1):
         if not isinstance(scenario, dict):
             problems.append(f"#{number}: a scenario must be a mapping")
             continue
@@ -383,7 +385,8 @@ def _grader(ws: Workspace, item: dict[str, Any], folder: Path) -> tuple[bool, st
         result = subprocess.run(
             [sys.executable, str((folder / "grade.py").resolve()), item["name"],
              "--workspace", str(ws.path), "--args", json.dumps(args)],
-            cwd=folder, capture_output=True, text=True, timeout=item.get("timeout", 600))
+            cwd=folder, capture_output=True, text=True, timeout=item.get("timeout", 600),
+            env={**os.environ, **GIT_ENV})
         data = json.loads(result.stdout.strip().splitlines()[-1])
         return data["pass"] is True, str(data.get("detail", ""))
     except (OSError, subprocess.TimeoutExpired, IndexError, KeyError, TypeError,
