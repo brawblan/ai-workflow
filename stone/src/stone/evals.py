@@ -150,6 +150,9 @@ def load_run_config(path: Path) -> dict[str, Any]:
     for variant in VARIANTS:
         if not isinstance(data["run"].get(variant), list):
             raise EvalError(f"{path}: 'run.{variant}' must be a list of arguments.")
+    for key in ("output", "output_where", "env", "tools"):
+        if not isinstance(data.get(key) or {}, dict):
+            raise EvalError(f"{path}: '{key}' must be a mapping.")
     return data
 
 
@@ -206,6 +209,11 @@ def _dotted(data: Any, dotted: str) -> Any:
     return data
 
 
+def _same(data: dict[str, Any], key: str, value: Any) -> bool:
+    """The key is in the object with the same value and type (true is not 1)."""
+    return key in data and type(data[key]) is type(value) and data[key] == value
+
+
 def parse_output(stdout: str, fields: dict[str, str],
                  where: dict[str, Any] | None = None) -> dict[str, Any]:
     """Read the last JSON object in the output that has each key and value in `where`."""
@@ -214,7 +222,7 @@ def parse_output(stdout: str, fields: dict[str, str],
             data = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if isinstance(data, dict) and all(data.get(k) == v for k, v in (where or {}).items()):
+        if isinstance(data, dict) and all(_same(data, k, v) for k, v in (where or {}).items()):
             return {name: _dotted(data, path) for name, path in fields.items()}
     return {}
 
