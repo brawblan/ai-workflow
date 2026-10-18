@@ -1,7 +1,7 @@
 ---
 id: full-project
 name: Full project
-version: 0.1.0
+version: 0.2.0
 purpose: Start a new product or a major area, and break it into app slices.
 triggers: [command]
 stages: [intake, shape, plan, verify, review, deliver, learn]   # the walking skeleton runs as an app-slice
@@ -14,7 +14,7 @@ gates:
   G3: required
   G4: human
   G5: always
-checks: [K1, K2, K3, K4, K5, K6, K7, K8, K9, K13, K14, K15, K17]
+checks: [K1, K2, K3, K4, K5, K6, K7, K8, K9, K13, K14, K15, K17, K18]
 limits:
   pr_changed_lines: 600
 outputs: [plan, pr]
@@ -36,12 +36,13 @@ runs as an [app-slice](app-slice.md).
 ## Flow
 
 1. Run the shaper with the human. Write the project foundation: mission, non-goals, principles,
-   tech stack, and roadmap.
+   tech stack, roadmap, and the personas file (`constitution/personas.md`).
 2. A human approves the foundation (G1).
 3. Start the planner in a fresh session. It writes:
    - The architecture rules as fitness checks (K8), not as prose.
    - The walking skeleton: the smallest app that builds, deploys, and runs one end-to-end test.
-   - A backlog of app slices, in order. Each slice has acceptance criteria and a test oracle.
+   - A backlog of app slices, in order. Each slice has acceptance criteria, a test oracle, and the
+     personas that it serves.
 4. A human approves the architecture and the backlog (G2).
 5. Build the walking skeleton as the first app slice. Its checks become the baseline for all later
    slices.
@@ -54,6 +55,7 @@ runs as an [app-slice](app-slice.md).
 - The walking skeleton passes all baseline checks in CI.
 - The backlog has at least the first 3 slices with complete Definition of Ready fields.
 - The instruction file is under the line limit (K15).
+- The personas file passes K18. Each persona has 3 to 5 job stories.
 
 ## Failure handling
 
@@ -64,4 +66,4 @@ runs as an [app-slice](app-slice.md).
 
 ## Evidence
 
-Dossier IDs: C3, C7, D10, D11, A7, A10, H2.
+Dossier IDs: C3, C7, D10, D11, D12, D13, A7, A10, H2.

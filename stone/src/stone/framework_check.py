@@ -8,6 +8,7 @@ from typing import Any
 
 import yaml
 
+from stone import personas_check
 from stone.findings import Finding
 from stone.markdown import relative_links, split_frontmatter, table_rows
 
@@ -178,4 +179,4 @@ def run(root: Path, framework: Path | None = None) -> list[Finding]:
     docs = [p for p in sorted(root.rglob("*.md"))
             if ".git" not in p.parts and "node_modules" not in p.parts]
     return (check_profiles(framework) + check_links(root, docs) + check_neutral(framework)
-            + check_config(root, framework))
+            + check_config(root, framework) + personas_check.run(root))

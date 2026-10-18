@@ -1,7 +1,7 @@
 ---
 id: debugging
 name: Debugging
-version: 0.1.0
+version: 0.2.0
 purpose: Find the root cause of one confirmed defect, prove it with a failing test, and fix it.
 triggers: [command, label:agent-ready]
 stages: [intake, shape, build, test, verify, review, deliver, learn]
@@ -14,7 +14,7 @@ gates:
   G3: required
   G4: human
   G5: if-needed
-checks: [K1, K2, K3, K6, K7, K9, K12, K13, K14, K17]
+checks: [K1, K2, K3, K6, K7, K9, K12, K13, K14, K17, K18]
 limits:
   pr_changed_lines: 200
 outputs: [pr]
@@ -35,7 +35,8 @@ the fix.
 
 ## Flow
 
-1. Run the G1 check: the issue has reproduction steps, an expected result, and an actual result.
+1. Run the G1 check: the issue has reproduction steps, an expected result, an actual result, and
+   the personas that the defect affects (or `none`).
 2. Start the tester in a fresh session. It writes a test that reproduces the defect. The test MUST
    fail on the current code.
 3. Run the test. If it passes, stop. The defect is not reproduced. Send the issue back to triage.

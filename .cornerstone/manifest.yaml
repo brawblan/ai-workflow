@@ -103,7 +103,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/shaper.md
-  hash: 35daf671da39c324ee1a86efef4f48f61df3f48c21fee9d4d6477a30cd2aadd1
+  hash: 75e06e816eaa3225b353e5e850b30a37d2a1ee53b9d0b64e0e8bba7d4394c2a5
 - id: role.tester
   kind: role
   purpose: Write independent tests from the ticket and the diff.
@@ -117,4 +117,4 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/tester.md
-  hash: 35a6975aee565537399638087caa2417b84b45e97746edba25c72b2cd0779d3a
+  hash: 334abdedcf3a7e0370ce41ad7d32e2637a47faa5423b0f1a4b3b3b518261a8c2

@@ -11,7 +11,8 @@ non-goals sections to decide if a change belongs. Remove each Guide comment when
 
 ## Audience
 
-<!-- Guide: Who uses it, and who does not. Be specific: size, role, skill level. -->
+<!-- Guide: Who uses it, and who does not. Be specific: size, role, skill level. The details of
+each type of user (job stories, limits) go in personas.md. Link to it. Do not copy it. -->
 
 - **Primary users:** <role, skill level, context>
 - **Ideal customer:** <organization or person, size, situation>

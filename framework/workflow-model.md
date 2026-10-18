@@ -43,7 +43,7 @@ The "Role" column names the role. The [mode](modes.md#presets) decides if a huma
 | shaper | Interview the human until the ticket meets the Definition of Ready. | Ticket, repo docs | Ticket fields | Write code |
 | planner | Write the plan artifact or decide that no plan is necessary. | Ticket, code, repo docs | Plan artifact | Write code |
 | implementer | Change the code to meet the ticket and the plan. | Ticket, plan, code | Source code, decision log | Change protected paths (tests, checks, CI, check config) |
-| tester | Write tests from the ticket and the plan. Test the public behavior. | Ticket, plan, diff, code | Test files, test report | Change source code |
+| tester | Write tests from the ticket and the plan. Write the acceptance tests from the job stories of the ticket's personas. Test the public behavior. | Ticket, plan, personas file, diff, code | Test files, test report | Change source code |
 | reviewer | Find defects and scope drift. Report only gaps that affect correctness or the ticket. | Ticket, plan, diff, check output, decision log | Review findings | Change any file |
 | investigator | Read, run, and report. Used for triage, debugging analysis, audits, and spikes. | Code, logs, issues | Findings report | Change files outside its scratch area |
 
@@ -70,15 +70,17 @@ These rules apply to each stage that an agent drives.
 | Test report | Markdown: tests added, behavior covered, gaps | PR comment | tester |
 | Review findings | Markdown: finding, severity, evidence | PR review | reviewer |
 | Findings report | Markdown: defects, risks, improvements | `docs/reports/<id>.md` | investigator |
+| Personas file | Markdown: one section for each persona (see [Personas](#personas)) | `constitution/personas.md` | shaper with a human (full-project) |
 
 Paths are defaults. The repo config can change them. See [customization.md](customization.md).
 
 ### Plan artifact sections
 
-1. Understanding (the problem in 3 sentences or fewer)
+1. Understanding (the problem in 3 sentences or fewer, and a `Personas: <IDs>` line from the ticket)
 2. Files to change
 3. Approach
-4. Acceptance criteria coverage (each criterion and how it is verified)
+4. Acceptance criteria coverage (each criterion, the job story ID that it serves, and how it is
+   verified)
 5. Out of scope and risks
 6. Open questions
 
@@ -92,3 +94,25 @@ Paths are defaults. The repo config can change them. See [customization.md](cust
 | Test oracle: how a person knows that it works | Profiles with a Build stage |
 | Reproduction steps, expected and actual result | Bug triage, debugging |
 | Time box | Spike, audit |
+| Personas: the IDs of the personas that the change serves | App slice. Single ticket and debugging: the IDs, or `none` if the change does not affect users. |
+
+### Personas
+
+A persona is a type of person who uses the product. It is not an agent role. The framework does not
+give agents personas, because a persona in a model prompt does not improve results (dossier E14).
+
+Full-project writes the personas file. Each later ticket names its personas in the Definition of
+Ready. The plan maps each acceptance criterion to a job story. The tester writes the acceptance
+tests from those job stories.
+
+The personas file has one `##` section for each persona, with these fields:
+
+| Field | Value |
+| --- | --- |
+| `id` | A slug, for example `analyst`. Unique in the file. |
+| `who` | One line. |
+| `jobs` | 3 to 5 job stories. Each one is `<id>.J<n>: When I ..., I want to ..., so that ...`. |
+| `limits` | `device`, `skill`, and `access`. |
+| `evidence` | `assumed` or `validated`. A lifecycle review flags each assumed persona (see [lifecycle.md](lifecycle.md#personas)). |
+
+Check K18 tests this format and the persona and job story IDs in the plans. Dossier: D12, D13.

@@ -1,6 +1,6 @@
 ---
 name: project-setup
-description: "Set up or update a repo's agent docs: a constitution/ folder (mission, principles, tech stack, roadmap), a short AGENTS.md with a CLAUDE.md import, and the OpenSpec wiring if the repo uses OpenSpec. Reads the repo first, then asks the user only for missing facts. Use when asked to set up a repo for AI agents, create or update a constitution, write AGENTS.md or CLAUDE.md, onboard a repo to spec-driven development, or make a user-level AGENTS.md."
+description: "Set up or update a repo's agent docs: a constitution/ folder (mission, personas, principles, tech stack, roadmap), a short AGENTS.md with a CLAUDE.md import, and the OpenSpec wiring if the repo uses OpenSpec. Reads the repo first, then asks the user only for missing facts. Use when asked to set up a repo for AI agents, create or update a constitution, write AGENTS.md or CLAUDE.md, onboard a repo to spec-driven development, or make a user-level AGENTS.md."
 ---
 
 # project-setup
@@ -13,6 +13,7 @@ them, then remove them.
 | --- | --- | --- |
 | `constitution/README.md` | `constitution/README.md` | Index of the constitution |
 | `constitution/mission.md` | `constitution/mission.md` | Vision, audience, tone, scope, non-goals |
+| `constitution/personas.md` | `constitution/personas.md` | The users: who, job stories, limits, evidence |
 | `constitution/principles.md` | `constitution/principles.md` | MUST rules (repos without OpenSpec) |
 | `constitution/principles.openspec.md` | `constitution/principles.md` | Pointer to `openspec/config.yaml` (repos with OpenSpec) |
 | `constitution/tech-stack.md` | `constitution/tech-stack.md` | Approved technology, ownership, deploy limits, gates |
@@ -73,6 +74,7 @@ Question bank (ask only the ones that the survey did not answer):
 | File | Questions |
 | --- | --- |
 | Mission | What changes for the user when this works? Who is the primary user, and who is not? What are 3 non-goals? What is the product voice? What is the engineering tone (strict or relaxed)? (Optional) How will you know it works? |
+| Personas | Which 1 to 5 types of people use the product? For each one: who are they, in one line? What are 3 to 5 things that they must get done ("When I ..., I want to ..., so that ...")? Which device, skill, and access limits do they have? Did you talk to real users of this type (validated), or is it a guess (assumed)? |
 | Principles | Which rules must every change follow (security, tests, data isolation, accessibility, ownership)? What are the merge gates? What is exempt from the test rule? |
 | Tech stack | Which tools are approved but not in the manifests yet? Which tools are not allowed? What are the deploy limits (cost, regions, one project per environment)? Which environments exist? |
 | Roadmap | What is the goal of the current phase? What ends the phase? Which epics or issues are in it, in order? What comes next? |
@@ -113,11 +115,12 @@ wants.
 
 - Every link in the new and changed files resolves.
 - `git grep -n "<!-- Guide:"` finds nothing in the target files.
-- No template placeholders are left (for example `<vision>`, `<command>`, `<branch>`). Read each
+- No template placeholders are left (for example `<vision>`, `<slug>`, `<command>`, `<branch>`). Read each
   target file to confirm. A regex search also finds real HTML and generics, so do not trust it alone.
 - No secrets, tokens, or private hostnames are in the files.
 - The repo's lint or format command passes on the changed files.
 - If OpenSpec is present, `openspec validate --all --strict` passes.
+- If `stone` is installed, `stone check` reports no K18 finding for `constitution/personas.md`.
 
 ## 7. Hand off
 

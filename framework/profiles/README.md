@@ -7,11 +7,11 @@ file has YAML frontmatter that the generator reads, and a body that people read.
 
 | Profile | Scope | Default mode | Plan form | Gates | Changes code | Key checks beyond the baseline |
 | --- | --- | --- | --- | --- | --- | --- |
-| [full-project](full-project.md) | A new product or a major area | hybrid | Plan artifact for each slice | G1 G2 G3 G4 G5 | yes, through slices | K4 K5 K8 |
-| [app-slice](app-slice.md) | One vertical feature through all layers | hybrid | Plan artifact | G1 G2 G3 G4 | yes | K4 K5 K8 K10 |
-| [single-ticket](single-ticket.md) | One small, clear change | agent-centric | Decision log | G1 (check) G3 G4 | yes | K5 if the ticket has UI behavior |
+| [full-project](full-project.md) | A new product or a major area | hybrid | Plan artifact for each slice | G1 G2 G3 G4 G5 | yes, through slices | K4 K5 K8 K18 |
+| [app-slice](app-slice.md) | One vertical feature through all layers | hybrid | Plan artifact | G1 G2 G3 G4 | yes | K4 K5 K8 K10 K18 |
+| [single-ticket](single-ticket.md) | One small, clear change | agent-centric | Decision log | G1 (check) G3 G4 | yes | K5 if the ticket has UI behavior, K18 |
 | [bug-triage](bug-triage.md) | Sort and confirm incoming bugs | agent-centric | none | G4 (labels) | no | — |
-| [debugging](debugging.md) | Find and fix the root cause of one defect | hybrid | Decision log | G1 (check) G3 G4 | yes | K12 (bisect) |
+| [debugging](debugging.md) | Find and fix the root cause of one defect | hybrid | Decision log | G1 (check) G3 G4 | yes | K12 (bisect), K18 |
 | [code-audit](code-audit.md) | Find defects, risks, and improvements in an area | agent-centric | none | G1 (scope) G4 (findings) | no | Reads K8 K9 K10 results |
 | [refactor-migration](refactor-migration.md) | Change structure, keep behavior | hybrid | Plan artifact | G1 G2 G3 G4 | yes | K8 K10 K12 |
 | [dependency-upgrade](dependency-upgrade.md) | Upgrade one dependency | agent-centric | Decision log | G3 G4 | yes | K4 K5 |

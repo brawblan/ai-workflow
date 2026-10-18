@@ -94,6 +94,8 @@ the workflow profiles where it applies, and the framework principle that it supp
 | D9 | For large features, let the agent interview you and write a spec. Then start a fresh session to build it. | [S10] | FP AS | P3, P8 |
 | D10 | For a long build, an initializer agent expands the request into a structured feature list. Each feature starts as failing. | [S7] | FP AS | P3, P8 |
 | D11 | The first tickets you create are the most important. They set the pattern for the rest. | [S2] | FP | P3 |
+| D12 | A persona describes one specific type of user, with goals and limits. A team designs for that person, not for an abstract "user". | [S31] | FP AS | P3 |
+| D13 | A job story states the situation, the motivation, and the expected outcome: "When ..., I want to ..., so that ...". It gives the context that a user story with a role does not. | [S32] | FP AS ST | P3 |
 
 ### E. Sessions, state, and roles
 
@@ -112,6 +114,7 @@ the workflow profiles where it applies, and the framework principle that it supp
 | E11 | Workflow patterns: prompt chaining, routing, parallelization, orchestrator-workers, evaluator-optimizer. | [S6] | ALL | P12 |
 | E12 | Break work into different sessions when the agent must check its own work. | [S3] | ALL | P2, P8 |
 | E13 | Start to run 2 or 3 agents at the same time. | [S2] | AS ST DU | P8 |
+| E14 | A persona in the system prompt did not improve model results on objective questions. The effect of each persona was mostly random, and an automatic choice of the best persona was no better than a random choice. | [S33] | ALL | P5, P7 |
 
 ### F. Autonomy and safety
 
@@ -177,6 +180,7 @@ the workflow profiles where it applies, and the framework principle that it supp
 | 7 | Developers feel faster [S16] **against** measured slowdown [S16] [S17]. | Measure outcomes. The framework tracks lead time, rework, escaped defects, review time, and cost for each merged PR. |
 | 8 | Write no code by hand [S2] [S12] **against** the human as an active pair [S23]. | Both are valid. They are presets. The [mode](../../framework/modes.md) selects the driver of each stage. The gates do not change with the mode. |
 | 9 | Controlled language such as ASD-STE100 removes ambiguity [S1] **against** explicit text has limited, model-tied effects [S1] [S4]. | STE applies to human-facing text, where the reader is a person. Agent-facing text uses STE only where an eval shows a gain. Review time, rework, and a quarterly blind A/B decide if STE stays. See [writing.md](../../framework/writing.md). |
+| 10 | Role-based frameworks give agents personas such as analyst or product manager [S30] **against** a persona in a prompt does not improve results [S33]. | Personas describe the users of the product, not the agents. Roles stay plain jobs with instructions, tools, and permissions. See [workflow-model.md](../../framework/workflow-model.md#personas). |
 
 ## 3. Gap analysis of this repo (brawblan/ai-workflow, v0.2.1)
 
@@ -240,3 +244,6 @@ in this repo.
 | S28 | Anthropic, [claude-code-action](https://github.com/anthropics/claude-code-action) (GitHub Actions). |
 | S29 | Anthropic, [Claude Code hooks guide](https://code.claude.com/docs/en/hooks-guide). |
 | S30 | [The BMAD Method explained](https://codemyspec.com/blog/bmad-method-explained). |
+| S31 | Alan Cooper, The Inmates Are Running the Asylum, Sams, 1999. |
+| S32 | Alan Klement, "Replacing the User Story with the Job Story", JTBD.info, 2013. |
+| S33 | Zheng, Pei, Logeswaran, Lee, Jurgens, [When "A Helpful Assistant" Is Not Really Helpful: Personas in System Prompts Do Not Improve Performances of Large Language Models](https://arxiv.org/abs/2311.10054), arXiv 2311.10054, Findings of EMNLP 2024. |

@@ -8,7 +8,7 @@ harness feature.
 | harness | The software that runs the model, gives it tools, and controls the loop. | agent tool, IDE |
 | model | The language model that the harness calls. | AI, LLM (in rules) |
 | session | One run of a harness with one context. A fresh session has no context from another session. | chat, conversation |
-| role | A named job in the workflow, with its own instructions, tools, and permissions. A human or an agent can fill it. | persona, sub-agent (in the core) |
+| role | A named job in the workflow, with its own instructions, tools, and permissions. A human or an agent can fill it. | agent persona, sub-agent (in the core) |
 | actor | A human or an agent that fills a role. | user, bot |
 | driver | The actor that does the work in one stage: `agent`, `human`, `pair`, or `checks`. | owner (of a stage) |
 | pair | A human and an agent in the same session. The human decides each change. Counts as one actor. | co-pilot, assist |
@@ -37,3 +37,5 @@ harness feature.
 | writing standard | The rules for human-facing text. The default is ASD-STE100 (STE). | style guide |
 | human-facing text | Text whose main reader is a person (PR body, plan, report, reply). | docs (in general) |
 | project dictionary | A repo file that gives each domain term one meaning. | glossary |
+| persona | One type of person who uses the product: who they are, their job stories, their limits, and the evidence for them. It is not a role. See [workflow-model.md](workflow-model.md#personas). | user type, agent persona |
+| job story | One thing that a persona must get done: "When I ..., I want to ..., so that ...". Its ID is `<persona id>.J<n>`. | user story (in the core) |
