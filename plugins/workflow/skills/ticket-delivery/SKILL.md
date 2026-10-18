@@ -33,7 +33,8 @@ with the ticket and the diff. Use the repo's role file if it has one (for exampl
 - Run the repo's check command from `AGENTS.md` or `.cornerstone/config.yaml` (`commands.all_checks`).
 - Checks are programs, so this session can run them. Record each command and its result.
 - If a check fails, stop. Report the output. The implementer fixes it, not this skill.
-- If the plan has a spec delta (`<plans>/<id>.spec.md`) with no `apply_order`, run
+- If the plan has a spec delta (`<plans>/<id>.spec.md`, where `<plans>` is `paths.plans` in
+  `.cornerstone/config.yaml`, default `docs/plans/`) with no `apply_order`, run
   `stone spec apply <id>`. Commit its output alone, with the trailers `Role: generator` and
   `Actor: agent`. Then run the checks again.
 

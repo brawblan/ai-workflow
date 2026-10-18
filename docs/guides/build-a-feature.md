@@ -54,18 +54,19 @@ For each task in the progress file, follow [Run the roles](run-the-roles.md):
 
 ### 4. Review and deliver
 
-Before the PR, apply the spec delta. Commit the output alone:
-
-```bash
-stone spec apply issue-64
-git add docs/specs docs/plans/issue-64.spec.md
-git commit -m "chore(specs): apply the spec delta of issue-64" \
-  --trailer "Role: generator" --trailer "Actor: human"
-```
-
-1. Start the reviewer with the plan and the branch. It reports scope drift from the plan.
+1. Start the reviewer with the plan and the branch. It reports scope drift from the plan, and
+   each scenario of the spec delta that has no test.
 2. Open one PR for each group of tasks that stays under the size limit. Use
-   `/workflow:ticket-delivery`.
+   `/workflow:ticket-delivery`. It applies the spec delta and commits the output alone. To do it
+   by hand:
+
+   ```bash
+   stone spec apply issue-64
+   git add docs/specs docs/plans/issue-64.spec.md
+   git commit -m "chore(specs): apply the spec delta of issue-64" \
+     --trailer "Role: generator" --trailer "Actor: human"
+   ```
+
 3. A human approves each PR (G4).
 
 | Failure | Action |
@@ -74,6 +75,7 @@ git commit -m "chore(specs): apply the spec delta of issue-64" \
 | An end-to-end test cannot run in CI | Record a waiver. Add a manual verify step to the PR. |
 | The reviewer finds scope drift | Remove the extra change, or open a new ticket for it. |
 | K19 reports the same `apply_order` after a merge | Run `stone spec sync`. Commit its output with `Role: generator`. |
+| Apply or sync says that a requirement exists, after a merge | Another branch added the same ID. In your delta, change the ID of the ADDED requirement to a free number. Then run `stone spec sync`. |
 
 ## When the profile ships
 

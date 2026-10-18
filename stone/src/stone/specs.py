@@ -75,6 +75,10 @@ def config_path(root: Path, key: str) -> Path:
             raise SpecError(f"{CONFIG}: the YAML is not valid: {error}") from None
         paths = data.get("paths") if isinstance(data, dict) else None
         value = paths.get(key) if isinstance(paths, dict) else None
+    if isinstance(value, list) and len(value) == 1:
+        value = value[0]  # render accepts a list of one folder too
+    if value is not None and not isinstance(value, str):
+        raise SpecError(f"{CONFIG}: 'paths.{key}' must be one folder.")
     path = (root / (value or DEFAULT_PATHS[key])).resolve()
     if not path.is_relative_to(root.resolve()):
         raise SpecError(f"{CONFIG}: 'paths.{key}' is outside the repo. Use a path in the repo.")
