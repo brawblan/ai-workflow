@@ -149,6 +149,8 @@ Do these items in order. Each item is one PR or more.
    - 6e. Done: K16 (no merge to main) for spike, which blocks from the start (D30). Golden-file tests
      for spike, bug-triage, and code-audit.
    - 6f. Done: golden-file tests for debugging, dependency-upgrade, and adapter-refresh.
+   - 6i. Done: golden-file tests for single-ticket and app-slice. All 10 profiles now have a
+     golden-file test.
    - 6g. Trigger workflows: `label:<name>`, `schedule:<cron>`, and `ci:<event>`. Untrusted event
      text goes to a step only through `env`. The adapter names the secret. Done: the label, schedule,
      `ci:issue-opened`, and `ci:dependency-pr` workflows (D31).
