@@ -47,6 +47,9 @@ The "Role" column names the role. The [mode](modes.md#presets) decides if a huma
 | reviewer | Find defects and scope drift. Report only gaps that affect correctness or the ticket. | Ticket, plan, diff, check output, decision log | Review findings | Change any file |
 | investigator | Read, run, and report. Used for triage, debugging analysis, audits, and spikes. | Code, logs, issues | Findings report | Change files outside its scratch area |
 
+The scratch area of the investigator is the reports path. On a branch with the `spike/` prefix, it
+is the whole work tree, except the harness and Cornerstone files. K16 stops a merge of that branch.
+
 Roles are actor-neutral. The "Must not" column applies to a human in the role too. See the
 [separation rule for all actors](modes.md#separation-rule-for-all-actors).
 

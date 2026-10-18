@@ -689,12 +689,22 @@ class RenderTest(unittest.TestCase):
             with self.subTest(version=version):
                 self.assertNotIn("framework_version", self.render_log(version))
 
-    def test_each_supported_profile_lists_k14(self) -> None:
-        self.assertTrue(render.SUPPORTED_PROFILES)
-        for name in sorted(render.SUPPORTED_PROFILES):
+    def test_each_profile_with_g3_lists_k6_and_k14(self) -> None:
+        # The rendered G3 workflow runs K6 and K14, so each profile with G3 must list both.
+        names = sorted(p.stem for p in (FRAMEWORK / "profiles").glob("*.md")
+                       if p.stem not in {"README", "_template"})
+        with_g3 = []
+        for name in names:
+            text = (FRAMEWORK / "profiles" / f"{name}.md").read_text(encoding="utf-8")
+            profile = split_frontmatter(text)[0]
+            if profile["gates"].get("G3", "skip") == "skip":
+                continue
+            with_g3.append(name)
             with self.subTest(profile=name):
-                text = (FRAMEWORK / "profiles" / f"{name}.md").read_text(encoding="utf-8")
-                self.assertIn("K14", split_frontmatter(text)[0]["checks"])
+                self.assertIn("K6", profile["checks"])
+                self.assertIn("K14", profile["checks"])
+        self.assertIn("single-ticket", with_g3)
+        self.assertIn("app-slice", with_g3)
 
 
 if __name__ == "__main__":

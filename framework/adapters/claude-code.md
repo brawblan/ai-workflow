@@ -107,7 +107,7 @@ file, and K6 catches that change in CI.
 | implementer | Read, Grep, Glob, Edit, Write, Bash | repo config |
 | tester | Read, Grep, Glob, Edit, Write (tests path only, enforced by hook), Bash | repo config |
 | reviewer | Read, Grep, Glob, Bash (read-only commands) | repo config |
-| investigator | Read, Grep, Glob, Bash | repo config |
+| investigator | Read, Grep, Glob, Edit, Write (reports path, or a `spike/` branch, enforced by hook), Bash | repo config |
 
 ## Existing plugin skills
 
