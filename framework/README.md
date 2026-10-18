@@ -141,6 +141,10 @@ Do these items in order. Each item is one PR or more.
      and 0.80 without it. Without the role, the model writes a plan for a typo fix (P2). Both
      variants keep an open question for G2 in a headless run (P3). Both copy `apply_order` into
      a new delta, so the planner template needs a rule for it. Result: `evals/results/`.
+   - 4d. Done: the planner template forbids `apply_order` in a new delta. In a headless run, it
+     gives the options, a recommendation, and a default for each open question, and keeps the
+     default out of the delta. With the role, P1 and P5 now pass `not_applied` (6 of 6). Result:
+     `evals/results/`.
 5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
    of Q4 2026.
 6. Version 1: support all 10 profiles (D24). Items 6b to 6h can run in parallel after 6a.
