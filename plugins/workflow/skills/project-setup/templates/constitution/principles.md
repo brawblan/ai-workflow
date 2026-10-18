@@ -1,8 +1,7 @@
 # Principles
 
-<!-- Guide: Use this file when the repo does NOT use OpenSpec. If it uses OpenSpec, use
-principles.openspec.md instead, and put the rules in openspec/config.yaml. Keep the rules short:
-each one is a MUST that a reviewer can check. Remove each Guide comment when you fill the file. -->
+<!-- Guide: Keep the rules short: each one is a MUST that a reviewer can check. Remove each Guide
+comment when you fill the file. -->
 
 Version: 1.0.0
 

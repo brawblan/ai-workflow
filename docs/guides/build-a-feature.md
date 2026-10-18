@@ -8,7 +8,7 @@ decision. You approve the plan before an agent writes code.
 | Profile | [app-slice](../../framework/profiles/app-slice.md) |
 | Default mode | hybrid: you own the plan, an agent does the build |
 | Gates | G1, G2 (plan), G3, G4 |
-| Status | Partial. `stone render` does not write the planner role yet. You write the plan in a new session with a prompt. |
+| Status | Partial. The pipeline does not set `passes` in the progress file yet. You set it by hand. |
 
 ## Flow
 
@@ -33,22 +33,9 @@ Add the `agent-ready` label when the ticket is ready. That label is G1.
 
 ### 2. Write the plan (G2)
 
-Pick one spec tool. Use the same one for each feature in the repo.
-
-| Spec tool | How |
-| --- | --- |
-| Plain (default) | Start a new session with the prompt below. |
-| OpenSpec | Run `/workflow:sdd-plan` with the issue number. |
-
-Prompt for the plain spec tool:
-
-```text
-Read issue #64 and constitution/personas.md. Write docs/plans/issue-64.md with these sections:
-Understanding, Files to change, Approach, Acceptance criteria coverage, Out of scope and risks,
-Open questions. Map each acceptance criterion to a job story ID.
-Write docs/plans/issue-64.progress.json with one task for each step. Set "passes": false.
-Do not write code.
-```
+Start the planner with the ready issue: `STONE_ROLE=planner claude --agent planner`. It writes
+`docs/plans/<id>.md` with the six plan sections, and `docs/plans/<id>.progress.json` with one task
+for each step. It maps each acceptance criterion to a job story ID. It does not write code.
 
 Read the plan. Edit the plan, not the code. Open a PR with the plan. Your approval of that PR is G2.
 
@@ -60,9 +47,6 @@ For each task in the progress file, follow [Run the roles](run-the-roles.md):
 2. Start the tester with the issue, the plan, and the branch. It writes the acceptance tests from
    the job stories, and the integration tests for the task.
 3. Run `commands.all_checks`. If they pass, set `"passes": true` for the task.
-
-Do not use `/workflow:sdd-build` in a Cornerstone repo. It builds and tests in one session, and
-that breaks the separation rule (P2).
 
 ### 4. Review and deliver
 
@@ -81,8 +65,6 @@ that breaks the separation rule (P2).
 
 | Step | Today | Target |
 | --- | --- | --- |
-| Plan | A prompt in a new session | The planner role, in a fresh session |
 | Progress | You set `passes` by hand | The pipeline sets `passes` after the checks pass |
 | Architecture | Your CI rules | Fitness checks (K8) |
 | Test quality | Not measured | Mutation score on the changed code (K10) |
-| OpenSpec build | Not usable (P2) | `sdd-build` split into an implementer step and a tester step |

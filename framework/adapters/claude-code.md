@@ -34,7 +34,7 @@ two layers:
 1. **Local hook.** The run script sets `STONE_ROLE=implementer`. A `PreToolUse` hook reads the role and
    the target path. It exits with code 2 if the path is protected. In a `pair` session, the hook
    uses the role of the human (default: implementer). The hook also limits the tester to the test
-   paths, and blocks each edit by the reviewer.
+   paths and the planner to the plans path, and blocks each edit by the reviewer.
 2. **CI check K6.** Each commit has the trailers `Role: <role>` and `Actor: human|agent`. A commit
    with no `Role:` trailer counts as an implementer commit. K6 fails if an implementer commit
    changes a protected path.
@@ -114,8 +114,7 @@ file, and K6 catches that change in CI.
 | Skill | Framework place | Change needed |
 | --- | --- | --- |
 | `project-setup` | full-project, Shape | Becomes the Shape step of `cornerstone-setup`. Stays usable alone. |
-| `sdd-plan` | Plan (OpenSpec) | Move to the OpenSpec section of [spec-tools.md](spec-tools.md). |
-| `sdd-build` | Build (OpenSpec) | Split: implementer and tester run in separate sessions. |
+| `sdd-plan`, `sdd-build` | Plan, Build | Removed in plugin 0.5.0 (D18). The planner, implementer, and tester role files do this work. |
 | `ticket-delivery` | Verify, Deliver | Done in plugin 0.4.0: it collects the tester, reviewer, and check output as evidence. It does not self-verify. |
 | `dev-pr` | Deliver | Done in plugin 0.4.0: the PR evidence sections (K14) and the role trailers. |
 | `backlog-sequencer` | Intake | No change. |

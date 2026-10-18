@@ -1,7 +1,7 @@
 # Adapters: spec tools
 
-A spec tool stores the plan artifact. The default is plain Markdown. OpenSpec is optional. The core
-works with either.
+A spec tool stores the plan artifact. The only adapter is plain Markdown. To add a spec tool, map
+it to the contract in [contract.md](contract.md#what-a-spec-tool-adapter-must-provide) (D18).
 
 ## Plain (default)
 
@@ -28,15 +28,3 @@ Progress file format:
   ]
 }
 ```
-
-## OpenSpec
-
-| Concept | Target | Notes |
-| --- | --- | --- |
-| Plan artifact | `openspec/changes/<id>/` (`proposal.md`, `design.md`, spec deltas, `tasks.md`) | Understanding and scope are in `proposal.md`. Approach and files are in `design.md`. AC coverage is in the spec scenarios. |
-| Decision log | `openspec/changes/<id>/decisions.md` | `[TO CONFIRM]` that OpenSpec keeps extra files when it archives a change. |
-| Progress file | `tasks.md` checkboxes, plus `progress.json` for the pass state | JSON is safer for the pass state (dossier E4). |
-| G2 approval | A human approves the docs PR from `sdd-plan` | |
-| Validate | `openspec validate <id> --strict` | |
-
-The `sdd-plan` and `sdd-build` skills in this repo are the current OpenSpec implementation.

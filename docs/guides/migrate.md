@@ -12,7 +12,7 @@ names with your version before you start.
 | From | Kind | You keep | You replace |
 | --- | --- | --- | --- |
 | [Spec Kit](#spec-kit) | Replace the build loop | The constitution and the old specs, as history | The implement step |
-| [OpenSpec](#openspec) | Add to it | All of OpenSpec. It is a spec-tool adapter. | The apply step |
+| [OpenSpec](#openspec) | Replace the build loop | The config context and the specs, as history | The propose, apply, and archive steps |
 | [BMAD](#bmad) | Map the concepts | The documents: brief, PRD, architecture, stories | The agent personas and the agent workflows |
 | [Rule files only](#rule-files-only) | Restructure | The facts in the rules | Rules that a check can enforce |
 
@@ -44,29 +44,30 @@ After the setup, stop using the implement command in this repo.
 
 ## OpenSpec
 
-OpenSpec is a supported spec tool. Keep it, and set `spec_tool: openspec` in the repo config.
+Cornerstone has no OpenSpec adapter (D18). New work uses plain plans. Keep `openspec/` as history.
 
 | OpenSpec | Cornerstone | Change |
 | --- | --- | --- |
-| `openspec/config.yaml` context | `constitution/principles.md` points to it | `project-setup` writes the pointer |
-| `openspec/specs/` | The spec of record | No change |
-| A change: `proposal.md`, `design.md`, spec deltas | The plan artifact | No change. See [spec-tools.md](../../framework/adapters/spec-tools.md#openspec). |
-| `tasks.md` | The progress file | Add `progress.json` for the pass state |
-| Propose step | Plan, then G2 | A human approves the change PR |
+| `openspec/config.yaml` context | `constitution/principles.md` | `project-setup` moves the rules |
+| `openspec/specs/` | History. The planner reads it as input. | Do not edit it |
+| A change: `proposal.md`, `design.md`, spec deltas | The plan artifact, `docs/plans/<id>.md` | Six fixed sections |
+| `tasks.md` | The progress file, `docs/plans/<id>.progress.json` | Each task has a `passes` field |
+| Propose step | The planner role, then G2 | A human approves the plan PR |
 | Apply step | The implementer and the tester, in separate sessions | The largest change |
 | Verify step | The checks (G3) and the reviewer | Add the reviewer session |
-| Archive step | Deliver | No change |
+| Archive step | Deliver | The plan stays in `docs/plans/` |
 
 Prompt:
 
 ```text
 /workflow:cornerstone-setup
-This repo uses OpenSpec. Keep openspec/ as it is, and set spec_tool to openspec.
-Wire openspec/config.yaml into constitution/principles.md as a pointer.
+This repo uses OpenSpec. Move the rules in openspec/config.yaml into constitution/principles.md.
+Keep openspec/ as history. Do not convert the old changes or specs.
+New work uses Cornerstone tickets, plans, and roles.
 ```
 
-Plan with `/workflow:sdd-plan`. Do not build with `/workflow:sdd-build` yet. It builds and tests in
-one session. Build with [the roles](run-the-roles.md).
+After the setup, stop using the OpenSpec commands in this repo. Plan and build with
+[the roles](run-the-roles.md).
 
 ## BMAD
 

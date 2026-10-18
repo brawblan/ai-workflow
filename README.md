@@ -34,8 +34,8 @@ Draft v0. The framework is complete enough to use on one profile. Other parts ar
 | --- | --- |
 | [Framework](framework/README.md): principles, workflow model, gates, checks, modes, 10 profiles | Draft v0 |
 | [Harness adapter](framework/adapters/claude-code.md) and [model profile](framework/adapters/claude-code/models/claude-5.yaml) | First adapter. The model profile evals are not written yet. |
-| [`stone`](stone/README.md) 0.3 | `stone check`, `stone check-writing` (K17), and `stone render` for the single-ticket profile |
-| [`workflow` plugin](plugins/workflow/) 0.4.1 | Eight skills. `cornerstone-setup` is the entry skill. |
+| [`stone`](stone/README.md) 0.4 | `stone check`, `stone check-writing` (K17), and `stone render` for the single-ticket and app-slice profiles |
+| [`workflow` plugin](plugins/workflow/) 0.5.0 | Six skills. `cornerstone-setup` is the entry skill. |
 | This repo | Uses Cornerstone on itself: [`.cornerstone/config.yaml`](.cornerstone/config.yaml) and CI in [`stone.yml`](.github/workflows/stone.yml) |
 
 The next steps are in the [roadmap](framework/README.md#roadmap). The design decisions (D1, D2, ...)
@@ -105,27 +105,26 @@ For the single-ticket profile, `stone render` writes:
 .cornerstone/manifest.yaml what stone render owns, with a hash for each file
 ```
 
-A second run changes only the files whose input changed. The repo config fields are in
+For the app-slice profile, it also writes the planner role. A second run changes only the files
+whose input changed. The repo config fields are in
 [customization.md](framework/customization.md).
 
 ## The skills
 
 The plugin skills are the first harness implementation of parts of the framework. `stone render`
-writes the tester and reviewer roles, so the plugin has no skill for them (D14).
+writes the planner, tester, and reviewer roles, so the plugin has no skill for them (D14, D18).
 
 | Skill | What it does |
 | --- | --- |
 | `cornerstone-setup` | Set up a repo for Cornerstone. It runs `project-setup`, writes `.cornerstone/config.yaml`, and runs `stone render` and `stone check`. |
-| `project-setup` | Set up a repo for agents: `constitution/` (with personas and job stories), `AGENTS.md`, and the OpenSpec wiring. It asks only for facts the repo does not have. |
+| `project-setup` | Set up a repo for agents: `constitution/` (with personas and job stories), and `AGENTS.md`. It asks only for facts the repo does not have. |
 | `ticket-delivery` | Collect the tester, reviewer, and check evidence for each acceptance criterion. Then open the PR with `dev-pr`. |
 | `dev-pr` | Branch, commit, rebase, validate, and open a PR into the integration branch, with the evidence sections. |
-| `sdd-plan` | Plan a GitHub issue as an [OpenSpec](https://github.com/Fission-AI/OpenSpec) change. No code. |
-| `sdd-build` | Build, verify, and archive an OpenSpec change. Then open a PR. |
 | `backlog-sequencer` | Sync a `status:blocked` label from "Depends on #N" text. Suggest priority labels. |
 | `ste-writing` | Write with Simplified Technical English rules, and add diagrams. |
 
-`sdd-plan` and `sdd-build` need OpenSpec in the repo (`openspec init`). `cornerstone-setup` needs
-the `stone` CLI and a clone of this repo. The other skills need only `git` and `gh`.
+`cornerstone-setup` needs the `stone` CLI and a clone of this repo. The other skills need only `git`
+and `gh`.
 
 ## Install the plugin for Claude Code
 

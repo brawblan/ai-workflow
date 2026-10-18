@@ -8,7 +8,7 @@ to write files. The core does not change when an adapter changes (P12).
 | Type | Maps | v0 adapters |
 | --- | --- | --- |
 | Harness adapter | Instruction file, skills, roles, hooks, sessions, triggers | [claude-code.md](claude-code.md) |
-| Spec-tool adapter | Plan artifact, progress file, plan approval | [spec-tools.md](spec-tools.md) (plain, OpenSpec) |
+| Spec-tool adapter | Plan artifact, progress file, plan approval | [spec-tools.md](spec-tools.md) (plain) |
 | Model profile | The idioms of one model family inside one harness: prompt style, plan use, effort, role models, limits | [claude-code/models/claude-5.yaml](claude-code/models/claude-5.yaml) |
 
 ## What a harness adapter MUST provide

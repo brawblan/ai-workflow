@@ -20,6 +20,7 @@ Start each role in a new terminal session. Do not reuse a session from an earlie
 | Role | Command | Give it |
 | --- | --- | --- |
 | shaper | `claude --agent shaper` | The ticket. Answer its questions until the ticket is ready. |
+| planner | `STONE_ROLE=planner claude --agent planner` | The ready ticket. Answer its open questions. App-slice only. |
 | implementer | `STONE_ROLE=implementer claude --agent implementer` | The ticket, and the plan if one exists |
 | tester | `STONE_ROLE=tester claude --agent tester` | The ticket and the branch name. It reads the diff. |
 | reviewer | `STONE_ROLE=reviewer claude --agent reviewer` | The ticket, the branch, the check output, and the decision log |
@@ -28,6 +29,7 @@ Start each role in a new terminal session. Do not reuse a session from an earlie
 
 | Role | Can change |
 | --- | --- |
+| planner | The plans path only |
 | implementer | All paths except tests, checks, CI, `.claude/`, and `.cornerstone/` |
 | tester | The test paths only |
 | reviewer | No path |
