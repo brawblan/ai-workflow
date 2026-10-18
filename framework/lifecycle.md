@@ -121,7 +121,7 @@ scenarios:
 | `command` | The command `run` exits with the code `exit` (default 0). |
 | `commit_trailer` | A commit of the run has the line `trailer`. |
 | `spec_delta_valid` | `path` is a spec delta with no format error. |
-| `grader` | `grade.py <name> --workspace <path> --args <json>` prints `{"pass": true}` as its last line. |
+| `grader` | `grade.py <name> --workspace <path> --args <json>` prints `{"pass": true}` as its last line. The environment variable `STONE_EVAL_REPORT` has the final text of the run. |
 
 Each check has a `kind`:
 

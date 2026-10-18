@@ -95,6 +95,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D32 | A trigger role gets read rules only for the checkout and the event folder. A read rule with no path lets the role read any file, such as the process environment with the harness secret. The report is public, and an encoded secret in a job output is not redacted. So the path limit, not the secret scrub, protects the secret (dossier F9, F12). | [generator/design.md](generator/design.md#trigger-workflows), the adapter doc |
 | D33 | K16 fails a PR from a `spike/` branch into `branches.main` or `branches.integration`. Without the second branch, spike code gets to main through the integration branch. Render needs both names, and they can be the same branch. K16 does not find spike commits on a branch with a different name. A squash, a rebase, or a cherry-pick gives new commit IDs, so a commit check is not reliable. A partial check gives false confidence. A commit check also needs a read token, and K16 now has no permissions (D30, dossier F11). So the spike profile says not to merge a spike branch into a different branch, and gate G4 is the control. | [checks.md](checks.md#k16-and-the-spike-branch), [profiles/spike.md](profiles/spike.md) |
 | D34 | `stone render` and `stone check` fail when a `branches.*` value in the repo config is not a YAML string. An unquoted `1.10` parses as `1.1` and `yes` as `True`. Render wrote the wrong text with no error, K16 compared against the wrong name, and it passed (D33). The error names the key and says to quote the value. A fix by conversion cannot work: the original text is lost after parsing. | [customization.md](customization.md#repo-config-cornerstoneconfigyaml) |
+| D35 | A `grader` check gets the final text of the run in the environment variable `STONE_EVAL_REPORT`. A role can give its result in a file or in its report, so a grader must read both. An environment variable does not change the `grade.py` arguments of an older eval. | [lifecycle.md](lifecycle.md#scenario-format) |
 
 ## Open questions
 
@@ -135,7 +136,10 @@ Do these items in order. Each item is one PR or more.
    - 4b. Done: the `role.tester` eval (T1 to T4, k = 3). The outcome rate is the same with and
      without the role (1.00). The role gives the contract (commit trailers and requirement IDs) and
      costs about 35% less. Result: `evals/results/`.
-   - 4c. Next: the eval for `role.planner`.
+   - 4c. Done: the `role.planner` eval (P1 to P5, k = 3). The outcome rate is 1.00 with the role
+     and 0.80 without it. Without the role, the model writes a plan for a typo fix (P2). Both
+     variants keep an open question for G2 in a headless run (P3). Both copy `apply_order` into
+     a new delta, so the planner template needs a rule for it. Result: `evals/results/`.
 5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
    of Q4 2026.
 6. Version 1: support all 10 profiles (D24). Items 6b to 6h can run in parallel after 6a.

@@ -1828,5 +1828,124 @@ class WorkBranchTest(EvalTestCase):
         self.assertEqual(passes, [False, False, True, True, True], self.runs()[0]["checks"])
 
 
+# EVAL-4c criterion 1 (D35): the grader gets the final report of the run -----------------------
+
+REPORT_GRADER = r'''
+import argparse, json, os
+parser = argparse.ArgumentParser()
+parser.add_argument("name")
+parser.add_argument("--workspace", required=True)
+parser.add_argument("--args", required=True)
+options = parser.parse_args()
+args = json.loads(options.args)
+value = os.environ.get("STONE_EVAL_REPORT")
+keep = os.environ.get("STONE_TEST_KEEP")
+ok = value == args["report"] and keep == "kept"
+print(json.dumps({"pass": ok, "detail": json.dumps({"report": value, "keep": keep})}))
+'''
+
+
+class ReportEnvTest(EvalTestCase):
+    def grade_report(self, expected: str, stdout: list[str]) -> list[dict]:
+        self.write(f"{EVAL_DIR}/grade.py", REPORT_GRADER)
+        expect = [{"check": "grader", "name": "report", "report": expected}]
+        with unittest.mock.patch.dict(os.environ, {"STONE_TEST_KEEP": "kept",
+                                                   "STONE_EVAL_REPORT": "a stale outer value"}):
+            self.grade_once(expect, stdout=stdout)
+        return self.runs()[0]["checks"]
+
+    def test_eval4c_c1_grader_gets_the_report_in_stone_eval_report(self) -> None:
+        report = "Plan written.\n\n## Open questions\n\n- What does an expired code do? é"
+        checks = self.grade_report(report, [result_line(report=report)])
+        self.assertTrue(checks[0]["pass"], checks[0]["detail"])
+
+    def test_eval4c_c1_with_no_report_the_value_is_an_empty_string(self) -> None:
+        checks = self.grade_report("", ["plain text only, no JSON object"])
+        self.assertTrue(checks[0]["pass"], checks[0]["detail"])
+
+    def test_eval4c_c1_the_report_is_the_report_field_of_the_last_result(self) -> None:
+        stdout = [json.dumps({"type": "result", "result": "not this one"}),
+                  result_line(report="THE FINAL TEXT")]
+        checks = self.grade_report("THE FINAL TEXT", stdout)
+        self.assertTrue(checks[0]["pass"], checks[0]["detail"])
+
+    def test_eval4c_c1_each_grader_check_of_a_run_gets_the_report(self) -> None:
+        self.write(f"{EVAL_DIR}/grade.py", REPORT_GRADER)
+        expect = [{"check": "grader", "name": "a", "report": "done twice"},
+                  {"check": "grader", "name": "b", "report": "done twice"},
+                  {"check": "grader", "name": "c", "report": "other"}]
+        with unittest.mock.patch.dict(os.environ, {"STONE_TEST_KEEP": "kept"}):
+            passes = self.grade_once(expect, stdout=[result_line(report="done twice")])
+        self.assertEqual(passes, [True, True, False], self.runs()[0]["checks"])
+
+
+# EVAL-4c criterion 8: the first entry of git status keeps its whole path -----------------------
+
+
+class FirstStatusEntryTest(EvalTestCase):
+    """The run makes only changes of tracked files that are not in the index (" M path")."""
+
+    def grade_unstaged(self, expect: list, actions: list) -> list[bool]:
+        passes = self.grade_once(expect, actions)
+        run = self.runs()[0]
+        self.assertEqual(run["error"], "", "the fake harness actions worked")
+        status = self.calls()[0]["status"]
+        self.assertEqual(status, "", "the setup is committed, so the run makes the only changes")
+        return passes
+
+    def test_eval4c_c8_only_one_unstaged_change_under_src_fails_unchanged_src(self) -> None:
+        expect = [
+            {"check": "unchanged", "paths": ["src/"]},
+            {"check": "unchanged", "paths": ["src/app.py"]},
+            {"check": "unchanged", "paths": ["rc/"]},
+            {"check": "only_changed", "paths": ["src/"]},
+            {"check": "only_changed", "paths": ["src/app.py"]},
+            {"check": "only_changed", "paths": ["rc/"]},
+            {"check": "unchanged", "paths": ["b/", "c/"]},
+        ]
+        passes = self.grade_unstaged(expect, [["write", "src/app.py", "VALUE = 2\n"]])
+        self.assertEqual(passes, [False, False, True, True, True, False, True], self.runs()[0])
+
+    def test_eval4c_c8_unstaged_first_entry_and_later_entries_are_all_whole(self) -> None:
+        # b/keep.txt sorts first, so its " M" entry is the first entry of the status list.
+        actions = [["write", "b/keep.txt", "changed b\n"], ["write", "c/keep.txt", "changed c\n"],
+                   ["write", "d/new.txt", "untracked\n"]]
+        expect = [
+            {"check": "unchanged", "paths": ["b/"]},
+            {"check": "unchanged", "paths": ["c/"]},
+            {"check": "unchanged", "paths": ["d/"]},
+            {"check": "unchanged", "paths": ["/keep.txt"]},
+            {"check": "only_changed", "paths": ["b/", "c/", "d/"]},
+            {"check": "only_changed", "paths": ["c/", "d/"]},
+            {"check": "unchanged", "paths": ["src/"]},
+        ]
+        passes = self.grade_unstaged(expect, actions)
+        self.assertEqual(passes, [False, False, False, True, True, False, True], self.runs()[0])
+
+    def test_eval4c_c8_unstaged_delete_of_a_tracked_file_is_whole(self) -> None:
+        self.write(f"{EVAL_DIR}/fixtures/del/src/app.py", "VALUE = 1\n")
+        self.write(f"{EVAL_DIR}/fixtures/del/src/old.py", "OLD = 1\n")
+        script = "import os; os.remove('src/old.py')"
+        expect = [
+            {"check": "unchanged", "paths": ["src/"]},
+            {"check": "unchanged", "paths": ["src/old.py"]},
+            {"check": "only_changed", "paths": ["src/old.py"]},
+            {"check": "unchanged", "paths": ["rc/"]},
+        ]
+        self.plan({"with": [{"actions": []}]})
+        self.scenarios(self.scenario(expect=expect, fixture="fixtures/del"))
+        # The fake harness has no delete action, so a command check before the checks is not
+        # possible. Use a run config whose command deletes the file, then runs the fake harness.
+        cmd = [sys.executable, "-c",
+               f"{script}; import runpy, sys; sys.argv = {[str(self.fake), 'with']!r} + "
+               "sys.argv[1:]; runpy.run_path(sys.argv[0], run_name='__main__')",
+               "--role", "$role"]
+        self.write_run_config(run={"with": cmd})
+        self.eval("--variant", "with")
+        run = self.runs()[0]
+        self.assertEqual(run["error"], "", run)
+        self.assertEqual(self.check_passes(run), [False, False, True, True], run)
+
+
 if __name__ == "__main__":
     unittest.main()
