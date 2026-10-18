@@ -132,7 +132,10 @@ def main() -> int:
     parser.add_argument("--args", default="{}")
     options = parser.parse_args()
     try:
-        passed, detail = GRADERS[options.name](options.workspace, json.loads(options.args))
+        args = json.loads(options.args)
+        if not isinstance(args, dict):
+            raise TypeError("--args must be a JSON object")
+        passed, detail = GRADERS[options.name](options.workspace, args)
     except PatchError as error:
         passed, detail = False, str(error)
     except (KeyError, TypeError, ValueError, OSError) as error:  # bad args or a missing file
