@@ -136,7 +136,7 @@ Do these items in order. Each item is one PR or more.
    - 6c. K15 (instruction size) for full-project. Golden-file test for full-project.
    - 6d. K10 and K12 as repo commands for refactor-migration. Golden-file test for it.
    - 6e. K16 (no merge to main) for spike. Golden-file tests for spike, bug-triage, and code-audit.
-   - 6f. Golden-file tests for debugging, dependency-upgrade, and adapter-refresh.
+   - 6f. Done: golden-file tests for debugging, dependency-upgrade, and adapter-refresh.
    - 6g. Trigger workflows: `label:<name>`, `schedule:<cron>`, and `ci:<event>`. Untrusted event
      text goes to a step only through `env`. The adapter names the secret.
    - 6h. Update the guides from "When the profile ships" to "Today" for each profile.
