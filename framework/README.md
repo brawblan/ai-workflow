@@ -84,6 +84,8 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D21 | Specs are generated from the applied spec deltas. Each plan that changes a behavior has a delta. `stone spec apply` merges it in the code PR, as a generator commit. A replay of the deltas must give the same specs, so a hand edit is drift. | [workflow-model.md](workflow-model.md#specs), [lifecycle.md](lifecycle.md#specs) |
 | D22 | Two applied deltas with the same `apply_order` are an error. `stone spec sync` gives the deltas the orders 1 to n and writes the specs again. K19 tests the deltas and the replay. The hook and K6 protect the specs path. | [workflow-model.md](workflow-model.md#specs), [checks.md](checks.md) |
 | D23 | The G3 workflow that `stone render` writes runs K14 on the PR body in `--mode warn`. It installs stone in a venv from the tag `v<framework_version>`. The step is in each render, because each supported profile lists K14. | [generator/design.md](generator/design.md), [customization.md](customization.md) |
+| D24 | Version 1 supports all 10 profiles. `stone render` writes each component that a selected profile needs, and a trigger workflow for each trigger that is not `command`. Each role has one role file for all profiles. The pipeline gives the profile steps to the role at run time. A profile is supported when the adapter has a role file for each of its roles. A component with `when` renders only for a profile with that gate or check. | [generator/design.md](generator/design.md), [profiles/README.md](profiles/README.md) |
+| D25 | The investigator writes only in `paths.reports` (default `docs/reports/`). On a `spike/` branch it can write any file, except the harness and Cornerstone files, because K16 stops the merge. So it has the Edit and Write tools, and the hook limits the paths. | [workflow-model.md](workflow-model.md#roles) |
 
 ## Open questions
 
@@ -118,10 +120,29 @@ Do these items in order. Each item is one PR or more.
    - 3c. Done in stone 0.5: check K14 (PR evidence) is `stone check-evidence` (D20). Review it
      for false positives by 2027-04-17.
    - 3d. Done in stone 0.7: the G3 workflow that `stone render` writes runs K14 on the PR body
-     (D23). Add a profile gate when render supports a profile without K14.
+     (D23). Done in stone 0.8: render writes that workflow only for a profile with G3 (D24).
 4. Write the evals for the first model profile. Set its status to `active` when they pass.
 5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
    of Q4 2026.
+6. Version 1: support all 10 profiles (D24). Items 6b to 6h can run in parallel after 6a.
+   - 6a. Done in stone 0.8: profile support from the adapter role files, the `when` filter, and the
+     investigator role with its hook rule (D24, D25).
+   - 6b. K7 (change size) as a generated check in the G3 workflow. All code profiles need it.
+   - 6c. K15 (instruction size) for full-project. Golden-file test for full-project.
+   - 6d. K10 and K12 as repo commands for refactor-migration. Golden-file test for it.
+   - 6e. K16 (no merge to main) for spike. Golden-file tests for spike, bug-triage, and code-audit.
+   - 6f. Golden-file tests for debugging, dependency-upgrade, and adapter-refresh.
+   - 6g. Trigger workflows: `label:<name>`, `schedule:<cron>`, and `ci:<event>`. Untrusted event
+     text goes to a step only through `env`. The adapter names the secret.
+   - 6h. Update the guides from "When the profile ships" to "Today" for each profile.
+
+   Exit criteria for version 1:
+
+   - `stone render` writes every component that each of the 10 profiles lists, with a golden-file
+     test for each profile.
+   - Each generated check (K6, K7, K14, K15, K16) blocks, after its 2-week warning time.
+   - Each new component has an eval plan and a review date in the manifest (P5).
+   - Then tag `v1.0.0`.
 
 ## Relation to the plugin in this repo
 

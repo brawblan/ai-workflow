@@ -34,7 +34,7 @@ Fill a fact sheet for each config field. Read before you ask.
 | --- | --- |
 | `harness` | The tool that runs this session. The name must be a file in `<clone>/framework/adapters/`. |
 | `model_profile` | `<clone>/framework/adapters/<harness>/models/`. Prefer `status: active`. Tell the user if none is active. |
-| `profiles` | Default `[single-ticket]`. `stone render` skips the profiles that it does not support. |
+| `profiles` | Default `[single-ticket]`. `stone render` skips a profile with a role that the adapter has no file for. |
 | `branches` | `gh repo view --json defaultBranchRef`, `AGENTS.md`, branch protection |
 | `commands` | `AGENTS.md`, `CONTRIBUTING*`, `Makefile`, `package.json` scripts, `pyproject.toml`, CI steps. Copy each command exactly. |
 | `paths` | The folder layout. `tests` and `checks` become protected paths for the implementer. |

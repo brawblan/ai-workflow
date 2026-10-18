@@ -13,9 +13,14 @@ import sys
 from pathlib import Path
 
 # The implementer must not change PROTECTED. The tester changes only TESTS. The planner only PLANS.
+# The investigator changes only REPORTS, except on a SPIKE_PREFIX branch, which never merges (K16).
+# No branch lets the investigator change HARNESS: the hook, the checks, and the harness settings.
 PROTECTED = $protected_json
 TESTS = $tests_json
 PLANS = $plans_json
+REPORTS = $reports_json
+HARNESS = $harness_json
+SPIKE_PREFIX = "spike/"
 
 
 def covers(prefixes: list[str], path: str) -> bool:
@@ -45,6 +50,15 @@ def tree_root(file: Path, project: Path) -> Path:
     return project
 
 
+def on_spike_branch(tree: Path) -> bool:
+    try:
+        run = subprocess.run(["git", "-C", str(tree), "branch", "--show-current"],
+                             capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return run.returncode == 0 and run.stdout.strip().startswith(SPIKE_PREFIX)
+
+
 def main() -> int:
     event = json.load(sys.stdin)
     tool_input = event.get("tool_input", {})
@@ -53,8 +67,9 @@ def main() -> int:
         return 0
     project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or event.get("cwd") or ".").resolve()
     file = Path(target).resolve()
+    tree = tree_root(file, project)
     try:
-        path = file.relative_to(tree_root(file, project)).as_posix()
+        path = file.relative_to(tree).as_posix()
     except ValueError:
         return 0  # outside the repo
     role = os.environ.get("STONE_ROLE", "implementer")
@@ -66,6 +81,11 @@ def main() -> int:
         reason = "is a protected path. The planner must not change tests, checks, CI, or specs"
     elif role == "planner" and not covers(PLANS, path):
         reason = f"is not a plan path. The planner changes only {', '.join(PLANS)}"
+    elif role == "investigator" and covers(HARNESS, path):
+        reason = "is a harness or Cornerstone path. The investigator must not change it"
+    elif role == "investigator" and not covers(REPORTS, path) and not on_spike_branch(tree):
+        reason = (f"is not a report path. The investigator writes only in {', '.join(REPORTS)}, "
+                  f"or on a {SPIKE_PREFIX} branch")
     elif role == "reviewer":
         reason = "cannot change. The reviewer changes no file"
     else:

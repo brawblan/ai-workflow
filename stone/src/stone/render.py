@@ -20,11 +20,11 @@ from stone.markdown import split_frontmatter
 CONFIG = Path(".cornerstone/config.yaml")
 MANIFEST = Path(".cornerstone/manifest.yaml")
 REQUIRED_FIELDS = ["framework_version", "harness", "model_profile", "profiles", "owners.default"]
-SUPPORTED_PROFILES = {"single-ticket", "app-slice"}
 REVIEW_MONTHS = 6
 CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches"}
 PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
                     "protected_json": "paths.tests and paths.checks"}
+FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "docs/reports/"}
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 
@@ -102,15 +102,32 @@ def warn_old_framework(version: Any) -> None:
               file=sys.stderr)
 
 
-def load_profiles(framework: Path, names: list[str]) -> list[dict[str, Any]]:
+def load_profiles(framework: Path, names: list[str],
+                  adapter_roles: set[str]) -> list[dict[str, Any]]:
+    """Return the selected profiles. Skip a profile with a role that the adapter has no file for."""
     profiles = []
     for name in names:
-        if name not in SUPPORTED_PROFILES:
-            print(f"skipped profile {name}: render does not support it yet", file=sys.stderr)
-            continue
         text = (framework / "profiles" / f"{name}.md").read_text(encoding="utf-8")
-        profiles.append(split_frontmatter(text)[0])
+        profile = split_frontmatter(text)[0]
+        missing = sorted(set(profile["roles"]) - adapter_roles)
+        if missing:
+            print(f"skipped profile {name}: the adapter has no role file for {missing}",
+                  file=sys.stderr)
+            continue
+        profiles.append(profile)
     return profiles
+
+
+def needed(entry: dict[str, Any], profiles: list[dict[str, Any]]) -> bool:
+    """Return True if a selected profile needs the component (D24)."""
+    if entry["kind"] == "role":
+        return any(entry["role"] in profile["roles"] for profile in profiles)
+    when = entry.get("when") or {}
+    if "gate" in when:
+        return any(profile["gates"].get(when["gate"], "skip") != "skip" for profile in profiles)
+    if "check" in when:
+        return any(when["check"] in profile["checks"] for profile in profiles)
+    return bool(profiles)
 
 
 def one_folder(value: Any, key: str = "plans") -> str:
@@ -119,7 +136,7 @@ def one_folder(value: Any, key: str = "plans") -> str:
         if len(value) != 1:
             raise RenderError(f"{CONFIG}: 'paths.{key}' must be one folder, not {len(value)}.")
         value = value[0]
-    folder = str(value or f"docs/{key}/").strip()
+    folder = str(value or FOLDER_DEFAULTS[key]).strip()
     return folder if folder.endswith("/") else folder + "/"
 
 
@@ -137,7 +154,10 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
         values[f"branch_{key}"] = str(value)
     values["paths_plans"] = one_folder(_get(config, "paths.plans"))
     values["paths_specs"] = one_folder(_get(config, "paths.specs"), "specs")
+    values["paths_reports"] = one_folder(_get(config, "paths.reports"), "reports")
     values["plans_json"] = json.dumps([values["paths_plans"]])
+    values["reports_json"] = json.dumps([values["paths_reports"]])
+    values["harness_json"] = json.dumps(ALWAYS_PROTECTED)
     tests = list(_get(config, "paths.tests") or [])
     checks = list(_get(config, "paths.checks") or [])
     if tests and checks:
@@ -159,13 +179,13 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     if model_profile.get("status") != "active":
         print(f"warning: model profile {model_profile['id']} has status "
               f"'{model_profile.get('status')}', not 'active'", file=sys.stderr)
-    roles = {role for profile in load_profiles(framework, config["profiles"])
-             for role in profile["roles"]}
+    adapter_roles = {entry["role"] for entry in registry if entry["kind"] == "role"}
+    profiles = load_profiles(framework, config["profiles"], adapter_roles)
     role_models = model_profile["defaults"]["role_models"]
 
     components = []
     for entry in registry:
-        if entry["kind"] == "role" and entry["role"] not in roles:
+        if not needed(entry, profiles):
             continue
         model = role_models.get(entry.get("role", ""), "")
         values = template_values(config, model)
@@ -183,9 +203,6 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
-    unknown = roles - {entry.get("role") for entry in registry}
-    if unknown:
-        raise RenderError(f"The adapter has no role file for {sorted(unknown)}. Add a template.")
     return components
 
 

@@ -9,7 +9,7 @@ The Cornerstone CLI. Version 0.7 has six commands:
 | `stone check-evidence` | Check K14. Fails if a required section of a PR body is missing or empty: Evidence, Decision log, Review findings, or Confidence. |
 | `stone spec apply <plan>` | Applies the spec delta of one plan (`<plans>/<plan>.spec.md`). It gives the delta the next `apply_order`, and writes the specs in `<specs>/`. It stops if a spec is not the same as a replay of the applied deltas. See [Specs](../framework/workflow-model.md#specs). |
 | `stone spec sync` | After a merge of the base branch: gives the applied deltas the orders 1 to n, and writes the specs from a replay. It overwrites a spec that is not the same as the replay. |
-| `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.4 supports the single-ticket and app-slice profiles: role files, the protected-path hook, check K6, and the G3 CI workflow. Version 0.7 adds a K14 step on the PR body to that workflow. |
+| `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.4 supports the single-ticket and app-slice profiles: role files, the protected-path hook, check K6, and the G3 CI workflow. Version 0.7 adds a K14 step on the PR body to that workflow. Version 0.8 renders the roles of all 10 profiles, with the new investigator role. It writes the G3 workflow and K6 only for a profile that has them (D24, D25). |
 
 The other commands in [the generator design](../framework/generator/design.md) are not built yet.
 
@@ -113,7 +113,8 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 - In `--diff` mode, K17 tests each line of an untracked Markdown file. It skips a file that git ignores.
 - The tense test (rule 2) and the passive test (rule 11) are warnings, because they also match some adjectives.
 - K14 finds a section by a heading (`## Evidence`) or a line with only bold text (`**Evidence**`). It does not judge if the content is true. The reviewer and the human do that.
-- `render` supports only the `claude-code` harness, and the `single-ticket` and `app-slice` profiles. It skips other profiles with a log line.
+- `render` supports only the `claude-code` harness. It skips a profile with a role that the adapter has no file for, with a log line.
+- `render` does not write K7, K15, K16, or the trigger workflows yet. The [roadmap](../framework/README.md#roadmap) lists them for v1.
 - `render` does not check `framework_version` against the framework folder. Check out the tag yourself.
 - `render` does not read profile overrides (`.cornerstone/profiles/`) yet.
 - If the hook entry in `.claude/settings.json` changes in a new framework version, `render` adds the new entry. Remove the old entry by hand.
