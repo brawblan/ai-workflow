@@ -25,7 +25,8 @@ REVIEW_MONTHS = 6
 CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches", "limit": "limits"}
 PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
                     "protected_json": "paths.tests and paths.checks",
-                    "branch_main_json": "branches.main"}
+                    "branch_main_json": "branches.main",
+                    "branch_integration_json": "branches.integration"}
 MODEL_VALUES = {"instruction_file_max_lines"}  # template values from `defaults` in the model profile
 FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "docs/reports/"}
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings

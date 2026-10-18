@@ -76,8 +76,8 @@ Add `--format github` to show the findings as annotations in a GitHub Actions ru
    ```
 
    Remove `--dry-run` to write the files. A second run changes only the files whose input changed.
-   If a profile lists K16, render needs `branches.main`. Make the K16 job a required status check on
-   that branch.
+   If a profile lists K16, render needs `branches.main` and `branches.integration`. Make the K16 job
+   a required status check on both branches.
    The G3 workflow installs stone from the tag `v<framework_version>` for its K14 step. Use
    0.5.0 or later. Render warns about an earlier version.
    A profile can list K4, K5, K8, K10, K11, or K12, with no command for it in the repo config.
