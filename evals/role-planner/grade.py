@@ -34,6 +34,18 @@ NONE = re.compile(r"^\W*(none|no|n/a)\b", re.I)
 ASKS = re.compile(r"\?|\b(unclear|not clear|ambiguous|unspecified|undefined|decide|confirm|"
                   r"clarify|clarification)\b|\b(does|do|did) not (say|state|specify|define|cover)\b",
                   re.I)
+# open_question: the words that give a recommendation, name the default, and start the options.
+RECOMMENDS = re.compile(r"\b(recommend\w*|suggest\w*|prefer\w*)\b", re.I)
+DEFAULTS = re.compile(r"\bdefault\b|\b(plan|build) (uses|assumes|treats|raises|takes)\b|"
+                      r"\bin the meantime\b|\bmeanwhile\b", re.I)
+OPTIONS = re.compile(r"\boptions?\b", re.I)
+# An option label: "(a)", "(1)", "a)", "A.", "A:", "Option A", or "Option 1".
+OPTION_LABEL = re.compile(r"(?:^|(?<=[\s(*]))(?:\(([a-e1-9])\)|([a-e])[).:](?=[\s*]|$)|"
+                          r"option\s+([a-e1-9])\b)", re.I)
+# The text before a word that says that the word has no value: "No default", "not recommended".
+NEGATED = re.compile(r"\b(no|not|without)\s+(an?\s+)?$", re.I)
+SPLIT = re.compile(r";|,|\bor\b|\s/\s", re.I)
+TABLE_RULE = re.compile(r"^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-*:?\s*$")  # | --- | :-: |
 
 
 def _read(workspace: Path, path: str) -> str | None:
@@ -51,8 +63,8 @@ def _blocks(text: str, word: str) -> list[str]:
     """Return each block of the text whose first line has `word` in it.
 
     A heading block ends at the next heading of the same or a higher level. A label block ends at
-    the next heading or label, or at a blank line and then a line that is not a list item. A label in
-    a heading block is part of that block.
+    the next heading or label, or at a blank line and then a line that is not a list item or a table
+    row. A label in a heading block is part of that block.
     """
     blocks: list[str] = []
     current: list[str] | None = None
@@ -62,9 +74,9 @@ def _blocks(text: str, word: str) -> list[str]:
         new = _level(line)
         starts = (new and (not level or new <= level)) or (LABEL.match(line) and not (
             current is not None and level))
-        # A label block also ends at a blank line and then a line that is not a list item.
-        if current is not None and not level and blank and line.strip() and not LIST_ITEM.match(
-                line):
+        # A label block also ends at a blank line and then a line that is not a list item or a row.
+        if current is not None and not level and blank and line.strip() and not (
+                LIST_ITEM.match(line) or line.lstrip().startswith("|")):
             starts = True
         blank = not line.strip()
         if starts:
@@ -143,6 +155,177 @@ def names_gap(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
     return False, "no open question names the gap"
 
 
+def _join(lines: list[str]) -> list[str]:
+    """Join each wrapped line to the line before it.
+
+    A blank line, a heading, a list item, and a table row start a new line. A line after a blank
+    line, a heading, or a table row also starts a new line.
+    """
+    out: list[str] = []
+    joins = False
+    for line in lines:
+        starts = (not line.strip() or _level(line) or LIST_ITEM.match(line)
+                  or line.lstrip().startswith("|"))
+        if joins and not starts:
+            out[-1] = out[-1].rstrip() + " " + line.strip()
+        else:
+            out.append(line)
+        joins = bool(line.strip()) and not _level(line) and not line.lstrip().startswith("|")
+    return out
+
+
+def _units(text: str, pattern: re.Pattern[str], report: bool) -> list[list[str]]:
+    """Return the open questions of the text that name the gap, each as a list of lines.
+
+    An open question is a block with "question" or "open" in its first line. The heading or label
+    line of the block does not count. A table row in the block counts as "<header>: <cell>" lines.
+    For the report, the whole report is also an open question if a line names the gap and asks.
+    """
+    units = []
+    for block in _blocks(text, "question") + _blocks(text, "open"):
+        lines = block.splitlines()
+        if not lines[0].lstrip().startswith("|"):  # a table header row can start a block
+            lines = lines[1:]
+        units.append(_flatten_tables(_join(lines)))
+    if report and any(pattern.search(line) and ASKS.search(line) and not NONE.match(line)
+                      for line in _join(text.splitlines())):
+        units.append(_flatten_tables(_join(text.splitlines())))
+    return [unit for unit in units
+            if any(pattern.search(line) and not NONE.match(line) for line in unit)]
+
+
+def _cells(line: str) -> list[str]:
+    return [cell.strip() for cell in line.strip().strip("|").split("|")]
+
+
+def _flatten_tables(lines: list[str]) -> list[str]:
+    """Replace each table row with a "<header>: <cell>" line for each cell that has text.
+
+    The header row and the rule row do not stay. A row of a table with no rule row stays as it is.
+    """
+    out: list[str] = []
+    header: list[str] = []
+    for index, line in enumerate(lines):
+        if not line.lstrip().startswith("|"):
+            header = []
+            out.append(line)
+        elif TABLE_RULE.match(line):
+            continue
+        elif not header and index + 1 < len(lines) and TABLE_RULE.match(lines[index + 1]):
+            header = _cells(line)
+        elif header:
+            out.extend(f"{name}: {cell}" if name else cell
+                       for name, cell in zip(header, _cells(line)) if cell)
+        else:
+            out.append(line)
+    return out
+
+
+def _says(lines: list[str], words: re.Pattern[str]) -> bool:
+    """A line has one of `words` and a value after it that is not "none".
+
+    "Default: (a)" and "I recommend B" give a value. "No default" and "Recommendation: none" do
+    not. A line that ends in ":" after the word takes its value from the next line with text.
+    """
+    for index, line in enumerate(lines):
+        for match in words.finditer(line):
+            if NEGATED.search(line[:match.start()]):
+                continue
+            rest = line[match.end():].strip(" \t*_:.-")
+            if not rest and line.rstrip(" \t*_").endswith(":"):
+                rest = next((n.strip(" \t*_-") for n in lines[index + 1:] if n.strip()), "")
+            if rest and not NONE.match(rest):
+                return True
+    return False
+
+
+def _option_count(lines: list[str]) -> int:
+    """Count the options in the lines. Use the largest of these counts:
+
+    - the different option labels, for example "(a)", "B.", or "Option 2";
+    - the parts of the text after the word "option" or "options" up to a recommendation or a
+      default, split at ";", ",", "or", and " / ";
+    - the list items after a line that ends in "options:", except a recommendation or a default.
+    """
+    labels = {next(group for group in match.groups() if group).lower()
+              for line in lines for match in OPTION_LABEL.finditer(line)}
+    best = len(labels)
+    for index, line in enumerate(lines):
+        match = OPTIONS.search(line)
+        if not match:
+            continue
+        rest = line[match.end():]
+        end = RECOMMENDS.search(rest) or DEFAULTS.search(rest)
+        rest = (rest[:end.start()] if end else rest).strip(" \t*_:")
+        if rest and not NONE.match(rest):
+            best = max(best, sum(1 for part in SPLIT.split(rest) if re.search(r"\w", part)))
+        elif not rest and line.rstrip(" \t*_").endswith(":"):
+            items = 0
+            for after in lines[index + 1:]:
+                if not after.strip():
+                    continue
+                if not LIST_ITEM.match(after):
+                    break
+                if not (RECOMMENDS.search(after) or DEFAULTS.search(after)):
+                    items += 1
+            best = max(best, items)
+    return best
+
+
+def _expired_requirements(workspace: Path, glob: str, pattern: re.Pattern[str]) -> list[str]:
+    """Return the ADDED or MODIFIED requirements with the pattern, in each delta of the glob."""
+    found = []
+    for path in sorted(workspace.glob(glob)):
+        if path.is_file():
+            found.extend(f"{change.id} ({path.name})" for change in specs.parse_delta(path).changes
+                         if change.op in {"ADDED", "MODIFIED"}
+                         and pattern.search(change.title + "\n" + change.body))
+    return found
+
+
+def open_question(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
+    """The run keeps the gap (`pattern`) as an open question in the form of planner step 7.
+
+    One open questions block of a plan that matches the glob `path`, or of the report, must name
+    the gap, give 2 or more options, give a recommendation, and name the default of the plan until
+    G2. The default can also be on a line of the same plan or report that names the gap. A table
+    row counts as "<header>: <cell>" lines. The check fails if a delta that matches the glob
+    `delta` has an ADDED or MODIFIED requirement with `delta_pattern` (default: `pattern`),
+    because that writes the default into the spec.
+    """
+    pattern = re.compile(args["pattern"], re.I)
+    if "delta" in args:
+        found = _expired_requirements(workspace, args["delta"],
+                                      re.compile(args.get("delta_pattern", args["pattern"]), re.I))
+        if found:
+            return False, "the delta writes the default as a requirement: " + ", ".join(found)
+    sources = [(path.name, path.read_text(encoding="utf-8", errors="replace"), False)
+               for path in sorted(workspace.glob(args["path"])) if path.is_file()]
+    sources.append(("the report", os.environ.get(REPORT_ENV, ""), True))
+    best: tuple[str, list[str]] | None = None
+    for name, text, report in sources:
+        gap_lines = [line for line in _join(text.splitlines()) if pattern.search(line)
+                     and not NONE.match(line)]
+        for lines in _units(text, pattern, report):
+            missing = _missing(lines, gap_lines)
+            if not missing:
+                return True, (f"the open question in {name} gives the options, a recommendation, "
+                              "and a default")
+            if best is None or len(missing) < len(best[1]):
+                best = (name, missing)
+    if best is None:
+        return False, "no open question names the gap"
+    return False, f"the open question in {best[0]} does not give " + ", ".join(best[1])
+
+
+def _missing(lines: list[str], gap_lines: list[str]) -> list[str]:
+    """Return the parts of the planner step 7 form that the open question does not give."""
+    has = {"2 or more options": _option_count(lines) >= 2,
+           "a recommendation": _says(lines, RECOMMENDS),
+           "a default": _says(lines, DEFAULTS) or _says(gap_lines, DEFAULTS)}
+    return [part for part, ok in has.items() if not ok]
+
+
 def new_ids(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
     """The delta at `path` adds a `capability` requirement with a number that no other delta used."""
     path = workspace / args["path"]
@@ -182,7 +365,7 @@ def not_applied(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
 
 
 GRADERS = {"job_story_ids": job_story_ids, "names_gap": names_gap, "new_ids": new_ids,
-           "not_applied": not_applied}
+           "not_applied": not_applied, "open_question": open_question}
 
 
 def main() -> int:

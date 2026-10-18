@@ -61,6 +61,13 @@ scenarios:
       # Each code has an end date, and the ticket does not say what an expired code does.
       - {check: grader, name: names_gap, path: "docs/plans/SHOP-14*.md",
          pattern: "expir|end date|last day|\\bends\\b|out of date|no longer valid"}
+      # Planner step 7: with no human, the question gives the options, a recommendation, and the
+      # default until G2. The delta must not have the default as a requirement.
+      - {check: grader, name: open_question, path: "docs/plans/SHOP-14*.md",
+         delta: "docs/plans/SHOP-14*.spec.md",
+         pattern: "expir|end date|last day|\\bends\\b|out of date|no longer valid",
+         delta_pattern: "expir|end date|last day|\\bend(s|ed)\\b|out of date|no longer valid",
+         kind: contract}
 
   - id: P4
     title: A helper to reuse exists
