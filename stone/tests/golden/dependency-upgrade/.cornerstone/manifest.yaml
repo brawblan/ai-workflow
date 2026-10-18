@@ -1,0 +1,137 @@
+framework_version: 0.8.0
+components:
+- id: check.k6
+  kind: check
+  purpose: K6. Fail if an implementer commit changes a protected path.
+  principle:
+  - P2
+  - P6
+  source: framework
+  owner: octocat
+  eval: ''
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .cornerstone/checks/protected_paths.py
+  hash: fd799150f510a8a1a64c68bd1cfc20e2ee3af7eb6f5f71a134b9d63dc8ec601c
+- id: check.k7
+  kind: check
+  purpose: K7. Fail if the diff is over the size limit of the PR profile and has no
+    waiver.
+  principle:
+  - P10
+  source: framework
+  owner: octocat
+  eval: evals/check-k7/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .cornerstone/checks/change_size.py
+  hash: 5aa37b56592aef5140f9e3f40fc103b6a1be59609e63b6e29c9e61c83c79b47d
+- id: ci-job.checks
+  kind: ci-job
+  purpose: G3. Run K6, K7, K14, and the repo checks on each pull request.
+  principle:
+  - P1
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/ci-job-checks/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .github/workflows/cornerstone-checks.yml
+  hash: 2554692f15bd73c40affe4c75814f235065182f6feecb0b23a148b1ab229d1ac
+- id: hook.protect-paths
+  kind: hook
+  purpose: Block an edit to a path that the current role must not change.
+  principle:
+  - P2
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .cornerstone/hooks/protect-paths.py
+  hash: 192d8f92803a6cf7a7802ac9e9aa79828dba20e3fef9de8e458f695bfb9b15d5
+- id: hook.settings
+  kind: hook
+  purpose: Register the protected-path hook in the harness settings. Other keys stay
+    as they are.
+  principle:
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/settings.json
+  hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+- id: role.implementer
+  kind: role
+  purpose: Change the code to meet the ticket. Write the decision log.
+  principle:
+  - P2
+  - P8
+  source: framework
+  owner: octocat
+  eval: evals/role-implementer/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/implementer.md
+  hash: 4a3bc8ceede10d63f12da236e3e3d61569e02679501560fdfaa6da6711bdcf1f
+- id: role.investigator
+  kind: role
+  purpose: Read, run, and report. Write only in the reports path, or anywhere on a
+    spike branch.
+  principle:
+  - P2
+  - P11
+  source: framework
+  owner: octocat
+  eval: evals/role-investigator/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/investigator.md
+  hash: 669723c9e13aacf308b32d803f35f6f30e960a9dec72ca48daeaf49b97192e8d
+- id: role.reviewer
+  kind: role
+  purpose: Find defects and scope drift in a fresh session.
+  principle:
+  - P2
+  - P11
+  source: framework
+  owner: octocat
+  eval: evals/role-reviewer/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/reviewer.md
+  hash: f8197133228034ca5d404252068295ef03b6ca9bfbdb4f091f05dbb8e219195b
+- id: role.tester
+  kind: role
+  purpose: Write independent tests from the ticket and the diff.
+  principle:
+  - P2
+  source: framework
+  owner: octocat
+  eval: evals/role-tester/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/tester.md
+  hash: 8243b524d35e82c4d0da8b38d4a74ae0fd3e4822e3608ae8c8b7d00665d60e5b

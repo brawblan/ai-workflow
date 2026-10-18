@@ -6,6 +6,8 @@
 # A ci-job can have `steps`: each step with the same `when` rule goes into the `$check_steps` block of
 # the job template. A step with `command` needs that key in `commands` of the repo config. If the key
 # has no value, render skips the step and warns (D29). A step is part of its ci-job component.
+# A component with `trigger` is rendered once for each selected profile with that trigger type, as
+# `<id>.<profile>` (D31). `parts` are fragments that render puts in the template at a `$name` line.
 # eval: the planned eval folder (lifecycle.md).
 
 components:
@@ -147,3 +149,23 @@ components:
         when: {check: K10}
         command: mutation
         template: workflows/steps/k10-mutation.yml
+
+  - id: trigger.label
+    kind: ci-job
+    trigger: label
+    purpose: Start the first role of the profile when a human adds the trigger label to an issue.
+    principle: [P6, P9]
+    template: workflows/trigger-label.yml
+    parts: {run_role: workflows/parts/run-role.yml}
+    target: .github/workflows/cornerstone-$profile-label.yml
+    eval: evals/trigger-label/
+
+  - id: trigger.schedule
+    kind: ci-job
+    trigger: schedule
+    purpose: Start the first role of the profile on its schedule. Post its report as an issue.
+    principle: [P6, P9]
+    template: workflows/trigger-schedule.yml
+    parts: {run_role: workflows/parts/run-role.yml}
+    target: .github/workflows/cornerstone-$profile-schedule.yml
+    eval: evals/trigger-schedule/

@@ -25,6 +25,10 @@ outputs: [pr]
 This profile runs on the framework repo, not on a target repo. It keeps the adapters and the model
 profiles in line with each vendor's current models and guidance.
 
+If a target repo selects this profile, `stone render` writes the four role files, the protected-path
+hook, checks K6 and K7, and the G3 workflow. It writes no model profile, because a target repo gets model
+profile changes only from a new framework version (step 10).
+
 ## Use when
 
 - A vendor releases a new model or a new model version.
