@@ -32,6 +32,7 @@ from stone import render, specs
 VARIANTS = ("with", "without")
 KINDS = {"outcome", "contract"}
 REPORT = "@report"  # a check path that means the final text of the run
+REPORT_ENV = "STONE_EVAL_REPORT"  # grade.py reads the final text of the run here
 RUNS = Path(".cornerstone/eval-runs")
 RESULTS = Path("evals/results")
 WORK_BRANCH = "feature/eval-work"
@@ -397,7 +398,7 @@ def _grader(ws: Workspace, item: dict[str, Any], folder: Path) -> tuple[bool, st
             [sys.executable, str((folder / "grade.py").resolve()), item["name"],
              "--workspace", str(ws.path), "--args", json.dumps(args)],
             cwd=folder, capture_output=True, text=True, timeout=item.get("timeout", 600),
-            env={**os.environ, **GIT_ENV})
+            env={**os.environ, **GIT_ENV, REPORT_ENV: ws.report})
         data = json.loads(result.stdout.strip().splitlines()[-1])
         return data["pass"] is True, str(data.get("detail", ""))
     except (OSError, subprocess.TimeoutExpired, IndexError, KeyError, TypeError,
