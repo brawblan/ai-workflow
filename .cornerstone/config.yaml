@@ -1,0 +1,32 @@
+# Cornerstone repo config for this repo. Fields: framework/customization.md.
+framework_version: 0.1.0           # this repo renders from its own framework/ folder
+harness: claude-code
+model_profile: claude-5
+spec_tool: plain
+profiles: [single-ticket]
+branches:
+  integration: main
+  main: main
+commands:                          # from AGENTS.md. No lint, type check, or acceptance command yet.
+  install: pip install ./stone
+  test_unit: python -m unittest discover -s stone/tests
+  all_checks: python -m unittest discover -s stone/tests && stone check && stone check-writing --diff origin/main
+paths:
+  source: [stone/src/]
+  tests: [stone/tests/]            # protected for the implementer
+  checks: [.github/workflows/, .cornerstone/checks/]
+  plans: docs/plans/
+limits:
+  pr_changed_lines: 600
+  function_lines: 60
+  cyclomatic: 10
+  mutation_score_changed_code: 0.6
+owners:
+  default: brawblan
+  solo: true                       # one human fills all human roles
+modes_allowed: [agent-centric, hybrid, human-centric]
+writing:
+  standard: ste
+  max_words_procedure: 20
+  max_words_description: 25
+waivers: []
