@@ -10,7 +10,7 @@
     {
       "name": "workflow",
       "source": "./plugins/workflow",
-      "description": "Skills for PR delivery, spec-driven development with OpenSpec, backlog sequencing, and Simplified Technical English writing."
+      "description": "Skills for Cornerstone setup, PR delivery, spec-driven development with OpenSpec, backlog sequencing, and Simplified Technical English writing."
     }
   ]
 }

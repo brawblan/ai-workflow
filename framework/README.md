@@ -74,6 +74,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D11 | STE stays only while review time, rework, and a quarterly blind A/B show that it helps. | [writing.md](writing.md#evidence-p5) |
 | D12 | Templates use `string.Template` from the standard library, not Jinja2. The CLI keeps one dependency (PyYAML). | [generator/design.md](generator/design.md#assumptions) |
 | D13 | The generator owns whole files (no markers, hash in the manifest), marked blocks in shared files, or merged entries in shared JSON files. | [generator/design.md](generator/design.md#constraints) |
+| D14 | `stone render` owns the role files. The plugin has no skill for the tester or the reviewer. | [generator/design.md](generator/design.md) |
 
 ## Open questions
 
@@ -89,12 +90,15 @@ Do these items in order. Each item is one PR or more.
    It writes the role files, the protected-path hook and check K6, a CI workflow, and the manifest.
 3. Update the plugin skills from the
    [gap analysis](../docs/research/dossier.md#3-gap-analysis-of-this-repo-brawblanai-workflow-v021).
-   Add the tester and reviewer roles and the `cornerstone-setup` entry skill. Remove the
-   self-verification from `ticket-delivery`. Add the evidence sections to `dev-pr`.
-4. Update `docs/tips/README.md` habit 4. The plan form now depends on the profile (D-series,
-   resolution 1 in the dossier).
-5. Write the evals for the first model profile. Set its status to `active` when they pass.
-6. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
+   `stone render` writes the role files, so the plugin has no tester or reviewer skill (D14).
+   - 3a. Done in plugin 0.3.0: the `cornerstone-setup` entry skill, the repo config of this repo,
+     and a `stone render` run in this repo.
+   - 3b. Remove the self-verification from `ticket-delivery`. Add the evidence sections to `dev-pr`.
+     Update `docs/tips/README.md` habit 4: the plan form now depends on the profile (D-series,
+     resolution 1 in the dossier).
+   - 3c (optional). Add check K14 (PR evidence) to `stone`.
+4. Write the evals for the first model profile. Set its status to `active` when they pass.
+5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
    of Q4 2026.
 
 ## Relation to the plugin in this repo

@@ -6,18 +6,19 @@ Use it with Claude Code, with other AI agents, or as notes to read.
 | Folder | What it has | Who uses it |
 | --- | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | How agents work in this repo: commands, rules, branches, and writing | Agents |
-| [`plugins/workflow/skills/`](plugins/workflow/skills/) | Seven skills in the open `SKILL.md` format | Anyone |
+| [`plugins/workflow/skills/`](plugins/workflow/skills/) | Eight skills in the open `SKILL.md` format | Anyone |
 | [`plugins/workflow/skills/project-setup/templates/`](plugins/workflow/skills/project-setup/templates/) | Templates: constitution, repo `AGENTS.md`, user `AGENTS.md`, OpenSpec config | Anyone |
 | [`global/`](global/) | My personal rules (`AGENTS.md`) and Claude Code settings | Me. Copy what you like. |
 | [`docs/tips/`](docs/tips/) | How I work, and why | Anyone |
 | [`framework/`](framework/README.md) | Draft: Cornerstone, the tool-neutral workflow framework (principles, modes, profiles, gates, adapters) | Anyone |
 | [`docs/research/`](docs/research/dossier.md) | The cited research behind the framework | Anyone |
-| [`stone/`](stone/README.md) | The Cornerstone CLI: `stone check` and the K17 writing check | Anyone |
+| [`stone/`](stone/README.md) | The Cornerstone CLI: `stone check`, the K17 writing check, and `stone render` | Anyone |
 
 ## The skills
 
 | Skill | What it does |
 | --- | --- |
+| `cornerstone-setup` | Set up a repo for Cornerstone. It runs `project-setup`, writes `.cornerstone/config.yaml`, and runs `stone render` and `stone check`. |
 | `project-setup` | Set up a repo for agents: `constitution/`, `AGENTS.md`, and the OpenSpec wiring. It asks only for facts the repo does not have. |
 | `dev-pr` | Branch, commit, rebase, validate, and open a PR into the integration branch. |
 | `ticket-delivery` | Check the work against an issue's acceptance criteria. Then branch, commit, and open a PR. |
@@ -26,8 +27,8 @@ Use it with Claude Code, with other AI agents, or as notes to read.
 | `sdd-build` | Build, verify, and archive an OpenSpec change. Then open a PR. |
 | `ste-writing` | Write with Simplified Technical English rules, and add diagrams. |
 
-`sdd-plan` and `sdd-build` need OpenSpec in the repo (`openspec init`). The other skills need only
-`git` and the GitHub CLI (`gh`).
+`sdd-plan` and `sdd-build` need OpenSpec in the repo (`openspec init`). `cornerstone-setup` needs
+the `stone` CLI and a clone of this repo. The other skills need only `git` and the GitHub CLI (`gh`).
 
 ## Set up a new repo
 
