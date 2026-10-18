@@ -40,6 +40,10 @@ approves the plan before the build starts (G2).
      with a `- WHEN` line and a `- THEN` line. REMOVED needs only the reason.
    - For ADDED, use a number that no delta in `docs/plans/` used before.
    - Do not edit `docs/specs/`. `stone spec apply` writes it at delivery.
+   - Do not write `apply_order`. `stone spec apply` sets it at delivery.
    In the acceptance criteria coverage, name the requirement ID of each criterion.
 7. Ask the human each open question. Write the answers into the plan. Do not invent a requirement.
+   If no human can answer in this session, keep each question in Open questions. For each
+   question, give the options and your recommendation. Do not choose the answer. Name the default
+   that the plan uses until G2.
 8. Report the plan path, the delta path, the questions that are still open, and the risks for G2.
