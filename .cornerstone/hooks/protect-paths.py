@@ -3,10 +3,12 @@
 
 PreToolUse hook: block an edit to a path that the current role must not change (P2).
 The role comes from STONE_ROLE. The default is implementer. Check K6 in CI is the source of truth.
+A path is relative to the git work tree that holds it, so a linked worktree gets the same rules.
 """
 
 import json
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -19,15 +21,39 @@ def covers(prefixes: list[str], path: str) -> bool:
     return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/") for p in prefixes)
 
 
+def git_tree(directory: Path) -> tuple[Path, Path] | None:
+    """Return (top level, common git dir) of the work tree that holds directory, or None."""
+    try:
+        run = subprocess.run(["git", "-C", str(directory), "rev-parse", "--path-format=absolute",
+                              "--show-toplevel", "--git-common-dir"],
+                             capture_output=True, text=True, timeout=10)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    lines = run.stdout.splitlines()
+    if run.returncode != 0 or len(lines) != 2:
+        return None
+    return Path(lines[0]).resolve(), Path(lines[1]).resolve()
+
+
+def tree_root(file: Path, project: Path) -> Path:
+    """Return the work tree that holds file if it is in the project repo, else project."""
+    directory = next((parent for parent in file.parents if parent.is_dir()), project)
+    tree, project_tree = git_tree(directory), git_tree(project)
+    if tree and project_tree and tree[1] == project_tree[1]:
+        return tree[0]
+    return project
+
+
 def main() -> int:
     event = json.load(sys.stdin)
     tool_input = event.get("tool_input", {})
     target = tool_input.get("file_path") or tool_input.get("notebook_path")
     if not target:
         return 0
-    root = Path(os.environ.get("CLAUDE_PROJECT_DIR") or event.get("cwd") or ".").resolve()
+    project = Path(os.environ.get("CLAUDE_PROJECT_DIR") or event.get("cwd") or ".").resolve()
+    file = Path(target).resolve()
     try:
-        path = Path(target).resolve().relative_to(root).as_posix()
+        path = file.relative_to(tree_root(file, project)).as_posix()
     except ValueError:
         return 0  # outside the repo
     role = os.environ.get("STONE_ROLE", "implementer")
