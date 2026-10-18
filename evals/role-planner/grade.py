@@ -35,7 +35,8 @@ ASKS = re.compile(r"\?|\b(unclear|not clear|ambiguous|unspecified|undefined|deci
                   r"clarify|clarification)\b|\b(does|do|did) not (say|state|specify|define|cover)\b",
                   re.I)
 # open_question: the words that give a recommendation, name the default, and start the options.
-RECOMMENDS = re.compile(r"\b(recommend\w*|suggest\w*|prefer\w*)\b", re.I)
+# "I suggest an argument" and "the author may prefer" are not a recommendation of an answer.
+RECOMMENDS = re.compile(r"\b(recommend\w*|suggestion|suggested|preferred|I prefer)\b", re.I)
 DEFAULTS = re.compile(r"\bdefault\b|\b(plan|build) (uses|assumes|treats|raises|takes)\b|"
                       r"\bin the meantime\b|\bmeanwhile\b", re.I)
 OPTIONS = re.compile(r"\boptions?\b", re.I)
@@ -52,6 +53,14 @@ CHANGE = re.compile(r"^## (?:ADDED|MODIFIED)\s+(\S+?):?(?:\s|$)")
 # A list item that gives a recommendation or a default, not an option: "- Recommendation: (b)",
 # "- I recommend (b)", "- Default until G2: (a)". "- Raise ExpiredCode (recommended)" is an option.
 PART_ITEM = re.compile(r"^\W*(\w+\s+){0,2}?(recommend|suggest|prefer|default|the plan uses)", re.I)
+# The first line of one question in a block of questions: a heading, a "Q1" or "Question 1" line,
+# or a line that starts with bold text, with or without a list marker, at the left margin.
+QUESTION_START = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__|Q\d+\b|Question \d+\b)", re.I)
+# A bold line that starts an option, a recommendation, or a default, not a question.
+NOT_QUESTION = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)?\s*(?:option\b|\(?[a-e][).:]|"
+                          r"(?:(?:plan|my|our|the)\s+)?(?:recommend|default)|the plan uses)", re.I)
+# A parameter default in code, not the default of the plan: "(default `date.today()`)".
+CODE_DEFAULT = re.compile(r"^[:=]?\s*`[^`]*`\s*\)")
 OPEN_NOTE = re.compile(r"\bopen question\b|\bnot (yet )?(decided|approved)\b", re.I)
 TABLE_RULE = re.compile(r"^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-*:?\s*$")  # | --- | :-: |
 
@@ -185,21 +194,49 @@ def _join(lines: list[str]) -> list[str]:
 def _units(text: str, pattern: re.Pattern[str], report: bool) -> list[list[str]]:
     """Return the open questions of the text that name the gap, each as a list of lines.
 
-    An open question is a block with "question" or "open" in its first line. The heading or label
-    line of the block does not count. A table row in the block counts as "<header>: <cell>" lines.
-    For the report, the whole report is also an open question if a line names the gap and asks.
+    A block of open questions has "question" or "open" in its first line. The heading or label
+    line of the block does not count. For the report, the whole report is also a block if a line
+    names the gap and asks. `_questions` splits each block into questions. A table row counts as
+    "<header>: <cell>" lines.
     """
-    units = []
+    blocks = []
     for block in _blocks(text, "question") + _blocks(text, "open"):
         lines = block.splitlines()
         if not lines[0].lstrip().startswith("|"):  # a table header row can start a block
             lines = lines[1:]
-        units.append(_flatten_tables(_join(lines)))
+        blocks.append(_join(lines))
     if report and any(pattern.search(line) and ASKS.search(line) and not NONE.match(line)
                       for line in _join(text.splitlines())):
-        units.append(_flatten_tables(_join(text.splitlines())))
+        blocks.append(_join(text.splitlines()))
+    units = [_flatten_tables(question) for lines in blocks for question in _questions(lines)]
     return [unit for unit in units
             if any(pattern.search(line) and not NONE.match(line) for line in unit)]
+
+
+def _questions(lines: list[str]) -> list[list[str]]:
+    """Split the lines of a block into questions, so that the parts of one question do not count
+    for a different question.
+
+    Each table row is a question, with the header row and the rule row. A heading or a
+    QUESTION_START line that is not a NOT_QUESTION line starts a question. The lines before the
+    first start are a question too. A block with no start is one question.
+    """
+    questions: list[list[str]] = [[]]
+    header: list[str] = []
+    for index, line in enumerate(lines):
+        if line.lstrip().startswith("|"):
+            if TABLE_RULE.match(line):
+                continue
+            if not header and index + 1 < len(lines) and TABLE_RULE.match(lines[index + 1]):
+                header = [line, lines[index + 1]]
+            else:
+                questions.append(header + [line])
+            continue
+        header = []
+        if _level(line) or (QUESTION_START.match(line) and not NOT_QUESTION.match(line)):
+            questions.append([])
+        questions[-1].append(line)
+    return [question for question in questions if question]
 
 
 def _cells(line: str) -> list[str]:
@@ -240,7 +277,8 @@ def _says(lines: list[str], words: re.Pattern[str]) -> bool:
     """
     for index, line in enumerate(lines):
         for match in words.finditer(line):
-            if NEGATED.search(line[:match.start()]):
+            if NEGATED.search(line[:match.start()]) or (
+                    line[:match.start()].endswith("(") and CODE_DEFAULT.match(line[match.end():])):
                 continue
             rest = line[match.end():]
             rest = (rest.split(":", 1)[1] if ":" in rest else rest).strip(" \t*_:.-")
