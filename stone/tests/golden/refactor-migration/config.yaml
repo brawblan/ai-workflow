@@ -1,0 +1,21 @@
+# Golden input: the repo config for the refactor-migration profile (D29).
+# The expected output is in expected/. Write it again with STONE_UPDATE_GOLDEN=1.
+framework_version: 0.8.0
+harness: claude-code
+model_profile: claude-5
+profiles: [refactor-migration]
+branches: {integration: dev, main: main}
+commands:
+  install: pip install .
+  test_unit: python -m unittest
+  all_checks: make check
+  architecture: lint-imports
+  mutation: mutmut run --paths-to-mutate src/
+  differential: pytest tests/differential
+paths:
+  tests: [tests/]
+  checks: [.github/workflows/, .cornerstone/checks/]
+  plans: docs/plans/
+limits:
+  mutation_score_changed_code: 0.6
+owners: {default: octocat}
