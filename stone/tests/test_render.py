@@ -38,7 +38,8 @@ owners: {default: octocat}
 """
 ROLE_FILES = [".claude/agents/implementer.md", ".claude/agents/reviewer.md",
               ".claude/agents/shaper.md", ".claude/agents/tester.md"]
-OTHER_FILES = [".claude/settings.json", ".cornerstone/checks/protected_paths.py",
+OTHER_FILES = [".claude/settings.json", ".cornerstone/checks/change_size.py",
+               ".cornerstone/checks/protected_paths.py",
                ".cornerstone/hooks/protect-paths.py", ".cornerstone/manifest.yaml",
                ".github/workflows/cornerstone-checks.yml"]
 PLANNER = ".claude/agents/planner.md"
@@ -113,7 +114,7 @@ class RenderTest(unittest.TestCase):
 
     def test_dry_run_writes_nothing(self) -> None:
         result = self.render(dry_run=True)
-        self.assertEqual(len(result.wrote), 9)
+        self.assertEqual(len(result.wrote), 10)
         self.assertFalse((self.root / ".claude").exists())
         self.assertFalse((self.root / render.MANIFEST).exists())
 
@@ -395,7 +396,7 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + OTHER_FILES))
         self.assertFalse((self.root / PLANNER).exists())
         self.assertNotIn("role.planner", [c["id"] for c in self.manifest()["components"]])
-        self.assertEqual(len(self.render(dry_run=True).skipped), 9)
+        self.assertEqual(len(self.render(dry_run=True).skipped), 10)
 
     def test_single_ticket_hook_keeps_the_role_rules(self) -> None:
         self.render()
@@ -632,11 +633,12 @@ class RenderTest(unittest.TestCase):
     def test_workflow_parses_and_keeps_the_step_order(self) -> None:
         self.render()
         names = [s["name"] for s in self.workflow_steps() if "name" in s]
-        self.assertEqual(len(names), 5, names)
+        self.assertEqual(len(names), 6, names)
         self.assertTrue(names[0].startswith("K6"), names)
-        self.assertEqual(names[1], "Install stone")
-        self.assertTrue(names[2].startswith("K14"), names)
-        self.assertEqual(names[3:], ["Install", "All checks"])
+        self.assertTrue(names[1].startswith("K7"), names)
+        self.assertEqual(names[2], "Install stone")
+        self.assertTrue(names[3].startswith("K14"), names)
+        self.assertEqual(names[4:], ["Install", "All checks"])
         self.assertEqual(self.step("Install")["run"], "pip install .")
         self.assertEqual(self.step("All checks")["run"], "make check")
 

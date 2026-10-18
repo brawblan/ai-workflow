@@ -46,6 +46,7 @@ INVESTIGATOR = ".claude/agents/investigator.md"
 HOOK = ".cornerstone/hooks/protect-paths.py"
 SETTINGS = ".claude/settings.json"
 K6 = ".cornerstone/checks/protected_paths.py"
+K7 = ".cornerstone/checks/change_size.py"
 K15 = ".cornerstone/checks/instruction_size.py"
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
 MANIFEST = ".cornerstone/manifest.yaml"
@@ -76,6 +77,8 @@ def expected_files(names: list[str]) -> list[str]:
         files.append(WORKFLOW)
     if any("K6" in profile["checks"] for profile in profiles):
         files.append(K6)
+    if any("K7" in profile["checks"] for profile in profiles):
+        files.append(K7)
     if any("K15" in profile["checks"] for profile in profiles):
         files.append(K15)
     return sorted(files)
@@ -613,7 +616,7 @@ class AllProfilesTest(RenderBase):
         result, log = self.render()
         self.assertEqual(result.exit_code, 0)
         self.assertNotIn("skipped profile", log)
-        want = [role_file(role) for role in ALL_ROLES] + ALWAYS + [WORKFLOW, K6]
+        want = [role_file(role) for role in ALL_ROLES] + ALWAYS + [WORKFLOW, K6, K7]
         if any("K15" in profile_data(name)["checks"] for name in profile_names()):
             want.append(K15)
         self.assertEqual(sorted(result.wrote), sorted(want))

@@ -29,6 +29,7 @@ MODEL_VALUES = {"instruction_file_max_lines"}  # template values from `defaults`
 FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "docs/reports/"}
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
+DEFAULT_PR_LINES = 600  # D4, customization.md
 
 
 class RenderError(Exception):
@@ -132,6 +133,19 @@ def needed(entry: dict[str, Any], profiles: list[dict[str, Any]]) -> bool:
     return bool(profiles)
 
 
+def size_limits(config: dict[str, Any], profiles: list[dict[str, Any]]) -> dict[str, int]:
+    """Return the K7 limit of each selected profile with K7 (D27). The repo limit only tightens."""
+    repo = _get(config, "limits.pr_changed_lines")
+    if repo is not None and (isinstance(repo, bool) or not isinstance(repo, int) or repo < 1):
+        raise RenderError(f"{CONFIG}: 'limits.pr_changed_lines' must be a whole number above 0.")
+    limits = {}
+    for profile in profiles:
+        if "K7" in profile["checks"]:
+            own = (profile.get("limits") or {}).get("pr_changed_lines", DEFAULT_PR_LINES)
+            limits[profile["id"]] = min(own, repo) if repo else own
+    return limits
+
+
 def one_folder(value: Any, key: str = "plans") -> str:
     """Return a path as one folder that ends with '/'. Templates add the file name to it."""
     if isinstance(value, list):
@@ -190,7 +204,9 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     # A component with `ci_step` adds a step to the G3 workflow, only if it is rendered.
     steps: dict[str, str | None] = {step_name(entry["id"]): None
                                     for entry in registry if entry.get("ci_step")}
-    base_values = {**template_values(config, ""), **model_values}
+    limits_json = json.dumps(size_limits(config, profiles), sort_keys=True)
+    base_values = {**template_values(config, ""), **model_values,
+                   "size_limits_json": limits_json}
     for entry in registry:
         if entry.get("ci_step") and needed(entry, profiles):
             steps[step_name(entry["id"])] = substitute(harness, entry["ci_step"], base_values,
@@ -202,6 +218,7 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
             continue
         model = defaults["role_models"].get(entry.get("role", ""), "")
         values = {**template_values(config, model), **model_values,
+                  "size_limits_json": limits_json,
                   **{name: step for name, step in steps.items() if step is not None}}
         content = substitute(harness, entry["template"], values, steps, config)
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],

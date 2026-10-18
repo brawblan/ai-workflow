@@ -71,6 +71,9 @@ Run `/workflow:ticket-delivery` in a new session. It collects the tester, review
 evidence for each acceptance criterion. Then it opens the PR with `/workflow:dev-pr`. It does not
 write tests or a review itself. If one is missing, it tells you which role to start.
 
+Put a `Profile: <id>` line in the PR body, for example `Profile: single-ticket`. Check K7 reads it
+to find the size limit.
+
 A human approves the PR (G4). A solo developer can approve their own human-centric work only under
 the [solo developer rule](../../framework/modes.md#solo-developer).
 
