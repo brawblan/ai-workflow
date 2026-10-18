@@ -34,9 +34,10 @@ KINDS = {"outcome", "contract"}
 REPORT = "@report"  # a check path that means the final text of the run
 RUNS = Path(".cornerstone/eval-runs")
 RESULTS = Path("evals/results")
+WORK_BRANCH = "feature/eval-work"
 GIT_ENV = {"GIT_AUTHOR_NAME": "stone eval", "GIT_AUTHOR_EMAIL": "eval@example.invalid",
            "GIT_COMMITTER_NAME": "stone eval", "GIT_COMMITTER_EMAIL": "eval@example.invalid",
-           # No global or system git config: the same scenario gives the same result on each machine.
+           # No global or system git config, so each machine gives the same result.
            "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
 
 
@@ -175,6 +176,7 @@ def prepare(folder: Path, scenario: dict[str, Any], framework: Path, role_file: 
     shutil.copytree(folder / scenario["fixture"], path)
     _git(path, "init", "-q", "-b", "main")
     _commit(path, "chore: fixture base")
+    _git(path, "checkout", "-q", "-b", WORK_BRANCH)  # an agent does not commit to the default
     if (path / render.CONFIG).exists():
         with redirect_stderr(StringIO()):
             render.render(path, framework)
@@ -204,14 +206,15 @@ def _dotted(data: Any, dotted: str) -> Any:
     return data
 
 
-def parse_output(stdout: str, fields: dict[str, str]) -> dict[str, Any]:
-    """Read the last JSON object in the output: one object, or the last line of a stream."""
+def parse_output(stdout: str, fields: dict[str, str],
+                 where: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Read the last JSON object in the output that has each key and value in `where`."""
     for line in reversed(stdout.strip().splitlines() or [""]):
         try:
             data = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if isinstance(data, dict):
+        if isinstance(data, dict) and all(data.get(k) == v for k, v in (where or {}).items()):
             return {name: _dotted(data, path) for name, path in fields.items()}
     return {}
 
@@ -262,7 +265,7 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
     except OSError as error:
         run.error = f"the harness did not start: {error}"
     try:
-        run.usage = parse_output(stdout, config.get("output") or {})
+        run.usage = parse_output(stdout, config.get("output") or {}, config.get("output_where"))
         run.usage.setdefault("seconds", round(time.monotonic() - start, 1))
         workspace.report = str(run.usage.pop("report", "") or "")
         transcript = opts["runs"] / f"{scenario['id']}-{variant}-{trial}.out"

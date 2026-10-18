@@ -153,6 +153,10 @@ flowchart LR
   name (P12). The `output` map of `eval.yaml` uses these names: `report` (the final text),
   `cost_usd`, `input_tokens`, `output_tokens`, and `turns`. The table shows "—" for a name that is
   not in the map.
+- The runner reads the last JSON object of the harness output. If `eval.yaml` has `output_where`,
+  it reads the last object with those keys and values.
+- The setup commits the fixture on `main`. Then the work continues on the branch
+  `feature/eval-work`, because a role does not commit to the default branch.
 - Git in the workspace does not read the global or the system git config. Thus each machine gives
   the same result. Add a `.gitignore` to each fixture for the files that a build or a test writes,
   for example a bytecode cache. If not, `unchanged` and `only_changed` count those files.
