@@ -15,7 +15,10 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from stone import specs
+from stone.markdown import split_frontmatter
 
 REPORT_ENV = "STONE_EVAL_REPORT"
 JOB_STORY = re.compile(r"\b[a-z][a-z0-9-]*\.J[1-9]\d*\b")
@@ -25,7 +28,7 @@ HEADING = re.compile(r"^\s{0,3}(#{1,6})\s")
 LABEL = re.compile(r"^\s{0,3}(?![-*+]\s|\d+[.)]\s)(\*\*[^*]+\*\*:?|__[^_]+__:?|[^.:!?|]{1,60}:)\s*$")
 LIST_ITEM = re.compile(r"^\s*([-*+]|\d+[.)])\s")
 # A line that says that there is no question, for example "None." or "No open questions".
-NONE = re.compile(r"^\W*(none|no\b|n/a)", re.I)
+NONE = re.compile(r"^\W*(none|no|n/a)\b", re.I)
 # A line of the report that asks: a question mark, or words that say that the ticket is not clear.
 # Only the present tense counts: "I decided" or "I confirmed" is a decision, not a question.
 ASKS = re.compile(r"\?|\b(unclear|not clear|ambiguous|unspecified|undefined|decide|confirm|"
@@ -167,7 +170,13 @@ def not_applied(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
     if not path.is_file():
         return False, f"no file {args['path']}"
     delta = specs.parse_delta(path)
-    if delta.order is not None or any("apply_order" in message for _, message in delta.errors):
+    try:
+        meta, _ = split_frontmatter(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        meta = {}  # parse_delta records the error
+    has_key = isinstance(meta, dict) and "apply_order" in meta  # also "apply_order:" with no value
+    if has_key or delta.order is not None or any("apply_order" in message
+                                                 for _, message in delta.errors):
         return False, "the delta has apply_order, so stone reads it as applied"
     return True, "the delta is not applied"
 
