@@ -37,7 +37,8 @@ jobs:
 
       # The first role of the profile. It has no write token, no shell, no web tools, and no file edits.
       # The event text is untrusted. The role returns its report as structured output. Then the post job
-      # posts the report with its own token (D31).
+      # posts the report with its own token (D31). The role reads only the checkout and the event folder.
+      # An unscoped Read rule also allows /proc/self/environ, so the posted report could leak the secret (D32).
       - name: Run the investigator
         id: run
         uses: anthropics/claude-code-action@f27be6b65a4652f08a2ba3cff79114829b588967 # v1.0.252
@@ -70,7 +71,7 @@ jobs:
             --agent investigator
             --model claude-opus-5-5
             --add-dir ${{ runner.temp }}/cornerstone
-            --allowedTools Read,Grep,Glob
+            --allowedTools "Read(./**),Read(/${{ runner.temp }}/cornerstone/**)"
             --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch
             --json-schema '{"type":"object","properties":{"report":{"type":"string"}},"required":["report"]}'
 

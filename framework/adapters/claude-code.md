@@ -105,7 +105,7 @@ The run job:
 | `claude_code_oauth_token` | `secrets.CLAUDE_CODE_OAUTH_TOKEN` | The harness secret |
 | `github_token` | `github.token` | The job `permissions` limit this token. The action does not get its app token. |
 | `prompt` | The role, the profile, the trigger, the event file path, and the profile steps | The pipeline gives the profile steps at run time (D24). |
-| `claude_args` | `--agent <role> --model <model> --add-dir <event folder> --allowedTools Read,Grep,Glob --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch --json-schema <report schema>` | The role reads and reports. It cannot change files, run commands, or send data out. |
+| `claude_args` | `--agent <role> --model <model> --add-dir <event folder> --allowedTools "Read(./**),Read(/<event folder>/**)" --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch --json-schema <report schema>` | The role reads and reports. It cannot change files or run commands. It reads only the checkout and the event folder (D32). Its only output is the report. |
 
 The action returns the report in `structured_output`. The post job reads it from the job output and
 gives it to `gh` through `env`.
@@ -116,7 +116,7 @@ The action checks that the actor has write access for issue events. For `schedul
 
 | Trigger | Action input | Why |
 | --- | --- | --- |
-| `ci:issue-opened` | `allowed_non_write_users: '*'` | Any user can report a bug. The action then scrubs secrets from the environment of each command. |
+| `ci:issue-opened` | `allowed_non_write_users: '*'` | Any user can report a bug. The action then scrubs secrets from the environment of each command. The role has no shell, so the read path limit (D32) protects the secret, not the scrub. |
 | `ci:dependency-pr` | `allowed_bots: 'dependabot[bot],renovate[bot]'` | The bot opens the PR. The job `if` accepts only these two authors. |
 
 ### Prompt-injection limits
@@ -128,6 +128,7 @@ limits apply:
 | --- | --- |
 | No write token in the run job | An injected instruction cannot change the repo, issues, or labels. |
 | Tool allowlist: Read, Grep, Glob | No shell, no edits, no web fetch. The only output is the report. |
+| Read rules only for `./**` and the event folder | Read, Grep, and Glob cannot open a file outside the checkout, such as `/proc/self/environ` with the harness secret. An unscoped `Read` rule allows all paths, and the report is public (D32, dossier F12). |
 | Event text in a file, not in the prompt or a `run` script | The text cannot inject shell commands (dossier F8). |
 | The post job posts the report as text | A report cannot apply labels. The investigator proposes labels, and a human approves them and the severity at G4. |
 | Bug-triage: the post job has only `issues: write` | No write token beyond comments and labels. No contents, PR, or workflow write. |
@@ -140,8 +141,10 @@ Limits that stay:
 - The run job can read all repo files. Do not keep private data in a repo that runs these workflows.
 - The role has no web tools. A step that reads a web page, for example release notes, uses only the
   event data and the repo. Do that step in a local run (`command`) if the report needs more.
-- The action process has the harness secret. The allowlist blocks the tools that could read the
-  environment, but the risk is not zero (dossier F10).
+- The action process has the harness secret. The allowlist blocks the shell, and the Read rules
+  block the files outside the checkout, but the risk is not zero (dossier F10, F12).
+- GitHub redacts a secret in a job output only as plain text. An encoded secret (for example
+  base64) is not redacted. Do not add an unscoped `Read`, `Grep`, or `Glob` rule.
 
 ## Modes
 
