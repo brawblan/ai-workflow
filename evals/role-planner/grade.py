@@ -45,6 +45,8 @@ OPTION_LABEL = re.compile(r"(?:^|(?<=[\s(*]))(?:\(([a-e1-9])\)|([a-e])[).:](?=[\
 # The text before a word that says that the word has no value: "No default", "not recommended".
 NEGATED = re.compile(r"\b(no|not|without)\s+(an?\s+)?$", re.I)
 SPLIT = re.compile(r";|,|\bor\b|\s/\s", re.I)
+# A change heading of a delta that adds or changes a requirement: "## ADDED cart.R3: A title".
+CHANGE = re.compile(r"^## (?:ADDED|MODIFIED)\s+(\S+?):?(?:\s|$)")
 TABLE_RULE = re.compile(r"^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-*:?\s*$")  # | --- | :-: |
 
 
@@ -224,16 +226,21 @@ def _flatten_tables(lines: list[str]) -> list[str]:
 def _says(lines: list[str], words: re.Pattern[str]) -> bool:
     """A line has one of `words` and a value after it that is not "none".
 
-    "Default: (a)" and "I recommend B" give a value. "No default" and "Recommendation: none" do
-    not. A line that ends in ":" after the word takes its value from the next line with text.
+    "Default: (a)" and "I recommend B" give a value. "No default", "Recommendation: none", and
+    "Default until G2: none" do not: the value is the text after the first ":", if there is one.
+    A line that ends in ":" after the word takes its value from the next line with text, if that
+    line does not give a different part (options, a recommendation, or a default).
     """
     for index, line in enumerate(lines):
         for match in words.finditer(line):
             if NEGATED.search(line[:match.start()]):
                 continue
-            rest = line[match.end():].strip(" \t*_:.-")
+            rest = line[match.end():]
+            rest = (rest.split(":", 1)[1] if ":" in rest else rest).strip(" \t*_:.-")
             if not rest and line.rstrip(" \t*_").endswith(":"):
-                rest = next((n.strip(" \t*_-") for n in lines[index + 1:] if n.strip()), "")
+                after = next((n for n in lines[index + 1:] if n.strip()), "")
+                part = OPTIONS.search(after) or RECOMMENDS.search(after) or DEFAULTS.search(after)
+                rest = "" if part else after.strip(" \t*_-")
             if rest and not NONE.match(rest):
                 return True
     return False
@@ -273,13 +280,24 @@ def _option_count(lines: list[str]) -> int:
 
 
 def _expired_requirements(workspace: Path, glob: str, pattern: re.Pattern[str]) -> list[str]:
-    """Return the ADDED or MODIFIED requirements with the pattern, in each delta of the glob."""
+    """Return the ADDED or MODIFIED sections with the pattern, in each delta of the glob.
+
+    The grader reads the "## ADDED|MODIFIED" sections from the text, so a delta that is not valid
+    (for example, a requirement with no scenario) is also read.
+    """
     found = []
     for path in sorted(workspace.glob(glob)):
-        if path.is_file():
-            found.extend(f"{change.id} ({path.name})" for change in specs.parse_delta(path).changes
-                         if change.op in {"ADDED", "MODIFIED"}
-                         and pattern.search(change.title + "\n" + change.body))
+        if not path.is_file():
+            continue
+        name, section = "", []
+        for line in path.read_text(encoding="utf-8", errors="replace").splitlines() + ["## END"]:
+            if line.startswith("## "):
+                if name and pattern.search("\n".join(section)):
+                    found.append(f"{name} ({path.name})")
+                match = CHANGE.match(line)
+                name, section = (match[1] if match else ""), [line]
+            else:
+                section.append(line)
     return found
 
 
