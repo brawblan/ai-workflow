@@ -3,6 +3,8 @@
 The home of **Cornerstone**, a tool-neutral framework for agent-assisted software delivery, and
 its `stone` CLI. The repo also has the `workflow` plugin skills, my personal agent rules, and tips.
 
+Read the docs at [brawblan.github.io/ai-workflow](https://brawblan.github.io/ai-workflow/).
+
 Cornerstone says how a human and an agent deliver software together. It sets who does each stage,
 which gates stop the work, and which checks decide that work is done. The core never names a tool.
 Adapters turn the core into files for one harness. `stone render` writes those files into a target
@@ -172,7 +174,7 @@ The skills use the open `SKILL.md` format. `stone render` has no adapter for oth
 | [`docs/research/`](docs/research/dossier.md) | The cited evidence for the framework |
 | [`docs/guides/`](docs/guides/README.md) | How to use Cornerstone, one situation at a time |
 | [`docs/tips/`](docs/tips/README.md) | How I work with agents, and why |
-| [`website/`](website/), [`mkdocs.yml`](mkdocs.yml) | The docs site, built with MkDocs Material |
+| [`website/`](website/), [`mkdocs.yml`](mkdocs.yml) | The [docs site](https://brawblan.github.io/ai-workflow/), built with MkDocs Material |
 | [`global/`](global/README.md) | My personal agent rules and settings, and how I sync them across devices |
 | [`AGENTS.md`](AGENTS.md) | How agents work in this repo: commands, rules, branches, and writing |
 
