@@ -76,6 +76,24 @@ The generator is mostly a design. The [`stone`](../stone/README.md) CLI has `sto
 
 None at this time.
 
+## Roadmap
+
+Do these items in order. Each item is one PR or more.
+
+1. On 2026-10-31, change K17 from `--mode warn` to `--mode block` in `.github/workflows/stone.yml`.
+   That date is 2 weeks after the K17 merge.
+2. Build `stone render` for the first harness adapter and the single-ticket profile. It writes the
+   role files, the protected-path hook and check K6, a CI workflow, and the manifest.
+3. Update the plugin skills from the
+   [gap analysis](../docs/research/dossier.md#3-gap-analysis-of-this-repo-brawblanai-workflow-v021).
+   Add the tester and reviewer roles and the `cornerstone-setup` entry skill. Remove the
+   self-verification from `ticket-delivery`. Add the evidence sections to `dev-pr`.
+4. Update `docs/tips/README.md` habit 4. The plan form now depends on the profile (D-series,
+   resolution 1 in the dossier).
+5. Write the evals for the first model profile. Set its status to `active` when they pass.
+6. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
+   of Q4 2026.
+
 ## Relation to the plugin in this repo
 
 The `workflow` plugin skills are the first harness implementation of parts of this framework.
