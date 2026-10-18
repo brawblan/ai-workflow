@@ -36,10 +36,23 @@ SCENARIOS = {s["id"]: s for s in
 GIT_ENV = {"GIT_AUTHOR_NAME": "tester", "GIT_AUTHOR_EMAIL": "tester@example.com",
            "GIT_COMMITTER_NAME": "tester", "GIT_COMMITTER_EMAIL": "tester@example.com",
            "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
-GRADERS = ("job_story_ids", "names_gap", "new_ids", "not_applied")
+GRADERS = ("job_story_ids", "names_gap", "new_ids", "not_applied", "open_question")
 GAP = "expir|end date|last day|\\bends\\b|out of date|no longer valid"  # the P3 pattern
 PLAN = "docs/plans/SHOP-12.md"
 DELTA = "docs/plans/SHOP-16.spec.md"
+# Open questions in the form of planner step 7, about the P3 gap (an expired code).
+OQ_LIST = ("1. Each code has an end date. What must amount_due do with an expired code?\n"
+           "   - (a) Raise UnknownCode.\n"
+           "   - (b) Raise a new ExpiredCode error.\n"
+           "   - Recommendation: (b), because the shopper sees why the code fails.\n"
+           "   - Default until G2: the plan raises UnknownCode, as in (a).")
+OQ_INLINE = ("The ticket does not say what amount_due does with an expired code. The options\n"
+             "are to raise UnknownCode or to ignore the code. I recommend that it raises\n"
+             "UnknownCode. The default until G2 is that the plan raises UnknownCode.")
+OQ_TABLE = ("| Question | Options | Recommendation | Default until G2 |\n"
+            "| --- | --- | --- | --- |\n"
+            "| What does amount_due do with an expired code? | Raise UnknownCode; ignore the code "
+            "| Raise UnknownCode | The plan raises UnknownCode |")
 
 
 def plan(coverage: str, *, heading: str = "## Acceptance criteria coverage",
@@ -562,6 +575,394 @@ class NamesGapRound3Test(GraderCase):
                 self.report(False, f"Plan written.\n{line}\n")
 
 
+# EVAL-4e: open_question (planner step 7) --------------------------------------------------------
+
+
+def requirement(op: str, rid: str, title: str, body: str = "The checkout MUST do it.") -> str:
+    """One change of a delta. A REMOVED change has no scenario."""
+    if op == "REMOVED":
+        return f"## REMOVED {rid}: {title}\n\n{body}\n"
+    return (f"## {op} {rid}: {title}\n\n{body}\n\n### Scenario: It works\n\n"
+            f"- WHEN a shopper does it\n- THEN it is done\n")
+
+
+def question(*lines: str) -> str:
+    """One numbered open question with nested items."""
+    first, *rest = lines
+    return "\n".join([f"1. {first}", *(f"   - {line}" for line in rest)])
+
+
+ASK = "What must amount_due do with an expired code?"
+REC = "Recommendation: raise UnknownCode."
+DEFAULT = "Default until G2: the plan raises UnknownCode."
+TWO = ("(a) Raise UnknownCode.", "(b) Ignore the code.")
+
+
+class OpenQuestionTest(GraderCase):
+    """EVAL-4e. A file test has an empty report, and a report test has no plan file."""
+
+    PATH = "docs/plans/SHOP-14*.md"
+    FILE = "docs/plans/SHOP-14.md"
+    DELTA = "docs/plans/SHOP-14.spec.md"
+    DELTA_GLOB = "docs/plans/SHOP-14*.spec.md"
+
+    def check(self, expected: bool, files: dict[str, str] | None = None, report: str | None = "",
+              **extra: Any) -> str:
+        args = {"path": self.PATH, "pattern": GAP, "delta": self.DELTA_GLOB, **extra}
+        return self.expect(expected, "open_question", self.workspace(files), args, report)
+
+    def plan_file(self, questions: str, approach: str = "Lower the amount by the percent.") -> dict:
+        return {self.FILE: plan("1. shopper.J3.", questions=questions, approach=approach)}
+
+    def file(self, expected: bool, questions: str, **extra: Any) -> str:
+        return self.check(expected, self.plan_file(questions), **extra)
+
+    def report(self, expected: bool, text: str, **extra: Any) -> str:
+        return self.check(expected, report=text, **extra)
+
+    def both(self, expected: bool, questions: str) -> None:
+        """The questions in the plan section, and in an "Open questions:" block of the report."""
+        with self.subTest(source="plan"):
+            self.file(expected, questions)
+        with self.subTest(source="report"):
+            self.report(expected, f"Plan written at {self.FILE}.\n\nOpen questions:\n{questions}\n")
+
+    # Criterion 2: the 3 forms ------------------------------------------------------------------
+    def test_oq_c2_numbered_list_with_nested_option_items_passes(self) -> None:
+        self.both(True, OQ_LIST)
+
+    def test_oq_c2_numbered_list_with_nested_numbered_options_passes(self) -> None:
+        text = ("1. What must amount_due do with an expired code?\n"
+                "   - Options:\n     1. Raise UnknownCode.\n     2. Ignore the code.\n"
+                f"   - {REC}\n   - {DEFAULT}")
+        self.both(True, text)
+
+    def test_oq_c2_inline_paragraph_that_wraps_passes(self) -> None:
+        self.both(True, OQ_INLINE)
+
+    def test_oq_c2_inline_text_on_one_line_passes(self) -> None:
+        self.both(True, OQ_INLINE.replace("\n", " "))
+
+    def test_oq_c2_table_with_named_columns_passes(self) -> None:
+        self.both(True, OQ_TABLE)
+
+    def test_oq_c2_table_after_a_blank_line_after_the_label_passes(self) -> None:
+        for label in ("Open questions:", "**Open questions**"):
+            text = f"Plan written.\n\n{label}\n\n{OQ_TABLE}\n"
+            with self.subTest(label=label):
+                self.report(True, text)
+                self.check(True, {self.FILE: text})
+
+    def test_oq_c2_table_with_other_columns_and_order_passes(self) -> None:
+        table = ("| # | Question | Default until G2 | Recommendation | Options |\n"
+                 "|:-:|:---|:---|:---|:---|\n"
+                 "| 1 | The end date of a code: what then? | The plan raises UnknownCode "
+                 "| ExpiredCode | (a) UnknownCode, (b) ExpiredCode |")
+        self.both(True, table)
+
+    def test_oq_c2_table_row_with_only_some_parts_fails(self) -> None:
+        table = ("| Question | Options |\n| --- | --- |\n"
+                 "| What does an expired code do? | Raise UnknownCode; ignore the code |")
+        self.both(False, table)
+
+    # Criterion 1: the block ----------------------------------------------------------------------
+    def test_oq_c1_gap_out_of_a_questions_block_fails(self) -> None:
+        self.check(False, self.plan_file("None.", approach=OQ_INLINE))
+        self.check(False, {self.FILE: f"# SHOP-14\n\n## Approach\n\n{OQ_LIST}\n"})
+
+    def test_oq_c1_a_block_with_open_or_question_in_its_first_line_counts(self) -> None:
+        for heading in ("## Open questions", "## Questions", "## Open items", "### Question 1"):
+            with self.subTest(heading=heading):
+                self.check(True, {self.FILE: f"# SHOP-14\n\n{heading}\n\n{OQ_LIST}\n"})
+        self.check(False, {self.FILE: f"# SHOP-14\n\n## Notes\n\n{OQ_LIST}\n"})
+
+    def test_oq_c1_the_first_line_of_the_block_does_not_name_the_gap(self) -> None:
+        body = "- (a) Refuse the code. (b) Ignore the code.\n- I recommend (a).\n- Default: (a)."
+        detail = self.check(False, {self.FILE: f"## Open questions on expired codes\n\n{body}\n"})
+        self.assertIn("gap", detail)
+        self.report(False, f"**Open questions on expired codes**\n{body}\n")
+
+    def test_oq_c1_line_that_starts_with_none_no_or_na_does_not_name_the_gap(self) -> None:
+        rest = "expired codes: (a) refuse, (b) ignore. I recommend (a). Default: (a)."
+        for word in ("None.", "No,", "N/A:", "- None:", "**No.**"):
+            with self.subTest(word=word):
+                self.both(False, f"{word} {rest}")
+
+    def test_oq_c1_line_that_starts_with_a_longer_word_names_the_gap(self) -> None:
+        line = ("Nothing in the ticket says what an expired code does. (a) Refuse it. "
+                "(b) Ignore it. I recommend (a). Default until G2: (a).")
+        self.both(True, line)
+
+    def test_oq_c1_the_parts_must_be_in_one_block(self) -> None:
+        text = (f"# SHOP-14\n\n## Open questions\n\n{question(ASK, *TWO, DEFAULT)}\n\n"
+                f"## Questions for the owner\n\n- {REC}\n")
+        self.assertIn("recommendation", self.check(False, {self.FILE: text}))
+
+    def test_oq_c1_the_parts_must_be_in_one_source(self) -> None:
+        files = self.plan_file(question(ASK, *TWO, DEFAULT))
+        self.check(False, files, report="Open questions:\n- I recommend (a) for an expired code.\n")
+
+    def test_oq_c1_a_file_that_does_not_match_the_glob_does_not_count(self) -> None:
+        for rel in ("docs/plans/SHOP-15.md", "docs/notes/SHOP-14.md"):
+            with self.subTest(path=rel):
+                self.check(False, {rel: plan("1. shopper.J3.", questions=OQ_LIST)})
+
+    def test_oq_c1_each_file_that_matches_the_glob_counts(self) -> None:
+        self.check(True, {self.FILE: plan("1. shopper.J3."),
+                          "docs/plans/SHOP-14-questions.md": f"## Open questions\n\n{OQ_LIST}\n"})
+
+    def test_oq_c1_no_plan_and_no_report_fails(self) -> None:
+        self.check(False)
+        self.check(False, report=None)
+        self.check(True, self.plan_file(OQ_LIST), report=None)
+
+    # Criterion 3: the whole report ---------------------------------------------------------------
+    def test_oq_c3_one_line_report_that_asks_passes(self) -> None:
+        self.report(True, "The ticket does not say what an expired code does: (a) refuse it, "
+                          "(b) ignore it. I recommend (a). The default until G2 is (a).")
+        self.report(True, "What does an expired code do? Options: refuse it or ignore it. "
+                          "I recommend refusing it. Default: refuse it.")
+
+    def test_oq_c3_report_with_the_parts_on_other_lines_passes(self) -> None:
+        self.report(True, "I wrote no plan.\n\nWhat must amount_due do with an expired code?\n\n"
+                          "Options: raise UnknownCode, or ignore the code.\n\n"
+                          "I recommend UnknownCode.\n\nThe default until G2 is UnknownCode.\n")
+
+    def test_oq_c3_report_line_with_the_gap_that_does_not_ask_fails(self) -> None:
+        self.report(False, "Expired codes: (a) refuse them, (b) ignore them. I recommend (a). "
+                           "Default until G2: (a).")
+
+    def test_oq_c3_the_ask_must_be_on_the_line_with_the_gap(self) -> None:
+        self.report(False, "Is the plan correct?\n\nExpired codes: (a) refuse them, (b) ignore "
+                           "them. I recommend (a). Default until G2: (a).\n")
+
+    def test_oq_c3_report_line_that_asks_and_starts_with_none_does_not_count(self) -> None:
+        self.report(False, "None: what does an expired code do? (a) refuse, (b) ignore. "
+                           "I recommend (a). Default: (a).")
+
+    def test_oq_c3_the_whole_text_rule_is_only_for_the_report(self) -> None:
+        line = ("The ticket does not say what an expired code does: (a) refuse it, (b) ignore "
+                "it. I recommend (a). The default until G2 is (a).")
+        self.check(False, {self.FILE: f"# SHOP-14\n\n{line}\n"})
+
+    # Criterion 4: the default on a line that names the gap ---------------------------------------
+    NO_DEFAULT = question(ASK, *TWO, "Recommendation: (a).")
+
+    def test_oq_c4_default_on_a_gap_line_of_the_same_plan_passes(self) -> None:
+        approach = "Until G2, the plan raises UnknownCode for an expired code."
+        self.check(True, self.plan_file(self.NO_DEFAULT, approach=approach))
+        self.assertIn("default", self.check(False, self.plan_file(self.NO_DEFAULT)))
+
+    def test_oq_c4_default_on_a_gap_line_of_the_same_report_passes(self) -> None:
+        self.report(True, "Plan written. The default for an expired code until G2: the plan "
+                          f"raises UnknownCode.\n\nOpen questions:\n{self.NO_DEFAULT}\n")
+
+    def test_oq_c4_default_on_a_line_that_does_not_name_the_gap_fails(self) -> None:
+        approach = "Until G2, the plan raises UnknownCode."
+        self.check(False, self.plan_file(self.NO_DEFAULT, approach=approach))
+
+    def test_oq_c4_default_in_a_different_source_does_not_count(self) -> None:
+        self.check(False, self.plan_file(self.NO_DEFAULT),
+                   report="Done. The default for an expired code is UnknownCode.")
+        approach = "Until G2, the plan raises UnknownCode for an expired code."
+        self.check(False, {self.FILE: plan("1. shopper.J3.", approach=approach)},
+                   report=f"Open questions:\n{self.NO_DEFAULT}\n")
+
+    def test_oq_c4_negated_default_on_a_gap_line_does_not_count(self) -> None:
+        approach = "There is no default for an expired code."
+        self.check(False, self.plan_file(self.NO_DEFAULT, approach=approach))
+
+    # Criterion 5: the options --------------------------------------------------------------------
+    def test_oq_c5_each_option_label_form_counts(self) -> None:
+        for first, second in (("(a)", "(b)"), ("(1)", "(2)"), ("a)", "b)"), ("A.", "B."),
+                              ("A:", "B:"), ("Option A:", "Option B:"),
+                              ("Option 1:", "Option 2:")):
+            text = question(ASK, f"{first} Raise UnknownCode.", f"{second} Ignore the code.",
+                            REC, DEFAULT)
+            with self.subTest(labels=(first, second)):
+                self.both(True, text)
+
+    def test_oq_c5_labels_on_one_line_count(self) -> None:
+        self.both(True, question(f"{ASK} (a) Raise UnknownCode. (b) Ignore the code.",
+                                 REC, DEFAULT))
+
+    def test_oq_c5_one_label_or_the_same_label_two_times_fails(self) -> None:
+        for items in (("(a) Raise UnknownCode.",),
+                      ("(a) Raise UnknownCode.", "(a) Ignore the code.")):
+            with self.subTest(items=items):
+                detail = self.file(False, question(ASK, *items, REC, DEFAULT))
+                self.assertIn("options", detail)
+
+    def test_oq_c5_parts_after_the_word_options_count(self) -> None:
+        for sep in ("; ", ", ", " or ", " / "):
+            text = question(ASK, f"Options: raise UnknownCode{sep}ignore the code.", REC, DEFAULT)
+            with self.subTest(sep=sep):
+                self.both(True, text)
+
+    def test_oq_c5_one_part_after_the_word_option_fails(self) -> None:
+        self.file(False, question(ASK, "Option: raise UnknownCode.", REC, DEFAULT))
+
+    def test_oq_c5_parts_end_at_a_recommendation_word(self) -> None:
+        text = question(ASK, "The option I recommend is to raise UnknownCode, or to ignore it.",
+                        DEFAULT)
+        self.assertIn("options", self.file(False, text))
+
+    def test_oq_c5_parts_end_at_a_default_word(self) -> None:
+        text = question(ASK, "Option: raise UnknownCode. The default until G2, or until the "
+                             "owner answers, is UnknownCode.", REC)
+        self.assertIn("options", self.file(False, text))
+
+    def test_oq_c5_list_items_after_an_options_line_count(self) -> None:
+        text = (f"1. {ASK}\n   - Options:\n     - Raise UnknownCode.\n     - Ignore the code.\n"
+                f"   - {REC}\n   - {DEFAULT}")
+        self.both(True, text)
+
+    def test_oq_c5_recommendation_and_default_items_are_not_options(self) -> None:
+        text = (f"1. {ASK}\n   - Options:\n     - Raise UnknownCode.\n"
+                f"     - {REC}\n     - {DEFAULT}")
+        self.assertIn("options", self.file(False, text))
+
+    def test_oq_c5_no_options_fails(self) -> None:
+        self.assertIn("options", self.file(False, question(ASK, REC, DEFAULT)))
+
+    # Criterion 6: a negated or empty recommendation or default -----------------------------------
+    def test_oq_c6_negated_default_does_not_count(self) -> None:
+        for line in ("No default until G2.", "There is no default.", "I have not a default.",
+                     "The plan goes on without a default."):
+            with self.subTest(line=line):
+                self.assertIn("default", self.file(False, question(ASK, *TWO, REC, line)))
+
+    def test_oq_c6_negated_recommendation_does_not_count(self) -> None:
+        for line in ("I do not recommend an option.", "No recommendation.",
+                     "I go on without a recommendation."):
+            with self.subTest(line=line):
+                detail = self.file(False, question(ASK, *TWO, line, DEFAULT))
+                self.assertIn("recommendation", detail)
+
+    def test_oq_c6_a_no_that_is_not_just_before_the_word_does_not_negate(self) -> None:
+        line = "The ticket has no rule, so I recommend (a)."
+        self.file(True, question(ASK, *TWO, line, DEFAULT))
+
+    def test_oq_c6_empty_or_none_value_does_not_count(self) -> None:
+        cases = (("recommendation", question(ASK, *TWO, "Recommendation: none.", DEFAULT)),
+                 ("recommendation", question(ASK, *TWO, "Recommendation: N/A", DEFAULT)),
+                 ("recommendation", question(ASK, *TWO, DEFAULT, "Recommendation:")),
+                 ("default", question(ASK, *TWO, REC, "Default: none.")),
+                 ("default", question(ASK, *TWO, REC, "Default:")))
+        for part, text in cases:
+            with self.subTest(text=text):
+                self.assertIn(part, self.file(False, text))
+
+    def test_oq_c6_empty_recommendation_before_a_default_line_does_not_count(self) -> None:
+        # "Recommendation:" has no value. The default on the next line is not its value.
+        self.file(False, question(ASK, *TWO, "Recommendation:", DEFAULT))
+
+    def test_oq_c6_default_until_g2_none_does_not_count(self) -> None:
+        self.file(False, question(ASK, *TWO, REC, "Default until G2: none."))
+
+    def test_oq_c6_empty_or_none_table_cell_does_not_count(self) -> None:
+        head = "| Question | Options | Recommendation | Default until G2 |\n| --- | --- | --- | --- |\n"
+        ask = "What does an expired code do?"
+        cases = (("recommendation", f"| {ask} | Refuse it; ignore it | | The plan refuses it |"),
+                 ("recommendation", f"| {ask} | Refuse it; ignore it | None | The plan refuses it |"),
+                 ("default", f"| {ask} | Refuse it; ignore it | Refuse it | |"),
+                 ("default", f"| {ask} | Refuse it; ignore it | Refuse it | None |"))
+        for part, row in cases:
+            with self.subTest(row=row):
+                self.assertIn(part, self.file(False, head + row))
+
+    # Criterion 7: the delta ----------------------------------------------------------------------
+    def with_delta(self, text: str, rel: str | None = None) -> dict[str, str]:
+        return {**self.plan_file(OQ_LIST), (rel or self.DELTA): text}
+
+    def test_oq_c7_added_requirement_with_the_gap_in_the_title_fails(self) -> None:
+        text = requirement("ADDED", "checkout.R1", "Refuse an expired code")
+        detail = self.check(False, self.with_delta(text))
+        self.assertIn("checkout.R1", detail)
+        self.assertIn("delta", detail)
+
+    def test_oq_c7_added_requirement_with_the_gap_in_the_body_fails(self) -> None:
+        text = requirement("ADDED", "checkout.R1", "Codes at checkout",
+                           "amount_due MUST raise UnknownCode for an expired code.")
+        self.assertIn("checkout.R1", self.check(False, self.with_delta(text)))
+
+    def test_oq_c7_modified_requirement_with_the_gap_fails(self) -> None:
+        text = requirement("MODIFIED", "cart.R1", "Add an item",
+                           "The cart MUST refuse an item after its end date.")
+        self.assertIn("cart.R1", self.check(False, self.with_delta(text)))
+
+    def test_oq_c7_one_change_with_the_gap_among_others_fails(self) -> None:
+        text = delta(requirement("ADDED", "checkout.R1", "Lower the amount"),
+                     requirement("ADDED", "checkout.R2", "Refuse an expired code"))
+        detail = self.check(False, self.with_delta(text))
+        self.assertIn("checkout.R2", detail)
+
+    def test_oq_c7_removed_change_with_the_gap_does_not_count(self) -> None:
+        text = requirement("REMOVED", "cart.R1", "Expired items", "Expired items are gone.")
+        self.check(True, self.with_delta(text))
+
+    def test_oq_c7_delta_without_the_gap_passes(self) -> None:
+        text = requirement("ADDED", "checkout.R1", "Lower the amount by the percent of the code")
+        self.check(True, self.with_delta(text))
+
+    def test_oq_c7_no_delta_file_is_not_a_failure(self) -> None:
+        self.check(True, self.plan_file(OQ_LIST))
+
+    def test_oq_c7_delta_pattern_replaces_the_pattern_for_the_delta(self) -> None:
+        text = requirement("ADDED", "checkout.R1", "A code that has ended is refused")
+        self.check(True, self.with_delta(text))  # the default delta_pattern is `pattern`
+        self.check(False, self.with_delta(text), delta_pattern=r"\bend(s|ed)\b")
+        other = requirement("ADDED", "checkout.R1", "Refuse an expired code")
+        self.check(True, self.with_delta(other), delta_pattern=r"\bend(s|ed)\b")
+
+    def test_oq_c7_only_a_delta_that_matches_the_glob_counts(self) -> None:
+        text = requirement("ADDED", "checkout.R1", "Refuse an expired code")
+        self.check(True, self.with_delta(text, "docs/notes/SHOP-14.spec.md"))
+        self.check(True, self.with_delta(text, "docs/plans/SHOP-15.spec.md"))
+        self.check(False, self.with_delta(text, "docs/plans/SHOP-14-codes.spec.md"))
+
+    def test_oq_c7_delta_with_the_gap_fails_a_report_question_too(self) -> None:
+        files = {self.DELTA: requirement("ADDED", "checkout.R1", "Refuse an expired code")}
+        self.check(False, files, report=f"Open questions:\n{OQ_LIST}\n")
+
+    def test_oq_c7_added_requirement_with_no_scenario_still_writes_the_default(self) -> None:
+        # The delta is not valid, but it still writes the default as a requirement.
+        text = "## ADDED checkout.R1: Refuse an expired code\n\nThe checkout MUST refuse it.\n"
+        self.check(False, self.with_delta(text))
+
+    def test_oq_c7_the_fixture_deltas_do_not_count(self) -> None:
+        self.check(True, self.plan_file(OQ_LIST), delta="docs/plans/*.spec.md")
+
+
+# Criterion 9 of EVAL-4e: a label block goes on at a blank line and a table row -------------------
+
+
+class LabelTableTest(GraderCase):
+    PATH = "docs/plans/SHOP-14*.md"
+    FILE = "docs/plans/SHOP-14.md"
+    TABLE = "| Question |\n| --- |\n| The end date of a code. |"
+
+    def names_gap(self, expected: bool, text: str) -> None:
+        args = {"path": self.PATH, "pattern": GAP}
+        with self.subTest(source="plan", text=text):
+            self.expect(expected, "names_gap", self.workspace({self.FILE: text}), args)
+        with self.subTest(source="report", text=text):
+            self.expect(expected, "names_gap", self.workspace(), args, report=text)
+
+    def test_oq_c9_names_gap_label_block_goes_on_at_a_blank_line_and_a_table_row(self) -> None:
+        for label in ("Open questions:", "**Open questions**", "__Questions__:"):
+            self.names_gap(True, f"Plan.\n\n{label}\n\n{self.TABLE}\n")
+            self.names_gap(True, f"Plan.\n\n{label}\n- Codes.\n\n{self.TABLE}\n")
+
+    def test_oq_c9_names_gap_label_block_still_ends_at_a_blank_line_and_a_paragraph(
+            self) -> None:
+        self.names_gap(False, "Open questions:\n\n| Question |\n| --- |\n| None |\n\n"
+                              "The end date of a code is in the plan.\n")
+
+    def test_oq_c9_a_table_row_out_of_a_questions_block_does_not_count(self) -> None:
+        self.names_gap(False, f"Approach:\n\n{self.TABLE}\n")
+
+
 # Criterion 4: new_ids ---------------------------------------------------------------------------
 
 
@@ -685,10 +1086,11 @@ class OutputTest(GraderCase):
     ARGS = {"job_story_ids": {"path": PLAN},
             "names_gap": {"path": "docs/plans/*.md", "pattern": GAP},
             "new_ids": {"path": DELTA, "capability": "cart"},
-            "not_applied": {"path": DELTA}}
+            "not_applied": {"path": DELTA},
+            "open_question": {"path": "docs/plans/*.md", "pattern": GAP}}
 
     def full(self, committed: bool = False) -> Path:
-        files = {PLAN: plan("1. shopper.J2.", questions="- An expired code?"),
+        files = {PLAN: plan("1. shopper.J2.", questions=OQ_LIST),
                  DELTA: delta(added("cart.R3"))}
         return self.workspace(files, committed)
 
@@ -740,6 +1142,31 @@ class OutputTest(GraderCase):
                      "/docs/plans/*.md"):
             with self.subTest(path=path):
                 self.expect(False, "names_gap", ws, {"path": path, "pattern": GAP})
+
+    def test_oq_c11_a_regex_that_is_not_valid_gives_a_json_failure(self) -> None:
+        ws = self.full()
+        base = {"path": "docs/plans/*.md", "pattern": GAP, "delta": "docs/plans/*.spec.md"}
+        for key in ("pattern", "delta_pattern"):
+            for bad in ("(expir", "[a-", "*expir"):
+                with self.subTest(key=key, regex=bad):
+                    self.expect(False, "open_question", ws, {**base, key: bad},
+                                report=f"Open questions:\n{OQ_LIST}\n")
+
+    def test_oq_c11_bad_input_gives_a_json_failure(self) -> None:
+        ws = self.full()
+        base = {"path": "docs/plans/*.md", "pattern": GAP}
+        for args in ({**base, "path": 3}, {**base, "path": None}, {**base, "pattern": None},
+                     {**base, "pattern": 3}, {**base, "delta": 3}, {**base, "delta": None},
+                     {**base, "delta": f"{ws.as_posix()}/docs/plans/*.spec.md"},
+                     {**base, "path": f"{ws.as_posix()}/docs/plans/*.md"}):
+            with self.subTest(args=args):
+                self.expect(False, "open_question", ws, args)
+
+    def test_oq_c11_a_delta_that_is_not_utf8_gives_json(self) -> None:
+        ws = self.full()
+        (ws / "docs/plans/SHOP-14.spec.md").write_bytes(b"## ADDED checkout.R1: \xff\xfe\n")
+        self.grade("open_question", ws, {"path": "docs/plans/*.md", "pattern": GAP,
+                                         "delta": "docs/plans/SHOP-14*.spec.md"})
 
     def test_c5_not_applied_bad_input_gives_a_json_failure(self) -> None:
         ws = self.full()
@@ -809,7 +1236,7 @@ class FixtureTest(unittest.TestCase):
 
 class KindTest(unittest.TestCase):
     FORMAT_CHECKS = {"sections_in_order", "json_valid", "spec_delta_valid"}
-    FORMAT_GRADERS = {"job_story_ids", "not_applied"}
+    FORMAT_GRADERS = {"job_story_ids", "not_applied", "open_question"}
 
     def is_format(self, item: dict[str, Any]) -> bool:
         if item["check"] == "grader":
@@ -879,6 +1306,68 @@ class ScenarioGraderTest(GraderCase):
         for files, report in weak:
             with self.subTest(report=report):
                 self.expect(False, "names_gap", self.workspace(files), args, report=report)
+
+    def test_oq_c10_p3_has_an_open_question_contract_check(self) -> None:
+        names = [i["name"] for i in grader_checks(SCENARIOS["P3"])]
+        self.assertEqual(names.count("open_question"), 1, names)
+        item = self.item("P3", "open_question")
+        gap = self.item("P3", "names_gap")
+        self.assertEqual(item.get("kind"), "contract")
+        self.assertEqual(gap.get("kind", "outcome"), "outcome")
+        self.assertEqual(item["pattern"], gap["pattern"])
+        self.assertEqual(item["delta"], "docs/plans/SHOP-14*.spec.md")
+        self.assertIsInstance(item.get("delta_pattern"), str)
+        self.assertTrue(item["delta_pattern"])
+
+    def test_oq_c10_p3_open_question_passes_each_form_in_the_plan_and_the_report(self) -> None:
+        args = grader_args(self.item("P3", "open_question"))
+        for form in (OQ_LIST, OQ_INLINE, OQ_TABLE):
+            with self.subTest(form=form[:20], source="plan"):
+                files = {"docs/plans/SHOP-14.md": plan("1. shopper.J3.", questions=form)}
+                self.expect(True, "open_question", self.workspace(files), args,
+                            report="Plan written at docs/plans/SHOP-14.md.")
+            with self.subTest(form=form[:20], source="report"):
+                self.expect(True, "open_question", self.workspace(), args,
+                            report=f"I wrote no plan.\n\nOpen questions:\n{form}\n")
+        self.expect(True, "open_question", self.workspace(), args,
+                    report="The ticket does not say what an expired code does: (a) refuse it, "
+                           "(b) ignore it. I recommend (a). The default until G2 is (a).")
+
+    def test_oq_c8_p3_weak_and_partial_outputs_fail_and_name_what_is_missing(self) -> None:
+        args = grader_args(self.item("P3", "open_question"))
+        p14 = "docs/plans/SHOP-14.md"
+
+        def in_plan(questions: str) -> dict[str, str]:
+            return {p14: plan("1. shopper.J3.", questions=questions)}
+
+        weak = [
+            ("only other questions", in_plan(question(
+                "Must the checkout page show the code?", "(a) Show it.", "(b) Hide it.",
+                "Recommendation: (a).", "Default until G2: the plan shows it.")), "", "gap"),
+            ("None", in_plan("None. Expired codes raise UnknownCode."), "", "gap"),
+            ("None in the report", {}, "None. Expired codes raise UnknownCode.", "gap"),
+            ("no options", in_plan(question(ASK, REC, DEFAULT)), "", "options"),
+            ("1 option", in_plan(question(ASK, "(a) Raise UnknownCode.", REC, DEFAULT)), "",
+             "options"),
+            ("no recommendation", in_plan(question(ASK, *TWO, DEFAULT)), "", "recommendation"),
+            ("no default", in_plan(question(ASK, *TWO, REC)), "", "default"),
+            ("default in the delta",
+             {**in_plan(OQ_LIST), "docs/plans/SHOP-14.spec.md": requirement(
+                 "ADDED", "checkout.R1", "Codes at checkout",
+                 "amount_due MUST raise UnknownCode for an expired code.")}, "", "checkout.R1"),
+        ]
+        for name, files, report, missing in weak:
+            with self.subTest(case=name):
+                detail = self.expect(False, "open_question", self.workspace(files), args,
+                                     report=report)
+                self.assertIn(missing, detail)
+
+    def test_oq_c10_p3_delta_pattern_catches_an_ended_code_in_the_delta(self) -> None:
+        args = grader_args(self.item("P3", "open_question"))
+        files = {"docs/plans/SHOP-14.md": plan("1. shopper.J3.", questions=OQ_LIST),
+                 "docs/plans/SHOP-14.spec.md": requirement(
+                     "ADDED", "checkout.R1", "A code that has ended raises UnknownCode")}
+        self.expect(False, "open_question", self.workspace(files), args)
 
     def test_p5_delta_with_r3_passes_and_with_r2_fails(self) -> None:
         args = grader_args(self.item("P5", "new_ids"))
