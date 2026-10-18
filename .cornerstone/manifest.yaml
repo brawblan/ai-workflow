@@ -44,7 +44,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .cornerstone/hooks/protect-paths.py
-  hash: f6774cfd20d8249ba866501d118b78d84614eb940fdf43dfe565dcadae7fdc6a
+  hash: c5e9fde56224da2d031d4122e8596dc67b45c0e9e4927597e45fea7a3fa40e19
 - id: hook.settings
   kind: hook
   purpose: Register the protected-path hook in the harness settings. Other keys stay
@@ -89,7 +89,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/reviewer.md
-  hash: ee5c1aa3a11a3fae36298dab4eff6fdbe182cd8d802fbffc970c2567a2dcd009
+  hash: a4e1c8cafcb4d0b3869aca58abce967ad15df3b0e337189ec3d422a350c9c6b8
 - id: role.shaper
   kind: role
   purpose: Interview the human until the ticket meets the Definition of Ready.
