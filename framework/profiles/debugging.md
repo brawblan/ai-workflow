@@ -1,7 +1,7 @@
 ---
 id: debugging
 name: Debugging
-version: 0.2.0
+version: 0.2.1
 purpose: Find the root cause of one confirmed defect, prove it with a failing test, and fix it.
 triggers: [command, label:agent-ready]
 stages: [intake, shape, build, test, verify, review, deliver, learn]
@@ -42,9 +42,11 @@ the fix.
 3. Run the test. If it passes, stop. The defect is not reproduced. Send the issue back to triage.
 4. Start the investigator in a fresh session. It finds the root cause:
    1. If a known good commit exists, run `git bisect run` with the failing test.
-   2. Read the code path. Write the cause and the evidence in the decision log.
-5. Start the implementer in a fresh session. Give it the issue, the failing test, and the decision
-   log. It fixes the root cause, not the symptom.
+   2. Read the code path. Write the cause and the evidence in the findings report
+      (`docs/reports/<id>.md`). The investigator writes only in the reports path (D25).
+5. Start the implementer in a fresh session. Give it the issue, the failing test, and the findings
+   report. It copies the root cause and the evidence into the decision log. Then it fixes the root
+   cause, not the symptom.
 6. Run the checks (G3). The new test and all old tests MUST pass.
 7. Start the reviewer in a fresh session. It checks that the fix addresses the root cause and does
    not hide the error.
@@ -53,7 +55,8 @@ the fix.
 ## Exit criteria
 
 - A test fails before the fix and passes after the fix.
-- The decision log names the root cause with evidence.
+- The findings report names the root cause with evidence.
+- The decision log names the same root cause and links to the findings report.
 - No error is suppressed (no empty catch, no skipped test).
 
 ## Failure handling
