@@ -16,7 +16,7 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | `docs/research/dossier.md` | The cited evidence for the framework |
 | `docs/tips/` | How the owner works, and why |
 | `stone/` | The `stone` CLI (Python 3.11+, PyYAML only) and its tests |
-| `mkdocs.yml`, `website/` | The docs site. `website/content/` mirrors the repo folders with symlinks. |
+| `mkdocs.yml`, `website/` | The docs site, https://brawblan.github.io/ai-workflow/. `website/content/` mirrors the repo folders with symlinks. |
 | `.github/workflows/stone.yml` | CI: unit tests, `stone check`, and K17 |
 
 ## Commands
