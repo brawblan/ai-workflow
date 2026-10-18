@@ -14,6 +14,7 @@ import hashlib
 import io
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -961,6 +962,212 @@ class LabelTableTest(GraderCase):
 
     def test_oq_c9_a_table_row_out_of_a_questions_block_does_not_count(self) -> None:
         self.names_gap(False, f"Approach:\n\n{self.TABLE}\n")
+
+
+# EVAL-4e round 2: the review fixes of open_question ----------------------------------------------
+
+
+class OpenQuestionRound2Test(GraderCase):
+    """EVAL-4e round 2 (R1 to R6). The helpers are the helpers of OpenQuestionTest."""
+
+    PATH, FILE = OpenQuestionTest.PATH, OpenQuestionTest.FILE
+    DELTA, DELTA_GLOB = OpenQuestionTest.DELTA, OpenQuestionTest.DELTA_GLOB
+    check = OpenQuestionTest.check
+    plan_file = OpenQuestionTest.plan_file
+    file = OpenQuestionTest.file
+    report = OpenQuestionTest.report
+    both = OpenQuestionTest.both
+    with_delta = OpenQuestionTest.with_delta
+    NO_DEFAULT = OpenQuestionTest.NO_DEFAULT
+
+    # R1: a value that starts with "no" is a value --------------------------------------------------
+    def test_oq_r1_default_no_discount_counts(self) -> None:
+        self.both(True, question(ASK, *TWO, REC, "Default until G2: no discount, as with no code."))
+
+    def test_oq_r1_recommendation_no_discount_counts(self) -> None:
+        self.both(True, question(ASK, *TWO, "Recommendation: no discount.", DEFAULT))
+
+    def test_oq_r1_options_no_discount_or_raise_gives_2_options(self) -> None:
+        self.both(True, question(ASK, "Options: no discount, or raise UnknownCode.", REC, DEFAULT))
+
+    def test_oq_r1_no_discount_in_a_table_cell_counts(self) -> None:
+        table = ("| Question | Options | Recommendation | Default until G2 |\n"
+                 "| --- | --- | --- | --- |\n"
+                 "| What does amount_due do with an expired code? | No discount; raise UnknownCode "
+                 "| No discount | No discount |")
+        self.both(True, table)
+
+    def test_oq_r1_none_na_and_tbd_are_still_an_empty_value(self) -> None:
+        for value in ("none", "None.", "N/A", "n/a.", "TBD", "tbd."):
+            with self.subTest(value=value):
+                self.assertIn("default", self.file(
+                    False, question(ASK, *TWO, REC, f"Default until G2: {value}")))
+                self.assertIn("recommendation", self.file(
+                    False, question(ASK, *TWO, f"Recommendation: {value}", DEFAULT)))
+                self.assertIn("options", self.file(
+                    False, question(ASK, f"Options: {value}", REC, DEFAULT)))
+
+    def test_oq_r1_only_the_first_word_of_the_value_is_empty(self) -> None:
+        # "none" later in the value, or a longer word that starts with "none", is a value.
+        self.file(True, question(ASK, *TWO, REC, "Default until G2: UnknownCode, and none else."))
+        self.file(True, question(ASK, *TWO, REC, "Default until G2: nonetheless UnknownCode."))
+
+    # R2: a word in a sentence that ends in "?" does not count --------------------------------------
+    def test_oq_r2_default_word_in_a_question_is_not_a_default(self) -> None:
+        detail = self.file(False, question("What must the default be for an expired code?",
+                                           *TWO, REC))
+        self.assertIn("default", detail)
+
+    def test_oq_r2_recommend_word_in_a_question_is_not_a_recommendation(self) -> None:
+        detail = self.file(False, question(ASK, *TWO, "Which option do you recommend?", DEFAULT))
+        self.assertIn("recommendation", detail)
+
+    def test_oq_r2_both_words_in_questions_give_neither_part(self) -> None:
+        text = question("What must the default be for an expired code?", *TWO,
+                        "Which option do you recommend?")
+        for source in ("plan", "report"):
+            with self.subTest(source=source):
+                if source == "plan":
+                    detail = self.file(False, text)
+                else:
+                    detail = self.report(False, f"Open questions:\n{text}\n")
+                self.assertIn("recommendation", detail)
+                self.assertIn("default", detail)
+
+    def test_oq_r2_word_in_a_sentence_that_ends_in_a_full_stop_counts(self) -> None:
+        self.both(True, question(ASK, *TWO, REC, "Default until G2: UnknownCode. Is that right?"))
+        self.both(True, question(ASK, *TWO, "I recommend (a). Do you agree?", DEFAULT))
+
+    def test_oq_r2_question_before_the_word_on_the_same_line_does_not_stop_it(self) -> None:
+        self.both(True, question(f"{ASK} Default until G2: UnknownCode.", *TWO, REC))
+
+    def test_oq_r2_default_word_in_a_question_on_a_gap_line_does_not_count(self) -> None:
+        approach = "What is the default for an expired code?"
+        self.assertIn("default", self.check(False, self.plan_file(self.NO_DEFAULT,
+                                                                  approach=approach)))
+
+    # R3: an open note or a question in the delta does not count ------------------------------------
+    def test_oq_r3_open_question_note_in_a_requirement_passes(self) -> None:
+        text = requirement("ADDED", "checkout.R1", "Lower the amount by the percent",
+                           "What an expired code does is an open question (see the plan).")
+        self.check(True, self.with_delta(text))
+
+    def test_oq_r3_each_open_note_phrase_in_a_requirement_passes(self) -> None:
+        for note in ("not decided", "not yet decided", "not approved", "not yet approved"):
+            body = f"The checkout MUST lower the amount. An expired code is {note}."
+            for op in ("ADDED", "MODIFIED"):
+                with self.subTest(note=note, op=op):
+                    text = requirement(op, "checkout.R1", "Lower the amount", body)
+                    self.check(True, self.with_delta(text))
+
+    def test_oq_r3_line_that_asks_in_a_requirement_passes(self) -> None:
+        text = requirement("MODIFIED", "checkout.R1", "Lower the amount",
+                           "The checkout MUST lower the amount.\n\nWhat does an expired code do?")
+        self.check(True, self.with_delta(text))
+
+    def test_oq_r3_line_that_writes_the_default_still_fails(self) -> None:
+        text = requirement("ADDED", "checkout.R1", "Codes at checkout",
+                           "An expired code MUST raise UnknownCode.")
+        self.assertIn("checkout.R1", self.check(False, self.with_delta(text)))
+
+    def test_oq_r3_default_line_fails_in_a_section_with_an_open_note(self) -> None:
+        body = ("What an expired code does is an open question (see the plan).\n\n"
+                "An expired code MUST raise UnknownCode.")
+        for op in ("ADDED", "MODIFIED"):
+            with self.subTest(op=op):
+                text = requirement(op, "checkout.R1", "Codes at checkout", body)
+                self.assertIn("checkout.R1", self.check(False, self.with_delta(text)))
+
+    def test_oq_r3_heading_line_always_counts(self) -> None:
+        for title in ("Refuse an expired code?", "Expired codes (open question)",
+                      "Expired codes, not yet decided"):
+            with self.subTest(title=title):
+                text = requirement("ADDED", "checkout.R1", title)
+                self.assertIn("checkout.R1", self.check(False, self.with_delta(text)))
+
+    # R5: the list items after a line with "option" or "options" that ends in ":" -----------------
+    def options_list(self, intro: str, *items: str, gap: str = "\n") -> str:
+        """An open question with an intro line and nested items, then REC and DEFAULT."""
+        body = gap.join(f"     - {item}" for item in items)
+        return f"1. {ASK}\n   - {intro}\n{body}\n   - {REC}\n   - {DEFAULT}"
+
+    def test_oq_r5_text_between_the_word_and_the_colon_counts_the_items(self) -> None:
+        for intro in ("The options are:", "Options for an expired code:", "Options (pick one):",
+                      "Here is each option:"):
+            with self.subTest(intro=intro):
+                self.both(True, self.options_list(intro, "Raise UnknownCode.", "Ignore the code."))
+
+    def test_oq_r5_blank_lines_between_the_items_are_skipped(self) -> None:
+        text = self.options_list("The options are:", "Raise UnknownCode.", "Ignore the code.",
+                                 gap="\n\n")
+        self.file(True, text)
+
+    def test_oq_r5_count_stops_at_a_line_that_is_not_a_list_item(self) -> None:
+        text = (f"1. {ASK}\n   - The options are:\n     - Raise UnknownCode.\n\n"
+                "   The ticket gives no rule for this.\n\n     - Ignore the code.\n"
+                f"   - {REC}\n   - {DEFAULT}")
+        self.assertIn("options", self.file(False, text))
+
+    # R6: which list items are options ---------------------------------------------------------
+    def test_oq_r6_recommendation_and_default_items_are_not_options(self) -> None:
+        for item in ("Recommendation: raise UnknownCode.", "I recommend raising UnknownCode.",
+                     "Default until G2: the code raises UnknownCode.",
+                     "The plan uses UnknownCode until G2."):
+            with self.subTest(item=item):
+                text = self.options_list("The options are:", "Raise UnknownCode.", item)
+                self.assertIn("options", self.file(False, text))
+
+    def test_oq_r6_ticket_example_items_are_not_options(self) -> None:
+        # Each item has 1 label only, so 2 options can only come from 2 option items.
+        for item in ("Recommendation: (b)", "I recommend (b)", "Default until G2: (a)"):
+            with self.subTest(item=item):
+                text = self.options_list("Options for an expired code:", "Raise UnknownCode.", item)
+                self.assertIn("options", self.file(False, text))
+
+    def test_oq_r6_item_with_the_word_later_is_an_option(self) -> None:
+        text = self.options_list("The options are:", "Raise UnknownCode.",
+                                 "Raise ExpiredCode (recommended)")
+        self.both(True, text)
+
+    def test_oq_r6_wrapped_line_that_joins_an_item_does_not_stop_the_count(self) -> None:
+        text = (f"1. {ASK}\n   - The options are:\n     - Raise UnknownCode, so that the shopper\n"
+                "       sees one error for each bad code.\n     - Ignore the code.\n"
+                f"   - {REC}\n   - {DEFAULT}")
+        self.both(True, text)
+
+
+class OpenQuestionRound2ScenarioTest(GraderCase):
+    """EVAL-4e round 2, R4: the P3 delta_pattern and a scenario that names Code.ends."""
+
+    def args(self) -> dict[str, Any]:
+        item = next(i for i in grader_checks(SCENARIOS["P3"]) if i["name"] == "open_question")
+        return grader_args(item)
+
+    def test_oq_r4_p3_delta_pattern_does_not_match_ends(self) -> None:
+        pattern = re.compile(self.args()["delta_pattern"], re.I)
+        for text in ("SAVE10 ends 2030-12-31", "Code.ends", "the code ends"):
+            with self.subTest(text=text):
+                self.assertIsNone(pattern.search(text))
+        for text in ("an expired code", "the end date of a code", "a code that has ended"):
+            with self.subTest(text=text):
+                self.assertIsNotNone(pattern.search(text))
+
+    def test_oq_r4_p3_scenario_that_names_code_ends_passes(self) -> None:
+        text = ("## ADDED checkout.R1: Lower the amount by the percent\n\n"
+                "amount_due MUST lower the amount by the percent of the code.\n\n"
+                "### Scenario: A valid code\n\n- GIVEN SAVE10 ends 2030-12-31\n"
+                "- WHEN a shopper uses SAVE10 on 2026-01-01\n- THEN the amount is 10% lower\n")
+        files = {"docs/plans/SHOP-14.md": plan("1. shopper.J3.", questions=OQ_LIST),
+                 "docs/plans/SHOP-14.spec.md": text}
+        self.expect(True, "open_question", self.workspace(files), self.args())
+
+    def test_oq_r4_p3_delta_with_expired_end_date_or_ended_still_fails(self) -> None:
+        for title in ("Refuse an expired code", "Refuse a code after its end date",
+                      "A code that has ended raises UnknownCode"):
+            with self.subTest(title=title):
+                files = {"docs/plans/SHOP-14.md": plan("1. shopper.J3.", questions=OQ_LIST),
+                         "docs/plans/SHOP-14.spec.md": requirement("ADDED", "checkout.R1", title)}
+                self.expect(False, "open_question", self.workspace(files), self.args())
 
 
 # Criterion 4: new_ids ---------------------------------------------------------------------------
