@@ -14,3 +14,6 @@ settings.local.json
 __pycache__/
 *.egg-info/
 build/
+
+# stone eval: transcripts and run records
+.cornerstone/eval-runs/

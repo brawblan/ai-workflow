@@ -18,6 +18,7 @@ each component that `stone render` writes.
 | Role | `.claude/agents/<role>.md` with `name`, `description`, `tools`, `model` | partial | Tools can be limited. Paths cannot be limited by the role file. See "Protected paths". |
 | Fresh session for each role | A separate `claude -p` run for each role | full | A sub-agent also has a fresh context, but the lead agent starts it. Use separate runs where P2 applies. |
 | Headless run | `claude -p "<prompt>" --output-format json` | full | |
+| Eval run | [claude-code/eval.yaml](claude-code/eval.yaml): the argv for each variant, the env, the tools of each role, and the JSON paths of the result | full | `stone eval` reads it (D23). `[TO CONFIRM]` that `--setting-sources project` keeps the user instruction file out of the run. |
 | Select the role for a headless run | `[TO CONFIRM]` flag or setting that loads one agent file | partial | Fallback: pass the role file text with the prompt. |
 | Hook before a file edit | `PreToolUse` hook with matcher `Edit\|Write` in `.claude/settings.json`. Exit code 2 blocks the edit. | full | |
 | Hook before the session ends | `Stop` hook that runs the checks | full | Do not loop forever. The harness caps repeated blocks. |

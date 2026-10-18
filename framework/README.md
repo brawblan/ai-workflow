@@ -83,6 +83,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D20 | Check K14 is the `stone check-evidence` command, as K17 is a `stone` command. The required sections are Evidence, Decision log, Review findings, and Confidence. A section with only `None` is empty. Write `None` and the reason. | [checks.md](checks.md), [generator/design.md](generator/design.md) |
 | D21 | Specs are generated from the applied spec deltas. Each plan that changes a behavior has a delta. `stone spec apply` merges it in the code PR, as a generator commit. A replay of the deltas must give the same specs, so a hand edit is drift. | [workflow-model.md](workflow-model.md#specs), [lifecycle.md](lifecycle.md#specs) |
 | D22 | Two applied deltas with the same `apply_order` are an error. `stone spec sync` gives the deltas the orders 1 to n and writes the specs again. K19 tests the deltas and the replay. The hook and K6 protect the specs path. | [workflow-model.md](workflow-model.md#specs), [checks.md](checks.md) |
+| D23 | `stone eval` runs a component eval with and without the component, in a temp git repo. The harness adapter gives the run command in `eval.yaml`. Checks are code first. An `outcome` check tests behavior, and a `contract` check tests the format of the component. The variants get the same prompt and tools. Runs are local, not in CI. | [lifecycle.md](lifecycle.md#eval-design), [generator/design.md](generator/design.md) |
 
 ## Open questions
 
@@ -116,6 +117,8 @@ Do these items in order. Each item is one PR or more.
    - 3c. Done in stone 0.5: check K14 (PR evidence) is `stone check-evidence` (D20). Review it
      for false positives by 2027-04-17.
 4. Write the evals for the first model profile. Set its status to `active` when they pass.
+   - 4a. Done in stone 0.7: the `stone eval` runner and the scenario format (D23).
+   - 4b. Next: the evals for `role.tester`, then for `role.planner`.
 5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
    of Q4 2026.
 

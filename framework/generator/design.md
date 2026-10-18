@@ -41,7 +41,7 @@ repo config.
 | `stone check-writing` | Run K17 on files, on the changed lines since a base, or on a PR body. **Built in v0.1.** |
 | `stone check-evidence` | Run K14 on a PR body: fail if a required section is missing or empty. **Built in v0.5.** |
 | `stone review` | List the components past `review_by`. Exit code 1 if there are any. |
-| `stone eval <component-id>` | Run the component's eval with and without the component. (Later version.) |
+| `stone eval <component-id>` | Run the component's eval with and without the component (D23). **Built in v0.7.** |
 | `stone refresh <harness>` | Start the adapter-refresh profile for one harness. Framework repo only. (Later version.) |
 
 ## Constraints
