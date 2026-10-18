@@ -88,6 +88,12 @@ def git(*args):
                           check=True).stdout
 
 
+def git_try(*args):
+    """Like git, but give "" if the command fails (for example, no branch with that name)."""
+    result = subprocess.run(["git", *args], cwd=cwd, env=GIT_ENV, capture_output=True, text=True)
+    return result.stdout if result.returncode == 0 else ""
+
+
 try:
     stat = os.fstat(0)
     stdin = "devnull" if os.path.samestat(stat, os.stat(os.devnull)) else "other"
@@ -105,6 +111,10 @@ record = {"variant": variant, "number": number, "argv": argv, "cwd": str(cwd),
           "log": git("log", "--format=%B%x1e"),
           "status": git("status", "--porcelain", "--untracked-files=all"),
           "tracked": git("ls-files", "-z").split("\0"),
+          "branch": git_try("symbolic-ref", "-q", "--short", "HEAD").strip(),
+          "main_log": git_try("log", "main", "--format=%H%x1f%B%x1e"),
+          "head_log": git("log", "--format=%H%x1f%B%x1e"),
+          "main_files": git_try("ls-tree", "-r", "--name-only", "main").splitlines(),
           "texts": {n: (cwd / n).read_text(encoding="utf-8") for n in plan.get("read", [])
                     if (cwd / n).is_file()}}
 with (state / "calls.jsonl").open("a", encoding="utf-8") as handle:
@@ -219,13 +229,14 @@ class EvalTestCase(unittest.TestCase):
                 "--budget", "$budget", "--tools", "$tools", "--prompt", "$prompt"]
 
     def run_config(self, run: dict | None = None, env: dict | None = None,
-                   tools: dict | None = None, output: dict | None = None) -> dict:
+                   tools: dict | None = None, output: dict | None = None,
+                   output_where: Any = None) -> dict:
         env = env if env is not None else {
             "with": {"FAKE_ROLE": "$role", "FAKE_MODEL": "$model"},
             "without": {"FAKE_ROLE": "without-$role"}}
         env = {variant: {"FAKE_STATE": str(self.state), **(env.get(variant) or {})}
                for variant in ("with", "without")}
-        return {
+        config = {
             "run": {"with": self.fake_cmd("with"), "without": self.fake_cmd("without"),
                     **(run or {})},
             "env": env,
@@ -235,6 +246,9 @@ class EvalTestCase(unittest.TestCase):
                 "output_tokens": "usage.output_tokens", "input_tokens": "usage.input_tokens",
                 "turns": "num_turns"},
         }
+        if output_where is not None:
+            config["output_where"] = output_where
+        return config
 
     def write_run_config(self, path: Path | None = None, **kwargs: Any) -> None:
         (path or self.run_yaml).write_text(yaml.safe_dump(self.run_config(**kwargs)),
@@ -1556,6 +1570,262 @@ class ShapeValidationTest(EvalTestCase):
                 item["expect"] = value
                 self.assert_exit_2({"component": COMPONENT, "role": "tester",
                                     "scenarios": [item]})
+
+
+# Real-run fixes (AC26, AC27) -----------------------------------------------------------------
+#
+# The criteria come from the follow-up ticket after a real harness run.
+
+
+def event(**fields: Any) -> str:
+    """One JSON object line of a harness output stream."""
+    return json.dumps(fields)
+
+
+class OutputWhereTest(EvalTestCase):
+    """AC26: `output_where` selects the JSON object line that gives the usage and the report."""
+
+    EXPECT = [{"check": "matches", "path": "@report", "pattern": "^THE RESULT$"},
+              {"check": "file_exists", "path": "src/app.py"}]
+
+    @staticmethod
+    def stream() -> list[str]:
+        """A stream in which the result event is not the last JSON object line."""
+        return [
+            "starting the run",
+            event(type="system", subtype="init", result="init", total_cost_usd=7.0),
+            event(type="result", subtype="success", result="an earlier result",
+                  total_cost_usd=0.05, num_turns=1,
+                  usage={"output_tokens": 1, "input_tokens": 1}),
+            event(type="result", subtype="success", result="THE RESULT", total_cost_usd=0.25,
+                  num_turns=3, usage={"output_tokens": 42, "input_tokens": 7}),
+            event(type="system", subtype="hook", result="a later event", total_cost_usd=9.0),
+            event(result="an object with no type key", total_cost_usd=8.0),
+            event(type="result", subtype="error", result="other subtype", total_cost_usd=6.0,
+                  num_turns=4, usage={"output_tokens": 60, "input_tokens": 6}),
+            json.dumps([1, 2, 3]),
+            "a last line that is not JSON",
+        ]
+
+    def run_with(self, where: Any, stdout: list[str], expect: list | None = None) -> dict:
+        self.reset_records()
+        self.write_run_config(output_where=where)
+        self.plan({"with": [{"stdout": stdout}]})
+        self.scenarios(self.scenario(expect=expect or self.EXPECT))
+        code, out = self.eval("--variant", "with")
+        runs = self.runs()
+        self.assertEqual(len(runs), 1, out)
+        return runs[0]
+
+    def test_ac26_output_where_reads_the_last_matching_object_and_skips_later_ones(self) -> None:
+        run = self.run_with({"type": "result", "subtype": "success"}, self.stream())
+        self.assertEqual(run["error"], "")
+        self.assertEqual(self.check_passes(run), [True, True], run)
+        usage = run["usage"]
+        self.assertEqual(usage["cost_usd"], 0.25)
+        self.assertEqual(usage["output_tokens"], 42)
+        self.assertEqual(usage["input_tokens"], 7)
+        self.assertEqual(usage["turns"], 3)
+
+    def test_ac26_output_where_needs_each_key_to_match(self) -> None:
+        """With only `type`, the later object with the other subtype is the last match."""
+        run = self.run_with({"type": "result"}, self.stream(), expect=[
+            {"check": "matches", "path": "@report", "pattern": "^other subtype$"}])
+        self.assertEqual(self.check_passes(run), [True], run)
+        self.assertEqual(run["usage"]["cost_usd"], 6.0)
+        self.assertEqual(run["usage"]["turns"], 4)
+
+    def test_ac26_output_where_with_no_match_gives_empty_usage_and_the_run_is_graded(self) -> None:
+        expect = [{"check": "matches", "path": "@report", "pattern": "."},
+                  {"check": "file_exists", "path": "src/app.py"},
+                  {"check": "file_exists", "path": "marker.txt"}]
+        self.reset_records()
+        self.write_run_config(output_where={"type": "result", "subtype": "never"})
+        self.plan({"with": [{"stdout": self.stream(),
+                             "actions": [["write", "marker.txt", "x"]]}]})
+        self.scenarios(self.scenario(expect=expect))
+        code, out = self.eval("--variant", "with")
+        runs = self.runs()
+        self.assertEqual(len(runs), 1, out)
+        run = runs[0]
+        self.assertEqual(run["error"], "", "no match is not a harness error")
+        self.assertEqual(self.check_passes(run), [False, True, True], "the run is graded")
+        for name in ("cost_usd", "output_tokens", "input_tokens", "turns", "report"):
+            with self.subTest(name=name):
+                self.assertNotIn(name, run["usage"])
+        _, rows = self.table()
+        self.assertEqual(self.col(rows[("T1", "with")], "error"), "0")
+
+    def test_ac26_without_output_where_reads_the_last_json_object_line(self) -> None:
+        run = self.run_with(None, self.stream(), expect=[
+            {"check": "matches", "path": "@report", "pattern": "^other subtype$"}])
+        self.assertEqual(self.check_passes(run), [True], run)
+        self.assertEqual(run["usage"]["cost_usd"], 6.0)
+        self.assertEqual(run["usage"]["output_tokens"], 60)
+
+    def test_ac26_output_where_needs_the_key_in_the_object(self) -> None:
+        """A `null` value in `output_where` does not match an object that does not have the key."""
+        stdout = [
+            event(type="result", stop_reason=None, result="THE RESULT", total_cost_usd=0.25),
+            event(type="result", result="no stop_reason key", total_cost_usd=5.0),
+        ]
+        run = self.run_with({"type": "result", "stop_reason": None}, stdout)
+        self.assertEqual(run["usage"].get("cost_usd"), 0.25, run)
+        self.assertEqual(self.check_passes(run), [True, True], run)
+
+    def test_ac26_output_where_compares_json_values_of_the_same_type(self) -> None:
+        """The JSON values 0 and 1 are not the JSON values false and true."""
+        cases = {
+            "false is not 0": ({"type": "result", "is_error": False}, "is_error", False, 0),
+            "true is not 1": ({"type": "result", "done": True}, "done", True, 1),
+        }
+        for name, (where, key, right, wrong) in cases.items():
+            with self.subTest(case=name):
+                stdout = [
+                    event(type="result", result="THE RESULT", total_cost_usd=0.25, **{key: right}),
+                    event(type="result", result="wrong type", total_cost_usd=5.0, **{key: wrong}),
+                ]
+                run = self.run_with(where, stdout)
+                self.assertEqual(run["usage"].get("cost_usd"), 0.25, run)
+
+    def test_ac26_adapter_eval_yaml_reads_the_result_event_of_a_stream(self) -> None:
+        """The real `output_where` and `output` of the adapter, with the stream of a real run."""
+        framework = self.copy_framework()
+        adapter_file = framework / "adapters/claude-code/eval.yaml"
+        adapter = yaml.safe_load(adapter_file.read_text(encoding="utf-8"))
+        self.assertIsInstance(adapter.get("output_where"), dict, "the adapter gives output_where")
+        self.write_run_config(path=adapter_file, output=adapter["output"],
+                              output_where=adapter["output_where"])
+        stdout = [
+            event(type="system", subtype="init", session_id="s1"),
+            event(type="assistant", message={"content": [{"type": "text", "text": "Working."}]}),
+            event(type="result", subtype="success", is_error=False, result="THE RESULT",
+                  total_cost_usd=0.25, num_turns=3,
+                  usage={"output_tokens": 42, "input_tokens": 7}),
+            event(type="system", subtype="status", session_id="s1"),
+        ]
+        self.plan({"with": [{"stdout": stdout}], "without": [{"stdout": stdout}]})
+        self.scenarios(self.scenario(expect=self.EXPECT))
+        code, out = self.eval(framework=framework, run_config=False)
+        self.assertEqual(code, 0, out)
+        runs = self.runs()
+        self.assertEqual(sorted(run["variant"] for run in runs), ["with", "without"])
+        for run in runs:
+            with self.subTest(variant=run["variant"]):
+                self.assertEqual(self.check_passes(run), [True, True], run)
+                self.assertEqual(run["usage"]["cost_usd"], 0.25)
+                self.assertEqual(run["usage"]["output_tokens"], 42)
+                self.assertEqual(run["usage"]["input_tokens"], 7)
+                self.assertEqual(run["usage"]["turns"], 3)
+
+
+class WorkBranchTest(EvalTestCase):
+    """AC27: the base is on `main`. The setup commits and the run are on `feature/eval-work`."""
+
+    BRANCH = "feature/eval-work"
+
+    @staticmethod
+    def commits(log: str) -> list[tuple[str, list[str]]]:
+        """Parse a `%H%x1f%B%x1e` log into (hash, message lines), newest first."""
+        items = []
+        for entry in log.split("\x1e"):
+            if entry.strip():
+                sha, _, body = entry.strip().partition("\x1f")
+                items.append((sha.strip(), [line.strip() for line in body.splitlines()]))
+        return items
+
+    def test_ac27_harness_starts_on_the_work_branch_in_both_variants(self) -> None:
+        self.scenarios(self.scenario(fixture="fixtures/rendered", change="fixtures/basic.diff"))
+        code, out = self.eval()
+        self.assertEqual(code, 0, out)
+        calls = self.calls()
+        self.assertEqual(sorted(call["variant"] for call in calls), ["with", "without"])
+        for call in calls:
+            with self.subTest(variant=call["variant"]):
+                self.assertEqual(call["branch"], self.BRANCH)
+                self.assertEqual(call["status"], "")
+
+    def test_ac27_base_is_on_main_and_the_render_and_change_commits_are_on_the_work_branch(
+            self) -> None:
+        self.scenarios(self.scenario(fixture="fixtures/rendered", change="fixtures/basic.diff"))
+        code, out = self.eval()
+        self.assertEqual(code, 0, out)
+        for call in self.calls():
+            with self.subTest(variant=call["variant"]):
+                main = self.commits(call["main_log"])
+                head = self.commits(call["head_log"])
+                self.assertEqual(len(main), 1, "main has only the base commit of the fixture")
+                base_sha, base_lines = main[0]
+                self.assertEqual(head[-1][0], base_sha, "the work branch starts at the base")
+                self.assertNotIn("Role: generator", base_lines)
+                self.assertNotIn("Role: implementer", base_lines)
+                after_base = [lines for sha, lines in head if sha != base_sha]
+                self.assertTrue(any("Role: generator" in lines for lines in after_base),
+                                "the render commit is on the work branch")
+                self.assertTrue(any("Role: implementer" in lines for lines in after_base),
+                                "the change commit is on the work branch")
+                self.assertIn("src/app.py", call["main_files"])
+                self.assertIn(".cornerstone/config.yaml", call["main_files"])
+                self.assertNotIn(OTHER_ROLE_FILE, call["main_files"],
+                                 "the rendered files are not on main")
+                self.assertIn(OTHER_ROLE_FILE, call["files"])
+
+    def test_ac27_base_is_on_main_for_a_fixture_with_no_config_and_no_change(self) -> None:
+        self.scenarios(self.scenario(fixture="fixtures/basic"))
+        self.eval("--variant", "with")
+        call = self.calls()[0]
+        self.assertEqual(call["branch"], self.BRANCH)
+        main = self.commits(call["main_log"])
+        self.assertEqual(len(main), 1)
+        self.assertEqual(self.commits(call["head_log"])[-1][0], main[0][0])
+        self.assertIn("b/keep.txt", call["main_files"])
+
+    def on_branch_command(self) -> str:
+        """A command check: HEAD is still on the work branch and main has only the base."""
+        code = ("import subprocess, sys\n"
+                "def git(*a):\n"
+                "    return subprocess.run(['git', *a], capture_output=True,"
+                " text=True).stdout.strip()\n"
+                f"ok = (git('symbolic-ref', '--short', 'HEAD') == {self.BRANCH!r}"
+                " and git('rev-list', '--count', 'main') == '1')\n"
+                "sys.exit(0 if ok else 1)\n")
+        return f"{shlex.quote(sys.executable)} -c {shlex.quote(code)}"
+
+    def test_ac27_harness_commit_on_the_work_branch_counts_for_the_checks(self) -> None:
+        actions = [["write", "tests/test_a.py", "x"], ["add", "tests/test_a.py"],
+                   ["commit", "test: add tests\n\nRole: tester\nActor: agent"]]
+        expect = [
+            {"check": "commit_trailer", "trailer": "Role: tester"},
+            {"check": "commit_trailer", "trailer": "Actor: agent"},
+            {"check": "commit_trailer", "trailer": "Role: implementer"},
+            {"check": "commit_trailer", "trailer": "Role: generator"},
+            {"check": "only_changed", "paths": ["tests/"]},
+            {"check": "unchanged", "paths": ["tests/"]},
+            {"check": "unchanged", "paths": ["src/", ".claude/", ".cornerstone/"]},
+            {"check": "command", "run": self.on_branch_command()},
+        ]
+        passes = self.grade_once(expect, actions, fixture="fixtures/rendered",
+                                 change="fixtures/basic.diff")
+        self.assertEqual(self.runs()[0]["error"], "")
+        self.assertEqual(self.calls()[0]["branch"], self.BRANCH)
+        self.assertEqual(passes, [True, True, False, False, True, False, True, True],
+                         self.runs()[0]["checks"])
+
+    def test_ac27_files_of_a_harness_commit_count_for_unchanged_and_only_changed(self) -> None:
+        actions = [["write", "src/app.py", "VALUE = 2\n"],
+                   ["write", "tests/test_a.py", "x"], ["add", "src/app.py", "tests/test_a.py"],
+                   ["commit", "fix: change src\n\nRole: tester"]]
+        expect = [
+            {"check": "unchanged", "paths": ["src/"]},
+            {"check": "only_changed", "paths": ["tests/"]},
+            {"check": "only_changed", "paths": ["tests/", "src/"]},
+            {"check": "unchanged", "paths": [".claude/", ".cornerstone/", "b/"]},
+            {"check": "command", "run": self.on_branch_command()},
+        ]
+        passes = self.grade_once(expect, actions, fixture="fixtures/rendered",
+                                 change="fixtures/basic.diff")
+        self.assertEqual(self.runs()[0]["error"], "")
+        self.assertEqual(passes, [False, False, True, True, True], self.runs()[0]["checks"])
 
 
 if __name__ == "__main__":
