@@ -1,0 +1,3 @@
+# The docs site build only. The stone CLI does not use these packages.
+mkdocs==1.6.1
+mkdocs-material==9.7.7
