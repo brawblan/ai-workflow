@@ -1,6 +1,7 @@
 # Eval of role.tester (lifecycle.md, "Eval design"). Run: stone eval role.tester --trials 3
 # Each fixture is a repo at the commit before the change. `change` is the implementer commit.
 # Mutants and the fix patch apply to the code after the change. grade.py applies them to a copy.
+# A mutant is killed if a test that passes on the code fails on it. Run with `python` on PATH.
 
 component: role.tester
 role: tester
@@ -15,14 +16,14 @@ scenarios:
       Ticket SLUG-1: add slugify(title) to src/text.py. Personas: none.
       Acceptance criteria:
       1. slugify("Hello World") returns "hello-world".
-      2. A character that is not a letter or a digit is removed and splits words:
+      2. A character that is not a-z, A-Z, or 0-9 is removed and splits words:
          slugify("C++ & Rust!") returns "c-rust".
       3. The slug does not start or end with "-": slugify("  --Hi--  ") returns "hi".
       Test command: python -m unittest discover -s tests -t .
     expect:
       - {check: unchanged, paths: [src/]}
       - {check: file_exists, path: "tests/**/test_*.py"}
-      - {check: grader, name: kills_mutants, min: 3, mutants: [mutants/slugify-m1-no-lower.diff,
+      - {check: grader, name: kills_mutants, mutants: [mutants/slugify-m1-no-lower.diff,
          mutants/slugify-m2-underscore.diff, mutants/slugify-m3-keeps-plus.diff,
          mutants/slugify-m4-edge-dashes.diff]}
       - {check: commit_trailer, trailer: "Role: tester", kind: contract}
@@ -42,8 +43,9 @@ scenarios:
     expect:
       - {check: unchanged, paths: [src/]}
       - {check: grader, name: passes_with_patch, patch: fixtures/prices-fix.diff}
-      - {check: matches, path: "@report", pattern: "fail"}
-      - {check: commit_trailer, trailer: "Role: tester", kind: contract}
+      # The report names the discount failure on one line. No commit check: the role says to
+      # stop when the ticket and the code disagree (tester.md).
+      - {check: matches, path: "@report", pattern: "discount[^\\n]*\\bfail|\\bfail[^\\n]*discount"}
 
   - id: T3
     title: The ticket implies edge cases
@@ -59,7 +61,7 @@ scenarios:
       Test command: python -m unittest discover -s tests -t .
     expect:
       - {check: unchanged, paths: [src/]}
-      - {check: grader, name: kills_mutants, min: 3, mutants: [mutants/median-m1-no-sort.diff,
+      - {check: grader, name: kills_mutants, mutants: [mutants/median-m1-no-sort.diff,
          mutants/median-m2-upper-middle.diff, mutants/median-m3-off-by-one.diff]}
       - {check: grader, name: kills_mutants, mutants: [mutants/median-m4-sorts-input.diff]}
       - {check: commit_trailer, trailer: "Role: tester", kind: contract}

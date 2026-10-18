@@ -1,5 +1,5 @@
 diff --git a/src/text.py b/src/text.py
-index 429d9a3..f9b7bfb 100644
+index 429d9a3..01a3b20 100644
 --- a/src/text.py
 +++ b/src/text.py
 @@ -5,5 +5,4 @@ import re
@@ -8,4 +8,4 @@ index 429d9a3..f9b7bfb 100644
      """Return a URL slug: lower case words of a-z and 0-9, joined by '-'."""
 -    words = re.findall(r"[a-z0-9]+", title.lower())
 -    return "-".join(words)
-+    return re.sub(r"[^a-z0-9]+", "-", title.lower())
++    return re.sub(r"[^a-z0-9]+", "-", title.lower()).rstrip("-")

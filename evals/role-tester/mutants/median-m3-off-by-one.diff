@@ -1,5 +1,5 @@
 diff --git a/src/stats.py b/src/stats.py
-index a471ef5..e0fd3cc 100644
+index 2d8d129..fdbb5f8 100644
 --- a/src/stats.py
 +++ b/src/stats.py
 @@ -7,4 +7,4 @@ def median(values: list[float]) -> float:
