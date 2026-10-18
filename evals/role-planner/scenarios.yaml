@@ -29,6 +29,7 @@ scenarios:
       - {check: json_valid, path: docs/plans/SHOP-12.progress.json, required: [id, tasks],
          kind: contract}
       - {check: spec_delta_valid, path: docs/plans/SHOP-12.spec.md, kind: contract}
+      - {check: grader, name: not_applied, path: docs/plans/SHOP-12.spec.md, kind: contract}
       - {check: grader, name: job_story_ids, path: docs/plans/SHOP-12.md, min: 3,
          kind: contract}
 
@@ -89,3 +90,4 @@ scenarios:
       - {check: only_changed, paths: [docs/plans/]}
       - {check: grader, name: new_ids, path: docs/plans/SHOP-16.spec.md, capability: cart}
       - {check: spec_delta_valid, path: docs/plans/SHOP-16.spec.md, kind: contract}
+      - {check: grader, name: not_applied, path: docs/plans/SHOP-16.spec.md, kind: contract}

@@ -144,7 +144,19 @@ def new_ids(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
     return True, "ADDED " + ", ".join(added)
 
 
-GRADERS = {"job_story_ids": job_story_ids, "names_gap": names_gap, "new_ids": new_ids}
+def not_applied(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
+    """The delta at `path` has no `apply_order`. Only `stone spec apply` sets it, at delivery."""
+    path = workspace / args["path"]
+    if not path.is_file():
+        return False, f"no file {args['path']}"
+    delta = specs.parse_delta(path)
+    if delta.order is not None or any("apply_order" in message for _, message in delta.errors):
+        return False, "the delta has apply_order, so stone reads it as applied"
+    return True, "the delta is not applied"
+
+
+GRADERS = {"job_story_ids": job_story_ids, "names_gap": names_gap, "new_ids": new_ids,
+           "not_applied": not_applied}
 
 
 def main() -> int:
