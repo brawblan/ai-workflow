@@ -9,7 +9,7 @@
   with:
     claude_code_oauth_token: $${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
     github_token: $${{ github.token }}
-    allowed_non_write_users: '$non_write_users'
+    allowed_non_write_users: '$allowed_non_write_users'
     allowed_bots: '$allowed_bots'
     prompt: |
       You are the $role. Profile: $profile_name ($profile). Trigger: $trigger.

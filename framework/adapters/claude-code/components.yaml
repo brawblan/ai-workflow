@@ -146,7 +146,7 @@ components:
     parts: {run_role: workflows/parts/run-role.yml}
     target: .github/workflows/cornerstone-$profile-issue-opened.yml
     # Anyone can open an issue. The run job has no write token, so the action may start for them.
-    values: {non_write_users: "*"}
+    values: {allowed_non_write_users: "*"}
     eval: evals/trigger-issue-opened/
 
   - id: trigger.dependency-pr
