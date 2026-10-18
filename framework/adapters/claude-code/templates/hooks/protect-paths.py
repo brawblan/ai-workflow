@@ -62,7 +62,7 @@ def main() -> int:
         reason = "is a protected path. The implementer must not change tests, checks, or CI"
     elif role == "tester" and not covers(TESTS, path):
         reason = f"is not a test path. The tester changes only {', '.join(TESTS)}"
-    elif role == "planner" and not covers(PLANS, path):
+    elif role == "planner" and (not covers(PLANS, path) or covers(PROTECTED, path)):
         reason = f"is not a plan path. The planner changes only {', '.join(PLANS)}"
     elif role == "reviewer":
         reason = "cannot change. The reviewer changes no file"

@@ -275,7 +275,8 @@ def _require_no_tie(history: list[Delta]) -> None:
 
 def _write_specs(folder: Path, expected: dict[str, str]) -> list[Path]:
     written = []
-    folder.mkdir(parents=True, exist_ok=True)
+    if expected:
+        folder.mkdir(parents=True, exist_ok=True)
     for name in drift(folder, expected):
         path = folder / name
         if name in expected:
@@ -327,6 +328,7 @@ def sync(root: Path) -> list[str]:
     Use it after a merge: two branches can give two deltas the same order. Sync keeps the replay
     order, and it overwrites each spec that is not the same as the replay.
     """
+    folder = config_path(root, "specs")
     deltas = load_deltas(root)
     _require_valid(deltas)
     history = applied(deltas)
@@ -337,7 +339,7 @@ def sync(root: Path) -> list[str]:
             delta.path.write_text(set_order(delta.path.read_text(encoding="utf-8"), order),
                                   encoding="utf-8")
             renumbered.append(delta.path)
-    return _relative(root, [*renumbered, *_write_specs(config_path(root, "specs"), expected)])
+    return _relative(root, [*renumbered, *_write_specs(folder, expected)])
 
 
 def check(root: Path) -> list[Finding]:
