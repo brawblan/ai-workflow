@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 # The implementer must not change PROTECTED. The tester changes only TESTS. The planner only PLANS.
-PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "stone/tests/"]
+PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "stone/tests/"]
 TESTS = ["stone/tests/"]
 PLANS = ["docs/plans/"]
 
