@@ -35,11 +35,15 @@ ASKS = re.compile(r"\?|\b(unclear|not clear|ambiguous|unspecified|undefined|deci
                   r"clarify|clarification)\b|\b(does|do|did) not (say|state|specify|define|cover)\b",
                   re.I)
 # open_question: the words that give a recommendation, name the default, and start the options.
-# "I suggest (b)" and "Suggested answer: (b)" recommend. "The ticket suggested nothing", "I suggest
-# an optional argument", and "the author may prefer" do not.
-RECOMMENDS = re.compile(r"\b(recommend\w*|suggestion|preference|"
-                        r"(I|we)('d| would)? (suggest|prefer)(?= \(?[a-e1-9]\b| option| answer)|"
-                        r"suggested(?=:| answer| option)|preferred(?=:| answer| option|\)))", re.I)
+# "I prefer to reject it", "I suggest (b)", "Suggested answer: (b)", and "(a) Reject, preferred."
+# recommend. "The ticket suggested nothing", "I suggest an optional argument", and "the author may
+# prefer" do not.
+RECOMMENDS = re.compile(r"\b(recommend\w*|suggestion|preference|(I|we)('d| would)? prefer\b|"
+                        r"(I|we)('d| would)? suggest"
+                        r"(?= \(?[a-e1-9][).:]| \([a-e1-9]\)| option\b| answer\b)|"
+                        r"suggested(?=:| answer| option)|"
+                        r"preferred(?=[:.,;)]| answer| option|\s*$))",
+                        re.I)
 DEFAULTS = re.compile(r"\bdefault\b|\b(plan|build) (uses|assumes|treats|raises|takes)\b|"
                       r"\bin the meantime\b|\bmeanwhile\b", re.I)
 OPTIONS = re.compile(r"\boptions?\b", re.I)
@@ -57,12 +61,13 @@ CHANGE = re.compile(r"^## (?:ADDED|MODIFIED)\s+(\S+?):?(?:\s|$)")
 # "- I recommend (b)", "- Default until G2: (a)". "- Raise ExpiredCode (recommended)" is an option.
 PART_ITEM = re.compile(r"^\W*(\w+\s+){0,2}?(recommend|suggest|prefer|default|the plan uses)", re.I)
 # The styles of a line that can start a question, from the strongest: a heading, a "Q1" or
-# "Question 1" line, a numbered item, a line that starts with bold text, and a bullet item.
+# "Question 1" line, a numbered item, a paragraph that starts with bold text, and a bullet item.
 STYLES = ("heading", "q", "numbered", "bold", "bullet")
 Q_LINE = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)?\s*(?:Q\d+|Question \d+)\b", re.I)
 # A line that gives a part of a question, not a new question: an option, a recommendation, or a
 # default ("**Options:**", "- (a) ...", "I recommend (a)", "**Interim default:** (a)").
-PART_LINE = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)?\s*(?:options?\b|\(?[a-e][).:]\s|"
+PART_LINE = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)?\s*"
+                       r"(?:options?\b|\(?[a-e][).:][\s*_]|"
                        r"(?:\w+\s+){0,2}?(?:recommend|default\b|suggest|prefer)|the plan uses|"
                        r"until G2)", re.I)
 # A bold label, such as "**Context:**" or "**Why it matters**:". It does not start a question.
@@ -229,7 +234,8 @@ def _style(line: str) -> tuple[int, int] | None:
     """Return (the index in STYLES, the heading level) of a line that can start a question.
 
     Only a heading or a line at the left margin can start a question. A PART_LINE or a BOLD_LABEL
-    line cannot.
+    line cannot, and a line of only bold text cannot if it does not end in "?" ("**Context**").
+    A bullet item that starts with bold text is a bullet item, not a bold paragraph.
     """
     level = _level(line)
     if level:
@@ -242,8 +248,8 @@ def _style(line: str) -> tuple[int, int] | None:
         return None
     if re.match(r"\d+[.)]\s", line):
         return 2, 0
-    if re.match(r"(?:[-*+]\s+)?(?:\*\*|__)", line):
-        return 3, 0
+    if re.match(r"\*\*|__", line):
+        return (3, 0) if not _label(line) or line.rstrip(" *_").endswith("?") else None
     if LIST_ITEM.match(line):
         return 4, 0
     return None
@@ -268,33 +274,37 @@ def _questions(lines: list[str], pattern: re.Pattern[str]) -> list[list[str]]:
     styles = [style for style in map(_style, lines[:gap + 1]) if style]
     if not styles:  # a question in a paragraph: a later question after a blank line sets the style
         styles = [style for index, style in enumerate(map(_style, lines))
-                  if index > gap and style and style[0] != 4 and not lines[index - 1].strip()]
+                  if index > gap and style and style[0] in (0, 1, 3)
+                  and not lines[index - 1].strip()]
     if not styles:
         return [lines]
     kind, level = min(styles)
     questions: list[list[str]] = [[]]
     for index, line in enumerate(lines):
-        if _starts(_style(line), index > 0 and not lines[index - 1].strip(), kind, level):
+        if _starts(line, index > 0 and not lines[index - 1].strip(), kind, level):
             questions.append([])
         questions[-1].append(line)
     return [question for question in questions if question]
 
 
-def _starts(style: tuple[int, int] | None, after_blank: bool, kind: int, level: int) -> bool:
-    """A line of this style starts a question in a block with questions of style `kind`.
+def _starts(line: str, after_blank: bool, kind: int, level: int) -> bool:
+    """The line starts a question in a block with questions of style `kind`.
 
     A heading starts one (for headings, at `level` or higher). A line of the same style and a "Q1"
-    line start one. For a list of questions, a bold line after a blank line also starts one: in
-    Markdown, a line at the left margin after a blank line ends the list item. A bullet line with
-    no bold does not, so that an options list stays in its question.
+    line start one. For a list of questions, a line that starts with bold text (also a bullet item)
+    after a blank line also starts one: in Markdown, a line at the left margin after a blank line
+    ends the list item. A bullet item with no bold does not, so that an options list stays in its
+    question.
     """
+    style = _style(line)
     if style is None:
         return False
     if style[0] == 0:
         return kind != 0 or style[1] <= level
     if style[0] in (kind, 1):
         return True
-    return kind in (2, 4) and after_blank and style[0] == 3
+    bold = re.match(r"(?:[-*+]\s+)?(?:\*\*|__)", line)
+    return kind in (2, 4) and after_blank and style[0] in (3, 4) and bool(bold)
 
 
 def _rows(lines: list[str]) -> list[list[str]]:
@@ -358,7 +368,8 @@ def _says(lines: list[str], words: re.Pattern[str]) -> bool:
 
     "Default: (a)" and "I recommend B" give a value. "No default", "Recommendation: none", and
     "Default until G2: none" do not: the value is the text after the first ":", if there is one.
-    A word in a question ("What must the default be?") does not count.
+    A word in a question ("What must the default be?") does not count. A word at the end of an
+    option line marks that option: "- (a) Reject, preferred." gives a recommendation.
     A line that ends in ":" after the word takes its value from the next line with text, if that
     line does not give a different part (options, a recommendation, or a default).
     """
@@ -373,6 +384,10 @@ def _says(lines: list[str], words: re.Pattern[str]) -> bool:
                 after = next((n for n in lines[index + 1:] if n.strip()), "")
                 part = OPTIONS.search(after) or RECOMMENDS.search(after) or DEFAULTS.search(after)
                 rest = "" if part else after.strip(" \t*_-")
+            before = line[:match.start()]
+            if not rest and (LIST_ITEM.match(line) or OPTION_LABEL.search(before)) and re.search(
+                    r"\w", LIST_ITEM.sub("", before, count=1)):
+                rest = before  # a mark after an option: "- (a) Reject, preferred."
             if rest and not EMPTY.match(rest) and not _asks_about(line, match.end()):
                 return True
     return False
@@ -391,14 +406,14 @@ def _option_count(lines: list[str]) -> int:
     - the parts of the text after the word "option" or "options" up to a recommendation or a
       default, split at ";", ",", "or", and " / ";
     - the list items after a label line with the word (it ends in ":", or it is a heading or only
-      bold text), except an item that starts with a recommendation or a default;
-    - the list items that start with bold text that is not a label, for example "- **Reject it**".
+      bold text), or after the first line of the question if it ends in "?". An item that starts
+      with a recommendation or a default does not count.
     """
     labels = {next(group for group in match.groups() if group).lower()
               for line in lines for match in OPTION_LABEL.finditer(line)}
-    best = max(len(labels), sum(1 for line in lines if LIST_ITEM.match(line) and re.match(
-        r"\s*(\*\*|__)", LIST_ITEM.sub("", line, count=1))
-        and not BOLD_LABEL.match(line.strip()) and not PART_LINE.match(line.strip())))
+    best = len(labels)
+    if lines and lines[0].rstrip(" \t*_").endswith("?"):  # "**Q1. What does it do?**" and a list
+        best = max(best, _items_after(lines, 0, by_label=True))
     for index, line in enumerate(lines):
         match = OPTIONS.search(line)
         if not match:
@@ -409,16 +424,35 @@ def _option_count(lines: list[str]) -> int:
         if rest and not EMPTY.match(rest):
             best = max(best, sum(1 for part in SPLIT.split(rest) if re.search(r"\w", part)))
         if _label(line):  # "Options:", "The options are:", "Options for X:", "#### Options"
-            items = 0
-            for after in lines[index + 1:]:
-                if not after.strip():
-                    continue
-                if not LIST_ITEM.match(after):
-                    break
-                if not PART_ITEM.match(LIST_ITEM.sub("", after, count=1)):
-                    items += 1
-            best = max(best, items)
+            best = max(best, _items_after(lines, index))
     return best
+
+
+def _items_after(lines: list[str], index: int, by_label: bool = False) -> int:
+    """Count the list items after the line at `index`, up to a line that is not a list item.
+
+    Blank lines do not count. These items do not count: an item that starts with a recommendation
+    or a default, a label item that ends in ":" ("- Options:", "- **Context:** ..."), and an item
+    with the word "option". A bold item ("- **Ignore it**") is an option. With `by_label`, the
+    items with the same option label count as one: "(a) ..." and "(a) ..." are 1 option.
+    """
+    items = 0
+    labels: set[str] = set()
+    for after in lines[index + 1:]:
+        if not after.strip():
+            continue
+        if not LIST_ITEM.match(after):
+            break
+        text = LIST_ITEM.sub("", after, count=1).strip()
+        if (PART_ITEM.match(text) or text.rstrip(" *_").endswith(":") or BOLD_LABEL.match(text)
+                or OPTIONS.search(text)):
+            continue
+        label = OPTION_LABEL.match(text.lstrip("*_"))
+        if by_label and label:
+            labels.add(next(group for group in label.groups() if group).lower())
+        else:
+            items += 1
+    return items + len(labels)
 
 
 def _expired_requirements(workspace: Path, glob: str, pattern: re.Pattern[str]) -> list[str]:
