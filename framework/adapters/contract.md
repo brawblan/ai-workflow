@@ -44,7 +44,8 @@ only its model profile. Use [model-profile-template.yaml](model-profile-template
    Add an eval. If no eval exists yet, leave the field empty.
 4. A status: `proposed`, `active`, or `retired`. Only an `active` profile can be the default in a
    target repo. A profile becomes `active` when the [adapter-refresh](../profiles/adapter-refresh.md)
-   evals support it.
+   evals support it. An `active` profile can have idioms with no eval yet. Such an idiom is not
+   proven (D37 in the [framework decisions](../README.md)).
 
 Path: `framework/adapters/<harness>/models/<model-family>.yaml`. All vendor adapters and model
 profiles stay in the repo. A target repo selects one of each in its config.
