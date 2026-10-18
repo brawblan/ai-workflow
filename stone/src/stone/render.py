@@ -97,8 +97,9 @@ def warn_old_framework(version: Any) -> None:
     except ValueError:
         return
     if parts < K14_SINCE:
-        print(f"warning: framework_version {version} has no 'stone check-evidence'. The K14 step "
-              "in the G3 workflow fails. Set framework_version to 0.5.0 or later.", file=sys.stderr)
+        print(f"warning: framework_version {version} is not a tag with 'stone check-evidence'. "
+              "The K14 step in the G3 workflow fails. Use a full tag, 0.5.0 or later.",
+              file=sys.stderr)
 
 
 def load_profiles(framework: Path, names: list[str]) -> list[dict[str, Any]]:
