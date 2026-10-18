@@ -29,7 +29,8 @@ approves the plan before the build starts (G2).
       `analyst.J1`), and how it is verified.
    5. Out of scope and risks.
    6. Open questions.
-5. Write the progress file at `${paths_plans}<ticket-id>.progress.json`. Make one task for each
-   small unit of work, with `id`, `description`, `test_steps`, and `"passes": false`.
+5. Write the progress file at `${paths_plans}<ticket-id>.progress.json`: an object with the `id`
+   of the ticket and a `tasks` list. Make one task for each small unit of work, with `id`,
+   `description`, `test_steps`, and `"passes": false`.
 6. Ask the human each open question. Write the answers into the plan. Do not invent a requirement.
 7. Report the plan path, the questions that are still open, and the risks for G2.

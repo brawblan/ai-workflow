@@ -34,7 +34,7 @@ two layers:
 1. **Local hook.** The run script sets `STONE_ROLE=implementer`. A `PreToolUse` hook reads the role and
    the target path. It exits with code 2 if the path is protected. In a `pair` session, the hook
    uses the role of the human (default: implementer). The hook also limits the tester to the test
-   paths, and blocks each edit by the reviewer.
+   paths and the planner to the plans path, and blocks each edit by the reviewer.
 2. **CI check K6.** Each commit has the trailers `Role: <role>` and `Actor: human|agent`. A commit
    with no `Role:` trailer counts as an implementer commit. K6 fails if an implementer commit
    changes a protected path.

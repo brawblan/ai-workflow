@@ -100,9 +100,19 @@ def load_profiles(framework: Path, names: list[str]) -> list[dict[str, Any]]:
     return profiles
 
 
+def plans_folder(value: Any) -> str:
+    """Return the plans path as one folder that ends with '/'. Templates add the file name to it."""
+    if isinstance(value, list):
+        if len(value) != 1:
+            raise RenderError(f"{CONFIG}: 'paths.plans' must be one folder, not {len(value)}.")
+        value = value[0]
+    folder = str(value or "docs/plans/").strip()
+    return folder if folder.endswith("/") else folder + "/"
+
+
 def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     """Return the repo facts that templates can use. TODO values are left out on purpose."""
-    values = {"model": model, "paths_plans": "docs/plans/"}
+    values = {"model": model}
     for key, value in (config.get("commands") or {}).items():
         values[f"command_{key}"] = str(value)
     for key, value in (config.get("paths") or {}).items():
@@ -111,6 +121,7 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
                                   if isinstance(value, list) else str(value))
     for key, value in (config.get("branches") or {}).items():
         values[f"branch_{key}"] = str(value)
+    values["paths_plans"] = plans_folder(_get(config, "paths.plans"))
     values["plans_json"] = json.dumps([values["paths_plans"]])
     tests = list(_get(config, "paths.tests") or [])
     checks = list(_get(config, "paths.checks") or [])

@@ -1,6 +1,6 @@
 # stone
 
-The Cornerstone CLI. Version 0.3 has three commands:
+The Cornerstone CLI. Version 0.4 has three commands:
 
 | Command | Does |
 | --- | --- |
