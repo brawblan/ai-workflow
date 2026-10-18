@@ -1,12 +1,13 @@
 # Model profile: Claude 5 family in Claude Code.
-# Status is "proposed": no idiom has an eval yet. The adapter-refresh profile adds evals.
+# Status is "active" (D37): the role.planner and role.tester evals pass. An idiom with an empty
+# eval is not proven yet. The adapter-refresh profile adds evals.
 
 id: claude-5
 vendor: anthropic
 harness: claude-code
 models: [claude-opus-5-5, claude-sonnet-5-5]   # from global/settings.json in this repo
-status: proposed
-reviewed: 2026-10-17
+status: active
+reviewed: 2026-10-18
 sources:
   - url: https://code.claude.com/docs/en/best-practices
     read: 2026-10-17
@@ -34,14 +35,14 @@ idioms:
     guidance: Give the agent a check that it can run, and ask for the check output as evidence.
     source: https://code.claude.com/docs/en/best-practices
     affects: [role.implementer, role.tester]
-    eval: ""
+    eval: evals/role-tester/
 
   - id: plan-only-when-unsure
     area: planning
     guidance: Skip a plan when the diff fits in one sentence. Plan when the approach is unclear or many files change.
     source: https://code.claude.com/docs/en/best-practices
     affects: [role.planner]
-    eval: ""
+    eval: evals/role-planner/
 
   - id: prune-instruction-file
     area: instructions

@@ -97,6 +97,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D34 | `stone render` and `stone check` fail when a `branches.*` value in the repo config is not a YAML string. An unquoted `1.10` parses as `1.1` and `yes` as `True`. Render wrote the wrong text with no error, K16 compared against the wrong name, and it passed (D33). The error names the key and says to quote the value. A fix by conversion cannot work: the original text is lost after parsing. | [customization.md](customization.md#repo-config-cornerstoneconfigyaml) |
 | D35 | A `grader` check gets the final text of the run in the environment variable `STONE_EVAL_REPORT`. A role can give its result in a file or in its report, so a grader must read both. An environment variable does not change the `grade.py` arguments of an older eval. | [lifecycle.md](lifecycle.md#scenario-format) |
 | D36 | Eval results stay as committed files in `evals/results/`, one file for each run. The docs site shows them on the Evals page. A build hook reads the files and writes the page, so a new result file needs no page edit. The page shows the latest run of each component and links to the earlier runs and to the eval folder on GitHub. | [lifecycle.md](lifecycle.md#eval-design) |
+| D37 | The first model profile of the first harness adapter is `active`. The role.planner and role.tester evals pass (k = 3), and their idioms name the eval. The other idioms have no eval yet, so they are not proven, and adapter-refresh keeps them as proposed. Render no longer warns for this profile. The shaper, implementer, reviewer, and investigator evals stay on the roadmap. | [adapters/contract.md](adapters/contract.md), [lifecycle.md](lifecycle.md#eval-design) |
 
 ## Open questions
 
@@ -149,6 +150,9 @@ Do these items in order. Each item is one PR or more.
      the contract rate is 1.00 (3 of 3). Without it, the rate is 0.00: each run gives options and
      a recommendation, but no default. The outcome rate is 1.00 in both variants. Result:
      `evals/results/`.
+   - 4f. Done: the first model profile is `active` (D37). The `verify-loop` and
+     `plan-only-when-unsure` idioms name their evals. Still to write: the evals for the shaper,
+     the implementer, the reviewer, the investigator, and the hooks.
 5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
    of Q4 2026.
 6. Version 1: support all 10 profiles (D24). Items 6b to 6h can run in parallel after 6a.
