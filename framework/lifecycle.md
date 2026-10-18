@@ -106,7 +106,7 @@ scenarios:
       Ticket SLUG-1: ...
     expect:
       - {check: unchanged, paths: [src/]}
-      - {check: grader, name: kills_mutants, min: 2}
+      - {check: grader, name: kills_mutants, mutants: [mutants/slugify-m1.diff]}
       - {check: commit_trailer, trailer: "Role: tester", kind: contract}
 ```
 

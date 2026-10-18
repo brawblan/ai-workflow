@@ -1,0 +1,11 @@
+diff --git a/src/prices.py b/src/prices.py
+index b988f8e..b9d4342 100644
+--- a/src/prices.py
++++ b/src/prices.py
+@@ -7,5 +7,5 @@ def total(items: list[tuple[float, int]], discount_pct: float = 0) -> float:
+         raise ValueError("discount_pct must be from 0 to 100")
+     subtotal = sum(price * quantity for price, quantity in items)
+     if discount_pct:
+-        return subtotal * discount_pct / 100
++        return subtotal * (100 - discount_pct) / 100
+     return subtotal

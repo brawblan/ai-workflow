@@ -1,0 +1,10 @@
+diff --git a/src/text.py b/src/text.py
+index 429d9a3..1a05ed9 100644
+--- a/src/text.py
++++ b/src/text.py
+@@ -6,4 +6,4 @@ import re
+ def slugify(title: str) -> str:
+     """Return a URL slug: lower case words of a-z and 0-9, joined by '-'."""
+     words = re.findall(r"[a-z0-9]+", title.lower())
+-    return "-".join(words)
++    return "_".join(words)

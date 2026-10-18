@@ -1,0 +1,22 @@
+diff --git a/src/cart.py b/src/cart.py
+index 7e8f52e..4aeaa96 100644
+--- a/src/cart.py
++++ b/src/cart.py
+@@ -1 +1,17 @@
+ """Shopping cart."""
++
++
++class Cart:
++    """A quantity for each item name."""
++
++    def __init__(self) -> None:
++        self.items: dict[str, int] = {}
++
++    def add(self, name: str, quantity: int = 1) -> None:
++        self.items[name] = self.items.get(name, 0) + quantity
++
++    def remove(self, name: str) -> None:
++        del self.items[name]
++
++    def quantity(self, name: str) -> int:
++        return self.items.get(name, 0)
