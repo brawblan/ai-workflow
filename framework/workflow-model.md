@@ -154,7 +154,7 @@ Rules:
    `apply_order`, and it writes the specs. Commit its output alone, with `Role: generator`.
 5. `stone spec apply` writes the specs. A replay of all applied deltas, in `apply_order`, must give
    the same files. A person changes a spec only with a new delta. Thus the plans folder is permanent
-   history: do not delete an applied delta.
+   history: do not delete an applied delta. The specs folder holds only the generated specs.
 6. A ticket with no change to a behavior has no delta.
 
 The tester names each test for a requirement with its ID, so the reviewer can match the tests to

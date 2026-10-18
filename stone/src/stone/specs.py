@@ -25,7 +25,8 @@ CHANGE = re.compile(r"^## (?P<op>ADDED|MODIFIED|REMOVED) (?P<id>\S+): (?P<title>
 REQUIREMENT_ID = re.compile(r"^(?P<capability>[a-z][a-z0-9-]*)\.R(?P<number>[1-9]\d*)$")
 SCENARIO = re.compile(r"^### Scenario: \S")
 STEP = re.compile(r"^\s*(?:[-*]\s+)?\**(?P<word>WHEN|THEN)\b")
-HEADING = re.compile(r"^#{1,6} ")
+HEADING = re.compile(r"^#{1,3} ")  # a #### heading can be part of a scenario
+FENCE = ("```", "~~~")
 ORDER_LINE = re.compile(r"^apply_order:.*$", re.M)
 
 
@@ -66,17 +67,31 @@ def config_path(root: Path, key: str) -> Path:
     """Return `paths.<key>` from the repo config, or the default."""
     value = None
     if (root / CONFIG).exists():
-        data = yaml.safe_load((root / CONFIG).read_text(encoding="utf-8")) or {}
-        value = (data.get("paths") or {}).get(key)
-    return root / (value or DEFAULT_PATHS[key])
+        try:
+            data = yaml.safe_load((root / CONFIG).read_text(encoding="utf-8")) or {}
+        except yaml.YAMLError as error:
+            raise SpecError(f"{CONFIG}: the YAML is not valid: {error}") from None
+        paths = data.get("paths") if isinstance(data, dict) else None
+        value = paths.get(key) if isinstance(paths, dict) else None
+    path = (root / (value or DEFAULT_PATHS[key])).resolve()
+    if not path.is_relative_to(root.resolve()):
+        raise SpecError(f"{CONFIG}: 'paths.{key}' is outside the repo. Use a path in the repo.")
+    return path
 
 
 def parse_delta(path: Path) -> Delta:
     """Read one delta. Record each format error with its line number."""
     text = path.read_text(encoding="utf-8")
-    meta, skip = split_frontmatter(text)
-    order = meta.get("apply_order")
     delta = Delta(path.name[: -len(DELTA_SUFFIX)], path, None)
+    try:
+        meta, skip = split_frontmatter(text)
+    except yaml.YAMLError:
+        meta, skip = {}, 0
+        delta.errors.append((1, "The frontmatter is not valid YAML. Fix it."))
+    if not isinstance(meta, dict):
+        meta = {}
+        delta.errors.append((1, "The frontmatter must be 'key: value' lines."))
+    order = meta.get("apply_order")
     if order is not None and (not isinstance(order, int) or isinstance(order, bool) or order < 1):
         delta.errors.append((1, "'apply_order' must be a whole number from 1."))
     else:
@@ -85,7 +100,7 @@ def parse_delta(path: Path) -> Delta:
     body: list[str] = []
     in_code = False
     for number, line in enumerate(text.splitlines()[skip:], skip + 1):
-        if line.lstrip().startswith(("```", "~~~")):
+        if line.lstrip().startswith(FENCE):
             in_code = not in_code
         if not in_code and line.startswith("## "):
             _close(delta, current, body)
@@ -131,14 +146,20 @@ def _close(delta: Delta, change: Change | None, body: list[str]) -> None:
 def _scenario_problem(body: list[str]) -> str:
     """Return what is wrong with the scenarios of one requirement, or an empty string."""
     scenarios: list[set[str]] = []
+    in_scenario = in_code = False
     for line in body:
-        if SCENARIO.match(line):
+        if line.lstrip().startswith(FENCE):
+            in_code = not in_code
+        elif in_code:
+            continue
+        elif SCENARIO.match(line):
             scenarios.append(set())
+            in_scenario = True
         elif HEADING.match(line):
-            scenarios.append({"WHEN", "THEN"})  # not a scenario: nothing to test
-        elif scenarios and (step := STEP.match(line)):
+            in_scenario = False
+        elif in_scenario and (step := STEP.match(line)):
             scenarios[-1].add(step["word"])
-    if not any(SCENARIO.match(line) for line in body):
+    if not scenarios:
         return "has no scenario. Add a '### Scenario: <name>' with WHEN and THEN lines."
     if any(words != {"WHEN", "THEN"} for words in scenarios):
         return "has a scenario with no WHEN line or no THEN line. Add both."
@@ -222,7 +243,7 @@ def apply(root: Path, plan: str) -> list[str]:
     """Apply the delta of one plan. Return the paths that changed, relative to root."""
     deltas = load_deltas(root)
     if plan not in deltas:
-        folder = config_path(root, "plans").relative_to(root).as_posix()
+        folder = config_path(root, "plans").relative_to(root.resolve()).as_posix()
         raise SpecError(f"No spec delta for '{plan}'. Write {folder}/{plan}{DELTA_SUFFIX} first.")
     target = deltas[plan]
     if target.order is not None:
@@ -238,14 +259,12 @@ def apply(root: Path, plan: str) -> list[str]:
     changed = drift(folder, render_specs(state))
     if changed:
         raise SpecError(f"Drift in {', '.join(changed)}: the specs are not the same as a replay "
-                        "of the applied deltas. Undo the hand edit, and change a delta instead.")
+                        "of the applied deltas. Undo the edit (git checkout), and change a delta instead.")
     new_state = copy.deepcopy(state)
     apply_delta(new_state, target)
     expected = render_specs(new_state)
     order = max((d.order or 0 for d in history), default=0) + 1
-    target.path.write_text(set_order(target.path.read_text(encoding="utf-8"), order),
-                           encoding="utf-8")
-    written = [target.path]
+    written = []
     folder.mkdir(parents=True, exist_ok=True)
     for name in drift(folder, expected):
         path = folder / name
@@ -254,4 +273,9 @@ def apply(root: Path, plan: str) -> list[str]:
         else:
             path.unlink()
         written.append(path)
-    return [path.relative_to(root).as_posix() for path in written]
+    # Write the delta last, so that a failed spec write never marks it as applied.
+    target.path.write_text(set_order(target.path.read_text(encoding="utf-8"), order),
+                           encoding="utf-8")
+    written.insert(0, target.path)
+    base = root.resolve()
+    return [path.resolve().relative_to(base).as_posix() for path in written]
