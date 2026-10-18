@@ -45,5 +45,5 @@ approves the plan before the build starts (G2).
 7. Ask the human each open question. Write the answers into the plan. Do not invent a requirement.
    If no human can answer in this session, keep each question in Open questions. For each
    question, give the options and your recommendation. Do not choose the answer. Name the default
-   that the plan uses until G2.
+   that the plan uses until G2. Do not write the default into the spec delta.
 8. Report the plan path, the delta path, the questions that are still open, and the risks for G2.

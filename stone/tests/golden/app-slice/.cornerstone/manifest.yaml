@@ -105,7 +105,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/planner.md
-  hash: 47dff6cd17b9df6c8459ffe2680e3ed850a031c504b718724b43051ed4e15732
+  hash: 56e2d606afeff42e58d0ed719470f7213364a0d02fb181d2da8747a1ed5bb93c
 - id: role.reviewer
   kind: role
   purpose: Find defects and scope drift in a fresh session.
