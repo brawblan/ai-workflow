@@ -474,6 +474,179 @@ class K16NeedsMainBranchTest(K16Base):
                 self.assertEqual(result.exit_code, 0)
                 self.assertFalse((self.root / K16).exists())
 
+    # AC8: an empty, null, or blank branches.main is the same as no branches.main.
+
+    BLANK_CASES = {
+        "branches.main is an empty string": 'branches: {integration: dev, main: ""}',
+        "branches.main is an empty single-quoted string": "branches: {integration: dev, main: ''}",
+        "branches.main is null": "branches: {integration: dev, main: null}",
+        "branches.main is ~": "branches: {integration: dev, main: ~}",
+        "branches.main has no value": "branches:\n  integration: dev\n  main:",
+        "branches.main is only spaces": 'branches: {integration: dev, main: "   "}',
+        "branches.main is one space": 'branches: {integration: dev, main: " "}',
+        "branches.main is spaces and a tab": 'branches: {integration: dev, main: "  \\t "}',
+    }
+
+    def test_ac8_blank_main_render_raises_and_names_branches_main(self) -> None:
+        for label, branches in self.BLANK_CASES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure(["spike"], branches)
+                with contextlib.redirect_stderr(io.StringIO()):
+                    with self.assertRaises(render.RenderError) as caught:
+                        render.render(self.root, FRAMEWORK, today=TODAY)
+                self.assertIn("branches.main", str(caught.exception))
+                self.assertEqual(self.written_files(), [])
+
+    def test_ac8_blank_main_cli_exits_1_and_names_branches_main(self) -> None:
+        for label, branches in self.BLANK_CASES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure(["spike"], branches)
+                code, out = self.cli_render()
+                self.assertEqual(code, 1, out)
+                self.assertIn("branches.main", out)
+                self.assertEqual(self.written_files(), [])
+                self.assertFalse((self.root / K16).exists())
+
+    def test_ac8_blank_main_with_single_ticket_also_writes_nothing(self) -> None:
+        for label, branches in self.BLANK_CASES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure(["single-ticket", "spike"], branches)
+                code, out = self.cli_render()
+                self.assertEqual(code, 1, out)
+                self.assertIn("branches.main", out)
+                self.assertEqual(self.written_files(), [])
+
+    def test_ac8_blank_main_does_not_change_existing_files(self) -> None:
+        for label, branches in self.BLANK_CASES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure(["spike"])
+                self.render()
+                before = {path: self.read(path) for path in self.written_files()}
+                self.configure(["spike"], branches)
+                code, out = self.cli_render()
+                self.assertEqual(code, 1, out)
+                self.assertEqual({path: self.read(path) for path in self.written_files()},
+                                 before)
+                self.assertEqual(self.k16_step()["env"]["MAIN_BRANCH"], "main")
+
+
+# AC9: a main branch name with YAML or shell text renders a valid workflow with the exact name.
+
+QUOTED_MAIN_NAMES = {
+    # label: (the name, the YAML text for the config value)
+    "double quote": ('rel"x', "'rel\"x'"),
+    "space and hash": ("rel #x", '"rel #x"'),
+    "double quote and hash": ('rel"x #y', "'rel\"x #y'"),
+    "single quote": ("rel'x", '"rel\'x"'),
+    "backslash": ("rel\\x", "'rel\\x'"),
+    "colon and space": ("rel: x", '"rel: x"'),
+    "dollar text": ("rel$(x)", "'rel$(x)'"),
+}
+
+
+class K16QuotedMainBranchTest(K16Base):
+    def configure_main(self, config_value: str) -> None:
+        self.configure(["spike"], f"branches: {{integration: dev, main: {config_value}}}")
+
+    def test_ac9_config_fixture_holds_the_exact_name(self) -> None:
+        # Guard the test data: the config YAML must hold the name that the test expects.
+        for label, (name, config_value) in QUOTED_MAIN_NAMES.items():
+            with self.subTest(case=label):
+                parsed = yaml.safe_load(f"main: {config_value}")
+                self.assertEqual(parsed["main"], name)
+
+    def test_ac9_render_writes_valid_yaml_with_the_exact_main_branch(self) -> None:
+        for label, (name, config_value) in QUOTED_MAIN_NAMES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_main(config_value)
+                result, _ = self.render()
+                self.assertEqual(result.exit_code, 0)
+                workflow = self.workflow()
+                self.assertIsInstance(workflow, dict)
+                self.assertEqual(set(triggers(workflow)), {"pull_request_target"})
+                self.assertEqual(workflow["permissions"], {})
+                env = self.k16_step()["env"]
+                self.assertIsInstance(env["MAIN_BRANCH"], str)
+                self.assertEqual(env["MAIN_BRANCH"], name)
+                self.assertEqual(env["HEAD_REF"].replace(" ", ""), "${{github.head_ref}}")
+                self.assertEqual(env["BASE_REF"].replace(" ", ""), "${{github.base_ref}}")
+
+    def test_ac9_cli_render_exits_0(self) -> None:
+        for label, (_, config_value) in QUOTED_MAIN_NAMES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_main(config_value)
+                code, out = self.cli_render()
+                self.assertEqual(code, 0, out)
+                self.assertTrue((self.root / K16).is_file())
+
+    def test_ac9_second_render_writes_nothing(self) -> None:
+        for label, (_, config_value) in QUOTED_MAIN_NAMES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_main(config_value)
+                self.render()
+                result, _ = self.render()
+                self.assertEqual(result.wrote, [])
+                self.assertEqual(result.drift, [])
+
+    def test_ac9_plain_name_is_unchanged(self) -> None:
+        self.configure(["spike"])
+        self.render()
+        self.assertEqual(self.k16_step()["env"]["MAIN_BRANCH"], "main")
+
+    @unittest.skipIf(BASH is None, "bash is not installed")
+    def test_ac9_spike_into_the_quoted_main_fails(self) -> None:
+        for label, (name, config_value) in QUOTED_MAIN_NAMES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_main(config_value)
+                self.render()
+                run = self.run_step("spike/can-x-do-y", name)
+                self.assertNotEqual(run.returncode, 0, run.stdout + run.stderr)
+                errors = [line for line in (run.stdout + run.stderr).splitlines()
+                          if line.startswith("::error")]
+                self.assertEqual(len(errors), 1, run.stdout + run.stderr)
+                self.assertIn(name, errors[0])
+                self.assertFalse((self.work / "x").exists())
+
+    @unittest.skipIf(BASH is None, "bash is not installed")
+    def test_ac9_other_heads_and_bases_pass_with_the_quoted_main(self) -> None:
+        for label, (name, config_value) in QUOTED_MAIN_NAMES.items():
+            with self.subTest(case=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_main(config_value)
+                self.render()
+                # Near names: the name without its special text, and the YAML-quoted text.
+                for head, base in (("feature/x", name), ("spike/x", "dev"),
+                                   ("spike/x", "rel"), ("spike/x", config_value),
+                                   ("spike/x", name + " ")):
+                    run = self.run_step(head, base)
+                    self.assertEqual(run.returncode, 0, (head, base, run.stdout + run.stderr))
+
+    def run_step(self, head: str, base: str) -> subprocess.CompletedProcess:
+        step = self.k16_step()
+        self.work = Path(self.folder.name) / "work"
+        self.work.mkdir(exist_ok=True)
+        env = {"PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+               "HEAD_REF": head, "BASE_REF": base, "MAIN_BRANCH": step["env"]["MAIN_BRANCH"]}
+        return subprocess.run([BASH, "-e", "-c", step["run"]], cwd=self.work, env=env,
+                              capture_output=True, text=True)
+
 
 if __name__ == "__main__":
     unittest.main()
