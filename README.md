@@ -34,8 +34,8 @@ Draft v0. The framework is complete enough to use on one profile. Other parts ar
 | --- | --- |
 | [Framework](framework/README.md): principles, workflow model, gates, checks, modes, 10 profiles | Draft v0 |
 | [Harness adapter](framework/adapters/claude-code.md) and [model profile](framework/adapters/claude-code/models/claude-5.yaml) | First adapter. The model profile evals are not written yet. |
-| [`stone`](stone/README.md) 0.5 | `stone check`, `stone check-writing` (K17), `stone spec apply`, and `stone render` for the single-ticket and app-slice profiles |
-| [`workflow` plugin](plugins/workflow/) 0.5.0 | Six skills. `cornerstone-setup` is the entry skill. |
+| [`stone`](stone/README.md) 0.6 | `stone check`, `stone check-writing` (K17), `stone spec apply`, and `stone render` for the single-ticket and app-slice profiles |
+| [`workflow` plugin](plugins/workflow/) 0.6.0 | Six skills. `cornerstone-setup` is the entry skill. |
 | This repo | Uses Cornerstone on itself: [`.cornerstone/config.yaml`](.cornerstone/config.yaml) and CI in [`stone.yml`](.github/workflows/stone.yml) |
 
 The next steps are in the [roadmap](framework/README.md#roadmap). The design decisions (D1, D2, ...)
@@ -66,7 +66,7 @@ and writes the generated files.
 | Stages | Intake, Shape, Plan, Build, Test, Verify, Review, Deliver, Learn | [workflow-model.md](framework/workflow-model.md) |
 | Roles | Shaper, planner, implementer, tester, reviewer, investigator | [workflow-model.md](framework/workflow-model.md#roles) |
 | Gates | G1 Ready, G2 Plan approved, G3 Checks pass, G4 Change approved, G5 Release approved | [gates.md](framework/gates.md) |
-| Checks | K1 to K18. Programs that run in CI, outside the agent session. | [checks.md](framework/checks.md) |
+| Checks | K1 to K19. Programs that run in CI, outside the agent session. | [checks.md](framework/checks.md) |
 | Profiles | One configuration for each type of work, for example single-ticket, debugging, or spike | [profiles/](framework/profiles/README.md) |
 | Modes | Who drives each stage: agent-centric, hybrid, or human-centric | [modes.md](framework/modes.md) |
 | Adapters | The only place for harness, vendor, model, and spec-tool details | [adapters/](framework/adapters/contract.md) |

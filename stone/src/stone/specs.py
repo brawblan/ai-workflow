@@ -14,8 +14,10 @@ from pathlib import Path
 
 import yaml
 
+from stone.findings import Finding
 from stone.markdown import split_frontmatter
 
+CHECK = "K19"
 CONFIG = Path(".cornerstone/config.yaml")
 DEFAULT_PATHS = {"plans": "docs/plans/", "specs": "docs/specs/"}
 DELTA_SUFFIX = ".spec.md"
@@ -249,6 +251,46 @@ def set_order(text: str, order: int) -> str:
     return "\n".join(["---", f"apply_order: {order}", *front, *lines[skip - 1 :]])
 
 
+def ties(history: list[Delta]) -> list[list[Delta]]:
+    """Return each group of applied deltas that have the same `apply_order`."""
+    groups: dict[int, list[Delta]] = {}
+    for delta in history:
+        groups.setdefault(delta.order or 0, []).append(delta)
+    return [group for group in groups.values() if len(group) > 1]
+
+
+def _require_valid(deltas: dict[str, Delta]) -> None:
+    for delta in deltas.values():
+        if delta.errors:
+            line, message = delta.errors[0]
+            raise SpecError(f"{delta.path.name}:{line}: {message}")
+
+
+def _require_no_tie(history: list[Delta]) -> None:
+    for group in ties(history):
+        names = ", ".join(delta.path.name for delta in group)
+        raise SpecError(f"{names} have the same apply_order ({group[0].order}). This occurs when "
+                        "two branches apply a delta. Run 'stone spec sync'.")
+
+
+def _write_specs(folder: Path, expected: dict[str, str]) -> list[Path]:
+    written = []
+    folder.mkdir(parents=True, exist_ok=True)
+    for name in drift(folder, expected):
+        path = folder / name
+        if name in expected:
+            path.write_text(expected[name], encoding="utf-8")
+        else:
+            path.unlink()
+        written.append(path)
+    return written
+
+
+def _relative(root: Path, paths: list[Path]) -> list[str]:
+    base = root.resolve()
+    return [path.resolve().relative_to(base).as_posix() for path in paths]
+
+
 def apply(root: Path, plan: str) -> list[str]:
     """Apply the delta of one plan. Return the paths that changed, relative to root."""
     deltas = load_deltas(root)
@@ -259,33 +301,73 @@ def apply(root: Path, plan: str) -> list[str]:
     if target.order is not None:
         raise SpecError(f"{target.path.name}: the delta is applied (apply_order: "
                         f"{target.order}). Write a new plan for a new change.")
-    for delta in deltas.values():
-        if delta.errors:
-            line, message = delta.errors[0]
-            raise SpecError(f"{delta.path.name}:{line}: {message}")
+    _require_valid(deltas)
     history = applied(deltas)
+    _require_no_tie(history)
     state = replay(history)
     folder = config_path(root, "specs")
     changed = drift(folder, render_specs(state))
     if changed:
         raise SpecError(f"Drift in {', '.join(changed)}: the specs are not the same as a replay "
-                        "of the applied deltas. Undo the edit (git checkout), and change a delta instead.")
+                        "of the applied deltas. Undo the edit (git checkout), and change a delta "
+                        "instead. After a merge, run 'stone spec sync'.")
     new_state = copy.deepcopy(state)
     apply_delta(new_state, target)
-    expected = render_specs(new_state)
     order = max((d.order or 0 for d in history), default=0) + 1
-    written = []
-    folder.mkdir(parents=True, exist_ok=True)
-    for name in drift(folder, expected):
-        path = folder / name
-        if name in expected:
-            path.write_text(expected[name], encoding="utf-8")
-        else:
-            path.unlink()
-        written.append(path)
+    written = _write_specs(folder, render_specs(new_state))
     # Write the delta last, so that a failed spec write never marks it as applied.
     target.path.write_text(set_order(target.path.read_text(encoding="utf-8"), order),
                            encoding="utf-8")
-    written.insert(0, target.path)
+    return _relative(root, [target.path, *written])
+
+
+def sync(root: Path) -> list[str]:
+    """Give the applied deltas the orders 1 to n, and write the specs from a replay.
+
+    Use it after a merge: two branches can give two deltas the same order. Sync keeps the replay
+    order, and it overwrites each spec that is not the same as the replay.
+    """
+    deltas = load_deltas(root)
+    _require_valid(deltas)
+    history = applied(deltas)
+    expected = render_specs(replay(history))
+    renumbered = []
+    for order, delta in enumerate(history, 1):
+        if delta.order != order:
+            delta.path.write_text(set_order(delta.path.read_text(encoding="utf-8"), order),
+                                  encoding="utf-8")
+            renumbered.append(delta.path)
+    return _relative(root, [*renumbered, *_write_specs(config_path(root, "specs"), expected)])
+
+
+def check(root: Path) -> list[Finding]:
+    """K19: the deltas are valid, no two have the same order, and the specs are a replay."""
+    try:
+        plans, folder = config_path(root, "plans"), config_path(root, "specs")
+    except SpecError as error:
+        return [Finding(CONFIG.as_posix(), 1, CHECK, str(error), "warning")]
+    deltas = load_deltas(root)
+    if not deltas and not folder.is_dir():
+        return []
     base = root.resolve()
-    return [path.resolve().relative_to(base).as_posix() for path in written]
+    findings = [Finding(delta.path.relative_to(base).as_posix(), line, CHECK, message, "warning")
+                for delta in deltas.values() for line, message in delta.errors]
+    if findings:
+        return findings
+    history = applied(deltas)
+    for group in ties(history):
+        for delta in group:
+            findings.append(Finding(delta.path.relative_to(base).as_posix(), 1, CHECK,
+                                    f"Another delta has apply_order {delta.order}. Run "
+                                    "'stone spec sync'.", "warning"))
+    try:
+        expected = render_specs(replay(history))
+    except SpecError as error:
+        return findings + [Finding(plans.relative_to(base).as_posix(), 1, CHECK, str(error),
+                                   "warning")]
+    for name in drift(folder, expected):
+        findings.append(Finding((folder / name).relative_to(base).as_posix(), 1, CHECK,
+                                "The spec is not the same as a replay of the applied deltas. "
+                                "Undo the edit, restore a deleted delta, or run 'stone spec sync' "
+                                "after a merge.", "warning"))
+    return findings

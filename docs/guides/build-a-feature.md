@@ -37,7 +37,11 @@ Start the planner with the ready issue: `STONE_ROLE=planner claude --agent plann
 `docs/plans/<id>.md` with the six plan sections, and `docs/plans/<id>.progress.json` with one task
 for each step. It maps each acceptance criterion to a job story ID. It does not write code.
 
-Read the plan. Edit the plan, not the code. Open a PR with the plan. Your approval of that PR is G2.
+If the feature adds, changes, or removes a behavior, the planner also writes the spec delta,
+`docs/plans/<id>.spec.md`. Each section is one requirement, for example `ADDED export.R3`, with
+WHEN and THEN scenarios. The format is in [Specs](../../framework/workflow-model.md#specs).
+
+Read the plan and the delta. Edit the plan, not the code. Open a PR with the plan. Your approval of that PR is G2.
 
 ### 3. Build each task
 
@@ -50,6 +54,15 @@ For each task in the progress file, follow [Run the roles](run-the-roles.md):
 
 ### 4. Review and deliver
 
+Before the PR, apply the spec delta. Commit the output alone:
+
+```bash
+stone spec apply issue-64
+git add docs/specs docs/plans/issue-64.spec.md
+git commit -m "chore(specs): apply the spec delta of issue-64" \
+  --trailer "Role: generator" --trailer "Actor: human"
+```
+
 1. Start the reviewer with the plan and the branch. It reports scope drift from the plan.
 2. Open one PR for each group of tasks that stays under the size limit. Use
    `/workflow:ticket-delivery`.
@@ -60,6 +73,7 @@ For each task in the progress file, follow [Run the roles](run-the-roles.md):
 | The build needs a change that the plan does not have | Stop. Update the plan. Get G2 again. |
 | An end-to-end test cannot run in CI | Record a waiver. Add a manual verify step to the PR. |
 | The reviewer finds scope drift | Remove the extra change, or open a new ticket for it. |
+| K19 reports the same `apply_order` after a merge | Run `stone spec sync`. Commit its output with `Role: generator`. |
 
 ## When the profile ships
 
