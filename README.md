@@ -5,6 +5,7 @@ Use it with Claude Code, with other AI agents, or as notes to read.
 
 | Folder | What it has | Who uses it |
 | --- | --- | --- |
+| [`AGENTS.md`](AGENTS.md) | How agents work in this repo: commands, rules, branches, and writing | Agents |
 | [`plugins/workflow/skills/`](plugins/workflow/skills/) | Seven skills in the open `SKILL.md` format | Anyone |
 | [`plugins/workflow/skills/project-setup/templates/`](plugins/workflow/skills/project-setup/templates/) | Templates: constitution, repo `AGENTS.md`, user `AGENTS.md`, OpenSpec config | Anyone |
 | [`global/`](global/) | My personal rules (`AGENTS.md`) and Claude Code settings | Me. Copy what you like. |
