@@ -36,7 +36,7 @@ SCENARIOS = {s["id"]: s for s in
 GIT_ENV = {"GIT_AUTHOR_NAME": "tester", "GIT_AUTHOR_EMAIL": "tester@example.com",
            "GIT_COMMITTER_NAME": "tester", "GIT_COMMITTER_EMAIL": "tester@example.com",
            "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
-GRADERS = ("job_story_ids", "names_gap", "new_ids")
+GRADERS = ("job_story_ids", "names_gap", "new_ids", "not_applied")
 GAP = "expir|end date|last day|\\bends\\b|out of date|no longer valid"  # the P3 pattern
 PLAN = "docs/plans/SHOP-12.md"
 DELTA = "docs/plans/SHOP-16.spec.md"
@@ -333,6 +333,159 @@ class NamesGapTest(GraderCase):
         self.expect(True, "names_gap", ws, {"path": self.PATH, "pattern": GAP}, report=None)
 
 
+# Criterion 3, round 2: the changed names_gap rules (a to d) -------------------------------------
+
+
+class NamesGapRound2Test(GraderCase):
+    """The rules of the changed criterion 3. A file test has an empty report."""
+
+    PATH = "docs/plans/SHOP-14*.md"
+    FILE = "docs/plans/SHOP-14.md"
+
+    def check(self, expected: bool, files: dict[str, str] | None = None,
+              report: str = "") -> str:
+        ws = self.workspace(files)
+        return self.expect(expected, "names_gap", ws, {"path": self.PATH, "pattern": GAP}, report)
+
+    def file(self, expected: bool, text: str) -> str:
+        return self.check(expected, {self.FILE: text})
+
+    def report(self, expected: bool, text: str) -> str:
+        return self.check(expected, report=text)
+
+    # a: a list item is not a label
+    def test_c3a_r2_list_item_that_ends_in_a_colon_stays_in_the_questions_block(self) -> None:
+        text = "Open questions:\n- Codes:\n  - What does an expired code do\n"
+        self.file(True, text)
+        self.report(True, text)
+
+    def test_c3a_r2_numbered_list_item_that_ends_in_a_colon_stays_in_the_block(self) -> None:
+        text = "Open questions:\n1. Codes:\n   1. The end date of a code\n"
+        self.file(True, text)
+        self.report(True, text)
+
+    def test_c3a_r2_list_item_with_question_and_a_colon_does_not_start_a_block(self) -> None:
+        # If "- Open questions:" were a label, the next line would be in a questions block.
+        for marker in ("-", "*", "+", "1.", "2)"):
+            text = f"Approach:\n{marker} Open questions:\n- An expired code raises UnknownCode.\n"
+            with self.subTest(marker=marker):
+                self.file(False, text)
+                self.report(False, text)
+
+    def test_c3a_r2_bold_and_short_colon_lines_are_still_labels(self) -> None:
+        self.file(True, "Plan.\n\n**Open questions**\n- The end date of a code.\n")
+        self.file(True, "Plan.\n\n__Questions__:\n- The end date of a code.\n")
+        self.file(True, "Plan.\n\nOpen questions:\n- The end date of a code.\n")
+
+    # b: where a block ends
+    def test_c3b_r2_heading_block_ends_at_a_heading_of_a_higher_level(self) -> None:
+        self.file(False, "# P\n\n## Open questions\n\nNone.\n\n# Notes\n\n- The end date of a code.\n")
+
+    def test_c3b_r2_heading_block_does_not_end_at_a_heading_of_a_lower_level(self) -> None:
+        self.file(True, "# P\n\n## Open questions\n\nNone.\n\n### Codes\n\n- The end date of a code.\n")
+
+    def test_c3b_r2_heading_block_does_not_end_at_a_blank_line_and_a_paragraph(self) -> None:
+        self.file(True, "## Open questions\n\nCodes.\n\nThe ticket gives no end date for a code.\n")
+
+    def test_c3b_r2_label_in_a_heading_block_is_part_of_that_block(self) -> None:
+        self.file(True, "## Open questions\n\nCodes:\n- The end date of a code.\n")
+        self.file(True, "## Open questions\n\n**Codes**\n\nThe end date of a code.\n")
+
+    def test_c3b_r2_label_block_ends_at_a_blank_line_and_then_a_line_that_is_not_a_list_item(
+            self) -> None:
+        text = "Open questions:\n- None.\n\nI chose to refuse an expired code.\n"
+        self.file(False, text)
+        self.report(False, text)
+
+    def test_c3b_r2_label_block_goes_on_at_a_blank_line_and_then_a_list_item(self) -> None:
+        for item in ("- The end date of a code.", "2. The end date of a code."):
+            with self.subTest(item=item):
+                self.file(True, f"Open questions:\n- Codes.\n\n{item}\n")
+
+    def test_c3b_r2_label_block_ends_at_the_next_heading(self) -> None:
+        text = "Open questions:\n- None.\n## Approach\n- Expired codes are refused.\n"
+        self.file(False, text)
+        self.report(False, text)
+
+    def test_c3b_r2_label_block_ends_at_the_next_label(self) -> None:
+        self.file(False, "Open questions:\n- None.\n**Approach**\n- Expired codes are refused.\n")
+
+    # c: which lines of a questions block count
+    def test_c3c_r2_none_line_in_a_questions_block_does_not_count(self) -> None:
+        text = "## Open questions\n\nNone. Expired codes are refused (assumed).\n"
+        self.file(False, text)
+        self.report(False, text)
+
+    def test_c3c_r2_line_that_starts_with_no_or_na_does_not_count(self) -> None:
+        for line in ("No. Expired codes are refused.", "N/A. Expired codes are refused.",
+                     "No open question: expired codes are refused.",
+                     "- None. Expired codes are refused.", "- N/A: the end date of a code."):
+            with self.subTest(line=line):
+                self.file(False, f"## Open questions\n\n{line}\n")
+                self.report(False, f"Open questions:\n{line}\n")
+
+    def test_c3c_r2_the_first_line_of_the_block_does_not_count(self) -> None:
+        self.file(False, "## Open questions on expired codes\n\nNone.\n")
+        self.file(False, "Questions about the end date:\n- None.\n")
+        self.report(False, "**Open questions on expired codes**\n- None.\n")
+
+    def test_c3c_r2_line_after_the_first_with_the_pattern_counts(self) -> None:
+        self.file(True, "## Open questions\n\nNone for the cart.\n- The end date of a code.\n")
+
+    # d: a report line that asks
+    def test_c3d_r2_each_ask_word_asks(self) -> None:
+        words = ("unclear", "not clear", "ambiguous", "unspecified", "undefined", "decide",
+                 "confirm", "clarify", "clarification")
+        for word in words:
+            with self.subTest(word=word):
+                self.report(True, f"Plan written.\nThe rule for an expired code: {word} here.\n")
+
+    def test_c3d_r2_each_does_not_say_form_asks(self) -> None:
+        for verb in ("does", "do", "did"):
+            for word in ("say", "state", "specify", "define", "cover"):
+                with self.subTest(form=f"{verb} not {word}"):
+                    self.report(True, f"The tickets {verb} not {word} the end date of a code.\n")
+
+    def test_c3d_r2_a_question_mark_asks(self) -> None:
+        self.report(True, "Should an expired code be refused?")
+
+    def test_c3d_r2_the_word_question_does_not_ask(self) -> None:
+        for line in ("There are no questions about expired codes.",
+                     "I have a question list for expired codes in the plan.",
+                     "The question of the end date is in the plan."):
+            with self.subTest(line=line):
+                self.report(False, f"Plan written.\n{line}\n")
+
+    def test_c3d_r2_past_tense_does_not_ask(self) -> None:
+        for line in ("I decided that an expired code raises UnknownCode.",
+                     "I confirmed that an expired code is refused.",
+                     "I clarified the end date of a code in the plan."):
+            with self.subTest(line=line):
+                self.report(False, f"Plan written.\n{line}\n")
+
+    def test_c3d_r2_ask_word_must_be_a_whole_word(self) -> None:
+        for line in ("The tests confirmed that expired codes are refused.",
+                     "The planner decides that expired codes are refused.",
+                     "The code has a clarifying note on its end date."):
+            with self.subTest(line=line):
+                self.report(False, f"Plan written.\n{line}\n")
+
+    def test_c3d_r2_report_line_that_starts_with_none_no_or_na_does_not_ask(self) -> None:
+        for line in ("No open questions. Expired codes raise UnknownCode.",
+                     "No rule covers an expired code. What must it do?",
+                     "None: is the end date of a code unclear?",
+                     "N/A: is the end date of a code in scope?"):
+            with self.subTest(line=line):
+                self.report(False, f"Plan written.\n{line}\n")
+
+    def test_c3d_r2_ticket_examples(self) -> None:
+        self.report(False, "No open questions. Expired codes raise UnknownCode.")
+        self.report(False, "Open questions:\n- None.\n\nI chose to refuse an expired code.")
+        self.report(False, "I decided that an expired code raises UnknownCode.")
+        self.report(True, "Open questions:\n- Codes:\n  - What does an expired code do")
+        self.report(True, "Should an expired code be refused?")
+
+
 # Criterion 4: new_ids ---------------------------------------------------------------------------
 
 
@@ -395,13 +548,68 @@ class NewIdsTest(GraderCase):
                    {"docs/plans/SHOP-17.spec.md": delta(added("cart.R4"))})
 
 
+# Criterion 9: not_applied -----------------------------------------------------------------------
+
+
+def front(*lines: str) -> str:
+    return "---\n" + "\n".join(lines) + "\n---\n\n"
+
+
+class NotAppliedTest(GraderCase):
+    def check(self, expected: bool, text: str | None, committed: bool = False) -> str:
+        ws = self.workspace({DELTA: text} if text is not None else None, committed)
+        return self.expect(expected, "not_applied", ws, {"path": DELTA})
+
+    def test_c9_delta_with_no_frontmatter_passes(self) -> None:
+        self.check(True, delta(added("cart.R3")))
+
+    def test_c9_delta_with_frontmatter_but_no_apply_order_passes(self) -> None:
+        self.check(True, front("ticket: SHOP-16") + delta(added("cart.R3")))
+
+    def test_c9_delta_with_apply_order_fails(self) -> None:
+        for order in ("3", "1", "99"):
+            with self.subTest(order=order):
+                self.check(False, front(f"apply_order: {order}") + delta(added("cart.R3")))
+
+    def test_c9_delta_with_apply_order_among_other_keys_fails(self) -> None:
+        self.check(False, front("ticket: SHOP-16", "apply_order: 3") + delta(added("cart.R3")))
+
+    def test_c9_apply_order_that_is_not_a_valid_number_still_fails(self) -> None:
+        for value in ("0", "x", "-1", "2.5", "true"):
+            with self.subTest(value=value):
+                self.check(False, front(f"apply_order: {value}") + delta(added("cart.R3")))
+
+    def test_c9_apply_order_key_with_no_value_fails(self) -> None:
+        # The ticket: the delta must have no apply_order in its frontmatter.
+        self.check(False, front("apply_order:") + delta(added("cart.R3")))
+
+    def test_c9_apply_order_in_the_body_is_not_frontmatter(self) -> None:
+        body = delta(added("cart.R3")) + "\nThe old deltas have apply_order: 1 and 2.\n"
+        self.check(True, body)
+
+    def test_c9_missing_delta_fails(self) -> None:
+        self.check(False, None)
+
+    def test_c9_a_folder_at_the_path_fails(self) -> None:
+        ws = self.workspace({DELTA + "/x.md": "text\n"})
+        self.expect(False, "not_applied", ws, {"path": DELTA})
+
+    def test_c9_committed_delta_is_graded_the_same(self) -> None:
+        self.check(True, delta(added("cart.R3")), committed=True)
+        self.check(False, front("apply_order: 3") + delta(added("cart.R3")), committed=True)
+
+    def test_c9_an_old_applied_delta_in_the_fixture_fails(self) -> None:
+        self.expect(False, "not_applied", self.workspace(), {"path": "docs/plans/SHOP-3.spec.md"})
+
+
 # Criterion 5: output and no workspace change ----------------------------------------------------
 
 
 class OutputTest(GraderCase):
     ARGS = {"job_story_ids": {"path": PLAN},
             "names_gap": {"path": "docs/plans/*.md", "pattern": GAP},
-            "new_ids": {"path": DELTA, "capability": "cart"}}
+            "new_ids": {"path": DELTA, "capability": "cart"},
+            "not_applied": {"path": DELTA}}
 
     def full(self, committed: bool = False) -> Path:
         files = {PLAN: plan("1. shopper.J2.", questions="- An expired code?"),
@@ -448,6 +656,20 @@ class OutputTest(GraderCase):
             with self.subTest(pattern=pattern):
                 self.expect(False, "names_gap", ws, {"path": "docs/plans/*.md", "pattern": pattern},
                             report="What does an expired code do?")
+
+    def test_c5_an_absolute_glob_gives_a_json_failure(self) -> None:
+        ws = self.full()
+        self.expect(True, "names_gap", ws, {"path": "docs/plans/*.md", "pattern": GAP})
+        for path in (f"{ws.as_posix()}/docs/plans/*.md", f"{ws.as_posix()}/docs/plans/SHOP-12.md",
+                     "/docs/plans/*.md"):
+            with self.subTest(path=path):
+                self.expect(False, "names_gap", ws, {"path": path, "pattern": GAP})
+
+    def test_c5_not_applied_bad_input_gives_a_json_failure(self) -> None:
+        ws = self.full()
+        for args in ({}, {"file": DELTA}, {"path": 3}, {"path": None}):
+            with self.subTest(args=args):
+                self.expect(False, "not_applied", ws, args)
 
 
 # Criterion 6: the eval and the fixture are valid ------------------------------------------------
@@ -511,7 +733,7 @@ class FixtureTest(unittest.TestCase):
 
 class KindTest(unittest.TestCase):
     FORMAT_CHECKS = {"sections_in_order", "json_valid", "spec_delta_valid"}
-    FORMAT_GRADERS = {"job_story_ids"}
+    FORMAT_GRADERS = {"job_story_ids", "not_applied"}
 
     def is_format(self, item: dict[str, Any]) -> bool:
         if item["check"] == "grader":
@@ -557,6 +779,30 @@ class ScenarioGraderTest(GraderCase):
                     args, report="The ticket does not say what an expired code does.")
         self.expect(False, "names_gap", self.workspace({"docs/plans/SHOP-14.md": plan("1. x")}),
                     args, report="Plan written at docs/plans/SHOP-14.md.")
+
+    def test_c9_each_scenario_not_applied_check_fails_a_copied_apply_order(self) -> None:
+        items = [(sid, i) for sid, s in SCENARIOS.items() for i in grader_checks(s)
+                 if i["name"] == "not_applied"]
+        self.assertTrue(items, "no scenario has a not_applied check")
+        for sid, item in items:
+            args = grader_args(item)
+            text = delta(added("cart.R3", "A gift note"))
+            with self.subTest(scenario=sid):
+                self.expect(True, "not_applied", self.workspace({args["path"]: text}), args)
+                self.expect(False, "not_applied",
+                            self.workspace({args["path"]: front("apply_order: 3") + text}), args)
+
+    def test_p3_ticket_example_outputs_that_decide_the_gap_fail(self) -> None:
+        args = grader_args(self.item("P3", "names_gap"))
+        weak = [({"docs/plans/SHOP-14.md": plan(
+                     "1. shopper.J3.", questions="None. Expired codes are refused (assumed).")},
+                 "Plan written."),
+                ({}, "No open questions. Expired codes raise UnknownCode."),
+                ({}, "Open questions:\n- None.\n\nI chose to refuse an expired code."),
+                ({}, "I decided that an expired code raises UnknownCode.")]
+        for files, report in weak:
+            with self.subTest(report=report):
+                self.expect(False, "names_gap", self.workspace(files), args, report=report)
 
     def test_p5_delta_with_r3_passes_and_with_r2_fails(self) -> None:
         args = grader_args(self.item("P5", "new_ids"))
