@@ -6,7 +6,8 @@ Convention for all profiles:
   output tree under `expected/`.
 - One test file for each profile: `stone/tests/test_golden_<profile>.py`.
 - With `STONE_UPDATE_GOLDEN=1`, the test writes the expected files again and does not compare.
-  Read the diff of `expected/` before you commit it.
+  Read the diff of `expected/` before you commit it. Command:
+  `STONE_UPDATE_GOLDEN=1 python -m unittest discover -s stone/tests -p 'test_golden_*.py'`
 - Render uses a fixed date, so the manifest is stable.
 """
 
@@ -120,7 +121,7 @@ class RefactorMigrationGoldenTest(GoldenMixin, unittest.TestCase):
 
     def test_k10_step_gets_the_limit(self) -> None:
         step = next(s for s in self.steps() if s.get("name") == "K10 mutation score")
-        self.assertEqual(step["run"], "mutmut run --paths-to-mutate src/")
+        self.assertEqual(step["run"], "scripts/mutation-score.sh")
         self.assertEqual(str(step["env"]["MUTATION_SCORE_MIN"]), "0.6")
         self.assertIn("BASE_REF", step["env"])
 

@@ -34,7 +34,7 @@ CHECK_COMMANDS = {"test_integration": "pytest tests/integration",
                   "architecture": "lint-imports",
                   "property": "pytest tests/property",
                   "differential": "pytest tests/differential",
-                  "mutation": "mutmut run --paths-to-mutate src/"}
+                  "mutation": "scripts/mutation-score.sh"}
 # check -> (step name, command key), from the ticket and the steps of ci-job.checks.
 STEPS = {"K4": ("K4 integration tests", "test_integration"),
          "K5": ("K5 acceptance tests", "test_acceptance"),
@@ -591,6 +591,89 @@ class MissingLimitTest(StepsBase):
         self.assertEqual(code, 1)
         self.assertIn(LIMIT, out)
         self.assertEqual({path: self.read(path) for path in self.written_files()}, before)
+
+
+# AC11: a blank limit is the same as no limit. The K10 step needs a value.
+
+BLANK_LIMITS = {"null": None, "empty string": "", "spaces": "  "}
+
+
+class BlankLimitTest(StepsBase):
+    def configure_blank(self, value: Any, profiles: list[str] | None = None,
+                        commands: dict[str, Any] | None = None) -> None:
+        self.configure(profiles or ["refactor-migration"],
+                       CHECK_COMMANDS if commands is None else commands,
+                       {"mutation_score_changed_code": value})
+
+    def test_ac11_blank_limit_cli_exits_1_writes_nothing_and_names_the_limit(self) -> None:
+        for label, value in BLANK_LIMITS.items():
+            with self.subTest(limit=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_blank(value)
+                code, out, _ = self.cli_render()
+                self.assertEqual(code, 1, out)
+                self.assertIn(LIMIT, out)
+                self.assertEqual(self.written_files(), [])
+
+    def test_ac11_blank_limit_render_raises_and_names_the_limit(self) -> None:
+        for label, value in BLANK_LIMITS.items():
+            with self.subTest(limit=label):
+                self.configure_blank(value)
+                with self.assertRaisesRegex(render.RenderError, re.escape(LIMIT)):
+                    self.render()
+
+    def test_ac11_key_with_no_value_in_the_config_text_fails(self) -> None:
+        # The way a person writes it: the key is there, the value is not.
+        text = config_text(["refactor-migration"], CHECK_COMMANDS)
+        text += "limits:\n  mutation_score_changed_code:\n"
+        (self.root / ".cornerstone" / "config.yaml").write_text(text, encoding="utf-8")
+        code, out, _ = self.cli_render()
+        self.assertEqual(code, 1, out)
+        self.assertIn(LIMIT, out)
+        self.assertEqual(self.written_files(), [])
+
+    def test_ac11_blank_limit_does_not_write_an_empty_mutation_score_min(self) -> None:
+        self.configure_blank("")
+        self.cli_render()
+        self.assertFalse((self.root / WORKFLOW).exists())
+
+    def test_ac11_blank_limit_does_not_change_the_files_of_an_earlier_render(self) -> None:
+        self.configure(["refactor-migration"], CHECK_COMMANDS,
+                       {"mutation_score_changed_code": 0.6})
+        self.render()
+        before = {path: self.read(path) for path in self.written_files()}
+        for label, value in BLANK_LIMITS.items():
+            with self.subTest(limit=label):
+                self.configure_blank(value)
+                code, out, _ = self.cli_render()
+                self.assertEqual(code, 1, out)
+                self.assertIn(LIMIT, out)
+                self.assertEqual({path: self.read(path) for path in self.written_files()},
+                                 before)
+
+    def test_ac11_blank_limit_without_the_mutation_command_renders(self) -> None:
+        # No K10 step, so render does not need the limit.
+        commands = {k: v for k, v in CHECK_COMMANDS.items() if k != "mutation"}
+        for label, value in BLANK_LIMITS.items():
+            with self.subTest(limit=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_blank(value, commands=commands)
+                result, log = self.render()
+                self.assertEqual(result.exit_code, 0)
+                self.assertNotIn("K10 mutation score", self.step_names())
+                self.assertNotIn(LIMIT, log)
+
+    def test_ac11_blank_limit_with_a_profile_without_k10_renders(self) -> None:
+        for label, value in BLANK_LIMITS.items():
+            with self.subTest(limit=label):
+                self.tearDown()
+                self.setUp()
+                self.configure_blank(value, profiles=["single-ticket"])
+                result, _ = self.render()
+                self.assertEqual(result.exit_code, 0)
+                self.assertNotIn("K10 mutation score", self.step_names())
 
 
 # AC9: a second render with the same inputs writes nothing.

@@ -10,7 +10,7 @@ commands:
   test_unit: python -m unittest
   all_checks: make check
   architecture: lint-imports
-  mutation: mutmut run --paths-to-mutate src/
+  mutation: scripts/mutation-score.sh   # reads BASE_REF and MUTATION_SCORE_MIN (customization.md)
   differential: pytest tests/differential
 paths:
   tests: [tests/]
