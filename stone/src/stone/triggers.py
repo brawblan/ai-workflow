@@ -71,7 +71,7 @@ def cron(value: str) -> str:
 
 
 def flow_steps(framework: Path, profile_id: str) -> str:
-    """Return the numbered steps in the "## Flow" section of a profile."""
+    """Return the text of the "## Flow" section of a profile: the steps and any notes."""
     text = (framework / "profiles" / f"{profile_id}.md").read_text(encoding="utf-8")
     match = re.search(r"^## Flow\n(.*?)(?=^## )", text, re.M | re.S)
     if not match:

@@ -52,6 +52,7 @@ owners: {default: octocat}
 CONFIG_PATH = ".cornerstone/config.yaml"
 MANIFEST = ".cornerstone/manifest.yaml"
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
+SCHEDULE_WORKFLOW = f".github/workflows/cornerstone-{PROFILE}-schedule.yml"  # the weekly trigger (D31)
 K6 = ".cornerstone/checks/protected_paths.py"
 K7 = ".cornerstone/checks/change_size.py"
 HOOK = ".cornerstone/hooks/protect-paths.py"
@@ -86,10 +87,33 @@ def profile_needs(component: dict, profile: dict) -> bool:
     return True
 
 
+def trigger_key(text: str) -> str:
+    """Return the `trigger` field that a profile trigger needs: "label:x" gives "label" (D31)."""
+    return text if text.startswith("ci:") else text.partition(":")[0]
+
+
+def trigger_components(profile: dict) -> list[dict]:
+    """Return one component for each profile trigger that has a `trigger` entry in components.yaml.
+
+    The entry `trigger.label` gives `trigger.label.<profile>`, and `$profile` in its target is the
+    profile id. The `command` trigger has no entry, so it gives no component.
+    """
+    entries = {entry["trigger"]: entry for entry in adapter_components() if "trigger" in entry}
+    found = []
+    for text in profile.get("triggers", []):
+        entry = entries.get(trigger_key(str(text)))
+        if entry is not None:
+            found.append({**entry, "id": f"{entry['id']}.{profile['id']}",
+                          "target": entry["target"].replace("$profile", profile["id"])})
+    return found
+
+
 def expected_components() -> list[dict]:
-    """Return the components.yaml entries that the profile frontmatter selects."""
+    """Return the components that the profile frontmatter selects, with its trigger workflows."""
     profile = profile_frontmatter()
-    return [component for component in adapter_components() if profile_needs(component, profile)]
+    plain = [component for component in adapter_components()
+             if "trigger" not in component and profile_needs(component, profile)]
+    return plain + trigger_components(profile)
 
 
 def render_profile(root: Path) -> tuple[render.Result, str]:
@@ -328,10 +352,11 @@ class ProfilePinTest(RenderedRepo):
 
     def test_ac5_writes_the_files_the_profile_text_names_and_no_model_profile(self) -> None:
         # The profile text: "the four role files, the protected-path hook, checks K6 and K7, and the
-        # G3 workflow. It writes no model profile." This pin is fixed on purpose: it pins the prose.
-        # If render writes a new file for this profile, the profile text must change too.
+        # G3 workflow. It also writes the weekly trigger workflow (D31). It writes no model profile."
+        # This pin is fixed on purpose: it pins the prose. If render writes a new file for this
+        # profile, the profile text must change too.
         want = sorted([f".claude/agents/{role}.md" for role in ROLES]
-                      + [HOOK, SETTINGS, K6, K7, WORKFLOW, MANIFEST])
+                      + [HOOK, SETTINGS, K6, K7, WORKFLOW, SCHEDULE_WORKFLOW, MANIFEST])
         self.assertEqual(sorted(self.files), want)
         for path in self.files:
             with self.subTest(path=path):
@@ -342,6 +367,7 @@ class ProfilePinTest(RenderedRepo):
         text = (FRAMEWORK / "profiles" / f"{PROFILE}.md").read_text(encoding="utf-8")
         prose = " ".join(text.split())  # the sentence wraps over two lines
         self.assertIn("the protected-path hook, checks K6 and K7, and the G3 workflow", prose)
+        self.assertIn("It also writes the weekly trigger workflow (D31)", prose)
         self.assertIn("It writes no model profile", prose)
 
     def manifest(self) -> dict:
@@ -360,12 +386,20 @@ class ProfilePinTest(RenderedRepo):
         derived = {component["id"] for component in expected_components()}
         self.assertLessEqual(PINNED_IDS, derived, sorted(PINNED_IDS - derived))
 
+    def test_ac8_each_profile_trigger_except_command_has_one_trigger_component(self) -> None:
+        # This guards the trigger derivation. If it finds no entry for a trigger, this test fails.
+        triggers = [str(text) for text in profile_frontmatter()["triggers"] if text != "command"]
+        derived = trigger_components(profile_frontmatter())
+        self.assertEqual(len(derived), len(triggers), [component["id"] for component in derived])
+        self.assertNotIn("skipped trigger", self.log)
+
     def test_ac8_written_files_are_the_targets_of_the_expected_components(self) -> None:
         want = sorted([component["target"] for component in expected_components()] + [MANIFEST])
         self.assertEqual(sorted(self.files), want)
 
     def test_ac8_each_manifest_entry_matches_its_components_yaml_entry(self) -> None:
-        source = {component["id"]: component for component in adapter_components()}
+        # A trigger component maps to its `trigger` entry, with the profile id in the id and target.
+        source = {component["id"]: component for component in expected_components()}
         for entry in self.manifest()["components"]:
             with self.subTest(component=entry["id"]):
                 component = source[entry["id"]]
