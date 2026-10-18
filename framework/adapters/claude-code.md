@@ -33,7 +33,8 @@ two layers:
 
 1. **Local hook.** The run script sets `STONE_ROLE=implementer`. A `PreToolUse` hook reads the role and
    the target path. It exits with code 2 if the path is protected. In a `pair` session, the hook
-   uses the role of the human (default: implementer).
+   uses the role of the human (default: implementer). The hook also limits the tester to the test
+   paths, and blocks each edit by the reviewer.
 2. **CI check K6.** Each commit has the trailers `Role: <role>` and `Actor: human|agent`. A commit
    with no `Role:` trailer counts as an implementer commit. K6 fails if an implementer commit
    changes a protected path.
@@ -41,14 +42,25 @@ two layers:
 The CI check is the source of truth. The hook gives faster feedback. A git commit template can add
 the trailers for human commits.
 
+The protected paths are `paths.tests` and `paths.checks` from the repo config, plus `.claude/` and
+`.cornerstone/`. These two folders hold the hook, the check, and the harness settings.
+
+`stone render` writes the hook to `.cornerstone/hooks/protect-paths.py` and K6 to
+`.cornerstone/checks/protected_paths.py`. It merges this entry into `.claude/settings.json` and keeps
+the other keys. The hook catches edits by the file tools only. A shell command can still change a
+file, and K6 catches that change in CI.
+
 ```json
 {
   "hooks": {
     "PreToolUse": [
       {
-        "matcher": "Edit|Write",
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
         "hooks": [
-          { "type": "command", "command": ".cornerstone/hooks/protect-paths.py" }
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR/.cornerstone/hooks/protect-paths.py\""
+          }
         ]
       }
     ]

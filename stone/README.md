@@ -6,7 +6,7 @@ The Cornerstone CLI. Version 0.2 has three commands:
 | --- | --- |
 | `stone check` | Validates the framework: profile frontmatter, gate rules, check IDs, the gates table, relative links, and P12 (no vendor names in the core). If `.cornerstone/config.yaml` exists, it validates it too. |
 | `stone check-writing` | Check K17. Tests human-facing Markdown against the measurable rules of the [writing standard](../framework/writing.md). |
-| `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.2 writes the role files for the single-ticket profile. |
+| `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.2 supports the single-ticket profile: role files, the protected-path hook, check K6, and the G3 CI workflow. |
 
 The other commands in [the generator design](../framework/generator/design.md) are not built yet.
 
@@ -60,6 +60,9 @@ Add `--format github` to show the findings as annotations in a GitHub Actions ru
 
    Remove `--dry-run` to write the files. A second run changes only the files whose input changed.
 
+6. Commit the render output alone, with the trailers `Role: generator` and `Actor: human`. K6 counts
+   a commit with no `Role:` trailer as an implementer commit, and the output is in protected paths.
+
 ## Outputs
 
 Each finding is one line: path, line, severity, check, and a message with the fix.
@@ -92,6 +95,8 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 - The tense test (rule 2) and the passive test (rule 11) are warnings, because they also match some adjectives.
 - `render` supports only the `claude-code` harness and the `single-ticket` profile. It skips other profiles with a log line.
 - `render` does not check `framework_version` against the framework folder. Check out the tag yourself.
+- `render` does not read profile overrides (`.cornerstone/profiles/`) yet.
+- If the hook entry in `.claude/settings.json` changes in a new framework version, `render` adds the new entry. Remove the old entry by hand.
 
 ## Test
 

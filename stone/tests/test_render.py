@@ -5,6 +5,10 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 import io
+import json
+import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -21,6 +25,7 @@ model_profile: claude-5
 profiles: [single-ticket]
 branches: {integration: dev, main: main}
 commands:
+  install: pip install .
   test_unit: python -m unittest
   all_checks: make check
 paths:
@@ -31,6 +36,9 @@ owners: {default: octocat}
 """
 ROLE_FILES = [".claude/agents/implementer.md", ".claude/agents/reviewer.md",
               ".claude/agents/shaper.md", ".claude/agents/tester.md"]
+OTHER_FILES = [".claude/settings.json", ".cornerstone/checks/protected_paths.py",
+               ".cornerstone/hooks/protect-paths.py", ".cornerstone/manifest.yaml",
+               ".github/workflows/cornerstone-checks.yml"]
 
 
 class RenderTest(unittest.TestCase):
@@ -55,12 +63,12 @@ class RenderTest(unittest.TestCase):
 
     def test_writes_role_files_and_manifest(self) -> None:
         result = self.render()
-        self.assertEqual(sorted(result.wrote), [*ROLE_FILES, ".cornerstone/manifest.yaml"])
+        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + OTHER_FILES))
         tester = (self.root / ".claude/agents/tester.md").read_text(encoding="utf-8")
         self.assertIn("model: claude-opus-5-5", tester)
         self.assertIn("Write tests only here: `tests/`", tester)
         self.assertIn("Run `python -m unittest`", tester)
-        entry = self.manifest()["components"][2]
+        entry = self.manifest()["components"][-2]
         self.assertEqual(entry["id"], "role.shaper")
         self.assertEqual((entry["owner"], entry["added"], entry["review_by"]),
                          ("octocat", "2026-10-17", "2027-04-17"))
@@ -101,7 +109,7 @@ class RenderTest(unittest.TestCase):
 
     def test_dry_run_writes_nothing(self) -> None:
         result = self.render(dry_run=True)
-        self.assertEqual(len(result.wrote), 5)
+        self.assertEqual(len(result.wrote), 9)
         self.assertFalse((self.root / ".claude").exists())
         self.assertFalse((self.root / render.MANIFEST).exists())
 
@@ -124,6 +132,61 @@ class RenderTest(unittest.TestCase):
     def test_unsupported_profile_is_skipped(self) -> None:
         self.write_config(CONFIG.replace("[single-ticket]", "[single-ticket, bug-triage]"))
         self.assertEqual(self.render().exit_code, 0)
+
+    def test_settings_merge_keeps_other_keys(self) -> None:
+        settings = self.root / ".claude/settings.json"
+        settings.parent.mkdir(parents=True)
+        settings.write_text('{"permissions": {"allow": ["Bash(ls)"]}}', encoding="utf-8")
+        self.render()
+        data = json.loads(settings.read_text(encoding="utf-8"))
+        self.assertEqual(data["permissions"], {"allow": ["Bash(ls)"]})
+        self.assertEqual(data["hooks"]["PreToolUse"][0]["matcher"],
+                         "Edit|Write|MultiEdit|NotebookEdit")
+        self.assertIn(".claude/settings.json", self.render().skipped)
+
+    def test_removed_hook_entry_is_drift(self) -> None:
+        self.render()
+        (self.root / ".claude/settings.json").write_text("{}", encoding="utf-8")
+        self.assertEqual(self.render().drift, [".claude/settings.json"])
+
+    def run_hook(self, path: str, role: str) -> int:
+        event = json.dumps({"tool_input": {"file_path": str(self.root / path)}})
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(self.root), "STONE_ROLE": role}
+        return subprocess.run([sys.executable, ".cornerstone/hooks/protect-paths.py"],
+                              cwd=self.root, input=event, env=env, capture_output=True,
+                              text=True).returncode
+
+    def test_hook_blocks_by_role(self) -> None:
+        self.render()
+        self.assertEqual(self.run_hook("tests/test_a.py", "implementer"), 2)
+        self.assertEqual(self.run_hook(".cornerstone/checks/protected_paths.py", "implementer"), 2)
+        self.assertEqual(self.run_hook("src/a.py", "implementer"), 0)
+        self.assertEqual(self.run_hook("tests/test_a.py", "tester"), 0)
+        self.assertEqual(self.run_hook("src/a.py", "tester"), 2)
+        self.assertEqual(self.run_hook("src/a.py", "reviewer"), 2)
+
+    def git(self, *args: str) -> None:
+        subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
+                       cwd=self.root, check=True, capture_output=True)
+
+    def commit(self, path: str, message: str) -> None:
+        (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / path).write_text(message, encoding="utf-8")
+        self.git("add", path)
+        self.git("commit", "-m", message)
+
+    def test_k6_fails_on_an_implementer_commit_to_tests(self) -> None:
+        self.render()
+        self.git("init", "-q")
+        self.commit("README.md", "base")
+        self.commit("tests/test_a.py", "add a test\n\nRole: tester")
+        self.commit("src/a.py", "change code")
+        k6 = [sys.executable, ".cornerstone/checks/protected_paths.py", "HEAD~2"]
+        self.assertEqual(subprocess.run(k6, cwd=self.root, capture_output=True).returncode, 0)
+        self.commit("tests/test_b.py", "change a test\n\nRole: implementer")
+        run = subprocess.run([*k6[:2], "HEAD~3"], cwd=self.root, capture_output=True, text=True)
+        self.assertEqual(run.returncode, 1)
+        self.assertIn("changes tests/test_b.py, a protected path", run.stdout)
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 # Generator design
 
-Status: design. `stone check`, `stone check-writing`, and part of `stone render` are built (see
-[stone/](../../stone/README.md)). The other commands are not built yet.
+Status: design. `stone check`, `stone check-writing`, and `stone render` for one profile are built
+(see [stone/](../../stone/README.md)). The other commands are not built yet.
 
 ## Goal
 
@@ -33,7 +33,7 @@ repo config.
 | Command | Does |
 | --- | --- |
 | `stone init` | Make `.cornerstone/config.yaml` with `TODO(<owner>)` values. |
-| `stone render` | Write all files from the inputs. Safe to run again. **Built in v0.2 for the role files of the single-ticket profile and the manifest.** |
+| `stone render` | Write all files from the inputs. Safe to run again. **Built in v0.2 for the single-ticket profile: role files, the protected-path hook, K6, the G3 CI workflow, and the manifest.** No profile overrides yet. |
 | `stone check` | Validate the config, the profiles, and the manifest. Report drift between files and templates. **Built in v0.1 (no manifest or drift yet).** |
 | `stone check-writing` | Run K17 on files, on the changed lines since a base, or on a PR body. **Built in v0.1.** |
 | `stone review` | List the components past `review_by`. Exit code 1 if there are any. |
@@ -49,6 +49,8 @@ repo config.
     has its hash. A file that does not match that hash is drift.
   - A block in a shared file (for example the instruction file) sits between markers. Content
     outside the markers belongs to the human.
+  - An entry in a shared JSON file (for example the harness settings) is merged in. The other keys
+    belong to the human. If the human removes the entry, that is drift.
 
 ```text
 <!-- stone:begin id=instruction.commands hash=<sha256> -->
