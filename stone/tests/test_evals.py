@@ -15,10 +15,12 @@ import os
 import re
 import shlex
 import shutil
+import subprocess
 import sys
 import tempfile
 import time
 import unittest
+import unittest.mock
 from pathlib import Path
 from typing import Any
 
@@ -65,7 +67,7 @@ def result_line(report: str = "done", cost: float = 0.1, tokens: int = 5) -> str
 
 FAKE_HARNESS = r'''
 """Fake harness for the stone eval tests. It records each call, then does the planned actions."""
-import json, os, subprocess, sys, time
+import json, os, signal, subprocess, sys, time
 from pathlib import Path
 
 variant, argv = sys.argv[1], sys.argv[2:]
@@ -102,6 +104,7 @@ record = {"variant": variant, "number": number, "argv": argv, "cwd": str(cwd),
           "is_git_root": (cwd / ".git").exists(),
           "log": git("log", "--format=%B%x1e"),
           "status": git("status", "--porcelain", "--untracked-files=all"),
+          "tracked": git("ls-files", "-z").split("\0"),
           "texts": {n: (cwd / n).read_text(encoding="utf-8") for n in plan.get("read", [])
                     if (cwd / n).is_file()}}
 with (state / "calls.jsonl").open("a", encoding="utf-8") as handle:
@@ -116,10 +119,29 @@ for action in step.get("actions", []):
         git("add", *action[1:])
     elif action[0] == "commit":
         git("commit", "-q", "-m", action[1])
+    elif action[0] == "mv":
+        (cwd / action[2]).parent.mkdir(parents=True, exist_ok=True)
+        git("mv", action[1], action[2])
+    elif action[0] == "spawn":  # a child process that writes a file after a delay
+        code = (f"import pathlib, time; time.sleep({action[2]}); "
+                f"pathlib.Path({action[1]!r}).write_text('late')")
+        subprocess.Popen([sys.executable, "-c", code])
+    elif action[0] == "kill_parent":  # stop the stone process that started this harness
+        os.kill(os.getppid(), signal.SIGKILL)
+        time.sleep(1)
 print(f"TRANSCRIPT {variant} {number}")
+sys.stdout.flush()
+if step.get("raw_stdout"):
+    sys.stdout.buffer.write(bytes.fromhex(step["raw_stdout"]))
+    sys.stdout.buffer.flush()
 for line in step.get("stdout", [plan["default_result"]]):
     print(line)
 sys.stdout.flush()
+for line in step.get("stderr", []):
+    print(line, file=sys.stderr)
+if step.get("raw_stderr"):
+    sys.stderr.buffer.write(bytes.fromhex(step["raw_stderr"]))
+sys.stderr.flush()
 if step.get("sleep"):
     time.sleep(step["sleep"])
 sys.exit(step.get("exit", 0))
@@ -153,6 +175,8 @@ elif options.name == "not_last":
 elif options.name == "uses_args":
     ok = (workspace / args["file"]).is_file() and args.get("min") == 2
     print(json.dumps({"pass": ok}))
+elif options.name == "literal":
+    print(json.dumps({"pass": args["value"]}))
 '''
 
 
@@ -289,6 +313,14 @@ class EvalTestCase(unittest.TestCase):
     @staticmethod
     def col(row: dict[str, str], word: str) -> str:
         return next(value for key, value in row.items() if word in key)
+
+    def reset_records(self) -> None:
+        """Remove the records of an earlier eval in the same test: runs, results, and calls."""
+        shutil.rmtree(self.root / ".cornerstone/eval-runs", ignore_errors=True)
+        shutil.rmtree(self.root / "evals/results", ignore_errors=True)
+        for path in self.state.iterdir():
+            if path.name != "plan.json":
+                path.unlink()
 
     def no_run_started(self) -> None:
         self.assertEqual(self.calls(), [])
@@ -1141,6 +1173,389 @@ class ModelTest(EvalTestCase):
         for call in self.calls():
             with self.subTest(variant=call["variant"]):
                 self.assertEqual(arg(call, "--model"), "other-model")
+
+
+# Review fixes (AC13 to AC25) -----------------------------------------------------------------
+#
+# The criteria come from the follow-up ticket after the review of the first version.
+
+
+class BareFixtureTest(EvalTestCase):
+    def test_ac13_fixture_without_config_but_with_role_file_removes_it_for_without(self) -> None:
+        self.write(f"{EVAL_DIR}/fixtures/bare/src/app.py", "VALUE = 1\n")
+        self.write(f"{EVAL_DIR}/fixtures/bare/{ROLE_FILE}", "# The fixture tester role\n")
+        self.scenarios(self.scenario(fixture="fixtures/bare", expect=[
+            {"check": "unchanged", "paths": [".claude/"]}]))
+        code, out = self.eval()
+        self.assertEqual(code, 0, out)
+        calls = {call["variant"]: call for call in self.calls()}
+        self.assertIn(ROLE_FILE, calls["with"]["files"])
+        self.assertNotIn(ROLE_FILE, calls["without"]["files"])
+        for variant in ("with", "without"):
+            with self.subTest(variant=variant):
+                self.assertEqual(calls[variant]["status"], "", "the setup is committed")
+        runs = {run["variant"]: run for run in self.runs()}
+        self.assertEqual(self.check_passes(runs["without"]), [True],
+                         "the removal is part of the setup, not a change of the run")
+
+
+class ChangedPathsTest(EvalTestCase):
+    RENAME_EXPECT = [
+        {"check": "unchanged", "paths": ["b/"]},
+        {"check": "unchanged", "paths": ["e/"]},
+        {"check": "only_changed", "paths": ["e/"]},
+        {"check": "only_changed", "paths": ["b/"]},
+        {"check": "only_changed", "paths": ["b/", "e/"]},
+        {"check": "unchanged", "paths": ["c/", "src/"]},
+    ]
+    RENAME_PASSES = [False, False, False, False, True, True]
+
+    def grade_once(self, expect: list, actions: list | None = None,
+                   stdout: list[str] | None = None, **extra: Any) -> list[bool]:
+        passes = super().grade_once(expect, actions, stdout, **extra)
+        self.assertEqual(self.runs()[0]["error"], "", "the fake harness actions worked")
+        return passes
+
+    def test_ac14_committed_rename_counts_both_paths(self) -> None:
+        actions = [["mv", "b/keep.txt", "e/moved.txt"], ["commit", "test: move"]]
+        passes = self.grade_once(self.RENAME_EXPECT, actions)
+        self.assertEqual(passes, self.RENAME_PASSES, self.runs()[0])
+
+    def test_ac14_staged_rename_counts_both_paths(self) -> None:
+        actions = [["mv", "b/keep.txt", "e/moved.txt"]]
+        passes = self.grade_once(self.RENAME_EXPECT, actions)
+        self.assertEqual(passes, self.RENAME_PASSES, self.runs()[0])
+
+    def test_ac14_paths_with_a_space_or_non_ascii_match(self) -> None:
+        names = ["docs/my notes.md", "docs/日本語.md", "docs/café.md"]
+        expect = [{"check": "unchanged", "paths": [name]} for name in names] + [
+            {"check": "only_changed", "paths": names},
+            {"check": "only_changed", "paths": names[:1]},
+        ]
+        writes = [["write", name, "text\n"] for name in names]
+        modes = {
+            "untracked": writes,
+            "staged": writes + [["add", *names]],
+            "committed": writes + [["add", *names], ["commit", "docs: add"]],
+        }
+        for mode, actions in modes.items():
+            with self.subTest(mode=mode):
+                self.reset_records()
+                passes = self.grade_once(expect, actions)
+                self.assertEqual(passes, [False, False, False, True, False], self.runs()[0])
+
+    def test_ac14_rename_of_a_path_with_a_space_to_a_non_ascii_path(self) -> None:
+        self.write(f"{EVAL_DIR}/fixtures/names/old name.txt", "same text\n")
+        self.write(f"{EVAL_DIR}/fixtures/names/src/app.py", "VALUE = 1\n")
+        expect = [
+            {"check": "unchanged", "paths": ["old name.txt"]},
+            {"check": "unchanged", "paths": ["日本/"]},
+            {"check": "only_changed", "paths": ["old name.txt", "日本/"]},
+            {"check": "unchanged", "paths": ["src/"]},
+        ]
+        modes = {
+            "staged": [["mv", "old name.txt", "日本/new name.txt"]],
+            "committed": [["mv", "old name.txt", "日本/new name.txt"], ["commit", "test: mv"]],
+        }
+        for mode, actions in modes.items():
+            with self.subTest(mode=mode):
+                self.reset_records()
+                passes = self.grade_once(expect, actions, fixture="fixtures/names")
+                self.assertEqual(passes, [False, False, True, True], self.runs()[0])
+
+
+class GitConfigTest(EvalTestCase):
+    """AC15: the git of the workspace does not read the global or the system git config."""
+
+    EXPECT = [
+        {"check": "commit_trailer", "trailer": "Role: tester"},
+        {"check": "unchanged", "paths": ["ignored-new.txt"]},
+        {"check": "only_changed", "paths": ["tests/"]},
+        {"check": "command", "run": "git check-ignore -q ignored-new.txt", "exit": 1},
+        {"check": "command", "run": "git commit -q --allow-empty -m signed-or-not"},
+    ]
+    PASSES = [True, False, False, True, True]
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write(f"{EVAL_DIR}/fixtures/gitcfg/src/app.py", "VALUE = 1\n")
+        self.write(f"{EVAL_DIR}/fixtures/gitcfg/ignored-base.txt", "in the fixture\n")
+        ignore = self.base / "global-ignore"
+        ignore.write_text("ignored*.txt\n", encoding="utf-8")
+        self.bad_config = self.base / "bad-gitconfig"
+        self.bad_config.write_text(
+            f"[core]\n\texcludesFile = {ignore}\n[commit]\n\tgpgsign = true\n"
+            "[gpg]\n\tprogram = /no/such/gpg-for-stone-eval\n", encoding="utf-8")
+        self.empty_config = self.base / "empty-gitconfig"
+        self.empty_config.write_text("", encoding="utf-8")
+        self.plan({"with": [{"actions": [
+            ["write", "tests/test_a.py", "x"], ["add", "tests/test_a.py"],
+            ["commit", "test: add\n\nRole: tester"],
+            ["write", "ignored-new.txt", "made by the run"]]}]})
+        self.scenarios(self.scenario(fixture="fixtures/gitcfg", expect=self.EXPECT))
+
+    def outcome(self, env: dict[str, str], drop: tuple[str, ...] = ()) -> tuple[list[bool], dict]:
+        self.reset_records()
+        with unittest.mock.patch.dict(os.environ, env):
+            for name in drop:
+                os.environ.pop(name, None)
+            code, out = self.eval("--variant", "with")
+        runs = self.runs()
+        self.assertEqual(len(runs), 1, out)
+        self.assertEqual(runs[0]["error"], "", out)
+        calls = self.calls()
+        self.assertEqual(len(calls), 1, out)
+        return self.check_passes(runs[0]), calls[0]
+
+    def assert_config_is_read_by_git(self, env: dict[str, str], scope: str) -> None:
+        """Make sure that this git reads the variable. If not, the test proves nothing."""
+        result = subprocess.run(["git", "config", f"--{scope}", "--get", "commit.gpgsign"],
+                                env={**os.environ, **env}, capture_output=True, text=True)
+        if result.stdout.strip() != "true":
+            self.skipTest(f"this git does not read the {scope} config from the environment")
+
+    def test_ac15_global_config_does_not_change_the_result(self) -> None:
+        env = {"GIT_CONFIG_GLOBAL": str(self.bad_config)}
+        self.assert_config_is_read_by_git(env, "global")
+        baseline, _ = self.outcome({"GIT_CONFIG_GLOBAL": str(self.empty_config)})
+        self.assertEqual(baseline, self.PASSES)
+        passes, call = self.outcome(env)
+        self.assertEqual(passes, baseline)
+        self.assertIn("ignored-base.txt", call["tracked"], "the setup commits the ignored name")
+
+    def test_ac15_system_config_does_not_change_the_result(self) -> None:
+        env = {"GIT_CONFIG_GLOBAL": str(self.empty_config),
+               "GIT_CONFIG_SYSTEM": str(self.bad_config)}
+        self.assert_config_is_read_by_git({**env, "GIT_CONFIG_NOSYSTEM": ""}, "system")
+        passes, call = self.outcome(env, drop=("GIT_CONFIG_NOSYSTEM",))
+        self.assertEqual(passes, self.PASSES)
+        self.assertIn("ignored-base.txt", call["tracked"])
+
+
+class BrokenCheckTest(EvalTestCase):
+    @staticmethod
+    def glob_rejects(pattern: str) -> bool:
+        try:
+            list(Path(tempfile.gettempdir()).glob(pattern))
+        except Exception:  # noqa: BLE001 - any error means that the glob rejects the pattern
+            return True
+        return False
+
+    def test_ac16_a_check_that_raises_fails_only_that_check_and_the_eval_continues(self) -> None:
+        rejected = [p for p in ("/an/absolute/*", "") if self.glob_rejects(p)]
+        if not rejected:
+            self.skipTest("this Python accepts each glob pattern in the list")
+        broken = [{"check": "file_exists", "path": p} for p in rejected] + [
+            {"check": "command", "run": 'echo "unbalanced'}]
+        expect = broken + [{"check": "file_exists", "path": "src/app.py"}]
+        self.scenarios(self.scenario("T1", expect=expect), self.scenario("T2", expect=expect))
+        code, out = self.eval("--variant", "with")
+        self.assertEqual(code, 1, out)
+        runs = self.runs()
+        self.assertEqual([run["scenario"] for run in runs], ["T1", "T2"], "the eval continues")
+        for run in runs:
+            with self.subTest(scenario=run["scenario"]):
+                self.assertEqual(run["error"], "")
+                self.assertEqual(self.check_passes(run), [False] * len(broken) + [True])
+                for check in run["checks"][:len(broken)]:
+                    self.assertTrue(check["detail"].startswith("the check failed"), check)
+        calls = self.calls()
+        self.assertEqual(len(calls), 2)
+        for call in calls:
+            self.assertFalse(Path(call["cwd"]).exists(), "the workspace is deleted")
+
+
+class PatternValidationTest(EvalTestCase):
+    def test_ac17_matches_with_a_pattern_that_is_not_a_regex_is_not_valid(self) -> None:
+        pattern = "([unclosed"
+        self.scenarios(self.scenario(expect=[
+            {"check": "matches", "path": "notes.md", "pattern": pattern}]))
+        for args in (("--check-only",), ()):
+            with self.subTest(args=args):
+                code, out = self.eval(*args)
+                self.assertEqual(code, 2, out)
+                self.assertIn(pattern, out)
+                self.no_run_started()
+
+    def test_ac17_a_valid_pattern_is_accepted(self) -> None:
+        self.scenarios(self.scenario(expect=[
+            {"check": "matches", "path": "notes.md", "pattern": r"^\[closed\]$"}]))
+        code, out = self.eval("--check-only")
+        self.assertEqual(code, 0, out)
+
+
+class StoppedProcessTest(EvalTestCase):
+    def test_ac18_runs_jsonl_keeps_each_finished_run_after_the_process_stops(self) -> None:
+        self.plan({"with": [{}, {"actions": [["kill_parent"]]}, {}]})
+        self.scenarios(self.scenario("T1"), self.scenario("T2"), self.scenario("T3"))
+        package = Path(cli.__file__).resolve().parents[1]
+        env = {**os.environ,
+               "PYTHONPATH": os.pathsep.join(filter(None, [str(package),
+                                                           os.environ.get("PYTHONPATH")]))}
+        script = "import sys; from stone import cli; sys.exit(cli.main(sys.argv[1:]))"
+        result = subprocess.run(
+            [sys.executable, "-c", script, "eval", COMPONENT, "--root", str(self.root),
+             "--framework", str(FRAMEWORK), "--run-config", str(self.run_yaml),
+             "--variant", "with"], env=env, capture_output=True, text=True, timeout=120)
+        calls = self.calls()
+        for call in calls[1:]:
+            self.addCleanup(KeepTest.remove_workspace, Path(call["cwd"]))
+        self.assertLess(result.returncode, 0, "the harness stopped the stone process")
+        self.assertEqual(len(calls), 2, "T3 did not start")
+        runs = self.runs()
+        self.assertEqual([run["scenario"] for run in runs], ["T1"])
+        self.assertEqual(self.check_passes(runs[0]), [True])
+
+
+class StrictGraderTest(EvalTestCase):
+    def test_ac19_grader_passes_only_on_the_json_value_true(self) -> None:
+        self.grader()
+        values = [True, "true", 1, "false", False, 1.0, "yes"]
+        expect = [{"check": "grader", "name": "literal", "value": value} for value in values]
+        self.assertEqual(self.grade_once(expect),
+                         [True, False, False, False, False, False, False])
+
+
+class StderrTest(EvalTestCase):
+    def test_ac20_stderr_goes_to_an_err_file_next_to_the_transcript(self) -> None:
+        self.plan({"with": [{"stderr": ["WARNING from the harness", "a second line"]}, {}]})
+        self.scenarios(self.scenario("T1"), self.scenario("T2"))
+        code, out = self.eval("--variant", "with")
+        self.assertEqual(code, 0, out)
+        folder = self.runs_folder()
+        transcripts = {p.read_text(encoding="utf-8").splitlines()[0]: p
+                       for p in folder.glob("*.out")}
+        self.assertEqual(sorted(transcripts), ["TRANSCRIPT with 0", "TRANSCRIPT with 1"])
+        with_err = transcripts["TRANSCRIPT with 0"].with_suffix(".err")
+        no_err = transcripts["TRANSCRIPT with 1"].with_suffix(".err")
+        self.assertTrue(with_err.is_file(), list(folder.iterdir()))
+        text = with_err.read_text(encoding="utf-8")
+        self.assertIn("WARNING from the harness", text)
+        self.assertIn("a second line", text)
+        self.assertNotIn("TRANSCRIPT", text, "the standard output is not in the .err file")
+        self.assertFalse(no_err.exists(), "no standard error output, no .err file")
+        self.assertEqual(len(list(folder.glob("*.err"))), 1)
+
+
+class TimeoutChildTest(EvalTestCase):
+    def late_file(self) -> Path:
+        return self.state / "late.txt"
+
+    def test_ac21_after_the_timeout_no_child_of_the_harness_writes(self) -> None:
+        late = self.late_file()
+        self.plan({"with": [{"actions": [["spawn", str(late), 2]], "sleep": 30}]})
+        self.scenarios(self.scenario())
+        start = time.monotonic()
+        code, out = self.eval("--variant", "with", "--timeout", "1")
+        self.assertEqual(code, 1, out)
+        self.assertTrue(self.runs()[0]["error"])
+        time.sleep(max(0.0, start + 5 - time.monotonic()))
+        self.assertFalse(late.exists(), "a child of the harness wrote after the timeout")
+
+    def test_ac21_control_the_child_writes_if_no_timeout_stops_it(self) -> None:
+        late = self.late_file()
+        self.plan({"with": [{"actions": [["spawn", str(late), 0.2]], "sleep": 2}]})
+        self.scenarios(self.scenario())
+        code, out = self.eval("--variant", "with", "--timeout", "60")
+        self.assertEqual(code, 0, out)
+        deadline = time.monotonic() + 5
+        while not late.exists() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertTrue(late.exists(), "the spawn action of the fake harness does not work")
+
+
+class BadBytesTest(EvalTestCase):
+    def test_ac22_output_that_is_not_utf8_does_not_stop_the_eval(self) -> None:
+        self.plan({"with": [{"raw_stdout": "fffe20626164c30a", "raw_stderr": "ff0a"}]})
+        expect = [{"check": "matches", "path": "@report", "pattern": "^done$"}]
+        self.scenarios(self.scenario(expect=expect))
+        code, out = self.eval("--variant", "with")
+        self.assertEqual(code, 0, out)
+        run = self.runs()[0]
+        self.assertEqual(run["error"], "")
+        self.assertEqual(self.check_passes(run), [True])
+
+    def test_ac22_cut_utf8_at_a_timeout_does_not_stop_the_eval(self) -> None:
+        self.plan({"with": [{"raw_stdout": "48690ae282", "stdout": [], "sleep": 30}, {}]})
+        self.scenarios(self.scenario("T1"), self.scenario("T2"))
+        code, out = self.eval("--variant", "with", "--timeout", "1")
+        self.assertEqual(code, 1, out)
+        runs = {run["scenario"]: run for run in self.runs()}
+        self.assertTrue(runs["T1"]["error"])
+        self.assertEqual(runs["T2"]["error"], "", "the eval continues after the timeout")
+
+
+class ModelNameTest(EvalTestCase):
+    def test_ac23_model_with_a_slash_writes_the_result_file_in_the_results_folder(self) -> None:
+        self.scenarios(self.scenario())
+        code, out = self.eval("--variant", "with", "--model", "vendor/model-x")
+        self.assertEqual(code, 0, out)
+        self.assertEqual(arg(self.calls()[0], "--model"), "vendor/model-x")
+        results = self.root / "evals/results"
+        self.assertEqual([p for p in results.rglob("*") if p.is_dir()], [],
+                         "the model name makes no folder")
+        files = list(results.glob("*.md"))
+        self.assertEqual(len(files), 1, list(results.rglob("*")))
+        self.assertIn("model-x", files[0].name)
+
+
+class MergedComponentTest(EvalTestCase):
+    MERGED = "hook.settings"
+
+    def setUp(self) -> None:
+        super().setUp()
+        folder = "evals/hook-protect-paths"
+        self.write(f"{folder}/fixtures/basic/src/app.py", "VALUE = 1\n")
+        self.write(f"{folder}/scenarios.yaml", yaml.safe_dump({
+            "component": self.MERGED, "role": "implementer", "task": "Do the task.",
+            "scenarios": [self.scenario()]}, sort_keys=False))
+
+    def eval_merged(self, *args: str) -> tuple[int, str]:
+        argv = ["eval", self.MERGED, "--root", str(self.root), "--framework", str(FRAMEWORK),
+                "--run-config", str(self.run_yaml), *args]
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+            code = cli.main(argv)
+        return code, out.getvalue()
+
+    def test_ac24_merged_component_with_without_or_both_exits_2(self) -> None:
+        for args in ((), ("--variant", "both"), ("--variant", "without"), ("--check-only",),
+                     ("--variant", "without", "--check-only")):
+            with self.subTest(args=args):
+                code, out = self.eval_merged(*args)
+                self.assertEqual(code, 2, out)
+                self.assertIn(self.MERGED, out)
+                self.no_run_started()
+
+    def test_ac24_merged_component_with_variant_with_runs(self) -> None:
+        code, out = self.eval_merged("--variant", "with", "--check-only")
+        self.assertEqual(code, 0, out)
+        code, out = self.eval_merged("--variant", "with")
+        self.assertNotEqual(code, 2, out)
+        self.assertEqual([call["variant"] for call in self.calls()], ["with"])
+
+
+class ShapeValidationTest(EvalTestCase):
+    def assert_exit_2(self, data: dict) -> None:
+        self.write_yaml(data)
+        for args in (("--check-only",), ()):
+            code, out = self.eval(*args)
+            self.assertEqual(code, 2, out)
+            self.no_run_started()
+
+    def test_ac25_scenarios_that_is_not_a_list_exits_2(self) -> None:
+        for value in ({"T1": self.scenario()}, "T1", 5, True):
+            with self.subTest(value=value):
+                self.assert_exit_2({"component": COMPONENT, "role": "tester",
+                                    "scenarios": value})
+
+    def test_ac25_expect_that_is_not_a_list_exits_2(self) -> None:
+        for value in ({"check": "file_exists", "path": "src/app.py"}, "file_exists", 5, True):
+            with self.subTest(value=value):
+                item = self.scenario()
+                item["expect"] = value
+                self.assert_exit_2({"component": COMPONENT, "role": "tester",
+                                    "scenarios": [item]})
 
 
 if __name__ == "__main__":
