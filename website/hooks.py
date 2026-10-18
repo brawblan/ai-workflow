@@ -9,10 +9,15 @@ import os
 import posixpath
 import re
 from collections.abc import Callable
+from pathlib import Path
 
 REPO_URL = "https://github.com/brawblan/ai-workflow"
 BRANCH = "main"
 LINK = re.compile(r"(\]\()([^)\s]+)(\))")
+EVALS_MARKER = "<!-- evals-index -->"
+EVALS_PAGE = "evals/README.md"
+RESULT_TITLE = re.compile(r"^# Eval results: (\S+)\s*$")
+RESULT_MODEL = re.compile(r"^Model: `([^`]+)`\. Date: (\d{4}-\d{2}-\d{2})\.")
 EXTERNAL = re.compile(r"^([a-z][a-z0-9+.-]*:|#|/)", re.IGNORECASE)
 
 
@@ -49,18 +54,61 @@ def rewrite_links(markdown: str, page_uri: str, page_repo_path: str, repo_root: 
     return LINK.sub(replace, markdown)
 
 
+def evals_index(evals_dir: Path) -> str:
+    """Return Markdown for the evals page: one section for each component, newest run first.
+
+    The result files in evals/results/ are the data. Each starts with the "# Eval results: <id>"
+    line and the "Model: `<model>`. Date: <date>." line that `stone eval` writes. The links are
+    relative to evals/README.md.
+    """
+    runs: dict[str, list[tuple[str, str, str, str]]] = {}
+    for path in sorted((evals_dir / "results").glob("*.md"), reverse=True):
+        lines = path.read_text(encoding="utf-8").splitlines()
+        title = RESULT_TITLE.match(lines[0]) if lines else None
+        model = RESULT_MODEL.match(lines[2]) if len(lines) > 2 else None
+        if title and model:
+            body = "\n".join(lines[3:]).strip()
+            runs.setdefault(title.group(1), []).append(
+                (model.group(2), model.group(1), path.name, body))
+    if not runs:
+        return "No eval results yet."
+    out: list[str] = []
+    for component in sorted(runs):
+        folder = component.replace(".", "-")
+        out += [f"## {component}", ""]
+        links = ["[Result files](results/)"]
+        if (evals_dir / folder / "scenarios.yaml").is_file():
+            links.insert(0, f"[Scenarios](./{folder}/scenarios.yaml)")
+            links.insert(1, f"[Eval folder](./{folder}/)")
+        out += [" · ".join(links), ""]
+        date, model, name, body = sorted(runs[component], reverse=True)[0]
+        out += [f"Latest run: {date}, model `{model}`. [Result file](results/{name}).", "", body, ""]
+        earlier = sorted(runs[component], reverse=True)[1:]
+        if earlier:
+            out += ["Earlier runs:", ""]
+            out += [f"- {d}, `{m}`: [result file](results/{n})" for d, m, n, _ in earlier]
+            out.append("")
+    return "\n".join(out)
+
+
 def on_page_markdown(markdown, page, config, files):  # MkDocs hook signature
     repo_root = os.path.dirname(config["config_file_path"])
     real = os.path.realpath(page.file.abs_src_path)
     page_repo_path = os.path.relpath(real, repo_root).replace(os.sep, "/")
     docs_dir = config["docs_dir"]
 
+    def built(site_path: str) -> bool:
+        found = files.get_file_from_path(site_path)
+        return found is not None and not found.inclusion.is_excluded()
+
     def on_site(site_path: str) -> bool:
-        if files.get_file_from_path(site_path) is not None:
+        if built(site_path):
             return True
         folder = os.path.join(docs_dir, site_path)
         return os.path.isdir(folder) and any(
-            files.get_file_from_path(posixpath.join(site_path, name)) is not None
-            for name in ("README.md", "index.md"))
+            built(posixpath.join(site_path, name)) for name in ("README.md", "index.md"))
 
+    if page.file.src_uri == EVALS_PAGE and EVALS_MARKER in markdown:
+        index = evals_index(Path(repo_root) / "evals")
+        markdown = markdown.replace(EVALS_MARKER, index)
     return rewrite_links(markdown, page.file.src_uri, page_repo_path, repo_root, on_site)
