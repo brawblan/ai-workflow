@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from stone import __version__, framework_check, writing_check
+from stone import __version__, framework_check, render, writing_check
 from stone.findings import report
 
 
@@ -18,6 +18,11 @@ def _parser() -> argparse.ArgumentParser:
     check.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
     check.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
     check.add_argument("--format", choices=["text", "github"], default="text")
+
+    build = commands.add_parser("render", help="Write the generated files and the manifest.")
+    build.add_argument("--root", type=Path, default=Path("."), help="Target repo. Default: '.'.")
+    build.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
+    build.add_argument("--dry-run", action="store_true", help="Print the changes. Write nothing.")
 
     writing = commands.add_parser("check-writing",
                                   help="K17: test human-facing text against the writing standard.")
@@ -42,6 +47,8 @@ def main(argv: list[str] | None = None) -> int:
         blocking = report(findings, args.format)
         print(f"stone check: {len(findings)} finding(s).")
         return 1 if blocking else 0
+    if args.command == "render":
+        return _render(args.root, args.framework, args.dry_run)
 
     rules_path = args.rules or args.root / writing_check.DEFAULT_RULES
     dictionary = args.dictionary or args.root / writing_check.DEFAULT_DICTIONARY
@@ -55,3 +62,17 @@ def main(argv: list[str] | None = None) -> int:
     errors = sum(1 for f in findings if f.severity == "error")
     print(f"K17: {errors} error(s), {len(findings) - errors} warning(s), mode {args.mode}.")
     return 1 if blocking else 0
+
+
+def _render(root: Path, framework: Path | None, dry_run: bool) -> int:
+    try:
+        result = render.render(root, framework, dry_run)
+    except render.RenderError as error:
+        print(f"stone render: {error}")
+        return 1
+    print(f"stone render: {len(result.wrote)} written, {len(result.skipped)} skipped, "
+          f"{len(result.drift)} drift.")
+    if result.drift:
+        print("Drift: a generated file changed by hand. Move the edit to the repo config, "
+              "or delete the file and render again.")
+    return result.exit_code
