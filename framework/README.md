@@ -134,7 +134,10 @@ Do these items in order. Each item is one PR or more.
    - 4b. Done: the `role.tester` eval (T1 to T4, k = 3). The outcome rate is the same with and
      without the role (1.00). The role gives the contract (commit trailers and requirement IDs) and
      costs about 35% less. Result: `evals/results/`.
-   - 4c. Next: the eval for `role.planner`.
+   - 4c. Done: the `role.planner` eval (P1 to P5, k = 3). The outcome rate is 1.00 with the role
+     and 0.80 without it. Without the role, the model writes a plan for a typo fix (P2). Both
+     variants keep an open question for G2 in a headless run (P3). Both copy `apply_order` into
+     a new delta, so the planner template needs a rule for it. Result: `evals/results/`.
 5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
    of Q4 2026.
 6. Version 1: support all 10 profiles (D24). Items 6b to 6h can run in parallel after 6a.
