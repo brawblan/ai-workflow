@@ -1607,12 +1607,13 @@ class OpenQuestionRound4Test(GraderCase):
                 f"- {REC}\n\n- {DEFAULT}")
         self.both(True, text)
 
-    def test_oq_s3_later_numbered_item_after_a_blank_line_sets_the_style(self) -> None:
+    def test_oq_s3_later_numbered_item_after_a_blank_line_does_not_set_the_style(self) -> None:
+        # Round 5 (T3) changed this: a later numbered item stays in the paragraph question.
         text = ("The ticket does not say what amount_due does with an expired code. (a) Raise "
                 "UnknownCode. (b) Ignore the code. Default until G2: (a).\n\n"
                 "1. How is a discount rounded? Recommendation: half up.\n"
                 "2. Which currency? Recommendation: EUR.")
-        self.both_detail(text, "recommendation")
+        self.both(True, text)
 
     def test_oq_s3_later_start_with_no_blank_line_does_not_set_the_style(self) -> None:
         text = ("The ticket does not say what amount_due does with an expired code. (a) Raise "
@@ -1727,13 +1728,14 @@ class OpenQuestionRound4Test(GraderCase):
         for line in ("I suggest (a).", "I'd prefer option B.", "We suggest (b).",
                      "I would suggest option (a).", "We prefer answer (a).", "I prefer (a).",
                      "Suggested: (a).", "Suggested answer: (a).", "Suggested option: (b).",
-                     "Preferred: (a).", "Preferred answer: (a).", "(a) Raise it (preferred)."):
+                     "Preferred: (a).", "Preferred answer: (a).", "(a) Raise it (preferred).",
+                     "I prefer to strip spaces."):  # round 5 (T6) moved this line here
             with self.subTest(line=line):
                 self.both(True, question(ASK, *TWO, line, DEFAULT))
 
     def test_oq_s10_suggest_and_prefer_before_other_words_do_not_recommend(self) -> None:
         for line in ("I suggest an optional argument.", "We suggest raising ExpiredCode.",
-                     "The ticket suggested nothing.", "I prefer to strip spaces.",
+                     "The ticket suggested nothing.",
                      "We suggest optional rounding.", "The preferred way is not clear.",
                      "We suggest a new ExpiredCode error."):
             with self.subTest(line=line):
@@ -1772,6 +1774,233 @@ class OpenQuestionRound4Test(GraderCase):
     def test_oq_s13_earlier_forms_still_pass(self) -> None:
         for name, text in (("list", OQ_LIST), ("inline", OQ_INLINE), ("table", OQ_TABLE),
                            ("numbered bold", ex_numbered()), ("bold q", ex_bold_q())):
+            with self.subTest(form=name):
+                self.both(True, text)
+
+
+# EVAL-4e round 5: the option count, bold bullets, labels, prefer, and suggest -------------------
+
+BOLD_ASK = "**What happens to an expired code?**"
+
+
+class OpenQuestionRound5Test(GraderCase):
+    """EVAL-4e round 5 (T1 to T8). The helpers are the helpers of OpenQuestionTest."""
+
+    PATH, FILE = OpenQuestionTest.PATH, OpenQuestionTest.FILE
+    DELTA, DELTA_GLOB = OpenQuestionTest.DELTA, OpenQuestionTest.DELTA_GLOB
+    check = OpenQuestionTest.check
+    plan_file = OpenQuestionTest.plan_file
+    file = OpenQuestionTest.file
+    report = OpenQuestionTest.report
+    both = OpenQuestionTest.both
+    both_detail = OpenQuestionRound3Test.both_detail
+
+    # T1: a question with only 1 option fails ---------------------------------------------------
+    def test_oq_t1_ticket_example_bold_question_with_1_option_fails(self) -> None:
+        text = ("1. **What happens with an expired code?** The ticket does not say.\n"
+                "   - **Reject it with an error.**\n   Recommendation: reject it.\n"
+                "   Default until G2: reject it.")
+        self.both_detail(text, "options", absent=("recommendation", "default"))
+
+    def test_oq_t1_bold_item_alone_is_not_a_second_option(self) -> None:
+        for first in ("1. **What happens with an expired code?**",
+                      f"1. **Expired codes.** {ASK}", f"**Q1. {ASK}**"):
+            text = (f"{first}\n   - **Reject it with an error.**\n   - {REC}\n   - {DEFAULT}")
+            with self.subTest(first=first):
+                self.both_detail(text, "options", absent=("recommendation", "default"))
+
+    def test_oq_t1_plain_question_with_1_option_fails(self) -> None:
+        self.both_detail(question(ASK, "Reject it with an error.", REC, DEFAULT), "options",
+                         absent=("recommendation", "default"))
+
+    # T2: the list items after a first line that ends in "?" ------------------------------------
+    def test_oq_t2_items_after_a_question_line_count_as_options(self) -> None:
+        for first in (ASK, "**What happens with an expired code?**"):
+            with self.subTest(first=first, form="numbered"):
+                self.both(True, question(first, "Reject it.", "Ignore it.", REC, DEFAULT))
+            with self.subTest(first=first, form="bold paragraph"):
+                text = f"**Q1. {ASK}**" if first == ASK else first
+                self.both(True, f"{text}\n\n- Reject it.\n- Ignore it.\n- {REC}\n- {DEFAULT}")
+
+    def test_oq_t2_count_stops_at_a_line_that_is_not_a_list_item(self) -> None:
+        tail = f"\n\n{REC}\n\n{DEFAULT}"
+        self.file(True, f"{BOLD_ASK}\n\n- Reject it.\n- Ignore it.{tail}")
+        detail = self.file(False, f"{BOLD_ASK}\n\n- Reject it.\n\nThe shop owner must decide."
+                                  f"\n\n- Ignore it.{tail}")
+        self.assertIn("options", detail)
+
+    def test_oq_t2_label_part_and_option_word_items_do_not_count(self) -> None:
+        for item in ("- Options:", "- **Context:** the ticket gives no rule.",
+                     "- The ticket gives no option for this.", "- Both options cost the shop money.",
+                     "- I recommend that it rejects the code.", "- Default: reject it."):
+            text = f"{BOLD_ASK}\n\n{item}\n- Reject it.\n- {REC}\n- {DEFAULT}"
+            with self.subTest(item=item):
+                self.both_detail(text, "options", absent=("recommendation", "default"))
+
+    def test_oq_t2_bold_only_items_count(self) -> None:
+        for items in ("- **Reject it**\n- **Ignore it**", "- **Ignore it**\n- Reject it."):
+            with self.subTest(items=items):
+                self.both(True, f"{BOLD_ASK}\n\n{items}\n- {REC}\n- {DEFAULT}")
+
+    def test_oq_t2_items_with_the_same_option_label_count_as_1(self) -> None:
+        for second in ("(a) Ignore the code.", "A. Ignore the code.", "a) Ignore the code.",
+                       "**A.** Ignore the code."):
+            text = question(ASK, "(a) Raise UnknownCode.", second, REC, DEFAULT)
+            with self.subTest(second=second):
+                self.both_detail(text, "options", absent=("recommendation", "default"))
+
+    def test_oq_t2_items_with_different_option_labels_count_as_2(self) -> None:
+        for second in ("(b) Ignore the code.", "B. Ignore the code."):
+            with self.subTest(second=second):
+                self.both(True, question(ASK, "(a) Raise UnknownCode.", second, REC, DEFAULT))
+
+    # T3: a question in a paragraph ---------------------------------------------------------------
+    PARAGRAPH = ("The ticket does not say what happens to a code after its end date. Options:")
+
+    def test_oq_t3_ticket_example_paragraph_with_numbered_options_passes(self) -> None:
+        text = (f"{self.PARAGRAPH}\n\n1. Reject it with an error.\n2. Accept it at full price.\n\n"
+                "Recommendation: 1. Default until G2: 1.")
+        self.both(True, text)
+
+    def test_oq_t3_later_bullet_item_does_not_set_the_style(self) -> None:
+        text = (f"{self.PARAGRAPH} (a) Reject it. (b) Ignore it. Default until G2: (a).\n\n"
+                "- How is a discount rounded? Recommendation: (a), half up.")
+        self.both(True, text)
+
+    def test_oq_t3_later_q_line_or_bold_paragraph_after_a_blank_line_sets_the_style(
+            self) -> None:
+        for start in ("Q2. How is a discount rounded?", "**Rounding.** How is it rounded?",
+                      "**How is a discount rounded?**"):
+            text = (f"{self.PARAGRAPH} (a) Reject it. (b) Ignore it. Default until G2: (a).\n\n"
+                    f"{start}\n\nRecommendation: half up.")
+            with self.subTest(start=start):
+                self.both_detail(text, "recommendation", absent=("options", "default"))
+
+    def test_oq_t3_later_heading_sets_the_style(self) -> None:
+        text = (f"{self.PARAGRAPH} (a) Reject it. (b) Ignore it. Default until G2: (a).\n\n"
+                "### Rounding\n\nRecommendation: half up.")
+        detail = self.file(False, text)
+        self.assertIn("recommendation", detail)
+        self.assertNotIn("default", detail)
+
+    # T4: a bold bullet item has the bullet style -----------------------------------------------
+    def test_oq_t4_bold_bullets_do_not_split_a_bold_paragraph_question(self) -> None:
+        text = (f"{BOLD_ASK}\n\n- **Reject** with an error (recommended)\n"
+                "- **Ignore** the end date\n\nDefault until G2: ignore it.")
+        self.both(True, text)
+
+    def test_oq_t4_bold_label_bullets_are_option_lines(self) -> None:
+        for items in ("- **(a)** Accept it\n- **(b)** Ignore it",
+                      "- **A.** Accept it\n- **B.** Ignore it"):
+            with self.subTest(items=items):
+                self.both(True, f"{BOLD_ASK}\n\n{items}\n\n{REC}\n\n{DEFAULT}")
+
+    def test_oq_t4_ticket_bold_label_bullets_stay_in_the_question(self) -> None:
+        # "(a)" and "A." are the same label: 1 option. The parts after them stay in the question.
+        text = f"{BOLD_ASK}\n\n- **(a)** Accept it\n- **A.** Ignore it\n- {REC}\n- {DEFAULT}"
+        self.both_detail(text, "options", absent=("recommendation", "default"))
+
+    def test_oq_t4_bold_bullet_after_a_blank_line_starts_a_numbered_block_question(self) -> None:
+        for start in ("* **Rounding**", "- **Rounding** How is a discount rounded?"):
+            text = f"{Q1_NO_REC}\n\n{start}\n  {ROUNDING_REC}"
+            with self.subTest(start=start):
+                self.both_detail(text, "recommendation", absent=("options", "default"))
+
+    # T5: a bold-only line that does not end in "?" is a label ----------------------------------
+    def test_oq_t5_bold_only_labels_do_not_start_a_bold_question(self) -> None:
+        text = (f"{BOLD_ASK}\n\n**Why it matters**\n\nThe shopper pays the full price.\n\n"
+                "**Options**\n\n- Reject it.\n- Ignore it.\n\n**Recommendation**\n\nReject it.\n\n"
+                f"{DEFAULT}")
+        self.both(True, text)
+
+    def test_oq_t5_bold_only_label_does_not_start_a_numbered_question(self) -> None:
+        for label in ("**Why it matters**", "**Options**", "**Context**"):
+            text = (f"1. {ASK}\n   - {TWO[0]}\n   - {TWO[1]}\n\n{label}\n\n"
+                    f"- {REC}\n- {DEFAULT}")
+            with self.subTest(label=label):
+                self.both(True, text)
+
+    def test_oq_t5_bold_only_question_still_starts_a_question(self) -> None:
+        for gap in (f"{BOLD_ASK}\n\n- {TWO[0]}\n- {TWO[1]}\n- {DEFAULT}", Q1_NO_REC):
+            text = f"{gap}\n\n**How is a discount rounded?**\n\n{ROUNDING_REC}"
+            with self.subTest(gap=gap.splitlines()[0]):
+                self.both_detail(text, "recommendation", absent=("options", "default"))
+
+    # T6: prefer and preferred ------------------------------------------------------------------
+    def test_oq_t6_prefer_forms_always_recommend(self) -> None:
+        for line in ("I prefer to reject expired codes.", "I prefer to strip spaces.",
+                     "I'd prefer to reject the code.", "I would prefer to raise UnknownCode.",
+                     "We prefer to ignore the code."):
+            with self.subTest(line=line):
+                self.both(True, question(ASK, *TWO, line, DEFAULT))
+
+    def test_oq_t6_may_prefer_does_not_recommend(self) -> None:
+        for line in ("The author may prefer to reject the code.", "Shoppers prefer a low price."):
+            with self.subTest(line=line):
+                self.both_detail(question(ASK, *TWO, line, DEFAULT), "recommendation",
+                                 absent=("options", "default"))
+
+    def test_oq_t6_preferred_before_each_mark_or_word_recommends(self) -> None:
+        for line in ("Preferred: (a).", "Raising UnknownCode is preferred.",
+                     "Raising UnknownCode is preferred, as the shopper sees why.",
+                     "Raising UnknownCode is preferred; the shopper sees why.",
+                     "(a) Raise UnknownCode (preferred)", "Preferred answer: (a).",
+                     "Preferred option: (a).", "Raising UnknownCode is preferred"):
+            with self.subTest(line=line):
+                self.both(True, question(ASK, *TWO, line, DEFAULT))
+
+    def test_oq_t6_preferred_before_other_words_does_not_recommend(self) -> None:
+        for line in ("The preferred way is not clear.", "A preferred shopper pays less."):
+            with self.subTest(line=line):
+                self.both_detail(question(ASK, *TWO, line, DEFAULT), "recommendation",
+                                 absent=("options", "default"))
+
+    # T7: a mark at the end of an option line ---------------------------------------------------
+    def test_oq_t7_recommendation_mark_at_the_end_of_an_option_item(self) -> None:
+        for item in ("(a) Reject, preferred.", "(a) Reject it, recommended.",
+                     "(a) Reject it (recommended)."):
+            with self.subTest(item=item):
+                self.both(True, question(ASK, item, "(b) Ignore it.", DEFAULT))
+
+    def test_oq_t7_default_mark_at_the_end_of_an_option_item(self) -> None:
+        for item in ("(a) Reject it (default).", "(a) Reject it, default."):
+            with self.subTest(item=item):
+                self.both(True, question(ASK, item, "(b) Ignore it.", REC))
+
+    def test_oq_t7_mark_at_the_end_of_an_option_label_line(self) -> None:
+        text = (f"**Q1. {ASK}**\n\n(a) Reject it, preferred.\n\n(b) Ignore it.\n\n"
+                "(b) is the default until G2.")
+        self.both(True, text)
+        text = f"**Q1. {ASK}**\n\n(a) Reject it (default).\n\n(b) Ignore it.\n\n{REC}"
+        self.both(True, text)
+
+    def test_oq_t7_mark_items_without_the_other_part_still_fail(self) -> None:
+        self.both_detail(question(ASK, "(a) Reject, preferred.", "(b) Ignore it."), "default",
+                         absent=("options", "recommendation"))
+        self.both_detail(question(ASK, "(a) Reject it (default).", "(b) Ignore it."),
+                         "recommendation", absent=("options", "default"))
+
+    # T8: suggest -------------------------------------------------------------------------------
+    def test_oq_t8_suggest_before_an_option_label_or_word_recommends(self) -> None:
+        for line in ("I suggest a) reject the code.", "I suggest a. reject the code.",
+                     "I suggest a: reject the code.", "We suggest (b).", "I suggest (b).",
+                     "I suggest option B.", "We suggest answer (a)."):
+            with self.subTest(line=line):
+                self.both(True, question(ASK, *TWO, line, DEFAULT))
+
+    def test_oq_t8_suggest_before_other_words_does_not_recommend(self) -> None:
+        for line in ("We suggest optional rounding.", "We suggest a new ExpiredCode error.",
+                     "I suggest answering this later.", "We suggest an error.",
+                     "I suggest a new rule for it."):
+            with self.subTest(line=line):
+                self.both_detail(question(ASK, *TWO, line, DEFAULT), "recommendation",
+                                 absent=("options", "default"))
+
+    # T9: the earlier forms still pass ----------------------------------------------------------
+    def test_oq_t9_earlier_forms_still_pass(self) -> None:
+        for name, text in (("list", OQ_LIST), ("inline", OQ_INLINE), ("table", OQ_TABLE),
+                           ("numbered bold", ex_numbered()), ("bold q", ex_bold_q()),
+                           ("s11 bold", ex_s11_bold())):
             with self.subTest(form=name):
                 self.both(True, text)
 
