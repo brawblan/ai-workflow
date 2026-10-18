@@ -14,7 +14,9 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 import io
+import json
 import os
+import re
 import shutil
 import tempfile
 import unittest
@@ -51,15 +53,43 @@ CONFIG_PATH = ".cornerstone/config.yaml"
 MANIFEST = ".cornerstone/manifest.yaml"
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
 K6 = ".cornerstone/checks/protected_paths.py"
+K7 = ".cornerstone/checks/change_size.py"
 HOOK = ".cornerstone/hooks/protect-paths.py"
 SETTINGS = ".claude/settings.json"
 ROLES = ["implementer", "investigator", "reviewer", "tester"]  # the profile `roles`, sorted
+COMPONENTS = FRAMEWORK / "adapters" / "claude-code" / "components.yaml"
+# The components that this profile must render at the least. A later sibling component can add to
+# the derived set, but it cannot take one of these out.
+PINNED_IDS = {f"role.{role}" for role in ROLES} | {
+    "check.k6", "check.k7", "ci-job.checks", "hook.protect-paths", "hook.settings"}
 HINT = f"If the change is intended, run with {UPDATE_ENV}=1 to write the fixtures again."
 
 
 def profile_frontmatter() -> dict:
     text = (FRAMEWORK / "profiles" / f"{PROFILE}.md").read_text(encoding="utf-8")
     return split_frontmatter(text)[0]
+
+
+def adapter_components() -> list[dict]:
+    return yaml.safe_load(COMPONENTS.read_text(encoding="utf-8"))["components"]
+
+
+def profile_needs(component: dict, profile: dict) -> bool:
+    """Apply the rule in the header comment of components.yaml to one component."""
+    if component["kind"] == "role":
+        return component["role"] in profile["roles"]
+    when = component.get("when") or {}
+    if "gate" in when:
+        return profile["gates"].get(when["gate"], "skip") != "skip"
+    if "check" in when:
+        return when["check"] in profile["checks"]
+    return True
+
+
+def expected_components() -> list[dict]:
+    """Return the components.yaml entries that the profile frontmatter selects."""
+    profile = profile_frontmatter()
+    return [component for component in adapter_components() if profile_needs(component, profile)]
 
 
 def render_profile(root: Path) -> tuple[render.Result, str]:
@@ -303,9 +333,51 @@ class ProfilePinTest(RenderedRepo):
         return [component["id"] for component in self.manifest()["components"]]
 
     def test_ac5_manifest_has_one_component_for_each_file_group(self) -> None:
-        want = sorted([f"role.{role}" for role in ROLES]
-                      + ["check.k6", "ci-job.checks", "hook.protect-paths", "hook.settings"])
+        # AC8: the expected set comes from the profile frontmatter and components.yaml.
+        want = sorted(component["id"] for component in expected_components())
         self.assertEqual(sorted(self.manifest_ids()), want)
+
+    def test_ac8_expected_components_include_the_pinned_ids(self) -> None:
+        # This guards the derivation. If it selects too little, this test fails.
+        derived = {component["id"] for component in expected_components()}
+        self.assertLessEqual(PINNED_IDS, derived, sorted(PINNED_IDS - derived))
+
+    def test_ac8_written_files_are_the_targets_of_the_expected_components(self) -> None:
+        want = sorted([component["target"] for component in expected_components()] + [MANIFEST])
+        self.assertEqual(sorted(self.files), want)
+
+    def test_ac8_each_manifest_entry_matches_its_components_yaml_entry(self) -> None:
+        source = {component["id"]: component for component in adapter_components()}
+        for entry in self.manifest()["components"]:
+            with self.subTest(component=entry["id"]):
+                component = source[entry["id"]]
+                self.assertEqual(entry["kind"], component["kind"])
+                self.assertEqual(entry["purpose"], component["purpose"])
+                self.assertEqual(entry["eval"], component["eval"])
+                self.assertEqual(entry["files"], [component["target"]])
+
+    def workflow_runs(self) -> dict[str, str]:
+        steps = yaml.safe_load(self.text(WORKFLOW))["jobs"]["checks"]["steps"]
+        return {step["name"]: step["run"] for step in steps if "name" in step}
+
+    def test_ac8_k7_is_in_checks_and_the_k7_check_exists(self) -> None:
+        self.assertIn("K7", profile_frontmatter()["checks"])
+        self.assertIn(K7, self.files)
+        self.assertIn("check.k7", self.manifest_ids())
+
+    def test_ac8_g3_workflow_has_one_k7_step_that_runs_the_k7_check(self) -> None:
+        runs = self.workflow_runs()
+        k7 = [run for name, run in runs.items() if name.startswith("K7")]
+        self.assertEqual(len(k7), 1, list(runs))
+        self.assertIn(K7, k7[0])
+        self.assertIn("--body -", k7[0])  # the PR body gives the profile and the waiver
+
+    def test_ac8_k7_check_has_the_size_limit_of_the_profile(self) -> None:
+        # The repo config sets no limit, so the profile limit is the limit (D27).
+        match = re.search(r"^LIMITS = (.+)$", self.text(K7), re.M)
+        self.assertIsNotNone(match, "the K7 check has no LIMITS line")
+        want = profile_frontmatter()["limits"]["pr_changed_lines"]
+        self.assertEqual(json.loads(match.group(1)), {PROFILE: want})
 
     def test_ac5_each_written_file_is_in_exactly_one_component(self) -> None:
         listed = [path for component in self.manifest()["components"]
