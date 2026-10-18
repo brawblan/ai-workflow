@@ -124,7 +124,7 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 
 ## Limits
 
-- K17 skips agent-facing files (skills, `AGENTS.md`, `CLAUDE.md`, `.claude/`, templates), code, inline code, URLs, and quoted text.
+- K17 skips agent-facing files (skills, `AGENTS.md`, `CLAUDE.md`, `.claude/`, templates, golden-file fixtures), code, inline code, URLs, and quoted text.
 - In `--diff` mode, K17 reports a finding only if the sentence starts on a changed line.
 - In `--diff` mode, K17 tests each line of an untracked Markdown file. It skips a file that git ignores.
 - The tense test (rule 2) and the passive test (rule 11) are warnings, because they also match some adjectives.
