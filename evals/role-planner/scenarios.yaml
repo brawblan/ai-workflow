@@ -1,0 +1,93 @@
+# Eval of role.planner (lifecycle.md, "Eval design"). Run: stone eval role.planner --trials 3
+# All scenarios use one fixture: a small shop with the app-slice profile, a personas file, and two
+# applied deltas. SHOP-3 added cart.R1 and cart.R2, and SHOP-8 removed cart.R2. Thus the spec shows
+# only cart.R1, and the next free number is R3. grade.py reads the final text of the run from
+# STONE_EVAL_REPORT. The hook limits the planner to docs/plans/ in both variants.
+
+component: role.planner
+role: planner
+task: |
+  Plan this ticket. Do not change code. If you write a plan, write it at
+  docs/plans/<ticket-id>.md.
+
+scenarios:
+  - id: P1
+    title: A behavior change with 3 criteria
+    fixture: fixtures/shop
+    prompt: |
+      Ticket SHOP-12: a shopper can save a cart item for later. Personas: shopper
+      Acceptance criteria:
+      1. Cart.save_for_later(name) moves the line of the item from the cart to a saved list.
+      2. A saved item does not count in Cart.total().
+      3. Cart.move_to_cart(name) moves a saved item back to the cart, with the same quantity.
+    expect:
+      - {check: only_changed, paths: [docs/plans/]}
+      - {check: file_exists, path: docs/plans/SHOP-12.md}
+      - {check: sections_in_order, path: docs/plans/SHOP-12.md, kind: contract,
+         sections: [Understanding, Files to change, Approach, Acceptance criteria coverage,
+                    Out of scope, Open questions]}
+      - {check: json_valid, path: docs/plans/SHOP-12.progress.json, required: [id, tasks],
+         kind: contract}
+      - {check: spec_delta_valid, path: docs/plans/SHOP-12.spec.md, kind: contract}
+      - {check: grader, name: not_applied, path: docs/plans/SHOP-12.spec.md, kind: contract}
+      - {check: grader, name: job_story_ids, path: docs/plans/SHOP-12.md, min: 3,
+         kind: contract}
+
+  - id: P2
+    title: A one-sentence change (a typo)
+    fixture: fixtures/shop
+    prompt: |
+      Ticket SHOP-13: the empty cart page says "Your cart is emtpy.". It must say
+      "Your cart is empty.". Personas: shopper
+      Acceptance criteria:
+      1. render_cart of an empty cart returns "Your cart is empty.".
+    expect:
+      - {check: only_changed, paths: [docs/plans/]}
+      - {check: file_absent, path: "docs/plans/SHOP-13*"}
+
+  - id: P3
+    title: The ticket does not say what occurs with an expired code
+    fixture: fixtures/shop
+    prompt: |
+      Ticket SHOP-14: a shopper can enter a discount code at checkout. Personas: shopper
+      The codes are in src/shop/codes.py.
+      Acceptance criteria:
+      1. amount_due(cart, code) lowers the amount by the percent of the code: SAVE10 on a cart
+         of 5000 cents gives 4500.
+      2. An unknown code raises UnknownCode.
+      3. With no code, amount_due(cart) is the cart total.
+    expect:
+      - {check: only_changed, paths: [docs/plans/]}
+      # Each code has an end date, and the ticket does not say what an expired code does.
+      - {check: grader, name: names_gap, path: "docs/plans/SHOP-14*.md",
+         pattern: "expir|end date|last day|\\bends\\b|out of date|no longer valid"}
+
+  - id: P4
+    title: A helper to reuse exists
+    fixture: fixtures/shop
+    prompt: |
+      Ticket SHOP-15: the shopper gets a receipt after checkout. Personas: shopper
+      Acceptance criteria:
+      1. receipt_text(cart) has one line for each item: the name, the quantity, and the line
+         price.
+      2. The last line is the amount due.
+      3. The amounts on the receipt look the same as the amounts on the cart page.
+    expect:
+      - {check: only_changed, paths: [docs/plans/]}
+      - {check: matches, path: docs/plans/SHOP-15.md, pattern: "\\bformat_money\\b"}
+
+  - id: P5
+    title: An old delta used R1 and R2, and R2 is removed
+    fixture: fixtures/shop
+    prompt: |
+      Ticket SHOP-16: a shopper can add a gift note to an item in the cart. Personas: shopper
+      This changes the cart behavior (docs/specs/cart.md). Write the spec delta at
+      docs/plans/SHOP-16.spec.md, in the format of the other deltas in docs/plans/.
+      Acceptance criteria:
+      1. Cart.set_note(name, text) keeps a note for an item in the cart.
+      2. A note of more than 100 characters raises ValueError.
+    expect:
+      - {check: only_changed, paths: [docs/plans/]}
+      - {check: grader, name: new_ids, path: docs/plans/SHOP-16.spec.md, capability: cart}
+      - {check: spec_delta_valid, path: docs/plans/SHOP-16.spec.md, kind: contract}
+      - {check: grader, name: not_applied, path: docs/plans/SHOP-16.spec.md, kind: contract}
