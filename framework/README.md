@@ -88,6 +88,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D25 | The investigator writes only in `paths.reports` (default `docs/reports/`). On a `spike/` branch it can write any file, except the harness and Cornerstone files, because K16 stops the merge. So it has the Edit and Write tools, and the hook limits the paths. | [workflow-model.md](workflow-model.md#roles) |
 | D26 | `stone eval` runs a component eval with and without the component, in a temp git repo. The harness adapter gives the run command in `eval.yaml`. Checks are code first. An `outcome` check tests behavior, and a `contract` check tests the format of the component. The variants get the same prompt and tools. Runs are local, not in CI. | [lifecycle.md](lifecycle.md#eval-design), [generator/design.md](generator/design.md) |
 | D27 | K7 is a script that `stone render` writes, with the limit of each selected profile in it. The limit is the profile limit, or `limits.pr_changed_lines` if that is smaller. CI does not know the profile of a PR, so the PR body names it on a `Profile: <id>` line. With no line, or with an unknown profile, the smallest limit applies. A `Waiver (P10)` section with text passes, with a notice. The G3 step reads the body through `env` and starts in `--mode warn`. | [checks.md](checks.md), [customization.md](customization.md) |
+| D29 | A "by profile" check that runs a repo tool (K4, K5, K8, K10, K11, K12) is an optional step of the G3 workflow. Render adds the step only if a selected profile lists the check and the repo config has its command (`commands.mutation`, `commands.differential`, and others). If the command has no value, render skips the step and warns. The steps fill one block placeholder. An empty block removes its line, so the template stays free of logic (D12). A step is part of its ci-job component, with the eval plan and the review date of that component (P5). | [customization.md](customization.md#commands-for-the-by-profile-checks), [generator/design.md](generator/design.md) |
 
 ## Open questions
 
@@ -134,7 +135,9 @@ Do these items in order. Each item is one PR or more.
    - 6b. Done: K7 (change size) as a generated check in the G3 workflow (D27). Two weeks after the
      merge, change K7 to `--mode block` in the G3 workflow template.
    - 6c. K15 (instruction size) for full-project. Golden-file test for full-project.
-   - 6d. K10 and K12 as repo commands for refactor-migration. Golden-file test for it.
+   - 6d. Done: K10 and K12 as repo commands for refactor-migration, with a golden-file test (D29).
+     The same steps serve K4, K5, K8, and K11. Two weeks after the merge, remove `continue-on-error`
+     from the step templates.
    - 6e. K16 (no merge to main) for spike. Golden-file tests for spike, bug-triage, and code-audit.
    - 6f. Golden-file tests for debugging, dependency-upgrade, and adapter-refresh.
    - 6g. Trigger workflows: `label:<name>`, `schedule:<cron>`, and `ci:<event>`. Untrusted event

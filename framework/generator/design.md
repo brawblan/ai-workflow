@@ -34,7 +34,7 @@ repo config.
 | Command | Does |
 | --- | --- |
 | `stone init` | Make `.cornerstone/config.yaml` with `TODO(<owner>)` values. |
-| `stone render` | Write all files from the inputs. Safe to run again. **Built in v0.2 for the single-ticket profile: role files, the protected-path hook, K6, the G3 CI workflow, and the manifest. Version 0.4 adds the app-slice profile and the planner role. Version 0.7 adds K14 to the G3 workflow (D23). Version 0.8 derives profile support from the role files of the adapter, and filters components with `when` (D24). Item 6b adds check K7 to the G3 workflow (D27).** No profile overrides yet. |
+| `stone render` | Write all files from the inputs. Safe to run again. **Built in v0.2 for the single-ticket profile: role files, the protected-path hook, K6, the G3 CI workflow, and the manifest. Version 0.4 adds the app-slice profile and the planner role. Version 0.7 adds K14 to the G3 workflow (D23). Version 0.8 derives profile support from the role files of the adapter, and filters components with `when` (D24). Item 6b adds check K7 to the G3 workflow (D27). Item 6d adds the steps for the "by profile" checks K4, K5, K8, K10, K11, and K12 (D29).** No profile overrides yet. |
 | `stone spec apply <plan>` | Apply the spec delta of one plan, and write the specs (D21). **Built in v0.5.** |
 | `stone spec sync` | Renumber the applied deltas and write the specs again, after a merge (D22). **Built in v0.6.** |
 | `stone check` | Validate the config, the profiles, and the manifest. Report drift between files and templates. **Built in v0.1 (no manifest or drift yet).** |
@@ -118,6 +118,7 @@ repo config.
 
 - Target repos use git and GitHub.
 - The template engine is `string.Template` from the Python standard library (D12). A template has
-  no logic. The CLI builds lists and conditions in code. A template-tool option (Copier) and Jinja2
+  no logic. The CLI builds lists and conditions in code. A block placeholder (`$check_steps`) holds
+  lines that the CLI builds. If the block is empty, the CLI removes its line (D29). A template-tool option (Copier) and Jinja2
   were not selected, because they add a dependency.
 - v0 has one harness adapter (see [adapters/](../adapters/contract.md)). Other harness adapters come later.

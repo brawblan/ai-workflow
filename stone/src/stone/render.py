@@ -6,6 +6,7 @@ import calendar
 import datetime as dt
 import hashlib
 import json
+import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -21,13 +22,14 @@ CONFIG = Path(".cornerstone/config.yaml")
 MANIFEST = Path(".cornerstone/manifest.yaml")
 REQUIRED_FIELDS = ["framework_version", "harness", "model_profile", "profiles", "owners.default"]
 REVIEW_MONTHS = 6
-CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches"}
+CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches", "limit": "limits"}
 PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
                     "protected_json": "paths.tests and paths.checks"}
 FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "docs/reports/"}
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 DEFAULT_PR_LINES = 600  # D4, customization.md
+BLOCKS = ["check_steps"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
 
 class RenderError(Exception):
@@ -123,12 +125,18 @@ def needed(entry: dict[str, Any], profiles: list[dict[str, Any]]) -> bool:
     """Return True if a selected profile needs the component (D24)."""
     if entry["kind"] == "role":
         return any(entry["role"] in profile["roles"] for profile in profiles)
+    return bool(profiles_that_need(entry, profiles))
+
+
+def profiles_that_need(entry: dict[str, Any], profiles: list[dict[str, Any]]) -> list[str]:
+    """Return the IDs of the profiles that match the `when` of a component or a step."""
     when = entry.get("when") or {}
     if "gate" in when:
-        return any(profile["gates"].get(when["gate"], "skip") != "skip" for profile in profiles)
+        return [profile["id"] for profile in profiles
+                if profile["gates"].get(when["gate"], "skip") != "skip"]
     if "check" in when:
-        return any(when["check"] in profile["checks"] for profile in profiles)
-    return bool(profiles)
+        return [profile["id"] for profile in profiles if when["check"] in profile["checks"]]
+    return [profile["id"] for profile in profiles]
 
 
 def size_limits(config: dict[str, Any], profiles: list[dict[str, Any]]) -> dict[str, int]:
@@ -166,6 +174,8 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
                                   if isinstance(value, list) else str(value))
     for key, value in (config.get("branches") or {}).items():
         values[f"branch_{key}"] = str(value)
+    for key, value in (config.get("limits") or {}).items():
+        values[f"limit_{key}"] = str(value)
     values["paths_plans"] = one_folder(_get(config, "paths.plans"))
     values["paths_specs"] = one_folder(_get(config, "paths.specs"), "specs")
     values["paths_reports"] = one_folder(_get(config, "paths.reports"), "reports")
@@ -205,21 +215,61 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         model = role_models.get(entry.get("role", ""), "")
         values = template_values(config, model)
         values["size_limits_json"] = limits_json
-        template = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
-        try:
-            content = Template(template).substitute(values)
-        except ValueError as error:
-            raise RenderError(f"The template {entry['template']} is not valid: {error}.") from None
-        except KeyError as error:
-            name = error.args[0]
-            prefix, _, key = name.partition("_")
-            hint = PLACEHOLDER_HINT.get(name, f"{CONFIG_SECTION.get(prefix, prefix)}.{key}")
-            raise RenderError(f"The template {entry['template']} needs '${name}'. Add {hint} "
-                              f"to {CONFIG}, without a TODO value.") from None
+        for block in BLOCKS:
+            values.setdefault(block, "")
+        if entry.get("steps"):
+            values["check_steps"] = render_steps(harness, entry["steps"], profiles, values)
+        content = substitute(harness, entry["template"], values)
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
     return components
+
+
+def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict[str, Any]],
+                 values: dict[str, str]) -> str:
+    """Return the optional steps that a selected profile needs, as one block of lines (D29).
+
+    A step with a `command` needs that key in `commands` of the repo config. If the key has no
+    value, render skips the step and warns: the profile lists the check, but the repo cannot run it.
+    """
+    blocks = []
+    for step in steps:
+        need = profiles_that_need(step, profiles)
+        if not need:
+            continue
+        step_values = dict(values, step_name=step.get("name", step["id"]))
+        command = step.get("command")
+        if command:
+            if f"command_{command}" not in values:
+                check = (step.get("when") or {}).get("check", step["id"])
+                subject = (f"profile {need[0]} lists" if len(need) == 1
+                           else f"profiles {', '.join(need)} list")
+                print(f"warning: {subject} {check}, but {CONFIG} has no "
+                      f"commands.{command}. The G3 workflow has no {check} step. Add the "
+                      "command and render again.", file=sys.stderr)
+                continue
+            step_values["step_command"] = values[f"command_{command}"]
+        blocks.append("\n" + substitute(harness, step["template"], step_values).rstrip("\n"))
+    return "\n".join(blocks)
+
+
+def substitute(harness: Path, name: str, values: dict[str, str]) -> str:
+    """Fill the placeholders of one template. A line with only an empty block goes away."""
+    template = (harness / "templates" / name).read_text(encoding="utf-8")
+    for block in BLOCKS:
+        if not values.get(block):
+            template = re.sub(rf"^\$(?:{block}|\{{{block}\}})\n", "", template, flags=re.M)
+    try:
+        return Template(template).substitute(values)
+    except ValueError as error:
+        raise RenderError(f"The template {name} is not valid: {error}.") from None
+    except KeyError as error:
+        key_name = error.args[0]
+        prefix, _, key = key_name.partition("_")
+        hint = PLACEHOLDER_HINT.get(key_name, f"{CONFIG_SECTION.get(prefix, prefix)}.{key}")
+        raise RenderError(f"The template {name} needs '${key_name}'. Add {hint} "
+                          f"to {CONFIG}, without a TODO value.") from None
 
 
 def add_months(day: dt.date, months: int) -> dt.date:

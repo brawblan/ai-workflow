@@ -10,7 +10,7 @@ The Cornerstone CLI. Version 0.9 has seven commands:
 | `stone spec apply <plan>` | Applies the spec delta of one plan (`<plans>/<plan>.spec.md`). It gives the delta the next `apply_order`, and writes the specs in `<specs>/`. It stops if a spec is not the same as a replay of the applied deltas. See [Specs](../framework/workflow-model.md#specs). |
 | `stone spec sync` | After a merge of the base branch: gives the applied deltas the orders 1 to n, and writes the specs from a replay. It overwrites a spec that is not the same as the replay. |
 | `stone eval <component-id>` | Runs the eval of one component, with the component and without it. It writes a result table to `evals/results/`. See [Eval design](../framework/lifecycle.md#eval-design). |
-| `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.4 supports the single-ticket and app-slice profiles: role files, the protected-path hook, check K6, and the G3 CI workflow. Version 0.7 adds a K14 step on the PR body to that workflow. Version 0.8 renders the roles of all 10 profiles, with the new investigator role. It writes the G3 workflow and K6 only for a profile that has them (D24, D25). Item 6b adds check K7 (change size) and its step in the G3 workflow (D27). |
+| `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.4 supports the single-ticket and app-slice profiles: role files, the protected-path hook, check K6, and the G3 CI workflow. Version 0.7 adds a K14 step on the PR body to that workflow. Version 0.8 renders the roles of all 10 profiles, with the new investigator role. It writes the G3 workflow and K6 only for a profile that has them (D24, D25). Item 6b adds check K7 (change size) and its step in the G3 workflow (D27). Item 6d adds a step to the G3 workflow for a "by profile" check (K4, K5, K8, K10, K11, K12). A selected profile must list the check, and the repo config must have its command (D29). |
 
 The other commands in [the generator design](../framework/generator/design.md) are not built yet.
 
@@ -78,6 +78,9 @@ Add `--format github` to show the findings as annotations in a GitHub Actions ru
    Remove `--dry-run` to write the files. A second run changes only the files whose input changed.
    The G3 workflow installs stone from the tag `v<framework_version>` for its K14 step. Use
    0.5.0 or later. Render warns about an earlier version.
+   A profile can list K4, K5, K8, K10, K11, or K12, with no command for it in the repo config.
+   Then render warns, and the G3 workflow has no step for that check. See
+   [customization.md](../framework/customization.md#commands-for-the-by-profile-checks).
 
 7. Run check K7 (change size) on your branch before you open the PR. Render writes it for each
    profile with K7. Use `-` to read the PR body from standard input:
@@ -131,6 +134,7 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 | A K17 finding on a correct use of a word | Add `<!-- ste-ignore -->` at the end of that line. A reviewer checks each mark. |
 | `No framework folder` | Run `stone` from the repo root, or pass `--framework <path>`. |
 | `render`: `'<field>' is a TODO value` | Write the real value in `.cornerstone/config.yaml`. |
+| `render`: `profile <id> lists K10, but ... has no commands.mutation` | Add the command to `.cornerstone/config.yaml`, then render again. Or record a waiver for the check. |
 | `render`: `drift <path>` | A person changed a generated file. Move the change to the repo config. Then delete the file and render again. |
 
 ## Limits

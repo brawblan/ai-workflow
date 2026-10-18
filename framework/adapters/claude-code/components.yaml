@@ -1,6 +1,9 @@
 # Components that `stone render` writes for this harness: one template and one target path each.
 # A role is rendered only if a selected profile uses it. A component with `when` is rendered only if
 # a selected profile has that gate (not `skip`) or that check. Other components are always rendered.
+# A ci-job can have `steps`: each step with the same `when` rule goes into the `$check_steps` block of
+# the job template. A step with `command` needs that key in `commands` of the repo config. If the key
+# has no value, render skips the step and warns (D29). A step is part of its ci-job component.
 # eval: the planned eval folder (lifecycle.md).
 
 components:
@@ -101,3 +104,34 @@ components:
     template: workflows/cornerstone-checks.yml
     target: .github/workflows/cornerstone-checks.yml
     eval: evals/ci-job-checks/
+    steps:                                   # the "by profile" checks that run a repo command
+      - id: k4
+        name: K4 integration tests
+        when: {check: K4}
+        command: test_integration
+        template: workflows/steps/repo-command.yml
+      - id: k5
+        name: K5 acceptance tests
+        when: {check: K5}
+        command: test_acceptance
+        template: workflows/steps/repo-command.yml
+      - id: k8
+        name: K8 architecture fitness
+        when: {check: K8}
+        command: architecture
+        template: workflows/steps/repo-command.yml
+      - id: k11
+        name: K11 property and fuzz tests
+        when: {check: K11}
+        command: property
+        template: workflows/steps/repo-command.yml
+      - id: k12
+        name: K12 differential tests
+        when: {check: K12}
+        command: differential
+        template: workflows/steps/repo-command.yml
+      - id: k10                              # last: mutation testing is the slowest check
+        name: K10 mutation score
+        when: {check: K10}
+        command: mutation
+        template: workflows/steps/k10-mutation.yml
