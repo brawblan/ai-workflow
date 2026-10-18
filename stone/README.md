@@ -1,10 +1,10 @@
 # stone
 
-The Cornerstone CLI. Version 0.2 has three commands:
+The Cornerstone CLI. Version 0.3 has three commands:
 
 | Command | Does |
 | --- | --- |
-| `stone check` | Validates the framework: profile frontmatter, gate rules, check IDs, the gates table, relative links, and P12 (no vendor names in the core). If `.cornerstone/config.yaml` exists, it validates it too. |
+| `stone check` | Validates the framework: profile frontmatter, gate rules, check IDs, the gates table, relative links, and P12 (no vendor names in the core). If `.cornerstone/config.yaml` exists, it validates it too. Check K18: if `constitution/personas.md` exists, it validates its format. It also tests each persona ID and job story ID in the plans. K18 findings are warnings for the first 2 weeks. |
 | `stone check-writing` | Check K17. Tests human-facing Markdown against the measurable rules of the [writing standard](../framework/writing.md). |
 | `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.2 supports the single-ticket profile: role files, the protected-path hook, check K6, and the G3 CI workflow. |
 
