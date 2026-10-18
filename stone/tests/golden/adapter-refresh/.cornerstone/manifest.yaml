@@ -135,3 +135,19 @@ components:
   files:
   - .claude/agents/tester.md
   hash: 8243b524d35e82c4d0da8b38d4a74ae0fd3e4822e3608ae8c8b7d00665d60e5b
+- id: trigger.schedule.adapter-refresh
+  kind: ci-job
+  purpose: Start the first role of the profile on its schedule. Post its report as
+    an issue.
+  principle:
+  - P6
+  - P9
+  source: framework
+  owner: octocat
+  eval: evals/trigger-schedule/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .github/workflows/cornerstone-adapter-refresh-schedule.yml
+  hash: d505cb32309094d4860130fb0defe1f7146032e7cff50a62db615ae2ac420e49
