@@ -73,6 +73,10 @@ and writes the generated files.
 
 ## Set up a repo with Cornerstone
 
+The [guides](docs/guides/README.md) cover each situation: a new project, an existing repo, a
+migration from another framework, and the daily work after the setup. This section is the short
+version.
+
 You need Python 3.11 or later, `git`, the GitHub CLI (`gh`), and Claude Code. Claude Code is the
 only harness adapter at this time.
 
@@ -167,6 +171,7 @@ The skills use the open `SKILL.md` format. `stone render` has no adapter for oth
 | [`stone/`](stone/README.md) | The `stone` CLI (Python 3.11+, PyYAML only) and its tests |
 | [`plugins/workflow/skills/`](plugins/workflow/skills/) | The plugin skills, and the `project-setup` templates |
 | [`docs/research/`](docs/research/dossier.md) | The cited evidence for the framework |
+| [`docs/guides/`](docs/guides/README.md) | How to use Cornerstone, one situation at a time |
 | [`docs/tips/`](docs/tips/README.md) | How I work with agents, and why |
 | [`global/`](global/README.md) | My personal agent rules and settings, and how I sync them across devices |
 | [`AGENTS.md`](AGENTS.md) | How agents work in this repo: commands, rules, branches, and writing |
