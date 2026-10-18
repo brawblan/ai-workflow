@@ -565,7 +565,7 @@ class RenderTest(unittest.TestCase):
         self.assertTrue((self.root / PLANNER).exists())
         self.assertNotIn("role.planner", [c["id"] for c in self.manifest()["components"]])
 
-    # K14 in the rendered G3 workflow (D21).
+    # K14 in the rendered G3 workflow (D23).
 
     def workflow_text(self) -> str:
         return (self.root / WORKFLOW).read_text(encoding="utf-8")
@@ -653,8 +653,34 @@ class RenderTest(unittest.TestCase):
             with self.subTest(version=version):
                 self.assertNotIn("framework_version", self.render_log(version))
 
-    def test_framework_version_with_two_parts_from_0_5_does_not_warn(self) -> None:
-        for version in ("'0.5'", "'1.0'"):
+    def assert_full_tag_warning(self, log: str, shown: str) -> None:
+        self.assertIn(f"warning: framework_version {shown} is not a tag with "
+                      "'stone check-evidence'.", log)
+        self.assertIn("Use a full tag, 0.5.0 or later.", log)
+
+    def test_old_framework_version_warns_with_the_full_tag_text(self) -> None:
+        for version in ("0.1.0", "0.4.9"):
+            with self.subTest(version=version):
+                self.assert_full_tag_warning(self.render_log(version), version)
+
+    def test_framework_version_0_5_with_two_parts_warns(self) -> None:
+        # Owner decision 2026-10-18: v0.5 is not a tag, so '0.5' must warn.
+        log = self.render_log("'0.5'")
+        self.assert_full_tag_warning(log, "0.5")
+        self.assertEqual(log.count("warning: framework_version"), 1, log)
+
+    def test_framework_version_0_5_as_a_yaml_number_warns(self) -> None:
+        # Without quotes, YAML reads 0.5 as a float. It must warn the same way.
+        self.assert_full_tag_warning(self.render_log("0.5"), "0.5")
+
+    def test_framework_version_with_two_parts_below_0_5_warns(self) -> None:
+        for version in ("'0.4'", "'0.1'"):
+            with self.subTest(version=version):
+                self.assert_full_tag_warning(self.render_log(version), version.strip("'"))
+
+    def test_framework_version_1_0_with_two_parts_does_not_warn(self) -> None:
+        # (1, 0) >= (0, 5, 0), so '1.0' does not warn (ticket criterion 2).
+        for version in ("'1.0'", "1.0", "'0.6'"):
             with self.subTest(version=version):
                 self.assertNotIn("framework_version", self.render_log(version))
 
