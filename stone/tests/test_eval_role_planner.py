@@ -2005,6 +2005,110 @@ class OpenQuestionRound5Test(GraderCase):
                 self.both(True, text)
 
 
+# The expired-code question of a real P3 run that has no plan default (U3).
+U3_RUN = ("1. **Ended codes.** What happens when a shopper enters a code after its `ends` date?\n"
+          "   - a. Raise `UnknownCode`, the same as an unknown code. (Recommended: smallest change.)\n"
+          "   - b. Raise a new `ExpiredCode`.\n"
+          "   - c. Ignore `ends` for now.\n"
+          "\n"
+          "   If a or b: should `amount_due` take a `today: date` argument? (Recommended: yes, "
+          "with a default of `date.today()`.)")
+# The expired-code question of a real P3 run that has a plan default (U4).
+U4_RUN = ("**OQ1. What happens with a code after its `ends` date?**\n"
+          "- A: Accept it. *(plan default until G2)*\n"
+          "- B: Raise `UnknownCode`.\n"
+          "- C: Raise a new `ExpiredCode`.\n"
+          "- Recommendation: **C**.")
+
+
+class OpenQuestionRound6Test(GraderCase):
+    """EVAL-4e round 6 (U1 to U5). The helpers are the helpers of OpenQuestionTest."""
+
+    PATH, FILE = OpenQuestionTest.PATH, OpenQuestionTest.FILE
+    DELTA, DELTA_GLOB = OpenQuestionTest.DELTA, OpenQuestionTest.DELTA_GLOB
+    check = OpenQuestionTest.check
+    plan_file = OpenQuestionTest.plan_file
+    file = OpenQuestionTest.file
+    report = OpenQuestionTest.report
+    both = OpenQuestionTest.both
+    both_detail = OpenQuestionRound3Test.both_detail
+
+    # U1: a code span with "(" or "=" after "default" is a parameter default ------------------
+    def test_oq_u1_ticket_parameter_default_forms_do_not_count(self) -> None:
+        for line in ("Add a `today` argument (default `date.today()`).",
+                     "Should `amount_due` take a `today: date` argument? (Recommended: yes, with a "
+                     "default of `date.today()`.)",
+                     "Add a `today` argument, default: `today=None`.",
+                     "Add a `today` argument, default = `date.today()`."):
+            with self.subTest(line=line):
+                self.both_detail(question(ASK, *TWO, REC, line), "default",
+                                 absent=("options", "recommendation"))
+
+    def test_oq_u1_each_joining_form_with_parenthesis_or_equals_code_does_not_count(
+            self) -> None:
+        for join in (" ", " of ", ": ", " = ", ":", "="):
+            for code in ("`date.today()`", "`today=None`"):
+                line = f"Add a `today` argument with a default{join}{code}."
+                with self.subTest(line=line):
+                    self.both_detail(question(ASK, *TWO, REC, line), "default",
+                                     absent=("options", "recommendation"))
+
+    def test_oq_u1_capital_default_with_parameter_code_does_not_count(self) -> None:
+        for line in ("Default: `today=None`.", "Default of `date.today()` for the new argument."):
+            with self.subTest(line=line):
+                self.both_detail(question(ASK, *TWO, REC, line), "default",
+                                 absent=("options", "recommendation"))
+
+    def test_oq_u1_parameter_default_on_a_gap_line_does_not_count(self) -> None:
+        approach = "Compare `today` with a default of `date.today()` to the end date of the code."
+        detail = self.check(False, self.plan_file(OpenQuestionTest.NO_DEFAULT, approach=approach))
+        self.assertIn("default", detail)
+
+    # U2: a plan default still counts --------------------------------------------------------
+    def test_oq_u2_ticket_plan_default_forms_still_count(self) -> None:
+        for items in ((*TWO, REC, "Default until G2: `UnknownCode`"),
+                      (*TWO, REC, "Default: `UnknownCode`"),
+                      ("(a) Raise UnknownCode (default).", TWO[1], REC),
+                      ("(a) Raise UnknownCode **(default)**", TWO[1], REC),
+                      ("(a) Raise UnknownCode. *(plan default until G2)*", TWO[1], REC)):
+            with self.subTest(items=items):
+                self.both(True, question(ASK, *items))
+
+    def test_oq_u2_code_without_parenthesis_or_equals_after_default_still_counts(self) -> None:
+        for line in ("Default of `UnknownCode` until G2.", "Default = `UnknownCode`.",
+                     "Default until G2: raise `UnknownCode`."):
+            with self.subTest(line=line):
+                self.both(True, question(ASK, *TWO, REC, line))
+
+    def test_oq_u2_plan_default_on_the_same_question_as_a_parameter_default_counts(
+            self) -> None:
+        line = "Add a `today` argument with a default of `date.today()`."
+        self.both(True, question(ASK, *TWO, REC, line, "Default until G2: `UnknownCode`"))
+
+    # U3: the real run with only a parameter default fails ------------------------------------
+    def test_oq_u3_real_run_with_only_a_parameter_default_fails_on_default(self) -> None:
+        self.both_detail(U3_RUN, "default", absent=("recommendation",))
+
+    def test_oq_u3_real_run_passes_when_a_plan_default_is_added(self) -> None:
+        self.both(True, f"{U3_RUN}\n   - Default until G2: a.")
+
+    # U4: the real run with a plan default passes ---------------------------------------------
+    def test_oq_u4_real_run_with_a_plan_default_mark_passes(self) -> None:
+        self.both(True, U4_RUN)
+
+    def test_oq_u4_real_run_without_the_mark_fails_on_default(self) -> None:
+        text = U4_RUN.replace(" *(plan default until G2)*", "")
+        self.both_detail(text, "default", absent=("options", "recommendation"))
+
+    # U5: the earlier forms still pass --------------------------------------------------------
+    def test_oq_u5_earlier_forms_still_pass(self) -> None:
+        for name, text in (("list", OQ_LIST), ("inline", OQ_INLINE), ("table", OQ_TABLE),
+                           ("numbered bold", ex_numbered()), ("bold q", ex_bold_q()),
+                           ("s11 bold", ex_s11_bold())):
+            with self.subTest(form=name):
+                self.both(True, text)
+
+
 # Criterion 4: new_ids ---------------------------------------------------------------------------
 
 
