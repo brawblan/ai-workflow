@@ -1170,6 +1170,324 @@ class OpenQuestionRound2ScenarioTest(GraderCase):
                 self.expect(False, "open_question", self.workspace(files), self.args())
 
 
+# EVAL-4e round 3: grade each open question of a block by itself ---------------------------------
+
+Q1_NO_REC = ("1. What must amount_due do with an expired code?\n   - (a) Raise UnknownCode.\n"
+             "   - (b) Ignore the code.\n   - Default until G2: (a).")
+ROUNDING_REC = "- Recommendation: round half up to the cent."
+
+
+def ex_numbered(nested: str = "   - ") -> str:
+    """Q9, pass: 2 numbered questions with bold text, each with its options and parts."""
+    return (f"1. **What happens with an expired code?** Each code has an `ends` date, but the\n"
+            f"   ticket does not say what `amount_due` does after that date.\n"
+            f"{nested}a. Raise `UnknownCode`.\n{nested}b. Raise a new `ExpiredCode` error.\n"
+            f"{nested}c. Ignore the code and charge the full amount.\n"
+            f"{nested}Recommendation: b.\n{nested}Default until G2: c.\n"
+            f"2. **How is a discount rounded?** The ticket gives no rule.\n"
+            f"{nested}a. Round half up to the cent.\n{nested}b. Round half to even.\n"
+            f"{nested}Recommendation: a.\n{nested}Default until G2: a.")
+
+
+def ex_bold_q() -> str:
+    """Q9, pass: "**Q1. ...**" and "**Q2. ...**", each with "- A:", "- B:" and the parts."""
+    return ("**Q1. What happens with a code after its `ends` date?**\n\n"
+            "- A: Raise `UnknownCode`, as for a code that is not in the list.\n"
+            "- B: Raise a new `ExpiredCode` error.\n- Recommendation: B\n"
+            "- Default until G2: **A**\n\n"
+            "**Q2. How is the discount rounded?**\n\n- A: Round half up to the cent.\n"
+            "- B: Round half to even.\n- Recommendation: A\n- Default until G2: **A**")
+
+
+def ex_no_rec(q3_part: str) -> str:
+    """Q9, fail: Q1 names the gap with options and a default, but only Q3 has `q3_part`."""
+    return ("**Q1. What does `amount_due` do with an expired code?**\n\n"
+            "- a. Raise `UnknownCode` **(default)**\n- b. Raise a new `ExpiredCode` error.\n\n"
+            "**Q2. Is the percent an int or a float?**\n\n- a. An int. b. A float.\n"
+            "- Default until G2: an int.\n\n"
+            "**Q3. Does a code match in a different case?**\n\n"
+            f"- a. Match the case. b. Ignore the case.\n- {q3_part}")
+
+
+def ex_no_default(q4_part: str) -> str:
+    """Q9, fail: Q1 names the gap with options and a recommendation, and Q4 has `q4_part`."""
+    return ("**Q1. What does `amount_due` do with a code after its end date?**\n\n"
+            "- (a) Raise `UnknownCode`.\n- (b) Raise a new `ExpiredCode` error.\n"
+            "- Recommendation: (b)\n\n"
+            "**Q2. Is the percent an int or a float?**\n\n- (a) An int. (b) A float.\n"
+            "- Recommendation: (a)\n- Default until G2: an int.\n\n"
+            "**Q3. Does a code match in a different case?**\n\n"
+            "- (a) Match the case. (b) Ignore the case.\n- Recommendation: (b)\n\n"
+            "**Q4. What does `amount_due` do with a code that is not in the list?**\n\n"
+            f"- {q4_part}")
+
+
+class OpenQuestionRound3Test(GraderCase):
+    """EVAL-4e round 3 (Q1 to Q9). The helpers are the helpers of OpenQuestionTest."""
+
+    PATH, FILE = OpenQuestionTest.PATH, OpenQuestionTest.FILE
+    DELTA, DELTA_GLOB = OpenQuestionTest.DELTA, OpenQuestionTest.DELTA_GLOB
+    check = OpenQuestionTest.check
+    plan_file = OpenQuestionTest.plan_file
+    file = OpenQuestionTest.file
+    report = OpenQuestionTest.report
+    both = OpenQuestionTest.both
+
+    def both_detail(self, questions: str, *missing: str, absent: tuple[str, ...] = ()) -> None:
+        """Both sources fail, and the detail names each part of `missing` and no part of `absent`."""
+        for source in ("plan", "report"):
+            with self.subTest(source=source):
+                if source == "plan":
+                    detail = self.file(False, questions)
+                else:
+                    detail = self.report(False, f"Plan written at {self.FILE}.\n\n"
+                                                f"Open questions:\n{questions}\n")
+                for part in missing:
+                    self.assertIn(part, detail)
+                for part in absent:
+                    self.assertNotIn(part, detail)
+
+    # Q1: each part must be in the question that names the gap ------------------------------------
+    def test_oq_q1_recommendation_of_a_different_question_does_not_count(self) -> None:
+        text = f"{Q1_NO_REC}\n2. **How is a discount rounded?**\n   {ROUNDING_REC}"
+        self.both_detail(text, "recommendation", absent=("default", "options"))
+
+    def test_oq_q1_default_of_a_different_question_does_not_count(self) -> None:
+        text = (f"1. {ASK}\n   - (a) Raise UnknownCode.\n   - (b) Ignore the code.\n"
+                f"   - {REC}\n2. **How is a discount rounded?**\n"
+                "   - Default until G2: round half up.")
+        self.both_detail(text, "default", absent=("recommendation",))
+
+    def test_oq_q1_options_of_a_different_question_do_not_count(self) -> None:
+        text = (f"1. **{ASK}**\n   - {REC}\n   - {DEFAULT}\n"
+                "2. **How is a discount rounded?**\n   - (a) Half up.\n   - (b) Half to even.")
+        self.both_detail(text, "options")
+
+    def test_oq_q1_default_on_a_gap_line_of_a_different_question_still_counts(self) -> None:
+        # Criterion 4 stays: a line of the same source that names the gap can give the default.
+        self.both(True, ex_no_default("The plan treats an expired code as an unknown code."))
+
+    def test_oq_q1_default_on_a_gap_line_out_of_the_block_still_counts(self) -> None:
+        text = f"1. {ASK}\n   - (a) Raise UnknownCode.\n   - (b) Ignore the code.\n   - {REC}"
+        text += "\n2. **How is a discount rounded?**\n   - Default until G2: round half up."
+        approach = "Until G2, the plan raises UnknownCode for an expired code."
+        self.check(True, self.plan_file(text, approach=approach))
+
+    # Q2: the lines that start a question ---------------------------------------------------------
+    def test_oq_q2_each_start_line_at_the_left_margin_starts_a_question(self) -> None:
+        for start in ("Q2. How is a discount rounded?", "Q2: How is a discount rounded?",
+                      "q2 How is a discount rounded?", "Question 2: How is a discount rounded?",
+                      "**Rounding.** How is a discount rounded?", "__Rounding.__ How is it rounded?",
+                      "**How is a discount rounded?**", "2. **Rounding.** How is it rounded?",
+                      "- **Q2. Rounding?**", "* **Rounding**", "1) __Rounding__"):
+            text = f"{Q1_NO_REC}\n\n{start}\n{ROUNDING_REC}"
+            with self.subTest(start=start):
+                self.both_detail(text, "recommendation")
+
+    def test_oq_q2_a_heading_starts_a_question(self) -> None:
+        for heading in ("### Q2. Rounding", "### Rounding", "#### How is a discount rounded?"):
+            text = f"{Q1_NO_REC}\n\n{heading}\n\n{ROUNDING_REC}"
+            with self.subTest(heading=heading):
+                self.assertIn("recommendation", self.file(False, text))
+
+    def test_oq_q2_heading_questions_in_the_section_each_pass_by_themselves(self) -> None:
+        text = (f"### Q1. Expired codes\n\n{question(ASK, *TWO, REC, DEFAULT)}\n\n"
+                "### Q2. Rounding\n\n1. How is a discount rounded?\n   - (a) Half up.\n"
+                "   - (b) Half to even.\n   - Recommendation: (a).\n   - Default until G2: (a).")
+        self.file(True, text)
+
+    def test_oq_q2_an_indented_line_does_not_start_a_question(self) -> None:
+        for start in ("   - **Q2. Rounding?**", "   **Rounding.** How is a discount rounded?",
+                      "   Q2. How is a discount rounded?", "  Question 2: rounding?",
+                      "    2. **Rounding.**"):
+            text = f"{Q1_NO_REC}\n\n{start}\n{ROUNDING_REC}"
+            with self.subTest(start=start):
+                self.both(True, text)
+
+    def test_oq_q2_bold_text_in_a_nested_item_stays_in_the_question(self) -> None:
+        text = (f"1. **{ASK}**\n   - **Why:** the ticket gives no rule.\n   - (a) Raise UnknownCode."
+                f"\n   - (b) Ignore the code.\n   - **Note:** the shopper sees the error.\n"
+                f"   - {REC}\n   - {DEFAULT}")
+        self.both(True, text)
+
+    def test_oq_q2_bold_start_right_after_a_list_item_starts_a_question(self) -> None:
+        # Q9 form 2 with no blank line between the questions.
+        text = ("**Q1. What happens with a code after its `ends` date?**\n"
+                "- A: Raise `UnknownCode`.\n- B: Raise a new `ExpiredCode` error.\n"
+                "- Default until G2: **A**\n"
+                "**Q2. How is the discount rounded?**\n- A: Half up.\n- B: Half to even.\n"
+                "- Recommendation: A")
+        self.both_detail(text, "recommendation")
+
+    # Q3: a bold option, recommendation, or default line does not start a question --------------
+    def test_oq_q3_bold_option_lines_do_not_start_a_question(self) -> None:
+        for first, second in (("**Option A:** Raise UnknownCode.", "**Option B:** Ignore it."),
+                              ("**A:** Raise UnknownCode.", "**B:** Ignore the code."),
+                              ("**(a)** Raise UnknownCode.", "**(b)** Ignore the code."),
+                              ("**a)** Raise UnknownCode.", "**b)** Ignore the code."),
+                              ("- **Option 1:** Raise UnknownCode.", "- **Option 2:** Ignore it.")):
+            text = (f"**Q1. {ASK}**\n\n{first}\n\n{second}\n\n- {REC}\n- {DEFAULT}")
+            with self.subTest(options=(first, second)):
+                self.both(True, text)
+
+    def test_oq_q3_underscore_bold_option_lines_are_options(self) -> None:
+        # Q3 names "__" bold too. The nested form has no question start, so it tests the labels.
+        first, second = "__Option A:__ Raise UnknownCode.", "__Option B:__ Ignore it."
+        with self.subTest(form="left margin"):
+            self.both(True, f"**Q1. {ASK}**\n\n{first}\n\n{second}\n\n- {REC}\n- {DEFAULT}")
+        with self.subTest(form="nested"):
+            self.both(True, question(ASK, first, second, REC, DEFAULT))
+
+    def test_oq_q3_bold_recommendation_lines_do_not_start_a_question(self) -> None:
+        for line in ("**Recommendation:** (a).", "**My recommendation:** (a).",
+                     "**Our recommendation:** (a).", "**Recommended:** (a).",
+                     "- **Recommendation:** (a)."):
+            text = f"**Q1. {ASK}**\n\n- {TWO[0]}\n- {TWO[1]}\n\n{line}\n\n- {DEFAULT}"
+            with self.subTest(line=line):
+                self.both(True, text)
+
+    def test_oq_q3_bold_default_lines_do_not_start_a_question(self) -> None:
+        for line in ("**Default until G2:** (a).", "**Plan default until G2:** (a).",
+                     "**The default until G2:** (a).", "**The plan uses** UnknownCode until G2.",
+                     "- **Default until G2:** (a)."):
+            text = f"**Q1. {ASK}**\n\n- {TWO[0]}\n- {TWO[1]}\n- {REC}\n\n{line}"
+            with self.subTest(line=line):
+                self.both(True, text)
+
+    def test_oq_q3_all_parts_on_bold_lines_pass(self) -> None:
+        text = (f"**Q1. {ASK}**\n\n**Option A:** Raise UnknownCode.\n\n"
+                "**Option B:** Raise a new ExpiredCode error.\n\n**Recommendation:** B.\n\n"
+                "**Default until G2:** A.\n\n**Q2. How is a discount rounded?**\n\n"
+                "**Option A:** Half up.\n\n**Option B:** Half to even.\n\n"
+                "**Recommendation:** A.\n\n**Default until G2:** A.")
+        self.both(True, text)
+
+    # Q4: the lines before the first start, and a block with no start -----------------------------
+    def test_oq_q4_lines_before_the_first_start_are_a_question(self) -> None:
+        text = ("The ticket does not say what amount_due does with an expired code.\n"
+                "- (a) Raise UnknownCode.\n- (b) Ignore the code.\n- Default until G2: (a).\n\n"
+                f"**Rounding.** How is a discount rounded?\n{ROUNDING_REC}")
+        self.both_detail(text, "recommendation")
+
+    def test_oq_q4_a_block_with_no_start_is_one_question(self) -> None:
+        text = ("The ticket does not say what amount_due does with an expired code.\n"
+                "- (a) Raise UnknownCode.\n- (b) Ignore the code.\n- Default until G2: (a).\n\n"
+                f"How is a discount rounded?\n{ROUNDING_REC}")
+        self.file(True, text)
+
+    def test_oq_q4_one_question_that_starts_with_a_start_line_passes(self) -> None:
+        for start in (f"**Expired codes.** {ASK}", f"Q1. {ASK}", f"1. **{ASK}**",
+                      f"- **Q1. {ASK}**"):
+            text = f"{start}\n   - {TWO[0]}\n   - {TWO[1]}\n   - {REC}\n   - {DEFAULT}"
+            with self.subTest(start=start):
+                self.both(True, text)
+
+    def test_oq_q4_round_1_and_2_forms_still_pass(self) -> None:
+        for name, text in (("list", OQ_LIST), ("inline", OQ_INLINE), ("table", OQ_TABLE),
+                           ("one line", OQ_INLINE.replace("\n", " "))):
+            with self.subTest(form=name):
+                self.both(True, text)
+
+    # Q5: each table row is a question ------------------------------------------------------------
+    HEAD = "| Question | Options | Recommendation | Default until G2 |\n| --- | --- | --- | --- |\n"
+    ROW_GAP = "| What does amount_due do with an expired code? | Raise UnknownCode; ignore it "
+    ROW_ROUND = "| How is a discount rounded? | Half up; half to even "
+
+    def test_oq_q5_default_in_a_different_row_does_not_count(self) -> None:
+        table = self.HEAD + self.ROW_GAP + "| Raise UnknownCode | |\n" + self.ROW_ROUND + \
+            "| Half up | The plan rounds half up |"
+        self.both_detail(table, "default", absent=("recommendation",))
+
+    def test_oq_q5_recommendation_in_a_different_row_does_not_count(self) -> None:
+        table = self.HEAD + self.ROW_ROUND + "| Half up | Half up |\n" + self.ROW_GAP + \
+            "| | The plan raises UnknownCode |"
+        self.both_detail(table, "recommendation")
+
+    def test_oq_q5_options_in_a_different_row_do_not_count(self) -> None:
+        table = self.HEAD + ("| What does amount_due do with an expired code? | "
+                             "| Raise UnknownCode | The plan raises UnknownCode |\n") + \
+            self.ROW_ROUND + "| Half up | Half up |"
+        self.both_detail(table, "options")
+
+    def test_oq_q5_a_full_row_after_other_rows_passes(self) -> None:
+        table = self.HEAD + self.ROW_ROUND + "| Half up | Half up |\n" + self.ROW_GAP + \
+            "| Raise UnknownCode | The plan raises UnknownCode |"
+        self.both(True, table)
+
+    # Q6: the whole report is split in the same way -----------------------------------------------
+    WHOLE = ("I wrote the plan at docs/plans/SHOP-14.md.\n\n"
+             "What must amount_due do with an expired code? Options: raise UnknownCode, or ignore "
+             "the code. The default until G2 is UnknownCode.\n\n")
+
+    def test_oq_q6_whole_report_part_in_a_different_question_does_not_count(self) -> None:
+        for start in ("**Rounding.** How is a discount rounded?", "## Rounding",
+                      "Q2. How is a discount rounded?"):
+            with self.subTest(start=start):
+                detail = self.report(False, f"{self.WHOLE}{start}\n\nI recommend half up.\n")
+                self.assertIn("recommendation", detail)
+
+    def test_oq_q6_whole_report_with_no_start_is_one_question(self) -> None:
+        self.report(True, f"{self.WHOLE}How is a discount rounded? I recommend half up.\n")
+
+    def test_oq_q6_whole_report_with_all_parts_in_the_gap_question_passes(self) -> None:
+        self.report(True, f"{self.WHOLE.rstrip()} I recommend UnknownCode.\n\n"
+                          "**Rounding.** How is a discount rounded? Half up.\n")
+
+    # Q7: the words that give a recommendation ----------------------------------------------------
+    def test_oq_q7_each_recommendation_word_counts(self) -> None:
+        for line in ("I recommend (a).", "Recommended: (a).", "Recommendation: (a).",
+                     "My suggestion: (a).", "Suggested: (a).", "Suggestion: (a).",
+                     "Preferred: (a).", "I prefer (a).", "(a) is my preferred option."):
+            with self.subTest(line=line):
+                self.both(True, question(ASK, *TWO, line, DEFAULT))
+
+    def test_oq_q7_suggest_and_may_prefer_do_not_give_a_recommendation(self) -> None:
+        for line in ("I suggest an optional argument for the date.",
+                     "The author may prefer to strip spaces.",
+                     "The author may prefer (a)."):
+            with self.subTest(line=line):
+                self.both_detail(question(ASK, *TWO, line, DEFAULT), "recommendation")
+
+    # Q8: a parameter default in code is not a default of the plan --------------------------------
+    def test_oq_q8_parameter_default_in_code_does_not_count(self) -> None:
+        for line in ("Add a `today` argument (default `date.today()`).",
+                     "Add `today: date` (default `date.today()`) to amount_due."):
+            with self.subTest(line=line):
+                self.both_detail(question(ASK, *TWO, REC, line), "default")
+
+    def test_oq_q8_parameter_default_on_a_gap_line_does_not_count(self) -> None:
+        approach = "Compare `today` (default `date.today()`) with the end date of the code."
+        self.assertIn("default", self.check(False, self.plan_file(OpenQuestionTest.NO_DEFAULT,
+                                                                  approach=approach)))
+
+    def test_oq_q8_default_marks_and_a_code_value_still_count(self) -> None:
+        for items in (("(a) Raise UnknownCode (default).", TWO[1], REC),
+                      ("(a) Raise UnknownCode **(default)**", TWO[1], REC),
+                      (*TWO, REC, "Default until G2: `UnknownCode`"),
+                      (*TWO, REC, "Default until G2: raise `UnknownCode`.")):
+            with self.subTest(items=items):
+                self.both(True, question(ASK, *items))
+
+    # Q9: realistic multi-question examples -------------------------------------------------------
+    def test_oq_q9_numbered_bold_questions_with_nested_options_pass(self) -> None:
+        for nested in ("   - ", "   "):
+            with self.subTest(nested=repr(nested)):
+                self.both(True, ex_numbered(nested))
+
+    def test_oq_q9_bold_q_questions_with_a_and_b_items_pass(self) -> None:
+        self.both(True, ex_bold_q())
+
+    def test_oq_q9_recommendation_only_in_q3_fails(self) -> None:
+        for part in ("The author may prefer to strip spaces too.",
+                     "Recommendation: (b), ignore the case."):
+            with self.subTest(part=part):
+                self.both_detail(ex_no_rec(part), "recommendation", absent=("default",))
+
+    def test_oq_q9_default_only_in_q4_that_does_not_name_the_gap_fails(self) -> None:
+        self.both_detail(ex_no_default("The plan treats it as an unknown code."), "default",
+                         absent=("recommendation",))
+
+
 # Criterion 4: new_ids ---------------------------------------------------------------------------
 
 
