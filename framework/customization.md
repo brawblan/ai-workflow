@@ -39,7 +39,12 @@ commands:                          # exactly as a person types them
   lint: <command>
   typecheck: <command>
   test_unit: <command>
-  test_acceptance: <command>
+  test_acceptance: <command>      # K5 step in the G3 workflow, if a profile lists K5
+  test_integration: <command>     # K4 step
+  architecture: <command>         # K8 step
+  property: <command>             # K11 step
+  differential: <command>         # K12 step
+  mutation: <command>             # K10 step. It gets BASE_REF and MUTATION_SCORE_MIN.
   all_checks: <command>
 paths:
   source: [src/]
@@ -73,6 +78,37 @@ limit for one PR, add a `Waiver (P10)` section to the PR body. Name the profile 
 
 The generator fills the facts that it can find. It asks a human for the rest. It writes
 `TODO(<owner>)` for an unknown value. It does not guess.
+
+### Commands for the "by profile" checks
+
+The G3 workflow runs a "by profile" check only if a selected profile lists the check and the repo
+config has its command (D29). The command runs after `all_checks`. Its exit code passes or fails the
+step. If a profile lists the check and the command has no value, `stone render` skips the step and
+writes a warning.
+
+| Check | Command key | Example |
+| --- | --- | --- |
+| K4 | `test_integration` | `pytest tests/integration` |
+| K5 | `test_acceptance` | `npx playwright test` |
+| K8 | `architecture` | `lint-imports` |
+| K10 | `mutation` | `scripts/mutation-score.sh` |
+| K11 | `property` | `pytest tests/property` |
+| K12 | `differential` | `pytest tests/differential` |
+
+The K10 step gives two environment variables to the command. The command MUST read them. Most
+mutation tools do not read them, so wrap the tool in a repo script:
+
+| Variable | Value |
+| --- | --- |
+| `BASE_REF` | The base branch of the PR, for example `origin/main`. Test only the mutants in the code changed since it. |
+| `MUTATION_SCORE_MIN` | `limits.mutation_score_changed_code`. Fail if the score is under it. |
+
+The K10 step needs `limits.mutation_score_changed_code`. If it has no value, render stops.
+
+A new step warns for 2 weeks (`continue-on-error`). Then the framework makes it block.
+
+CI does not know the profile of a PR. So each step runs on each PR in the repo. For example, a repo
+with single-ticket and refactor-migration runs K10 on each single-ticket PR too.
 
 ## Profile override (`.cornerstone/profiles/<profile>.yaml`)
 
