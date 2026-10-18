@@ -486,6 +486,82 @@ class NamesGapRound2Test(GraderCase):
         self.report(True, "Should an expired code be refused?")
 
 
+# Criterion 3, round 3: "None", "No", and "N/A" are whole words -------------------------------------
+
+
+class NamesGapRound3Test(GraderCase):
+    """The changed criteria 3c and 3d. A file test has an empty report."""
+
+    PATH = NamesGapRound2Test.PATH
+    FILE = NamesGapRound2Test.FILE
+    check = NamesGapRound2Test.check
+    file = NamesGapRound2Test.file
+    report = NamesGapRound2Test.report
+
+    EXAMPLE = "Nonexistent end date: what does an expired code do?"  # the ticket example
+    # Lines that start with a longer word and do not ask. They isolate rule 3c from rule 3d.
+    LONGER = ("Nonexistent end date for a code.",
+              "Notes on the end date of a code.",
+              "Nothing in the ticket gives an end date for a code.",
+              "Nobody owns the end date of a code.",
+              "Non-expired and expired codes have one rule.",
+              "- Nothing in the ticket gives an end date for a code.",
+              "1. Notes on the end date of a code.")
+    # Lines that start with the whole word, with a mark after it.
+    WHOLE = ("None, the end date of a code is in the ticket.",
+             "None - the end date of a code is in the ticket.",
+             "No, the end date of a code is in the ticket.",
+             "No: the end date of a code is in the ticket.",
+             "N/A - the end date of a code is in the ticket.",
+             "- No, the end date of a code is in the ticket.",
+             "**None.** The end date of a code is in the ticket.")
+
+    # 3c: a line of a questions block
+    def test_c3c_r3_ticket_example_in_a_questions_block_passes(self) -> None:
+        self.file(True, f"## Open questions\n\n{self.EXAMPLE}\n")
+        self.file(True, f"## Open questions\n\n- {self.EXAMPLE}\n")
+        self.file(True, f"Plan.\n\nOpen questions:\n- {self.EXAMPLE}\n")
+        self.report(True, f"Plan written.\n\nOpen questions:\n- {self.EXAMPLE}\n")
+
+    def test_c3c_r3_line_that_starts_with_a_longer_word_counts(self) -> None:
+        for line in self.LONGER:
+            with self.subTest(line=line):
+                self.file(True, f"## Open questions\n\n{line}\n")
+                self.report(True, f"Plan written.\n\nOpen questions:\n{line}\n")
+
+    def test_c3c_r3_line_that_starts_with_the_whole_word_does_not_count(self) -> None:
+        for line in self.WHOLE:
+            with self.subTest(line=line):
+                self.file(False, f"## Open questions\n\n{line}\n")
+                self.report(False, f"Plan written.\n\nOpen questions:\n{line}\n")
+
+    def test_c3c_r3_a_longer_word_line_does_not_count_out_of_a_questions_block(self) -> None:
+        for line in self.LONGER:
+            with self.subTest(line=line):
+                self.file(False, f"## Approach\n\n{line}\n")
+
+    # 3d: a report line that asks
+    def test_c3d_r3_ticket_example_asks_in_the_report(self) -> None:
+        self.report(True, f"Plan written.\n{self.EXAMPLE}\n")
+
+    def test_c3d_r3_report_line_that_asks_and_starts_with_a_longer_word_asks(self) -> None:
+        for line in ("Nothing in the ticket gives an end date. What must an expired code do?",
+                     "Notes: the end date of a code is unclear.",
+                     "Nobody said what an expired code does. Please confirm.",
+                     "Nonexistent end date: the owner must decide what an expired code does."):
+            with self.subTest(line=line):
+                self.report(True, f"Plan written.\n{line}\n")
+
+    def test_c3d_r3_report_line_that_asks_and_starts_with_the_whole_word_does_not_ask(
+            self) -> None:
+        for line in ("No, what does an expired code do?",
+                     "None - is the end date of a code unclear?",
+                     "N/A, the end date of a code is unclear.",
+                     "- No: please confirm the rule for an expired code."):
+            with self.subTest(line=line):
+                self.report(False, f"Plan written.\n{line}\n")
+
+
 # Criterion 4: new_ids ---------------------------------------------------------------------------
 
 
