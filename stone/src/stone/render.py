@@ -167,7 +167,8 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     # The framework tag. The G3 workflow installs stone from it.
     values = {"model": model, "framework_version": str(config.get("framework_version", ""))}
     for key, value in (config.get("commands") or {}).items():
-        values[f"command_{key}"] = str(value)
+        if value is not None and str(value).strip():  # an empty command has no value
+            values[f"command_{key}"] = str(value)
     for key, value in (config.get("paths") or {}).items():
         # A list becomes inline code items. A single path stays plain, so a template can extend it.
         values[f"paths_{key}"] = (", ".join(f"`{item}`" for item in value)
