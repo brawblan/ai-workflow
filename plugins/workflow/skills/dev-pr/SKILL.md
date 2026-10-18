@@ -50,6 +50,9 @@ name one, use `dev` if it exists on `origin`. Otherwise use the default branch f
 - If the repo has a formatter or lint command that its docs say to run before a commit, run it.
 - Write a commit message that explains *why*, not just *what* (match the repo's usual style —
   check `git log` for tone/format if unsure).
+- If the repo uses role trailers (it has `.cornerstone/config.yaml`, or its docs say so), add
+  `Role: <role>` and `Actor: agent|human` to each commit. A commit with no `Role:` trailer counts
+  as an implementer commit, and check K6 fails if it changes a test, check, or CI path.
 - End the message with a `Co-Authored-By: Claude <model name> <noreply@anthropic.com>` line.
   Use the name of the model that does the work, for example `Claude Opus 5.5`. If the harness
   gives an exact attribution line, use that line.
@@ -81,6 +84,18 @@ silently.
   change**, **Validation run**, **Risks**, **Rollback plan**, **Environment/config changes**,
   **Follow-up issues**. Keep scope focused to one concern; call out any deliberately-deferred
   follow-up work as an issue rather than folding it into this PR.
+- Add the evidence sections (check K14), also when the repo template does not have them:
+
+  | Section | Content |
+  | --- | --- |
+  | **Evidence** | Each acceptance criterion, its status, and the test or command output that proves it. With no ticket: each check command and its result. |
+  | **Decision log** | A link to the decision log, or a list: decision, options, choice, reason. |
+  | **Review findings** | The findings of the reviewer session, with severity. Write who reviewed, or that no review ran. |
+  | **Confidence** | High, medium, or low, with the reason and the open risks. |
+
+  K14 fails on an empty section. If a section does not apply, write `None` and the reason.
+  Do not fill **Evidence** or **Review findings** from your own reading of code that you wrote.
+  Use the `ticket-delivery` skill to collect them.
 - If the repo has a writing style guide (for example `docs/style/ste.md`), write the PR body with
   it. Use `Closes #<n>` only in the PR that completes the issue; otherwise use `Related #<n>`.
 - End the PR body with the same `Co-Authored-By: Claude <model name> <noreply@anthropic.com>`

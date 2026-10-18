@@ -93,9 +93,9 @@ Do these items in order. Each item is one PR or more.
    `stone render` writes the role files, so the plugin has no tester or reviewer skill (D14).
    - 3a. Done in plugin 0.3.0: the `cornerstone-setup` entry skill, the repo config of this repo,
      and a `stone render` run in this repo.
-   - 3b. Remove the self-verification from `ticket-delivery`. Add the evidence sections to `dev-pr`.
-     Update `docs/tips/README.md` habit 4: the plan form now depends on the profile (D-series,
-     resolution 1 in the dossier).
+   - 3b. Done in plugin 0.4.0. `ticket-delivery` does not self-verify. `dev-pr` has the evidence
+     sections. Habit 4 in `docs/tips/README.md` says that the profile sets the plan form
+     (resolution 1 in the dossier).
    - 3c (optional). Add check K14 (PR evidence) to `stone`.
 4. Write the evals for the first model profile. Set its status to `active` when they pass.
 5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end

@@ -20,8 +20,8 @@ Use it with Claude Code, with other AI agents, or as notes to read.
 | --- | --- |
 | `cornerstone-setup` | Set up a repo for Cornerstone. It runs `project-setup`, writes `.cornerstone/config.yaml`, and runs `stone render` and `stone check`. |
 | `project-setup` | Set up a repo for agents: `constitution/`, `AGENTS.md`, and the OpenSpec wiring. It asks only for facts the repo does not have. |
-| `dev-pr` | Branch, commit, rebase, validate, and open a PR into the integration branch. |
-| `ticket-delivery` | Check the work against an issue's acceptance criteria. Then branch, commit, and open a PR. |
+| `dev-pr` | Branch, commit, rebase, validate, and open a PR into the integration branch, with the evidence sections. |
+| `ticket-delivery` | Collect the tester, reviewer, and check evidence for each acceptance criterion. Then open the PR with `dev-pr`. |
 | `backlog-sequencer` | Sync a `status:blocked` label from "Depends on #N" text. Suggest priority labels. |
 | `sdd-plan` | Plan a GitHub issue as an [OpenSpec](https://github.com/Fission-AI/OpenSpec) change. No code. |
 | `sdd-build` | Build, verify, and archive an OpenSpec change. Then open a PR. |

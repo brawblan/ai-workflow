@@ -18,6 +18,8 @@ These come from real mistakes. Each one is a rule that I give my agent.
    stops and asks. It does not choose a side.
 3. **Run the formatter on the whole repo before a commit.** If it changes files outside the task,
    put those changes in a separate `chore:` commit.
-4. **Approve the plan before the code.** Use plan mode or a spec. Review the plan. Then let the
-   agent build.
+4. **Match the plan to the size of the change.** Plan a large change first: a new feature through
+   many layers, a refactor, or a migration. Approve the plan before the code. Skip the plan for a
+   small, clear change. The agent writes a decision log, and you read it in the PR. The workflow
+   profile sets the plan form (see [framework/profiles/](../../framework/profiles/README.md)).
 5. **Ask for a diagram.** A small diagram often explains a flow faster than a paragraph.
