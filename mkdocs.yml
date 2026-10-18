@@ -14,6 +14,8 @@ hooks:
 
 exclude_docs: |
   framework/adapters/*/templates/
+  /evals/*
+  !/evals/README.md
 
 theme:
   name: material
@@ -105,6 +107,7 @@ nav:
           - Spec tools: framework/adapters/spec-tools.md
       - Generator: framework/generator/design.md
   - stone CLI: stone/README.md
+  - Evals: evals/README.md
   - Research: docs/research/dossier.md
   - Tips:
       - docs/tips/README.md

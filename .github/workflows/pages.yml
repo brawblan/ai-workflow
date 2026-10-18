@@ -3,10 +3,10 @@ name: pages
 
 on:
   pull_request:
-    paths: [docs/**, framework/**, stone/README.md, website/**, mkdocs.yml, .github/workflows/pages.yml]
+    paths: [docs/**, evals/**, framework/**, stone/README.md, website/**, mkdocs.yml, .github/workflows/pages.yml]
   push:
     branches: [main]
-    paths: [docs/**, framework/**, stone/README.md, website/**, mkdocs.yml, .github/workflows/pages.yml]
+    paths: [docs/**, evals/**, framework/**, stone/README.md, website/**, mkdocs.yml, .github/workflows/pages.yml]
   workflow_dispatch:
 
 permissions:
