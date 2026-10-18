@@ -73,6 +73,6 @@ def _render(root: Path, framework: Path | None, dry_run: bool) -> int:
     print(f"stone render: {len(result.wrote)} written, {len(result.skipped)} skipped, "
           f"{len(result.drift)} drift.")
     if result.drift:
-        print("Drift: a generated file changed by hand. Move the edit to the repo config, "
-              "or delete the file and render again.")
+        print("Drift: a person changed generated content. Restore it, or move the change to "
+              "the repo config, delete the file, and render again.")
     return result.exit_code

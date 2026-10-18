@@ -5,6 +5,7 @@ from __future__ import annotations
 import calendar
 import datetime as dt
 import hashlib
+import json
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -22,6 +23,9 @@ REQUIRED_FIELDS = ["framework_version", "harness", "model_profile", "profiles", 
 SUPPORTED_PROFILES = {"single-ticket"}
 REVIEW_MONTHS = 6
 CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches"}
+PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
+                    "protected_json": "paths.tests and paths.checks"}
+ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 
 
 class RenderError(Exception):
@@ -36,6 +40,7 @@ class Component:
     principle: list[str]
     eval: str
     files: dict[str, str]  # target path -> rendered content
+    merge: bool = False  # True: a JSON fragment to merge into a shared file
 
     @property
     def hash(self) -> str:
@@ -106,6 +111,11 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
                                   if isinstance(value, list) else str(value))
     for key, value in (config.get("branches") or {}).items():
         values[f"branch_{key}"] = str(value)
+    tests = list(_get(config, "paths.tests") or [])
+    checks = list(_get(config, "paths.checks") or [])
+    if tests and checks:
+        values["tests_json"] = json.dumps(tests)
+        values["protected_json"] = json.dumps(sorted(set(tests + checks + ALWAYS_PROTECTED)))
     return {key: value for key, value in values.items() if "TODO(" not in value}
 
 
@@ -134,14 +144,17 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         template = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
         try:
             content = Template(template).substitute(values)
+        except ValueError as error:
+            raise RenderError(f"The template {entry['template']} is not valid: {error}.") from None
         except KeyError as error:
-            prefix, _, key = error.args[0].partition("_")
-            raise RenderError(f"The template {entry['template']} needs '${error.args[0]}'. Add "
-                              f"{CONFIG_SECTION.get(prefix, prefix)}.{key} to {CONFIG}, "
-                              "without a TODO value.") from None
+            name = error.args[0]
+            prefix, _, key = name.partition("_")
+            hint = PLACEHOLDER_HINT.get(name, f"{CONFIG_SECTION.get(prefix, prefix)}.{key}")
+            raise RenderError(f"The template {entry['template']} needs '${name}'. Add {hint} "
+                              f"to {CONFIG}, without a TODO value.") from None
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
-                                    {entry["target"]: content}))
+                                    {entry["target"]: content}, entry.get("merge") == "json"))
     unknown = roles - {entry.get("role") for entry in registry}
     if unknown:
         raise RenderError(f"The adapter has no role file for {sorted(unknown)}. Add a template.")
@@ -164,6 +177,48 @@ def _disk_files(root: Path, paths: list[str]) -> dict[str, str]:
     """Return the content of each path that exists on disk."""
     return {path: (root / path).read_text(encoding="utf-8")
             for path in paths if (root / path).exists()}
+
+
+def _file_state(disk: dict[str, str], component: Component, old: dict[str, Any] | None) -> str:
+    if disk == component.files:
+        return "skipped"
+    if not disk or (old and len(disk) == len(component.files)
+                    and content_hash(disk) == old["hash"]):
+        return "wrote"  # new, or unchanged since the last render
+    return "drift"  # a person changed, removed, or wrote a generated file
+
+
+def _contains(data: Any, fragment: Any) -> bool:
+    if isinstance(fragment, dict):
+        return isinstance(data, dict) and all(
+            key in data and _contains(data[key], value) for key, value in fragment.items())
+    if isinstance(fragment, list):
+        return isinstance(data, list) and all(item in data for item in fragment)
+    return data == fragment
+
+
+def _merge(data: dict[str, Any], fragment: dict[str, Any]) -> None:
+    for key, value in fragment.items():
+        if isinstance(value, dict):
+            _merge(data.setdefault(key, {}), value)
+        elif isinstance(value, list):
+            items = data.setdefault(key, [])
+            items.extend(item for item in value if item not in items)
+        else:
+            data[key] = value
+
+
+def _merge_json(root: Path, path: str, fragment_text: str) -> tuple[bool, str]:
+    """Return (the file has the fragment, the file text with the fragment merged in)."""
+    target = root / path
+    try:
+        data = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {}
+    except json.JSONDecodeError as error:
+        raise RenderError(f"{path} is not valid JSON: {error}. Fix the file.") from None
+    fragment = json.loads(fragment_text)
+    present = _contains(data, fragment)
+    _merge(data, fragment)
+    return present, json.dumps(data, indent=2) + "\n"
 
 
 def _manifest_entry(component: Component, old: dict[str, Any] | None, config: dict[str, Any],
@@ -200,14 +255,19 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
     for component in components:
         old = old_entries.get(component.id)
         paths = sorted(component.files)
-        disk = _disk_files(root, paths)
-        if disk == component.files:
-            result.skipped.extend(paths)
-        elif not disk or (old and len(disk) == len(paths) and content_hash(disk) == old["hash"]):
-            to_write.update(component.files)  # new, or unchanged since the last render
-            result.wrote.extend(paths)
+        if component.merge:
+            present, merged = _merge_json(root, paths[0], component.files[paths[0]])
+            write = {paths[0]: merged}
+            state = ("skipped" if present
+                     else "drift" if old and old["hash"] == component.hash  # entry removed
+                     else "wrote")
         else:
-            result.drift.extend(paths)  # a human changed or removed a generated file
+            write = component.files
+            state = _file_state(_disk_files(root, paths), component, old)
+        getattr(result, state).extend(paths)
+        if state == "wrote":
+            to_write.update(write)
+        if state == "drift":
             if old:
                 entries.append(old)
             continue

@@ -37,3 +37,36 @@ components:
     template: agents/reviewer.md
     target: .claude/agents/reviewer.md
     eval: evals/role-reviewer/
+
+  - id: hook.protect-paths
+    kind: hook
+    purpose: Block an edit to a path that the current role must not change.
+    principle: [P2, P6]
+    template: hooks/protect-paths.py
+    target: .cornerstone/hooks/protect-paths.py
+    eval: evals/hook-protect-paths/
+
+  - id: hook.settings
+    kind: hook
+    purpose: Register the protected-path hook in the harness settings. Other keys stay as they are.
+    principle: [P6]
+    template: hooks/settings.json
+    target: .claude/settings.json
+    merge: json
+    eval: evals/hook-protect-paths/
+
+  - id: check.k6
+    kind: check
+    purpose: K6. Fail if an implementer commit changes a protected path.
+    principle: [P2, P6]
+    template: checks/protected_paths.py
+    target: .cornerstone/checks/protected_paths.py
+    eval: ""
+
+  - id: ci-job.checks
+    kind: ci-job
+    purpose: G3. Run K6 and the repo checks on each pull request.
+    principle: [P1, P6]
+    template: workflows/cornerstone-checks.yml
+    target: .github/workflows/cornerstone-checks.yml
+    eval: evals/ci-job-checks/

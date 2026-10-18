@@ -73,7 +73,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D10 | Check K17 tests the measurable STE rules and warns for 2 weeks, then blocks. The writing skill covers the rest. | [writing.md](writing.md#enforcement) |
 | D11 | STE stays only while review time, rework, and a quarterly blind A/B show that it helps. | [writing.md](writing.md#evidence-p5) |
 | D12 | Templates use `string.Template` from the standard library, not Jinja2. The CLI keeps one dependency (PyYAML). | [generator/design.md](generator/design.md#assumptions) |
-| D13 | The generator owns whole files (no markers, hash in the manifest) or marked blocks in shared files. | [generator/design.md](generator/design.md#constraints) |
+| D13 | The generator owns whole files (no markers, hash in the manifest), marked blocks in shared files, or merged entries in shared JSON files. | [generator/design.md](generator/design.md#constraints) |
 
 ## Open questions
 
@@ -85,8 +85,8 @@ Do these items in order. Each item is one PR or more.
 
 1. On 2026-10-31, change K17 from `--mode warn` to `--mode block` in `.github/workflows/stone.yml`.
    That date is 2 weeks after the K17 merge.
-2. Build `stone render` for the first harness adapter and the single-ticket profile. It writes the
-   role files, the protected-path hook and check K6, a CI workflow, and the manifest.
+2. Done in stone 0.2: `stone render` for the first harness adapter and the single-ticket profile.
+   It writes the role files, the protected-path hook and check K6, a CI workflow, and the manifest.
 3. Update the plugin skills from the
    [gap analysis](../docs/research/dossier.md#3-gap-analysis-of-this-repo-brawblanai-workflow-v021).
    Add the tester and reviewer roles and the `cornerstone-setup` entry skill. Remove the
