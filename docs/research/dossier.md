@@ -248,4 +248,4 @@ in this repo.
 | S31 | Alan Cooper, The Inmates Are Running the Asylum, Sams, 1999. |
 | S32 | Alan Klement, "Replacing the User Story with the Job Story", JTBD.info, 2013. |
 | S33 | Zheng, Pei, Logeswaran, Lee, Jurgens, [When "A Helpful Assistant" Is Not Really Helpful: Personas in System Prompts Do Not Improve Performances of Large Language Models](https://arxiv.org/abs/2311.10054), arXiv 2311.10054, Findings of EMNLP 2024. |
-| S34 | Fission AI, [OpenSpec](https://github.com/Fission-AI/OpenSpec), MIT license. The idea of spec deltas that merge into current specs. Cornerstone uses the idea, not the tool (D18, D20). |
+| S34 | Fission AI, [OpenSpec](https://github.com/Fission-AI/OpenSpec), MIT license. The idea of spec deltas that merge into current specs. Cornerstone uses the idea, not the tool (D18, D21). |

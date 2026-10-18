@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 
-from stone import __version__, framework_check, render, specs, writing_check
+from stone import __version__, evidence_check, framework_check, render, specs, writing_check
 from stone.findings import report
 
 
@@ -44,6 +45,16 @@ def _parser() -> argparse.ArgumentParser:
     writing.add_argument("--mode", choices=["warn", "block"], default="warn",
                          help="warn: report only (the first 2 weeks). block: fail on errors.")
     writing.add_argument("--format", choices=["text", "github"], default="text")
+
+    evidence = commands.add_parser("check-evidence",
+                                   help="K14: fail if a required PR section is missing or empty.")
+    evidence.add_argument("body", help="The PR body file. Use '-' to read standard input.")
+    evidence.add_argument("--section", action="append", metavar="NAME",
+                          help="A required section. Repeat for more. Default: "
+                               + ", ".join(evidence_check.DEFAULT_SECTIONS) + ".")
+    evidence.add_argument("--mode", choices=["warn", "block"], default="warn",
+                          help="warn: report only (the first 2 weeks). block: fail on findings.")
+    evidence.add_argument("--format", choices=["text", "github"], default="text")
     return parser
 
 
@@ -58,6 +69,8 @@ def main(argv: list[str] | None = None) -> int:
         return _render(args.root, args.framework, args.dry_run)
     if args.command == "spec":
         return _spec_apply(args.root, args.plan)
+    if args.command == "check-evidence":
+        return _check_evidence(args.body, args.section, args.mode, args.format)
 
     rules_path = args.rules or args.root / writing_check.DEFAULT_RULES
     dictionary = args.dictionary or args.root / writing_check.DEFAULT_DICTIONARY
@@ -84,6 +97,22 @@ def _spec_apply(root: Path, plan: str) -> int:
     print(f"stone spec apply: {len(changed)} file(s) changed. Commit them alone, with the "
           "trailers 'Role: generator' and 'Actor: agent' or 'Actor: human'.")
     return 0
+
+
+def _check_evidence(body: str, sections: list[str] | None, mode: str, fmt: str) -> int:
+    if body == "-":
+        text = sys.stdin.read()
+    else:
+        try:
+            text = Path(body).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            reason = error.reason if isinstance(error, UnicodeDecodeError) else error.strerror
+            print(f"check-evidence: cannot read {body}: {reason}")
+            return 2
+    findings = evidence_check.check_text(text, "<stdin>" if body == "-" else body, sections)
+    blocking = report(findings, fmt, warn_only=mode == "warn")
+    print(f"K14: {len(findings)} finding(s), mode {mode}.")
+    return 1 if blocking else 0
 
 
 def _render(root: Path, framework: Path | None, dry_run: bool) -> int:
