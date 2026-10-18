@@ -160,12 +160,13 @@ def load_run_config(path: Path) -> dict[str, Any]:
 # Running -----------------------------------------------------------------------------------
 
 
-def _git(cwd: Path, *args: str) -> str:
+def _git(cwd: Path, *args: str, strip: bool = True) -> str:
+    """Run git. A caller that parses fixed columns (status --porcelain) passes strip=False."""
     result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True,
                             env={**os.environ, **GIT_ENV})
     if result.returncode != 0:
         raise EvalError(f"git {' '.join(args)} failed in {cwd}: {result.stderr.strip()}")
-    return result.stdout.strip()
+    return result.stdout.strip() if strip else result.stdout
 
 
 def _commit(cwd: Path, message: str) -> None:
@@ -295,8 +296,9 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
 def _changed(ws: Workspace) -> list[str]:
     """Return each path that the run added, changed, or removed. A rename gives both paths."""
     committed = _git(ws.path, "diff", "--name-only", "--no-renames", "-z", ws.setup, "HEAD")
+    # No strip: the first entry can start with a space (" M path" is a change not in the index).
     status = _git(ws.path, "status", "--porcelain=v1", "-z", "--no-renames",
-                  "--untracked-files=all")
+                  "--untracked-files=all", strip=False)
     return sorted(set(committed.split("\0") + [item[3:] for item in status.split("\0")]) - {""})
 
 
