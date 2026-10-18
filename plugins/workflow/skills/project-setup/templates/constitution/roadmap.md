@@ -10,7 +10,7 @@ comment when you fill the file. -->
 flowchart LR
   R[Roadmap phase] --> B[Backlog item or epic]
   B --> I[GitHub issue]
-  I --> C[Spec / OpenSpec change]
+  I --> C[Plan or spec]
   C --> PR[PR and release]
 ```
 

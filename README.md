@@ -6,8 +6,8 @@ Use it with Claude Code, with other AI agents, or as notes to read.
 | Folder | What it has | Who uses it |
 | --- | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | How agents work in this repo: commands, rules, branches, and writing | Agents |
-| [`plugins/workflow/skills/`](plugins/workflow/skills/) | Eight skills in the open `SKILL.md` format | Anyone |
-| [`plugins/workflow/skills/project-setup/templates/`](plugins/workflow/skills/project-setup/templates/) | Templates: constitution, repo `AGENTS.md`, user `AGENTS.md`, OpenSpec config | Anyone |
+| [`plugins/workflow/skills/`](plugins/workflow/skills/) | Six skills in the open `SKILL.md` format | Anyone |
+| [`plugins/workflow/skills/project-setup/templates/`](plugins/workflow/skills/project-setup/templates/) | Templates: constitution, repo `AGENTS.md`, user `AGENTS.md` | Anyone |
 | [`global/`](global/) | My personal rules (`AGENTS.md`) and Claude Code settings | Me. Copy what you like. |
 | [`docs/tips/`](docs/tips/) | How I work, and why | Anyone |
 | [`framework/`](framework/README.md) | Draft: Cornerstone, the tool-neutral workflow framework (principles, modes, profiles, gates, adapters) | Anyone |
@@ -19,16 +19,14 @@ Use it with Claude Code, with other AI agents, or as notes to read.
 | Skill | What it does |
 | --- | --- |
 | `cornerstone-setup` | Set up a repo for Cornerstone. It runs `project-setup`, writes `.cornerstone/config.yaml`, and runs `stone render` and `stone check`. |
-| `project-setup` | Set up a repo for agents: `constitution/`, `AGENTS.md`, and the OpenSpec wiring. It asks only for facts the repo does not have. |
+| `project-setup` | Set up a repo for agents: `constitution/` and `AGENTS.md`. It asks only for facts the repo does not have. |
 | `dev-pr` | Branch, commit, rebase, validate, and open a PR into the integration branch, with the evidence sections. |
 | `ticket-delivery` | Collect the tester, reviewer, and check evidence for each acceptance criterion. Then open the PR with `dev-pr`. |
 | `backlog-sequencer` | Sync a `status:blocked` label from "Depends on #N" text. Suggest priority labels. |
-| `sdd-plan` | Plan a GitHub issue as an [OpenSpec](https://github.com/Fission-AI/OpenSpec) change. No code. |
-| `sdd-build` | Build, verify, and archive an OpenSpec change. Then open a PR. |
 | `ste-writing` | Write with Simplified Technical English rules, and add diagrams. |
 
-`sdd-plan` and `sdd-build` need OpenSpec in the repo (`openspec init`). `cornerstone-setup` needs
-the `stone` CLI and a clone of this repo. The other skills need only `git` and the GitHub CLI (`gh`).
+`cornerstone-setup` needs the `stone` CLI and a clone of this repo. The other skills need only `git`
+and the GitHub CLI (`gh`).
 
 ## Set up a new repo
 
@@ -47,7 +45,7 @@ CLAUDE.md              @AGENTS.md
 constitution/
   README.md            index
   mission.md           vision, audience, tone, scope, non-goals
-  principles.md        MUST rules (or a pointer to openspec/config.yaml)
+  principles.md        MUST rules for all changes
   tech-stack.md        approved technology, ownership, deploy limits, gates
   roadmap.md           phases and milestones, in order
 ```

@@ -11,6 +11,15 @@ components:
     target: .claude/agents/shaper.md
     eval: evals/role-shaper/
 
+  - id: role.planner
+    kind: role
+    role: planner
+    purpose: Write the plan artifact and the progress file. A human approves them at G2.
+    principle: [P3, P7]
+    template: agents/planner.md
+    target: .claude/agents/planner.md
+    eval: evals/role-planner/
+
   - id: role.implementer
     kind: role
     role: implementer

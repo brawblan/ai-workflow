@@ -20,7 +20,7 @@ from stone.markdown import split_frontmatter
 CONFIG = Path(".cornerstone/config.yaml")
 MANIFEST = Path(".cornerstone/manifest.yaml")
 REQUIRED_FIELDS = ["framework_version", "harness", "model_profile", "profiles", "owners.default"]
-SUPPORTED_PROFILES = {"single-ticket"}
+SUPPORTED_PROFILES = {"single-ticket", "app-slice"}
 REVIEW_MONTHS = 6
 CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches"}
 PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
@@ -111,6 +111,7 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
                                   if isinstance(value, list) else str(value))
     for key, value in (config.get("branches") or {}).items():
         values[f"branch_{key}"] = str(value)
+    values["plans_json"] = json.dumps([values["paths_plans"]])
     tests = list(_get(config, "paths.tests") or [])
     checks = list(_get(config, "paths.checks") or [])
     if tests and checks:

@@ -12,9 +12,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-# The implementer must not change PROTECTED. The tester changes only TESTS.
+# The implementer must not change PROTECTED. The tester changes only TESTS. The planner only PLANS.
 PROTECTED = $protected_json
 TESTS = $tests_json
+PLANS = $plans_json
 
 
 def covers(prefixes: list[str], path: str) -> bool:
@@ -61,6 +62,8 @@ def main() -> int:
         reason = "is a protected path. The implementer must not change tests, checks, or CI"
     elif role == "tester" and not covers(TESTS, path):
         reason = f"is not a test path. The tester changes only {', '.join(TESTS)}"
+    elif role == "planner" and not covers(PLANS, path):
+        reason = f"is not a plan path. The planner changes only {', '.join(PLANS)}"
     elif role == "reviewer":
         reason = "cannot change. The reviewer changes no file"
     else:

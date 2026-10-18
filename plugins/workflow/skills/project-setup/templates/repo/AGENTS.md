@@ -41,7 +41,7 @@ list is in the principles. -->
 
 <!-- Guide: Remove this section if the repo does not use spec-driven development. -->
 
-- Use spec-driven development for feature work: <OpenSpec / Spec Kit / plain specs in docs/specs/>.
+- Plan feature work before the build: <Cornerstone plans in docs/plans/ / Spec Kit / other>.
 - Workflow: <link, for example docs/sdd.md>.
 - Small fixes and docs edits do not need a spec.
 

@@ -6,7 +6,7 @@ The Cornerstone CLI. Version 0.3 has three commands:
 | --- | --- |
 | `stone check` | Validates the framework: profile frontmatter, gate rules, check IDs, the gates table, relative links, and P12 (no vendor names in the core). If `.cornerstone/config.yaml` exists, it validates it too. Check K18: if `constitution/personas.md` exists, it validates its format. It also tests each persona ID and job story ID in the plans. K18 findings are warnings for the first 2 weeks. |
 | `stone check-writing` | Check K17. Tests human-facing Markdown against the measurable rules of the [writing standard](../framework/writing.md). |
-| `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.2 supports the single-ticket profile: role files, the protected-path hook, check K6, and the G3 CI workflow. |
+| `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.4 supports the single-ticket and app-slice profiles: role files, the protected-path hook, check K6, and the G3 CI workflow. |
 
 The other commands in [the generator design](../framework/generator/design.md) are not built yet.
 
@@ -98,7 +98,7 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 - In `--diff` mode, K17 reports a finding only if the sentence starts on a changed line.
 - In `--diff` mode, K17 tests each line of an untracked Markdown file. It skips a file that git ignores.
 - The tense test (rule 2) and the passive test (rule 11) are warnings, because they also match some adjectives.
-- `render` supports only the `claude-code` harness and the `single-ticket` profile. It skips other profiles with a log line.
+- `render` supports only the `claude-code` harness, and the `single-ticket` and `app-slice` profiles. It skips other profiles with a log line.
 - `render` does not check `framework_version` against the framework folder. Check out the tag yourself.
 - `render` does not read profile overrides (`.cornerstone/profiles/`) yet.
 - If the hook entry in `.claude/settings.json` changes in a new framework version, `render` adds the new entry. Remove the old entry by hand.

@@ -114,8 +114,7 @@ file, and K6 catches that change in CI.
 | Skill | Framework place | Change needed |
 | --- | --- | --- |
 | `project-setup` | full-project, Shape | Becomes the Shape step of `cornerstone-setup`. Stays usable alone. |
-| `sdd-plan` | Plan (OpenSpec) | Move to the OpenSpec section of [spec-tools.md](spec-tools.md). |
-| `sdd-build` | Build (OpenSpec) | Split: implementer and tester run in separate sessions. |
+| `sdd-plan`, `sdd-build` | Plan, Build | Removed in plugin 0.5.0 (D18). The planner, implementer, and tester role files do this work. |
 | `ticket-delivery` | Verify, Deliver | Done in plugin 0.4.0: it collects the tester, reviewer, and check output as evidence. It does not self-verify. |
 | `dev-pr` | Deliver | Done in plugin 0.4.0: the PR evidence sections (K14) and the role trailers. |
 | `backlog-sequencer` | Intake | No change. |
