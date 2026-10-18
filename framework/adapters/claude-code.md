@@ -175,7 +175,7 @@ Limits that stay:
 (D30). The job runs on `pull_request_target`, so GitHub runs the workflow file from the base branch.
 A spike branch cannot change or remove it. The job checks out no code and has `permissions: {}`
 (dossier F11). It gets the branch names only through `env`. Add the `k16` job as a required status
-check on the main branch.
+check on the main branch and on the integration branch (D33).
 
 ## Role files (generated)
 
