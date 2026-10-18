@@ -172,6 +172,7 @@ The skills use the open `SKILL.md` format. `stone render` has no adapter for oth
 | [`docs/research/`](docs/research/dossier.md) | The cited evidence for the framework |
 | [`docs/guides/`](docs/guides/README.md) | How to use Cornerstone, one situation at a time |
 | [`docs/tips/`](docs/tips/README.md) | How I work with agents, and why |
+| [`website/`](website/), [`mkdocs.yml`](mkdocs.yml) | The docs site, built with MkDocs Material |
 | [`global/`](global/README.md) | My personal agent rules and settings, and how I sync them across devices |
 | [`AGENTS.md`](AGENTS.md) | How agents work in this repo: commands, rules, branches, and writing |
 

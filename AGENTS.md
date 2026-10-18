@@ -16,6 +16,7 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | `docs/research/dossier.md` | The cited evidence for the framework |
 | `docs/tips/` | How the owner works, and why |
 | `stone/` | The `stone` CLI (Python 3.11+, PyYAML only) and its tests |
+| `mkdocs.yml`, `website/` | The docs site. `website/content/` mirrors the repo folders with symlinks. |
 | `.github/workflows/stone.yml` | CI: unit tests, `stone check`, and K17 |
 
 ## Commands
@@ -27,6 +28,7 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | Validate the framework | `stone check` |
 | Writing check (K17) on your changes | `stone check-writing --diff origin/main` |
 | Validate the plugin | `claude plugin validate .` |
+| Preview the docs site | `pip install -r website/requirements.txt && mkdocs serve` |
 | Try a skill before you push | `claude --plugin-dir plugins/workflow` |
 | All checks before a push | `python -m unittest discover -s stone/tests && stone check && stone check-writing --diff origin/main` |
 

@@ -1,0 +1,113 @@
+# The Cornerstone docs site. Build: pip install -r website/requirements.txt && mkdocs build --strict
+# website/content/ mirrors the repo folders with symlinks, so the relative links in the docs work.
+site_name: Cornerstone
+site_description: A tool-neutral framework for agent-assisted software delivery
+site_url: https://brawblan.github.io/ai-workflow/
+repo_url: https://github.com/brawblan/ai-workflow
+repo_name: brawblan/ai-workflow
+edit_uri: ""
+
+docs_dir: website/content
+site_dir: website/build
+hooks:
+  - website/hooks.py
+
+exclude_docs: |
+  framework/adapters/*/templates/
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: blue grey
+      accent: amber
+      toggle:
+        icon: material/weather-night
+        name: Dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: blue grey
+      accent: amber
+      toggle:
+        icon: material/weather-sunny
+        name: Light mode
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - search.suggest
+    - content.code.copy
+  icon:
+    logo: material/cube-outline
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+validation:
+  omitted_files: warn
+  absolute_links: warn
+  unrecognized_links: warn
+  anchors: warn
+
+nav:
+  - Home: index.md
+  - Guides:
+      - docs/guides/README.md
+      - Start a project: docs/guides/start-a-project.md
+      - Add Cornerstone to a repo: docs/guides/add-to-a-repo.md
+      - Migrate to Cornerstone: docs/guides/migrate.md
+      - Make a small change: docs/guides/small-change.md
+      - Fix a bug: docs/guides/fix-a-bug.md
+      - Build a feature: docs/guides/build-a-feature.md
+      - Run the roles: docs/guides/run-the-roles.md
+  - Framework:
+      - framework/README.md
+      - Principles: framework/principles.md
+      - Vocabulary: framework/vocabulary.md
+      - Workflow model: framework/workflow-model.md
+      - Gates: framework/gates.md
+      - Checks: framework/checks.md
+      - Modes: framework/modes.md
+      - Profiles:
+          - framework/profiles/README.md
+          - Full project: framework/profiles/full-project.md
+          - App slice: framework/profiles/app-slice.md
+          - Single ticket: framework/profiles/single-ticket.md
+          - Bug triage: framework/profiles/bug-triage.md
+          - Debugging: framework/profiles/debugging.md
+          - Code audit: framework/profiles/code-audit.md
+          - Refactor or migration: framework/profiles/refactor-migration.md
+          - Dependency upgrade: framework/profiles/dependency-upgrade.md
+          - Adapter refresh: framework/profiles/adapter-refresh.md
+          - Spike: framework/profiles/spike.md
+          - Profile template: framework/profiles/_template.md
+      - Lifecycle: framework/lifecycle.md
+      - Writing: framework/writing.md
+      - Customization: framework/customization.md
+      - Adapters:
+          - Contract: framework/adapters/contract.md
+          - Claude Code: framework/adapters/claude-code.md
+          - Spec tools: framework/adapters/spec-tools.md
+      - Generator: framework/generator/design.md
+  - stone CLI: stone/README.md
+  - Research: docs/research/dossier.md
+  - Tips:
+      - docs/tips/README.md
+      - Spec-driven development: docs/tips/spec-driven-development.md
+      - Writing with STE: docs/tips/writing-with-ste.md
+      - Other tools: docs/tips/other-tools.md
