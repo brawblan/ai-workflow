@@ -60,6 +60,11 @@ verified. Say that no COAs exist, so the PR has no COA evidence.
 
 Follow the `dev-pr` skill. Fill its evidence sections from steps 2 to 5:
 
+- **Profile line:** if the repo has `.cornerstone/config.yaml`, put `Profile: <id>` at the top of
+  the PR body. Check K7 uses it to pick the size limit. If `profiles` has one id, use it. If it
+  has more, use the profile in the ticket. If the ticket names none, ask the user.
+- **Waiver (P10):** if the diff is over the K7 limit, tell the user. The user splits the PR, or
+  approves a `Waiver (P10)` section with the reason, the owner, and the end date.
 - **Evidence:** the COA table from step 4, or the summary from step 5.
 - **Decision log:** the link or the list from step 2.
 - **Review findings:** the reviewer's findings, or "None" with the reviewer's report link.
