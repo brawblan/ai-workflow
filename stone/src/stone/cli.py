@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from stone import __version__, framework_check, render, writing_check
+from stone import __version__, framework_check, render, specs, writing_check
 from stone.findings import report
 
 
@@ -23,6 +23,13 @@ def _parser() -> argparse.ArgumentParser:
     build.add_argument("--root", type=Path, default=Path("."), help="Target repo. Default: '.'.")
     build.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
     build.add_argument("--dry-run", action="store_true", help="Print the changes. Write nothing.")
+
+    spec = commands.add_parser("spec", help="Work with the specs of the repo.")
+    spec_commands = spec.add_subparsers(dest="spec_command", required=True)
+    spec_apply = spec_commands.add_parser(
+        "apply", help="Apply the spec delta of one plan to the specs.")
+    spec_apply.add_argument("plan", help="The plan ID: the delta is <plans>/<plan>.spec.md.")
+    spec_apply.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
 
     writing = commands.add_parser("check-writing",
                                   help="K17: test human-facing text against the writing standard.")
@@ -49,6 +56,8 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if blocking else 0
     if args.command == "render":
         return _render(args.root, args.framework, args.dry_run)
+    if args.command == "spec":
+        return _spec_apply(args.root, args.plan)
 
     rules_path = args.rules or args.root / writing_check.DEFAULT_RULES
     dictionary = args.dictionary or args.root / writing_check.DEFAULT_DICTIONARY
@@ -62,6 +71,19 @@ def main(argv: list[str] | None = None) -> int:
     errors = sum(1 for f in findings if f.severity == "error")
     print(f"K17: {errors} error(s), {len(findings) - errors} warning(s), mode {args.mode}.")
     return 1 if blocking else 0
+
+
+def _spec_apply(root: Path, plan: str) -> int:
+    try:
+        changed = specs.apply(root, plan)
+    except specs.SpecError as error:
+        print(f"stone spec apply: {error}")
+        return 1
+    for path in changed:
+        print(f"wrote {path}")
+    print(f"stone spec apply: {len(changed)} file(s) changed. Commit them alone, with the "
+          "trailers 'Role: generator' and 'Actor: agent' or 'Actor: human'.")
+    return 0
 
 
 def _render(root: Path, framework: Path | None, dry_run: bool) -> int:

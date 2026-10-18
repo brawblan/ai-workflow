@@ -10,6 +10,8 @@ it to the contract in [contract.md](contract.md#what-a-spec-tool-adapter-must-pr
 | Plan artifact | `docs/plans/<id>.md` with the six sections |
 | Decision log | `docs/plans/<id>.decisions.md` |
 | Progress file | `docs/plans/<id>.progress.json` |
+| Spec delta | `docs/plans/<id>.spec.md` |
+| Spec | `docs/specs/<capability>.md`, written by `stone spec apply` |
 | G2 approval | A human approves the PR that adds the plan, or adds the `plan-approved` label |
 | Validate | A script checks that the six sections exist and are not empty |
 
