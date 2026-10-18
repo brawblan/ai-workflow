@@ -67,6 +67,8 @@ These rules apply to each stage that an agent drives.
 | Plan artifact | Markdown with set sections | `docs/plans/<id>.md` | planner |
 | Decision log | Markdown list: decision, options, choice, reason | `docs/plans/<id>.decisions.md` | implementer, planner |
 | Progress file | JSON task list with a `passes` field | `docs/plans/<id>.progress.json` | planner, implementer |
+| Spec delta | Markdown: ADDED, MODIFIED, and REMOVED requirements (see [Specs](#specs)) | `docs/plans/<id>.spec.md` | planner |
+| Spec | Markdown: the current requirements of one capability | `docs/specs/<capability>.md` | `stone spec apply` (generator) |
 | Test report | Markdown: tests added, behavior covered, gaps | PR comment | tester |
 | Review findings | Markdown: finding, severity, evidence | PR review | reviewer |
 | Findings report | Markdown: defects, risks, improvements | `docs/reports/<id>.md` | investigator |
@@ -116,3 +118,44 @@ The personas file has one `##` section for each persona, with these fields:
 | `evidence` | `assumed` or `validated`. A lifecycle review flags each assumed persona (see [lifecycle.md](lifecycle.md#personas)). |
 
 Check K18 tests this format and the persona and job story IDs in the plans. Dossier: D12, D13.
+
+### Specs
+
+A plan artifact describes one change. A spec describes the product as it is now. The plans stay
+in the repo as history, and the specs show the result of all of them (dossier D14).
+
+The planner writes a spec delta next to the plan when the change adds, changes, or removes a
+behavior. Each section of the delta is one change:
+
+```markdown
+## ADDED export.R3: Export a filtered report
+
+The user MUST be able to export only the rows that the filter shows.
+
+### Scenario: export with a filter
+- WHEN the user sets a filter and selects Export
+- THEN the CSV file has only the rows that the filter shows
+
+## MODIFIED export.R1: <the new title>
+<the full new text, with its scenarios>
+
+## REMOVED export.R2: <title>
+<the reason, optional>
+```
+
+Rules:
+
+1. A requirement ID is `<capability>.R<n>`. The number never changes, and a removed number is not
+   used again. Each capability has one spec file.
+2. ADDED and MODIFIED sections have at least one `### Scenario:` with WHEN and THEN lines.
+   MODIFIED gives the full new text, not only the difference.
+3. A human approves the delta with the plan (G2). The delta is part of the plan.
+4. Before the code PR opens, run `stone spec apply <plan id>`. It gives the delta the next
+   `apply_order`, and it writes the specs. Commit its output alone, with `Role: generator`.
+5. `stone spec apply` writes the specs. A replay of all applied deltas, in `apply_order`, must give
+   the same files. A person changes a spec only with a new delta. Thus the plans folder is permanent
+   history: do not delete an applied delta. The specs folder holds only the generated specs.
+6. A ticket with no change to a behavior has no delta.
+
+The tester names each test for a requirement with its ID, so the reviewer can match the tests to
+the spec. Eval plan and review date: [lifecycle.md](lifecycle.md#specs).

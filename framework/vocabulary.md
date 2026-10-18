@@ -39,3 +39,6 @@ harness feature.
 | project dictionary | A repo file that gives each domain term one meaning. | glossary |
 | persona | One type of person who uses the product: who they are, their job stories, their limits, and the evidence for them. It is not a role. See [workflow-model.md](workflow-model.md#personas). | user type, agent persona |
 | job story | One thing that a persona must get done: "When I ..., I want to ..., so that ...". Its ID is `<persona id>.J<n>`. | user story (in the core) |
+| requirement | One behavior that the product MUST have, with one or more WHEN and THEN scenarios. Its ID is `<capability>.R<n>`. | feature, story |
+| spec | The current requirements of one capability. It is generated from the applied spec deltas. See [workflow-model.md](workflow-model.md#specs). | plan (for a spec), living document |
+| spec delta | The requirements that one plan adds, changes, or removes. A human approves it with the plan. | patch, change set |

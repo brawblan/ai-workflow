@@ -61,6 +61,19 @@ for a plan that names a persona, do these steps:
    risk.
 4. When research confirms a persona, set `evidence: validated` and add the source in the file.
 
+## Specs
+
+Specs and spec deltas are not components, but they cost the planner time and the human review time.
+Review the spec rules on 2027-04-18, and after the first 10 plans with a delta. Measure:
+
+| Measure | Keep the specs if |
+| --- | --- |
+| Review findings where the code and the spec disagree | They go down, or stay at zero |
+| Human time to approve a plan with a delta | It is not more than 1.5 times a plan with no delta |
+| Deltas that a human rejects as too large for the change | Fewer than 1 in 5 (dossier D5) |
+
+If the specs do not help, stop the deltas. The applied specs stay as documentation.
+
 ## Eval design
 
 | Item | Rule | Source |
