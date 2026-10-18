@@ -11,6 +11,6 @@ class Code:
 
 
 CODES = {
-    "SAVE10": Code(percent=10, ends=date(2026, 12, 31)),
+    "SAVE10": Code(percent=10, ends=date(2030, 12, 31)),
     "SPRING5": Code(percent=5, ends=date(2026, 5, 31)),
 }

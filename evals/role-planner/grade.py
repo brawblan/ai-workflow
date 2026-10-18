@@ -21,10 +21,15 @@ REPORT_ENV = "STONE_EVAL_REPORT"
 JOB_STORY = re.compile(r"\b[a-z][a-z0-9-]*\.J[1-9]\d*\b")
 HEADING = re.compile(r"^\s{0,3}(#{1,6})\s")
 # A label line starts a block in text with no heading: a bold line, or a short line that ends in ":".
-LABEL = re.compile(r"^\s{0,3}(\*\*[^*]+\*\*:?|__[^_]+__:?|[^.:!?|]{1,60}:)\s*$")
-# A line of the report that names a gap: a question, or words that say that the ticket is not clear.
-ASKS = re.compile(r"\?|question|unclear|not clear|ambiguous|unspecified|undefined|"
-                  r"(does|do|did) not (say|state|specify|define|cover)|decide|confirm|clarif",
+# A list item is not a label, so "- Codes:" in a questions block stays in that block.
+LABEL = re.compile(r"^\s{0,3}(?![-*+]\s|\d+[.)]\s)(\*\*[^*]+\*\*:?|__[^_]+__:?|[^.:!?|]{1,60}:)\s*$")
+LIST_ITEM = re.compile(r"^\s*([-*+]|\d+[.)])\s")
+# A line that says that there is no question, for example "None." or "No open questions".
+NONE = re.compile(r"^\W*(none|no\b|n/a)", re.I)
+# A line of the report that asks: a question mark, or words that say that the ticket is not clear.
+# Only the present tense counts: "I decided" or "I confirmed" is a decision, not a question.
+ASKS = re.compile(r"\?|\b(unclear|not clear|ambiguous|unspecified|undefined|decide|confirm|"
+                  r"clarify|clarification)\b|\b(does|do|did) not (say|state|specify|define|cover)\b",
                   re.I)
 
 
@@ -43,15 +48,22 @@ def _blocks(text: str, word: str) -> list[str]:
     """Return each block of the text whose first line has `word` in it.
 
     A heading block ends at the next heading of the same or a higher level. A label block ends at
-    the next heading or label. A label in a heading block is part of that block.
+    the next heading or label, or at a blank line and then a line that is not a list item. A label in
+    a heading block is part of that block.
     """
     blocks: list[str] = []
     current: list[str] | None = None
     level = 0  # the level of the open heading block, or 0 for a label block
+    blank = False
     for line in text.splitlines():
         new = _level(line)
         starts = (new and (not level or new <= level)) or (LABEL.match(line) and not (
             current is not None and level))
+        # A label block also ends at a blank line and then a line that is not a list item.
+        if current is not None and not level and blank and line.strip() and not LIST_ITEM.match(
+                line):
+            starts = True
+        blank = not line.strip()
         if starts:
             if current is not None:
                 blocks.append("\n".join(current))
@@ -109,16 +121,21 @@ def names_gap(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
     or if the report has it in an open questions block or on a line that asks.
     """
     pattern = re.compile(args["pattern"], re.I)
+
+    def asks(block: str) -> bool:  # a line of the block has the pattern and is not "None. ..."
+        return any(pattern.search(line) and not NONE.match(line)
+                   for line in block.splitlines()[1:])
+
     for path in sorted(workspace.glob(args["path"])):
         if path.is_file():
             text = path.read_text(encoding="utf-8", errors="replace")
-            if any(pattern.search(block) for block in _blocks(text, "question")):
+            if any(asks(block) for block in _blocks(text, "question")):
                 return True, f"the open questions of {path.name} name the gap"
     report = os.environ.get(REPORT_ENV, "")
-    if any(pattern.search(block) for block in _blocks(report, "question")):
+    if any(asks(block) for block in _blocks(report, "question")):
         return True, "the open questions of the report name the gap"
     for line in report.splitlines():
-        if pattern.search(line) and ASKS.search(line):
+        if pattern.search(line) and ASKS.search(line) and not NONE.match(line):
             return True, f"the report asks: {line.strip()[:80]}"
     return False, "no open question names the gap"
 
@@ -170,7 +187,8 @@ def main() -> int:
         if not isinstance(args, dict):
             raise TypeError("--args must be a JSON object")
         passed, detail = GRADERS[options.name](options.workspace, args)
-    except (KeyError, TypeError, ValueError, OSError, re.error) as error:  # bad args, no file
+    except (KeyError, TypeError, ValueError, OSError, re.error,
+            NotImplementedError) as error:  # bad args, no file, an absolute glob
         passed, detail = False, f"the grader input is not valid: {error!r}"
     print(json.dumps({"pass": passed, "detail": detail}))
     return 0
