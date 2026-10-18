@@ -3,22 +3,22 @@
 How to use Cornerstone, one situation at a time. Each guide names its
 [profile](../../framework/profiles/README.md) and its default [mode](../../framework/modes.md).
 
-Cornerstone is draft v0. `stone render` writes the role files for all 10 profiles. Some profile
-checks and the triggers are not rendered yet. So each guide has two parts:
+Cornerstone v1 supports all 10 profiles (D24). `stone render` writes the role files, the checks, and
+the trigger workflows of each profile. Each guide has two parts:
 
-- **Today:** the steps that work now, with the tools in this repo.
-- **When the profile ships:** the target flow from the framework. Use it to know what changes later.
+- **Today:** the steps that work now, with the real commands.
+- **Not built yet:** a short list of the parts that do not work. Do these by hand.
 
 ## Pick a guide
 
 | Situation | Guide | Profile | Default mode | Status |
 | --- | --- | --- | --- | --- |
-| I have an empty folder and an idea | [Start a project](start-a-project.md) | full-project | hybrid | Partial |
+| I have an empty folder and an idea | [Start a project](start-a-project.md) | full-project | hybrid | Works today |
 | I have a repo with no agent framework | [Add Cornerstone to a repo](add-to-a-repo.md) | single-ticket | agent-centric | Works today |
 | I use Spec Kit, OpenSpec, BMAD, or rule files | [Migrate to Cornerstone](migrate.md) | (setup) | — | Partial |
 | I want to make one small, clear change | [Make a small change](small-change.md) | single-ticket | agent-centric | Works today |
-| I have a confirmed bug | [Fix a bug](fix-a-bug.md) | debugging | hybrid | Partial |
-| I want a feature that touches many layers | [Build a feature](build-a-feature.md) | app-slice | hybrid | Partial |
+| I have a confirmed bug | [Fix a bug](fix-a-bug.md) | debugging | hybrid | Works today |
+| I want a feature that touches many layers | [Build a feature](build-a-feature.md) | app-slice | hybrid | Works today |
 
 All guides use [Run the roles](run-the-roles.md). It shows how to start each role in its own
 session, and how to commit its work.
