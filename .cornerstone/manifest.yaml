@@ -44,7 +44,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .cornerstone/hooks/protect-paths.py
-  hash: 0d7677bb3acf4afb3f3439fbc7bd0cf335edd56b45996f779fd45906e6f6ac28
+  hash: f6774cfd20d8249ba866501d118b78d84614eb940fdf43dfe565dcadae7fdc6a
 - id: hook.settings
   kind: hook
   purpose: Register the protected-path hook in the harness settings. Other keys stay
