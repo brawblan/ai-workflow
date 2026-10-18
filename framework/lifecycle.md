@@ -150,7 +150,15 @@ flowchart LR
 - The workspace is in the system temp folder, so that no instruction file in a parent folder goes
   into the run.
 - The harness adapter gives the command for each variant in `eval.yaml`. The core has no harness
-  name (P12).
+  name (P12). The `output` map of `eval.yaml` uses these names: `report` (the final text),
+  `cost_usd`, `input_tokens`, `output_tokens`, and `turns`. The table shows "—" for a name that is
+  not in the map.
+- Git in the workspace does not read the global or the system git config. Thus each machine gives
+  the same result. Add a `.gitignore` to each fixture for the files that a build or a test writes,
+  for example a bytecode cache. If not, `unchanged` and `only_changed` count those files.
+- A run stops at `--timeout`, with each process that the harness started.
+- The runner cannot yet remove a component that is merged into a shared file. For that component,
+  use `--variant with`.
 - The runner writes the transcripts and `runs.jsonl` to `.cornerstone/eval-runs/`. Do not commit
   them. It writes the result table to `evals/results/`. Add the table to the PR.
 - Use `--check-only` to validate the scenarios without a run.

@@ -13,6 +13,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -34,7 +35,9 @@ REPORT = "@report"  # a check path that means the final text of the run
 RUNS = Path(".cornerstone/eval-runs")
 RESULTS = Path("evals/results")
 GIT_ENV = {"GIT_AUTHOR_NAME": "stone eval", "GIT_AUTHOR_EMAIL": "eval@example.invalid",
-           "GIT_COMMITTER_NAME": "stone eval", "GIT_COMMITTER_EMAIL": "eval@example.invalid"}
+           "GIT_COMMITTER_NAME": "stone eval", "GIT_COMMITTER_EMAIL": "eval@example.invalid",
+           # No global or system git config: the same scenario gives the same result on each machine.
+           "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
 
 
 class EvalError(Exception):
@@ -113,6 +116,11 @@ def _check_problems(item: Any, folder: Path) -> list[str]:
         problems.append(f"the kind '{item['kind']}' is not valid. Use one of {sorted(KINDS)}")
     if item["check"] == "grader" and not (folder / "grade.py").exists():
         problems.append("a grader check needs grade.py in the eval folder")
+    if item["check"] == "matches" and "pattern" in item:
+        try:
+            re.compile(str(item["pattern"]))
+        except re.error as error:
+            problems.append(f"the pattern '{item['pattern']}' is not a valid regex: {error}")
     return problems
 
 
@@ -168,9 +176,9 @@ def prepare(folder: Path, scenario: dict[str, Any], framework: Path, role_file: 
     if (path / render.CONFIG).exists():
         with redirect_stderr(StringIO()):
             render.render(path, framework)
-        if variant == "without":
-            (path / role_file).unlink(missing_ok=True)
-        _commit(path, "chore(cornerstone): render\n\nRole: generator\nActor: agent")
+    if variant == "without" and role_file:
+        (path / role_file).unlink(missing_ok=True)
+    _commit(path, "chore(cornerstone): render\n\nRole: generator\nActor: agent")
     if scenario.get("change"):
         _git(path, "apply", "--whitespace=nowarn", str((folder / scenario["change"]).resolve()))
         _commit(path, "feat: the change under test\n\nRole: implementer\nActor: agent")
@@ -206,6 +214,25 @@ def parse_output(stdout: str, fields: dict[str, str]) -> dict[str, Any]:
     return {}
 
 
+def _harness(argv: list[str], cwd: Path, env: dict[str, str],
+             timeout: int) -> tuple[int | None, str, str]:
+    """Run the harness in its own process group. Return (exit code or None on timeout, out, err).
+
+    On a timeout, the whole group stops, so no tool process writes to the workspace after it.
+    """
+    with subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
+                          stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          start_new_session=True) as process:
+        try:
+            out, err = process.communicate(timeout=timeout)
+            code: int | None = process.returncode
+        except subprocess.TimeoutExpired:
+            os.killpg(process.pid, signal.SIGKILL)
+            out, err = process.communicate()
+            code = None
+    return code, out.decode(errors="replace"), err.decode(errors="replace")
+
+
 def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], variant: str,
              trial: int, opts: dict[str, Any]) -> Run:
     run = Run(scenario["id"], variant, trial)
@@ -218,30 +245,33 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
     prompt = "\n\n".join(part for part in (data.get("task"), scenario["prompt"]) if part)
     values = {"role": data["role"], "model": opts["model"], "budget": opts["budget"],
               "prompt": prompt, "tools": (config.get("tools") or {}).get(data["role"], [])}
-    env = {**os.environ, **{k: Template(str(v)).safe_substitute(values)
-                            for k, v in ((config.get("env") or {}).get(variant) or {}).items()}}
+    env = {**os.environ, **GIT_ENV,
+           **{k: Template(str(v)).safe_substitute(values)
+              for k, v in ((config.get("env") or {}).get(variant) or {}).items()}}
     start = time.monotonic()
+    stdout = stderr = ""
     try:
-        result = subprocess.run(build_command(config, variant, values), cwd=workspace.path,
-                                env=env, stdin=subprocess.DEVNULL, capture_output=True,
-                                text=True, timeout=opts["timeout"])
-        stdout = result.stdout
-        if result.returncode != 0:
-            run.error = f"the harness exit code is {result.returncode}"
-    except subprocess.TimeoutExpired as error:
-        stdout = error.stdout.decode() if isinstance(error.stdout, bytes) else error.stdout or ""
-        run.error = f"the harness ran for more than {opts['timeout']} seconds"
+        code, stdout, stderr = _harness(build_command(config, variant, values), workspace.path,
+                                        env, opts["timeout"])
+        if code is None:
+            run.error = f"the harness ran for more than {opts['timeout']} seconds"
+        elif code != 0:
+            run.error = f"the harness exit code is {code}"
     except OSError as error:
-        stdout, run.error = "", f"the harness did not start: {error}"
-    run.usage = parse_output(stdout, config.get("output") or {})
-    run.usage.setdefault("seconds", round(time.monotonic() - start, 1))
-    workspace.report = str(run.usage.pop("report", "") or "")
-    transcript = opts["runs"] / f"{scenario['id']}-{variant}-{trial}.out"
-    transcript.write_text(stdout, encoding="utf-8")
-    run.usage.update(transcript=str(transcript), workspace=str(workspace.path))
-    run.checks = grade(folder, scenario, workspace)
-    if not opts["keep"]:
-        shutil.rmtree(workspace.path.parent, ignore_errors=True)
+        run.error = f"the harness did not start: {error}"
+    try:
+        run.usage = parse_output(stdout, config.get("output") or {})
+        run.usage.setdefault("seconds", round(time.monotonic() - start, 1))
+        workspace.report = str(run.usage.pop("report", "") or "")
+        transcript = opts["runs"] / f"{scenario['id']}-{variant}-{trial}.out"
+        transcript.write_text(stdout, encoding="utf-8")
+        if stderr:
+            transcript.with_suffix(".err").write_text(stderr, encoding="utf-8")
+        run.usage.update(transcript=str(transcript), workspace=str(workspace.path))
+        run.checks = grade(folder, scenario, workspace)
+    finally:
+        if not opts["keep"]:
+            shutil.rmtree(workspace.path.parent, ignore_errors=True)
     return run
 
 
@@ -249,9 +279,11 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
 
 
 def _changed(ws: Workspace) -> list[str]:
-    committed = _git(ws.path, "diff", "--name-only", ws.setup, "HEAD").splitlines()
-    status = _git(ws.path, "status", "--porcelain", "--untracked-files=all").splitlines()
-    return sorted(set(committed + [line[3:] for line in status]) - {""})
+    """Return each path that the run added, changed, or removed. A rename gives both paths."""
+    committed = _git(ws.path, "diff", "--name-only", "--no-renames", "-z", ws.setup, "HEAD")
+    status = _git(ws.path, "status", "--porcelain=v1", "-z", "--no-renames",
+                  "--untracked-files=all")
+    return sorted(set(committed.split("\0") + [item[3:] for item in status.split("\0")]) - {""})
 
 
 def _under(path: str, prefixes: list[str]) -> bool:
@@ -322,7 +354,8 @@ def _json_valid(ws: Workspace, item: dict[str, Any], _: Path) -> tuple[bool, str
 def _command(ws: Workspace, item: dict[str, Any], _: Path) -> tuple[bool, str]:
     try:
         result = subprocess.run(shlex.split(item["run"]), cwd=ws.path, capture_output=True,
-                                text=True, timeout=item.get("timeout", 300))
+                                text=True, timeout=item.get("timeout", 300),
+                                env={**os.environ, **GIT_ENV})
     except (OSError, subprocess.TimeoutExpired) as error:
         return False, str(error)
     return result.returncode == item.get("exit", 0), f"exit code {result.returncode}"
@@ -352,7 +385,7 @@ def _grader(ws: Workspace, item: dict[str, Any], folder: Path) -> tuple[bool, st
              "--workspace", str(ws.path), "--args", json.dumps(args)],
             cwd=folder, capture_output=True, text=True, timeout=item.get("timeout", 600))
         data = json.loads(result.stdout.strip().splitlines()[-1])
-        return bool(data["pass"]), str(data.get("detail", ""))
+        return data["pass"] is True, str(data.get("detail", ""))
     except (OSError, subprocess.TimeoutExpired, IndexError, KeyError, TypeError,
             json.JSONDecodeError) as error:
         return False, f"the grader failed: {error}"
@@ -376,7 +409,10 @@ CHECKS: dict[str, tuple[Any, tuple[str, ...]]] = {  # name -> (function, require
 def grade(folder: Path, scenario: dict[str, Any], ws: Workspace) -> list[dict[str, Any]]:
     results = []
     for item in scenario["expect"]:
-        passed, detail = CHECKS[item["check"]][0](ws, item, folder)
+        try:
+            passed, detail = CHECKS[item["check"]][0](ws, item, folder)
+        except Exception as error:  # a broken check fails itself, not the eval
+            passed, detail = False, f"the check failed: {error}"
         label = (item.get("name") or item.get("path") or item.get("trailer") or item.get("run")
                  or ", ".join(item.get("paths", [])))
         results.append({"check": item["check"], "label": str(label), "kind":
@@ -440,6 +476,9 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
                              .read_text(encoding="utf-8"))
     model = model or profile["defaults"]["role_models"].get(data["role"], "")
     variants = VARIANTS if variant == "both" else (variant,)
+    if entry.get("merge") and "without" in variants:
+        raise EvalError(f"{component_id} is merged into a shared file. The runner cannot remove "
+                        "it for 'without' yet. Use --variant with.")
     if check_only:
         for scenario in scenarios:
             print(f"{scenario['id']}: {len(scenario['expect'])} check(s), "
@@ -452,17 +491,18 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
             "run_config": loaded, "model": model, "budget": budget, "timeout": timeout,
             "runs": runs_folder, "keep": keep}
     runs: list[Run] = []
-    for scenario in scenarios:
-        for name in variants:
-            for trial in range(1, trials + 1):
-                run = run_once(folder, data, scenario, name, trial, opts)
-                print(f"{run.scenario} {run.variant} {run.trial}: "
-                      f"{'pass' if run.passed() else 'fail'} {run.error}".rstrip())
-                runs.append(run)
     with (runs_folder / "runs.jsonl").open("w", encoding="utf-8") as handle:
-        for run in runs:
-            handle.write(json.dumps(run.__dict__) + "\n")
-    result_path = root / RESULTS / f"{stamp}-{component_id}-{model or 'default'}.md"
+        for scenario in scenarios:
+            for name in variants:
+                for trial in range(1, trials + 1):
+                    run = run_once(folder, data, scenario, name, trial, opts)
+                    print(f"{run.scenario} {run.variant} {run.trial}: "
+                          f"{'pass' if run.passed() else 'fail'} {run.error}".rstrip())
+                    runs.append(run)
+                    handle.write(json.dumps(run.__dict__) + "\n")  # kept if a later run stops
+                    handle.flush()
+    safe_model = re.sub(r"[^\w.-]+", "-", model) or "default"
+    result_path = root / RESULTS / f"{stamp}-{component_id}-{safe_model}.md"
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text(summary(component_id, model, runs), encoding="utf-8")
     return runs, str(result_path)

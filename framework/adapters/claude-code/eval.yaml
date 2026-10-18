@@ -21,7 +21,8 @@ tools:   # the same lists as the role files, plus the commands that the role run
            "Bash(git log*)", "Bash(git show*)", "Bash(git add*)", "Bash(git commit*)",
            "Bash(git status*)"]
 
-output:   # dotted paths in the last JSON object of the output (the "result" event)
+output:   # dotted paths in the last JSON object of the output (the "result" event).
+          # stone reads these names: report, cost_usd, input_tokens, output_tokens, turns.
   report: result
   cost_usd: total_cost_usd
   input_tokens: usage.input_tokens

@@ -132,6 +132,7 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 - `render` does not read profile overrides (`.cornerstone/profiles/`) yet.
 - `eval` runs on the local machine, not in CI. The runs need harness authentication and cost tokens.
 - `eval` puts each workspace in the system temp folder, so that no instruction file in a parent folder goes into the run.
+- `eval --model` sets the model on the command line. If the role file also sets a model, the harness decides which one wins. Use the model in the model profile, or check the adapter doc.
 - If the hook entry in `.claude/settings.json` changes in a new framework version, `render` adds the new entry. Remove the old entry by hand.
 
 ## Test
