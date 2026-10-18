@@ -1,4 +1,4 @@
-"""Tests for the role.planner eval in evals/role-planner/ (roadmap item 4c, D33).
+"""Tests for the role.planner eval in evals/role-planner/ (roadmap item 4c, D35).
 
 Each grader test copies the shop fixture to a temp folder, makes a git repo of it, and writes the
 planner output. Then it runs grade.py as a subprocess, as `stone eval` does, with the final text of

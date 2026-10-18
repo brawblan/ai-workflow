@@ -1828,7 +1828,7 @@ class WorkBranchTest(EvalTestCase):
         self.assertEqual(passes, [False, False, True, True, True], self.runs()[0]["checks"])
 
 
-# EVAL-4c criterion 1 (D33): the grader gets the final report of the run -----------------------
+# EVAL-4c criterion 1 (D35): the grader gets the final report of the run -----------------------
 
 REPORT_GRADER = r'''
 import argparse, json, os
