@@ -116,7 +116,7 @@ class RenderTest(unittest.TestCase):
 
     def test_dry_run_writes_nothing(self) -> None:
         result = self.render(dry_run=True)
-        self.assertEqual(len(result.wrote), 10)
+        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + OTHER_FILES + [ST_LABEL]))
         self.assertFalse((self.root / ".claude").exists())
         self.assertFalse((self.root / render.MANIFEST).exists())
 
@@ -396,11 +396,12 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(self.run_hook("docs/plans/T-1.md", "reviewer"), 2)
 
     def test_single_ticket_does_not_write_the_planner(self) -> None:
+        expected = sorted(ROLE_FILES + OTHER_FILES + [ST_LABEL])
         result = self.render()
-        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + OTHER_FILES + [ST_LABEL]))
+        self.assertEqual(sorted(result.wrote), expected)
         self.assertFalse((self.root / PLANNER).exists())
         self.assertNotIn("role.planner", [c["id"] for c in self.manifest()["components"]])
-        self.assertEqual(len(self.render(dry_run=True).skipped), 10)
+        self.assertEqual(sorted(self.render(dry_run=True).skipped), expected)
 
     def test_single_ticket_hook_keeps_the_role_rules(self) -> None:
         self.render()
