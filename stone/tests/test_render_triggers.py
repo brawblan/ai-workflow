@@ -1,4 +1,4 @@
-"""Tests for the trigger workflows of `stone render` (roadmap 6g part 1, D31)."""
+"""Tests for the trigger workflows of `stone render` (roadmap 6g parts 1 and 2, D31)."""
 
 from __future__ import annotations
 
@@ -14,7 +14,24 @@ from stone import cli
 from test_render_profiles import (FRAMEWORK, MANIFEST, TODAY, FrameworkCopy, RenderBase,
                                   profile_data, profile_names, trigger_files)
 
-TRIGGER = re.compile(r"^\.github/workflows/cornerstone-(.+)-(label|schedule)\.yml$")
+TRIGGER = re.compile(
+    r"^\.github/workflows/cornerstone-(.+)-(label|schedule|issue-opened|dependency-pr)\.yml$")
+ISSUE_TOKENS = ({"contents": "read", "issues": "read"}, {"issues": "write"})
+TOKENS = {"label": ISSUE_TOKENS, "schedule": ISSUE_TOKENS, "issue-opened": ISSUE_TOKENS,
+          "dependency-pr": ({"contents": "read", "pull-requests": "read"},
+                            {"pull-requests": "write"})}
+BOTS = "dependabot[bot],renovate[bot]"
+# (allowed_non_write_users, allowed_bots) of the run step, for each trigger type.
+ALLOWED = {"label": ("", ""), "schedule": ("", ""), "issue-opened": ("*", ""),
+           "dependency-pr": ("", BOTS)}
+
+
+def on(data: dict) -> dict:
+    return data.get("on", data.get(True))  # YAML 1.1 reads on as True
+
+
+def run_step(data: dict) -> dict:
+    return next(s for s in data["jobs"]["run"]["steps"] if s.get("id") == "run")
 
 
 def parts(path: str) -> tuple[str, str]:
@@ -46,8 +63,9 @@ class TriggerFilesTest(TriggerBase):
                 self.tearDown()
                 self.setUp()
                 self.select([name])
-                result, _ = self.render()
+                result, log = self.render()
                 self.assertEqual(result.exit_code, 0)
+                self.assertNotIn("skipped trigger", log)
                 self.assertEqual(sorted(self.workflows()), sorted(trigger_files([name])))
 
     def test_ac1_command_trigger_writes_no_workflow(self) -> None:
@@ -55,16 +73,23 @@ class TriggerFilesTest(TriggerBase):
         self.render()
         self.assertEqual(self.workflows(), {})
 
-    def test_ac1_ci_trigger_writes_no_file_and_logs_the_skip(self) -> None:
+    def test_p2_ac1_ci_trigger_writes_its_workflow(self) -> None:
         for name, event in (("bug-triage", "issue-opened"), ("dependency-upgrade", "dependency-pr")):
             with self.subTest(profile=name):
                 self.tearDown()
                 self.setUp()
                 self.select([name])
                 _, log = self.render()
-                self.assertIn(f"skipped trigger ci:{event} of profile {name}", log)
+                self.assertNotIn("skipped trigger", log)
                 self.assertEqual(sorted(self.workflows()),
-                                 [f".github/workflows/cornerstone-{name}-schedule.yml"])
+                                 [f".github/workflows/cornerstone-{name}-{event}.yml",
+                                  f".github/workflows/cornerstone-{name}-schedule.yml"])
+
+    def test_p2_ac1_no_profile_logs_a_skipped_trigger(self) -> None:
+        self.select(profile_names())
+        result, log = self.render()
+        self.assertEqual(result.exit_code, 0)
+        self.assertNotIn("skipped trigger", log)
 
 
 class TriggerContentTest(TriggerBase):
@@ -73,14 +98,39 @@ class TriggerContentTest(TriggerBase):
         self.select(profile_names())
         self.result, _ = self.render()
 
-    def test_ac2_permissions_are_exact(self) -> None:
+    def test_ac2_p2_ac2_ac3_permissions_are_exact(self) -> None:
         self.assertEqual(len(self.workflows()), len(trigger_files(profile_names())))
+        self.assertEqual({parts(p)[1] for p in self.workflows()}, set(TOKENS))
         for path, data in self.workflows().items():
             with self.subTest(path=path):
                 self.assertEqual(data["permissions"], {})
-                self.assertEqual(data["jobs"]["run"]["permissions"],
-                                 {"contents": "read", "issues": "read"})
-                self.assertEqual(data["jobs"]["post"]["permissions"], {"issues": "write"})
+                run, post = TOKENS[parts(path)[1]]
+                self.assertEqual(data["jobs"]["run"]["permissions"], run)
+                self.assertEqual(data["jobs"]["post"]["permissions"], post)
+
+    def test_p2_ac5_only_the_post_job_has_a_write_permission(self) -> None:
+        for path, data in self.workflows().items():
+            for job_name, job in data["jobs"].items():
+                with self.subTest(path=path, job=job_name):
+                    writes = "write" in (job.get("permissions") or {}).values()
+                    self.assertEqual(writes, job_name == "post")
+
+    def test_p2_ac2_ac3_events(self) -> None:
+        wf = self.workflows()
+        issue = wf[".github/workflows/cornerstone-bug-triage-issue-opened.yml"]
+        self.assertEqual(on(issue), {"issues": {"types": ["opened"]}})
+        pr = wf[".github/workflows/cornerstone-dependency-upgrade-dependency-pr.yml"]
+        self.assertEqual(on(pr), {"pull_request": {"types": ["opened", "reopened"]}})
+        for bot in BOTS.split(","):
+            self.assertIn(f'"{bot}"', pr["jobs"]["run"]["if"])
+        self.assertIn("github.event.pull_request.user.login", pr["jobs"]["run"]["if"])
+
+    def test_p2_ac2_ac3_ac4_run_step_allows_only_the_trigger_users(self) -> None:
+        for path, data in self.workflows().items():
+            with self.subTest(path=path):
+                step = run_step(data)["with"]
+                self.assertEqual((step["allowed_non_write_users"], step["allowed_bots"]),
+                                 ALLOWED[parts(path)[1]])
 
     def test_ac3_no_run_script_has_an_expression_and_events_come_through_env(self) -> None:
         for path, data in self.workflows().items():
@@ -118,6 +168,11 @@ class TriggerContentTest(TriggerBase):
                                  (TODAY.isoformat(), "2027-04-18"))
         self.assertEqual(len([i for i in entries if i.startswith("trigger.")]),
                          len(self.workflows()))
+        for entry_id, kind in (("trigger.issue-opened.bug-triage", "issue-opened"),
+                               ("trigger.dependency-pr.dependency-upgrade", "dependency-pr")):
+            with self.subTest(entry=entry_id):  # p2 AC6
+                self.assertEqual((entries[entry_id]["kind"], entries[entry_id]["eval"]),
+                                 ("ci-job", f"evals/trigger-{kind}/"))
 
     def test_ac9_second_render_writes_nothing(self) -> None:
         before = {path: self.read(path) for path in self.written_files()}
@@ -173,6 +228,21 @@ class EditedTriggerTest(FrameworkCopy, TriggerBase):
                 self.set_triggers(["command", f"schedule:{value}"])
                 self.assertEqual(self.cli_render(), 1)
                 self.assertEqual(self.written_files(), [])
+
+    def test_p2_ci_trigger_in_another_profile_gets_its_own_workflow(self) -> None:
+        self.set_triggers(["command", "ci:dependency-pr"])
+        self.assertEqual(self.cli_render(), 0)
+        data = yaml.safe_load(self.read(
+            ".github/workflows/cornerstone-code-audit-dependency-pr.yml"))
+        self.assertEqual(run_step(data)["with"]["allowed_bots"], BOTS)
+        self.assertEqual(data["jobs"]["post"]["permissions"], {"pull-requests": "write"})
+
+    def test_p2_unknown_ci_event_is_still_skipped_with_a_log_line(self) -> None:
+        self.set_triggers(["command", "ci:push"])
+        result, log = self.render()
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("skipped trigger ci:push of profile code-audit", log)
+        self.assertEqual(self.workflows(), {})
 
     def test_ac7_two_label_triggers_fail_and_write_no_file(self) -> None:
         # Finding (2026-10-18): render exits 0. Both labels get the id trigger.label.code-audit,
