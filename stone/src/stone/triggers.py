@@ -113,11 +113,11 @@ def insert_block(template: str, name: str, block: str) -> str:
     return re.sub(rf"^([ \t]*)\${name}[ \t]*$", indent, template, flags=re.M)
 
 
-def check_targets(targets: dict[str, str]) -> None:
+def check_targets(targets: list[tuple[str, str]]) -> None:
     """Fail if two triggers write the same file, for example two labels in one profile."""
     seen: dict[str, str] = {}
-    for component_id, target in targets.items():
+    for trigger_text, target in targets:
         if target in seen:
-            raise TriggerError(f"{seen[target]} and {component_id} write the same file {target}. "
-                               "Keep one trigger of each type in a profile.")
-        seen[target] = component_id
+            raise TriggerError(f"The triggers {seen[target]} and {trigger_text} write the same "
+                               f"file {target}. Keep one trigger of each type in a profile.")
+        seen[target] = trigger_text

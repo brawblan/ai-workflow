@@ -238,7 +238,7 @@ def trigger_components(framework: Path, harness: Path, registry: list[dict[str, 
     """Return one workflow for each profile trigger that is not `command` (D31)."""
     entries = {entry["trigger"]: entry for entry in registry if "trigger" in entry}
     found = triggers.profile_triggers(profiles)
-    components, targets = [], {}
+    components, targets = [], []
     for trigger in triggers.supported(found, set(entries)):
         entry = entries[trigger.key]
         values = template_values(config, "")
@@ -251,7 +251,7 @@ def trigger_components(framework: Path, harness: Path, registry: list[dict[str, 
         text = triggers.insert_block(text, "profile_steps", steps)
         component_id = f"{entry['id']}.{trigger.profile['id']}"
         target = fill(entry["target"], entry["template"], values, config)
-        targets[component_id] = target
+        targets.append((trigger.text, target))
         components.append(Component(component_id, entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {target: fill(text, entry["template"], values, config)}))
