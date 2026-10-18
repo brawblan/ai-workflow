@@ -31,6 +31,19 @@ checks for the profile in CI. Each check SHOULD also run on the developer's mach
 K4, K5, K8, K10, K11, and K12 run a repo tool. The repo config gives the command for each one. See
 [customization.md](customization.md#commands-for-the-by-profile-checks).
 
+## K16 and the spike branch
+
+K16 is the control that stops spike code from merging. The protected-path hook trusts the branch
+name (D25). On a branch with the `spike/` prefix, the investigator can write any file except the
+harness and Cornerstone files. K16 fails a pull request from that branch into the main branch.
+
+- `stone render` writes K16 as a CI job for each profile that lists K16 (D30).
+- The job runs from the base branch, so a commit on the spike branch cannot change or remove it.
+- K16 blocks from the start. A warning does not stop a merge, and D25 depends on K16.
+- Make the K16 job a required status check on the main branch.
+- K16 reads only the branch name. If a person renames a spike branch, K16 does not see it. Gate G4
+  is then the control.
+
 ## Choose a test technique by what you can state
 
 | You can state | Use | Check |
@@ -49,7 +62,8 @@ Source: dossier B14, C3.
 1. A check MUST be read-only for the implementer and the tester. Only a human changes a check (K6).
 2. A check failure message SHOULD say how to fix the failure. Agents act on the message (dossier C7).
 3. A new check starts as a warning for 2 weeks. Then it becomes blocking. The repo config can
-   change this period.
+   change this period. Exception: K16 blocks from the start, because a role permission depends on
+   it (D30).
 4. When an agent makes the same mistake twice, add a check if the rule can be stated. Add an
    instruction only if it cannot (P6).
 5. Limits (size, complexity, mutation score) are in the repo config, not in the check code.

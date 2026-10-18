@@ -193,3 +193,12 @@ components:
     target: .github/workflows/cornerstone-$profile-dependency-pr.yml
     values: {allowed_bots: "dependabot[bot],renovate[bot]"}
     eval: evals/trigger-dependency-pr/
+
+  - id: check.k16
+    kind: ci-job
+    purpose: K16. Fail a pull request from a spike branch into the main branch (D30).
+    principle: [P2, P6]
+    when: {check: K16}
+    template: workflows/cornerstone-k16.yml
+    target: .github/workflows/cornerstone-k16.yml
+    eval: evals/check-k16/

@@ -1,0 +1,79 @@
+framework_version: 0.8.0
+components:
+- id: hook.protect-paths
+  kind: hook
+  purpose: Block an edit to a path that the current role must not change.
+  principle:
+  - P2
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .cornerstone/hooks/protect-paths.py
+  hash: 192d8f92803a6cf7a7802ac9e9aa79828dba20e3fef9de8e458f695bfb9b15d5
+- id: hook.settings
+  kind: hook
+  purpose: Register the protected-path hook in the harness settings. Other keys stay
+    as they are.
+  principle:
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/settings.json
+  hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+- id: role.investigator
+  kind: role
+  purpose: Read, run, and report. Write only in the reports path, or anywhere on a
+    spike branch.
+  principle:
+  - P2
+  - P11
+  source: framework
+  owner: octocat
+  eval: evals/role-investigator/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/investigator.md
+  hash: 669723c9e13aacf308b32d803f35f6f30e960a9dec72ca48daeaf49b97192e8d
+- id: role.reviewer
+  kind: role
+  purpose: Find defects and scope drift in a fresh session.
+  principle:
+  - P2
+  - P11
+  source: framework
+  owner: octocat
+  eval: evals/role-reviewer/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/reviewer.md
+  hash: f8197133228034ca5d404252068295ef03b6ca9bfbdb4f091f05dbb8e219195b
+- id: trigger.schedule.code-audit
+  kind: ci-job
+  purpose: Start the first role of the profile on its schedule. Post its report as
+    an issue.
+  principle:
+  - P6
+  - P9
+  source: framework
+  owner: octocat
+  eval: evals/trigger-schedule/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .github/workflows/cornerstone-code-audit-schedule.yml
+  hash: 54c73a374f06a9e083c95be33e9f9c08f8ff4a3836c04ad31dd19b17709dec22

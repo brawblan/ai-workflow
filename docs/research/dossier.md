@@ -131,6 +131,7 @@ the workflow profiles where it applies, and the framework principle that it supp
 | F8 | Event text (an issue title or body, a PR title, a label) in an inline CI expression can inject shell commands. Pass it to the step through an environment variable. | [S35] [S36] | ALL | P9 |
 | F9 | A CI job output that contains a secret is redacted, and the next job does not get it. | [S36] | ALL | P9 |
 | F10 | An agent that reads untrusted issue text in CI needs a short-lived token with minimum permissions and a tool allowlist. A secret scrub reduces prompt-injection risk, but does not remove it. | [S37] | ALL | P9 |
+| F11 | A CI job that runs from the base branch of a pull request is not changed by the pull request. It is safe only if it does not check out or run code from the pull request. | [S38] | SP | P6, P9 |
 
 ### G. Measurement and component lifecycle
 
@@ -255,3 +256,4 @@ in this repo.
 | S35 | GitHub Security Lab, [Keeping your GitHub Actions and workflows secure Part 2: Untrusted input](https://securitylab.github.com/resources/github-actions-untrusted-input/). |
 | S36 | GitHub Docs, [Secure use reference](https://docs.github.com/en/actions/reference/security/secure-use), and the workflow syntax for job outputs. Read 2026-10-18. |
 | S37 | Anthropic, [claude-code-action security](https://github.com/anthropics/claude-code-action/blob/main/docs/security.md), v1.0.252. Read 2026-10-18. |
+| S38 | GitHub Security Lab, [Keeping your GitHub Actions and workflows secure: Preventing pwn requests](https://securitylab.github.com/resources/github-actions-preventing-pwn-requests/), 2021. The `pull_request_target` event. |

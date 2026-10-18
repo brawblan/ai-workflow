@@ -320,5 +320,104 @@ class DefaultExcludeTest(unittest.TestCase):
         self.assertEqual(sorted({f.path for f in findings}), ["docs/x.md"])
 
 
+# AC10: K17 skips Markdown under a folder named golden, and still tests other files.
+
+LONG_SENTENCE = " ".join(["word"] * 29) + " end.\n"  # 30 words: more than the limit of 25
+GOLDEN_FILE = "stone/tests/golden/spike/.claude/agents/shaper.md"
+OUTSIDE_FILE = "stone/tests/notes.md"
+
+
+class GoldenFolderTest(unittest.TestCase):
+    def setUp(self) -> None:
+        self._folder = tempfile.TemporaryDirectory()
+        # The rule file is outside the repo root, so that K17 does not test it.
+        self.root = Path(self._folder.name) / "repo"
+        self.root.mkdir()
+        self.rules_path = Path(self._folder.name) / "ste.md"
+        self.rules_path.write_text(RULES_MD, encoding="utf-8")
+
+    def tearDown(self) -> None:
+        self._folder.cleanup()
+
+    def write(self, name: str, text: str = LONG_SENTENCE) -> None:
+        path = self.root / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+
+    def git(self, *args: str) -> None:
+        subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                        "-c", "commit.gpgsign=false", *args],
+                       cwd=self.root, check=True, capture_output=True)
+
+    def paths_found(self, paths: list[str], base: str | None = None) -> list[str]:
+        findings = run(self.root, paths, base, rules(), DEFAULT_EXCLUDE)
+        return sorted({f.path for f in findings})
+
+    def cli(self, *args: str) -> tuple[int, str]:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = cli.main(["check-writing", "--root", str(self.root),
+                             "--rules", str(self.rules_path), "--mode", "block", *args])
+        return code, out.getvalue()
+
+    def test_ac10_fixture_sentence_fails_outside_a_golden_folder(self) -> None:
+        # Guard the test data: the same text has a finding when K17 tests it.
+        self.assertEqual(found(LONG_SENTENCE), ["Rule 8|error"])
+
+    def test_ac10_golden_file_given_by_path_is_skipped(self) -> None:
+        self.write(GOLDEN_FILE)
+        self.assertEqual(self.paths_found([GOLDEN_FILE]), [])
+
+    def test_ac10_golden_file_in_a_folder_scan_is_skipped_and_others_are_tested(self) -> None:
+        self.write(GOLDEN_FILE)
+        self.write(OUTSIDE_FILE)
+        self.assertEqual(self.paths_found(["stone"]), [OUTSIDE_FILE])
+
+    def test_ac10_golden_file_without_claude_folder_is_skipped(self) -> None:
+        name = "stone/tests/golden/spike/docs/report.md"
+        self.write(name)
+        self.write(OUTSIDE_FILE)
+        self.assertEqual(self.paths_found(["stone"]), [OUTSIDE_FILE])
+
+    def test_ac10_golden_file_in_a_diff_is_skipped_and_others_are_tested(self) -> None:
+        self.git("init", "-q", "-b", "main")
+        self.write("README.md", "# Readme\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "base")
+        self.git("checkout", "-q", "-b", "feature")
+        self.write(GOLDEN_FILE)
+        self.write(OUTSIDE_FILE)
+        self.assertEqual(self.paths_found([], base="main"), [OUTSIDE_FILE])
+
+    def test_ac10_golden_folder_at_the_repo_root_is_skipped(self) -> None:
+        self.write("golden/spike/.claude/agents/shaper.md")
+        self.write(OUTSIDE_FILE)
+        self.assertEqual(self.paths_found(["."]), [OUTSIDE_FILE])
+
+    def test_ac10_near_names_are_still_tested(self) -> None:
+        names = ["stone/tests/goldens/a.md", "stone/tests/not-golden/b.md",
+                 "stone/tests/golden-files/c.md", "stone/tests/golden.md",
+                 "docs/golden_notes.md"]
+        for name in names:
+            self.write(name)
+        self.assertEqual(self.paths_found(["."]), sorted(names))
+
+    def test_ac10_cli_passes_with_only_a_golden_file(self) -> None:
+        self.write(GOLDEN_FILE)
+        code, out = self.cli("stone")
+        self.assertEqual(code, 0, out)
+        self.assertIn("K17: 0 error(s)", out)
+        self.assertNotIn("shaper.md", out)
+
+    def test_ac10_cli_still_fails_on_a_file_outside_golden(self) -> None:
+        self.write(GOLDEN_FILE)
+        self.write(OUTSIDE_FILE)
+        code, out = self.cli("stone")
+        self.assertEqual(code, 1, out)
+        self.assertIn("notes.md", out)
+        self.assertNotIn("shaper.md", out)
+        self.assertIn("K17: 1 error(s)", out)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -24,7 +24,8 @@ REQUIRED_FIELDS = ["framework_version", "harness", "model_profile", "profiles", 
 REVIEW_MONTHS = 6
 CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches", "limit": "limits"}
 PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
-                    "protected_json": "paths.tests and paths.checks"}
+                    "protected_json": "paths.tests and paths.checks",
+                    "branch_main_json": "branches.main"}
 MODEL_VALUES = {"instruction_file_max_lines"}  # template values from `defaults` in the model profile
 FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "docs/reports/"}
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
@@ -175,7 +176,10 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
         values[f"paths_{key}"] = (", ".join(f"`{item}`" for item in value)
                                   if isinstance(value, list) else str(value))
     for key, value in (config.get("branches") or {}).items():
+        if value is None or not str(value).strip():
+            continue  # no branch name: a template that needs it raises an error that names it
         values[f"branch_{key}"] = str(value)
+        values[f"branch_{key}_json"] = json.dumps(str(value))  # a quoted YAML string
     for key, value in (config.get("limits") or {}).items():
         if value is not None and str(value).strip():  # an empty limit has no value
             values[f"limit_{key}"] = str(value)

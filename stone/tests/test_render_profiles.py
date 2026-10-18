@@ -49,6 +49,7 @@ K6 = ".cornerstone/checks/protected_paths.py"
 K7 = ".cornerstone/checks/change_size.py"
 K15 = ".cornerstone/checks/instruction_size.py"
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
+K16_WORKFLOW = ".github/workflows/cornerstone-k16.yml"
 MANIFEST = ".cornerstone/manifest.yaml"
 ALWAYS = [HOOK, SETTINGS, MANIFEST]
 REPORT_PROFILES = ["bug-triage", "code-audit", "spike"]
@@ -93,6 +94,8 @@ def expected_files(names: list[str]) -> list[str]:
         files.append(K7)
     if any("K15" in profile["checks"] for profile in profiles):
         files.append(K15)
+    if any("K16" in profile["checks"] for profile in profiles):
+        files.append(K16_WORKFLOW)
     return sorted(files)
 
 
@@ -632,6 +635,8 @@ class AllProfilesTest(RenderBase):
                 + trigger_files(profile_names()))
         if any("K15" in profile_data(name)["checks"] for name in profile_names()):
             want.append(K15)
+        if any("K16" in profile_data(name)["checks"] for name in profile_names()):
+            want.append(K16_WORKFLOW)
         self.assertEqual(sorted(result.wrote), sorted(want))
 
     def test_ac7_second_render_with_all_profiles_writes_nothing(self) -> None:

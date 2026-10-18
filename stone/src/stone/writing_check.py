@@ -16,7 +16,8 @@ DEFAULT_RULES = Path("plugins/workflow/skills/ste-writing/references/ste.md")
 DEFAULT_DICTIONARY = Path("docs/style/ste.md")
 # Agent-facing text is out of scope (writing.md, "Scope"). Golden files are rendered templates.
 DEFAULT_EXCLUDE = ["*SKILL.md", "*/skills/*", "AGENTS.md", "*/AGENTS.md", "CLAUDE.md",
-                   "*/CLAUDE.md", ".claude/*", "*/.claude/*", "*/templates/*", "*/golden/*",
+                   "*/CLAUDE.md", ".claude/*", "*/.claude/*", "*/templates/*",
+                   "golden/*", "*/golden/*",
                    ".git/*"]
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(\[])")
 WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’/_-]*")
