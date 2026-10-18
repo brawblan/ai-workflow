@@ -39,8 +39,9 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 - If the code and a doc disagree, stop and ask. Do not choose a side.
 - Before a destructive action (delete, force push, overwrite, tag move), show a WARNING and get
   approval.
-- Keep each PR under 600 changed lines (P10). If it is larger, split it, or record a waiver in the
-  PR body.
+- Keep each PR under the size limit (P10). The limit is `limits.pr_changed_lines` in the profile, or
+  the default in [customization.md](framework/customization.md). If a PR is larger, split it, or
+  record a waiver in the PR body.
 
 ## Framework changes
 
