@@ -402,6 +402,154 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(self.run_hook("docs/plans/T-1.md", "tester"), 2)
         self.assertEqual(self.run_hook("docs/plans/T-1.md", "reviewer"), 2)
 
+    # Specs part 2, AC4: the specs path is protected
+
+    def specs_path(self, value: str | None, profile: str = "[app-slice]") -> None:
+        text = CONFIG.replace("[single-ticket]", profile)
+        line = "  plans: docs/plans/\n"
+        self.write_config(text.replace(line, line + (f"  specs: {value}\n" if value else "")))
+
+    def protected_list(self, path: str) -> list[str]:
+        text = (self.root / path).read_text(encoding="utf-8")
+        line = next(line for line in text.splitlines() if line.startswith("PROTECTED = "))
+        return json.loads(line[len("PROTECTED = "):])
+
+    def test_specs_default_path_is_in_the_hook_and_k6_lists(self) -> None:
+        self.specs_path(None)
+        self.render()
+        for path in (".cornerstone/hooks/protect-paths.py",
+                     ".cornerstone/checks/protected_paths.py"):
+            with self.subTest(path=path):
+                self.assertIn("docs/specs/", self.protected_list(path))
+
+    def test_specs_path_is_protected_in_the_single_ticket_profile(self) -> None:
+        self.specs_path(None, "[single-ticket]")
+        self.render()
+        self.assertIn("docs/specs/", self.protected_list(".cornerstone/hooks/protect-paths.py"))
+        self.assertEqual(self.run_hook("docs/specs/export.md", "implementer"), 2)
+
+    def test_hook_blocks_each_writing_role_on_the_specs_path(self) -> None:
+        self.specs_path(None)
+        self.render()
+        for role in ("implementer", "tester", "planner", "reviewer"):
+            for path in ("docs/specs/export.md", "docs/specs/sub/a.md"):
+                with self.subTest(role=role, path=path):
+                    self.assertEqual(self.run_hook(path, role), 2)
+        # The roles keep their own paths.
+        self.assertEqual(self.run_hook("docs/plans/T-1.spec.md", "planner"), 0)
+        self.assertEqual(self.run_hook("tests/test_a.py", "tester"), 0)
+        self.assertEqual(self.run_hook("src/a.py", "implementer"), 0)
+
+    def test_hook_tells_the_implementer_why_it_blocks_a_spec(self) -> None:
+        self.specs_path(None)
+        self.render()
+        event = json.dumps({"tool_input": {"file_path": str(self.root / "docs/specs/export.md")}})
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(self.root), "STONE_ROLE": "implementer"}
+        run = subprocess.run([sys.executable, ".cornerstone/hooks/protect-paths.py"],
+                             cwd=self.root, input=event, env=env, capture_output=True, text=True)
+        self.assertEqual(run.returncode, 2)
+        self.assertIn("docs/specs/export.md", run.stderr)
+
+    def test_hook_blocks_the_specs_path_in_a_worktree(self) -> None:
+        self.specs_path(None)
+        self.render()
+        self.git("init", "-q")
+        self.commit("README.md", "base")
+        self.git("worktree", "add", "-q", "-b", "wt", ".claude/worktrees/wt")
+        tree = ".claude/worktrees/wt/"
+        for role in ("implementer", "tester", "planner"):
+            with self.subTest(role=role):
+                self.assertEqual(self.run_hook(tree + "docs/specs/export.md", role), 2)
+
+    def test_specs_path_from_the_config_is_protected(self) -> None:
+        self.specs_path("product/specs/")
+        self.render()
+        self.assertIn("product/specs/", self.protected_list(".cornerstone/hooks/protect-paths.py"))
+        self.assertNotIn("docs/specs/",
+                         self.protected_list(".cornerstone/hooks/protect-paths.py"))
+        for role in ("implementer", "tester", "planner"):
+            with self.subTest(role=role):
+                self.assertEqual(self.run_hook("product/specs/export.md", role), 2)
+        self.assertEqual(self.run_hook("docs/specs/export.md", "implementer"), 0)
+
+    def test_specs_path_with_no_trailing_slash_gets_one(self) -> None:
+        self.specs_path("product/specs")
+        self.render()
+        for path in (".cornerstone/hooks/protect-paths.py",
+                     ".cornerstone/checks/protected_paths.py"):
+            with self.subTest(path=path):
+                self.assertIn("product/specs/", self.protected_list(path))
+                self.assertNotIn("product/specs", self.protected_list(path))
+        self.assertEqual(self.run_hook("product/specs/export.md", "implementer"), 2)
+        self.assertEqual(self.run_hook("product/specsx/export.md", "implementer"), 0)
+        self.assertEqual(self.run_hook("product/specs.md", "implementer"), 0)
+
+    def test_specs_list_of_one_folder_renders_the_same_as_the_string(self) -> None:
+        self.specs_path("product/specs/")
+        self.render()
+        as_string = self.rendered_files()
+        self.folder.cleanup()
+        self.setUp()
+        self.specs_path("[product/specs/]")
+        self.render()
+        self.assertEqual(self.rendered_files(), as_string)
+
+    def test_specs_list_of_two_folders_stops_before_any_write(self) -> None:
+        self.specs_path("[docs/specs/, product/specs/]")
+        with self.assertRaisesRegex(render.RenderError, r"paths\.specs"):
+            self.render()
+        self.assertFalse((self.root / ".claude").exists())
+        self.assertFalse((self.root / render.MANIFEST).exists())
+
+    def test_new_specs_path_updates_the_hook_and_k6(self) -> None:
+        self.specs_path(None)
+        self.render()
+        self.specs_path("product/specs/")
+        result = self.render()
+        self.assertEqual(result.drift, [])
+        self.assertIn(".cornerstone/hooks/protect-paths.py", result.wrote)
+        self.assertIn(".cornerstone/checks/protected_paths.py", result.wrote)
+        self.assertEqual(self.run_hook("product/specs/export.md", "implementer"), 2)
+
+    def test_hook_blocks_the_planner_on_a_specs_path_in_the_plans_path(self) -> None:
+        # Edge: rule 4 says the hook stops the planner on the specs path. That must hold
+        # also when the config puts the specs folder in the plans folder.
+        self.specs_path("docs/plans/specs/")
+        self.render()
+        self.assertEqual(self.run_hook("docs/plans/T-1.md", "planner"), 0)
+        self.assertEqual(self.run_hook("docs/plans/specs/export.md", "planner"), 2)
+
+    def hook_message(self, path: str, role: str) -> str:
+        event = json.dumps({"tool_input": {"file_path": str(self.root / path)}})
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(self.root), "STONE_ROLE": role}
+        run = subprocess.run([sys.executable, ".cornerstone/hooks/protect-paths.py"],
+                             cwd=self.root, input=event, env=env, capture_output=True, text=True)
+        self.assertEqual(run.returncode, 2)
+        return run.stderr
+
+    def test_hook_tells_the_planner_which_rule_blocks(self) -> None:
+        self.specs_path("docs/plans/specs/")
+        self.render()
+        inside = self.hook_message("docs/plans/specs/export.md", "planner")
+        self.assertIn("docs/plans/specs/export.md is a protected path", inside)
+        self.assertNotIn("is not a plan path", inside)
+        outside = self.hook_message("src/a.py", "planner")
+        self.assertIn("src/a.py is not a plan path", outside)
+        self.assertNotIn("protected path", outside)
+
+    def test_k6_fails_on_an_implementer_commit_to_the_specs_path(self) -> None:
+        self.specs_path(None)
+        self.render()
+        self.git("init", "-q")
+        self.commit("README.md", "base")
+        self.commit("docs/specs/export.md", "write the specs\n\nRole: generator")
+        k6 = [sys.executable, ".cornerstone/checks/protected_paths.py", "HEAD~1"]
+        self.assertEqual(subprocess.run(k6, cwd=self.root, capture_output=True).returncode, 0)
+        self.commit("docs/specs/export.md", "edit a spec by hand")
+        run = subprocess.run([*k6[:2], "HEAD~2"], cwd=self.root, capture_output=True, text=True)
+        self.assertEqual(run.returncode, 1)
+        self.assertIn("changes docs/specs/export.md, a protected path", run.stdout)
+
     def test_change_to_single_ticket_reports_the_planner_as_stale(self) -> None:
         self.app_slice()
         self.render()

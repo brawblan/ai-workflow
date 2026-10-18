@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 # The implementer must not change PROTECTED. The tester changes only TESTS. The planner only PLANS.
-PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "stone/tests/"]
+PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "stone/tests/"]
 TESTS = ["stone/tests/"]
 PLANS = ["docs/plans/"]
 
@@ -62,6 +62,8 @@ def main() -> int:
         reason = "is a protected path. The implementer must not change tests, checks, or CI"
     elif role == "tester" and not covers(TESTS, path):
         reason = f"is not a test path. The tester changes only {', '.join(TESTS)}"
+    elif role == "planner" and covers(PROTECTED, path):
+        reason = "is a protected path. The planner must not change tests, checks, CI, or specs"
     elif role == "planner" and not covers(PLANS, path):
         reason = f"is not a plan path. The planner changes only {', '.join(PLANS)}"
     elif role == "reviewer":

@@ -82,6 +82,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D19 | `stone render` supports the app-slice profile. The planner role file writes only in the plans path. The protected-path hook enforces this. | [generator/design.md](generator/design.md) |
 | D20 | Check K14 is the `stone check-evidence` command, as K17 is a `stone` command. The required sections are Evidence, Decision log, Review findings, and Confidence. A section with only `None` is empty. Write `None` and the reason. | [checks.md](checks.md), [generator/design.md](generator/design.md) |
 | D21 | Specs are generated from the applied spec deltas. Each plan that changes a behavior has a delta. `stone spec apply` merges it in the code PR, as a generator commit. A replay of the deltas must give the same specs, so a hand edit is drift. | [workflow-model.md](workflow-model.md#specs), [lifecycle.md](lifecycle.md#specs) |
+| D22 | Two applied deltas with the same `apply_order` are an error. `stone spec sync` gives the deltas the orders 1 to n and writes the specs again. K19 tests the deltas and the replay. The hook and K6 protect the specs path. | [workflow-model.md](workflow-model.md#specs), [checks.md](checks.md) |
 
 ## Open questions
 
@@ -103,9 +104,10 @@ Do these items in order. Each item is one PR or more.
      after the merge, change K18 in `stone check` from a warning to an error.
    - 3a1. Done in plugin 0.5.0 and stone 0.4. The plugin has no spec-tool support (D18). The
      app-slice profile has the planner role (D19).
-   - 3a2. Done in stone 0.5: the spec format and `stone spec apply` (D20).
-   - 3a3. Add the spec replay check to `stone check`. Wire the specs into the planner, the
-     tester, the reviewer, the hook, and the guides.
+   - 3a2. Done in stone 0.5: the spec format and `stone spec apply` (D21).
+   - 3a3. Done in plugin 0.6.0 and stone 0.6: check K19 and `stone spec sync` (D22). The planner,
+     the tester, the reviewer, the hook, and the guides use the specs. Two weeks after the merge,
+     change K19 from a warning to an error.
    - 3a. Done in plugin 0.3.0: the `cornerstone-setup` entry skill, the repo config of this repo,
      and a `stone render` run in this repo.
    - 3b. Done in plugin 0.4.0. `ticket-delivery` does not self-verify. `dev-pr` has the evidence

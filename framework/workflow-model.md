@@ -151,11 +151,19 @@ Rules:
    MODIFIED gives the full new text, not only the difference.
 3. A human approves the delta with the plan (G2). The delta is part of the plan.
 4. Before the code PR opens, run `stone spec apply <plan id>`. It gives the delta the next
-   `apply_order`, and it writes the specs. Commit its output alone, with `Role: generator`.
+   `apply_order`, and it writes the specs. Commit its output alone, with `Role: generator`. The
+   hook stops the implementer, the tester, and the planner when they change the specs path. K6
+   fails an implementer commit that changes it.
 5. `stone spec apply` writes the specs. A replay of all applied deltas, in `apply_order`, must give
    the same files. A person changes a spec only with a new delta. Thus the plans folder is permanent
    history: do not delete an applied delta. The specs folder holds only the generated specs.
 6. A ticket with no change to a behavior has no delta.
+7. Two applied deltas must not have the same `apply_order`. This occurs when two branches apply a
+   delta and both merge. After you merge the base branch, run `stone spec sync`. It gives the
+   applied deltas the orders 1 to n, and it writes the specs again. Commit its output alone, with
+   `Role: generator`.
+
+Check K19 tests these rules in `stone check`.
 
 The tester names each test for a requirement with its ID, so the reviewer can match the tests to
 the spec. Eval plan and review date: [lifecycle.md](lifecycle.md#specs).

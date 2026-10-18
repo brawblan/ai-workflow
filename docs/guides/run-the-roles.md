@@ -29,7 +29,7 @@ Start each role in a new terminal session. Do not reuse a session from an earlie
 
 | Role | Can change |
 | --- | --- |
-| planner | The plans path only |
+| planner | The plans path only. Not the specs path. |
 | implementer | All paths except tests, checks, CI, `.claude/`, and `.cornerstone/` |
 | tester | The test paths only |
 | reviewer | No path |
@@ -54,7 +54,7 @@ git commit -m "fix(auth): renew the token before it expires" \
 
 | Trailer | Values |
 | --- | --- |
-| `Role:` | `implementer`, `tester`, `generator`, or another role from the workflow model |
+| `Role:` | `implementer`, `tester`, `generator` (output of `stone render`, `stone spec apply`, or `stone spec sync`), or another role from the workflow model |
 | `Actor:` | `human` or `agent` |
 
 A commit with no `Role:` trailer counts as an implementer commit. K6 fails if an implementer commit

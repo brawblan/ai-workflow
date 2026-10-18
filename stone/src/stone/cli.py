@@ -31,6 +31,9 @@ def _parser() -> argparse.ArgumentParser:
         "apply", help="Apply the spec delta of one plan to the specs.")
     spec_apply.add_argument("plan", help="The plan ID: the delta is <plans>/<plan>.spec.md.")
     spec_apply.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    spec_sync = spec_commands.add_parser(
+        "sync", help="After a merge: renumber the applied deltas, and write the specs again.")
+    spec_sync.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
 
     writing = commands.add_parser("check-writing",
                                   help="K17: test human-facing text against the writing standard.")
@@ -68,7 +71,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "render":
         return _render(args.root, args.framework, args.dry_run)
     if args.command == "spec":
-        return _spec_apply(args.root, args.plan)
+        return _spec(args.root, args.spec_command, getattr(args, "plan", ""))
     if args.command == "check-evidence":
         return _check_evidence(args.body, args.section, args.mode, args.format)
 
@@ -86,15 +89,15 @@ def main(argv: list[str] | None = None) -> int:
     return 1 if blocking else 0
 
 
-def _spec_apply(root: Path, plan: str) -> int:
+def _spec(root: Path, command: str, plan: str) -> int:
     try:
-        changed = specs.apply(root, plan)
+        changed = specs.apply(root, plan) if command == "apply" else specs.sync(root)
     except specs.SpecError as error:
-        print(f"stone spec apply: {error}")
+        print(f"stone spec {command}: {error}")
         return 1
     for path in changed:
         print(f"wrote {path}")
-    print(f"stone spec apply: {len(changed)} file(s) changed. Commit them alone, with the "
+    print(f"stone spec {command}: {len(changed)} file(s) changed. Commit them alone, with the "
           "trailers 'Role: generator' and 'Actor: agent' or 'Actor: human'.")
     return 0
 

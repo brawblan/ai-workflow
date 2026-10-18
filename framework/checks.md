@@ -25,6 +25,7 @@ checks for the profile in CI. Each check SHOULD also run on the developer's mach
 | K16 | No merge to main | A branch from a spike targets the main branch. | spike profile | branch protection, script |
 | K17 | Writing standard | New or changed human-facing text breaks a measurable rule. See [writing.md](writing.md#what-k17-tests). | yes, also for profiles that only write reports | script in the generator output |
 | K18 | Persona references | The personas file breaks the format in [workflow-model.md](workflow-model.md#personas), or a plan names a persona or a job story that the file does not have. | by profile | `stone check` |
+| K19 | Spec replay | A spec delta breaks the format in [workflow-model.md](workflow-model.md#specs). Two applied deltas have the same `apply_order`. A spec is not the same as a replay of the applied deltas. | by profile | `stone check` |
 
 "Baseline" checks run in each profile that changes code. A profile adds the "by profile" checks.
 

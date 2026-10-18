@@ -49,7 +49,9 @@ Each fact has one owner file, so the copies cannot drift.
 1. Start the planner with the issue text, in a fresh session.
 2. Answer the open questions that the agent asks.
 3. Read the plan at `docs/plans/<id>.md` and the task list in `docs/plans/<id>.progress.json`.
-4. Approve the plan in a docs PR (G2). Edit the plan, not the code.
+4. If the change adds, changes, or removes a behavior, read the spec delta at
+   `docs/plans/<id>.spec.md`.
+5. Approve the plan in a docs PR (G2). Edit the plan, not the code.
 
 The next session finds the plan from the issue ID. It does not need this conversation.
 
@@ -58,7 +60,8 @@ The next session finds the plan from the issue ID. It does not need this convers
 1. Start the implementer for each task in the progress file. It writes the decision log.
 2. Start the tester in a separate session. It writes the tests from the plan and the job stories.
 3. Start the reviewer. It compares the diff with the plan.
-4. Run `/workflow:ticket-delivery` to collect the evidence and open the PR.
+4. Run `/workflow:ticket-delivery`. It applies the spec delta, collects the evidence, and opens
+   the PR.
 
 If the scope changes during the build, the agent stops. Update the plan first, and get G2 again.
 
@@ -67,3 +70,5 @@ If the scope changes during the build, the agent stops. Update the plan first, a
 - You review a short plan, not a large diff.
 - The agent has a clear finish line: the tasks and the acceptance criteria.
 - The plans stay in the repo. The next person can read why the code is the way it is.
+- The specs in `docs/specs/` show the product as it is now. `stone spec apply` builds them from
+  the spec delta of each plan, so they cannot drift from what you approved.
