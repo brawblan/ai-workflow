@@ -74,7 +74,7 @@ components:
 
   - id: ci-job.checks
     kind: ci-job
-    purpose: G3. Run K6 and the repo checks on each pull request.
+    purpose: G3. Run K6, K14, and the repo checks on each pull request.
     principle: [P1, P6]
     template: workflows/cornerstone-checks.yml
     target: .github/workflows/cornerstone-checks.yml

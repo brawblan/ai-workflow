@@ -1,6 +1,6 @@
 # stone
 
-The Cornerstone CLI. Version 0.6 has six commands:
+The Cornerstone CLI. Version 0.7 has six commands:
 
 | Command | Does |
 | --- | --- |
@@ -9,7 +9,7 @@ The Cornerstone CLI. Version 0.6 has six commands:
 | `stone check-evidence` | Check K14. Fails if a required section of a PR body is missing or empty: Evidence, Decision log, Review findings, or Confidence. |
 | `stone spec apply <plan>` | Applies the spec delta of one plan (`<plans>/<plan>.spec.md`). It gives the delta the next `apply_order`, and writes the specs in `<specs>/`. It stops if a spec is not the same as a replay of the applied deltas. See [Specs](../framework/workflow-model.md#specs). |
 | `stone spec sync` | After a merge of the base branch: gives the applied deltas the orders 1 to n, and writes the specs from a replay. It overwrites a spec that is not the same as the replay. |
-| `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.4 supports the single-ticket and app-slice profiles: role files, the protected-path hook, check K6, and the G3 CI workflow. |
+| `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.4 supports the single-ticket and app-slice profiles: role files, the protected-path hook, check K6, and the G3 CI workflow. Version 0.7 adds a K14 step on the PR body to that workflow. |
 
 The other commands in [the generator design](../framework/generator/design.md) are not built yet.
 
@@ -75,6 +75,8 @@ Add `--format github` to show the findings as annotations in a GitHub Actions ru
    ```
 
    Remove `--dry-run` to write the files. A second run changes only the files whose input changed.
+   The G3 workflow installs stone from the tag `v<framework_version>` for its K14 step. Use
+   0.5.0 or later. Render warns about an earlier version.
 
 7. Commit the render output alone, with the trailers `Role: generator` and `Actor: human`. K6 counts
    a commit with no `Role:` trailer as an implementer commit, and the output is in protected paths.
