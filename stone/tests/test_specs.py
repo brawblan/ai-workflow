@@ -296,16 +296,15 @@ class SpecApplyTest(unittest.TestCase):
         self.apply("m")
         self.assertEqual(self.meta(f"{PLANS}/m.spec.md")["apply_order"], 3)
 
-    def test_ac4_tie_in_apply_order_is_sorted_by_plan_id(self) -> None:
+    def test_ac4_tie_in_apply_order_stops_apply(self) -> None:
+        # Part 2 changed this rule: a tie is an error, and `stone spec sync` repairs it.
         self.delta("a", added("export.R1", "From a"), front="apply_order: 1")
         self.delta("b", modified("export.R1", "From b"), front="apply_order: 1")
         self.write(f"{SPECS}/export.md", self._replay_text())
-        self.assertIn("From b", self.read(f"{SPECS}/export.md"))
         self.delta("c", added("export.R2"))
-        self.apply("c")
-        self.assertEqual(self.meta(f"{PLANS}/c.spec.md")["apply_order"], 2)
-        self.assertEqual(self.requirement_headings("export"),
-                         ["## export.R1: From b", "## export.R2: A title"])
+        message = self.assert_refused("c", "stone spec sync")
+        self.assertIn("a.spec.md", message)
+        self.assertIn("b.spec.md", message)
 
     def test_ac4_spec_equals_replay_from_an_empty_folder(self) -> None:
         self.delta("p1", added("export.R1"), added("export.R2"))
@@ -603,6 +602,436 @@ class SpecApplyTest(unittest.TestCase):
         self.delta("p1", added("export.R1"))
         changed = self.apply("p1")
         self.assertEqual(sorted(changed), [f"{PLANS}/p1.spec.md", "product/specs/export.md"])
+
+    # Part 2. Helpers for `stone spec sync` and check K19
+
+    def sync(self) -> list[str]:
+        return specs.sync(self.root)
+
+    def run_sync_cli(self) -> tuple[int, str, str]:
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = cli.main(["spec", "sync", "--root", str(self.root)])
+        return code, out.getvalue(), err.getvalue()
+
+    def assert_sync_refused(self, fragment: str | None = None) -> str:
+        """Sync must raise SpecError, write no file, and the CLI must return 1."""
+        before = self.snapshot()
+        with self.assertRaises(specs.SpecError) as caught:
+            self.sync()
+        self.assertEqual(self.snapshot(), before, "sync wrote a file on an error")
+        code, output, _ = self.run_sync_cli()
+        self.assertEqual(code, 1)
+        self.assertIn(str(caught.exception), output)
+        self.assertEqual(self.snapshot(), before, "the CLI sync wrote a file on an error")
+        if fragment is not None:
+            self.assertIn(fragment, str(caught.exception))
+        return str(caught.exception)
+
+    def k19(self) -> list:
+        return specs.check(self.root)
+
+    def k19_paths(self) -> list[str]:
+        return sorted(finding.path for finding in self.k19())
+
+    def assert_all_warnings(self, findings: list) -> None:
+        self.assertTrue(findings, "K19 found nothing")
+        for finding in findings:
+            self.assertEqual(finding.check, "K19")
+            self.assertEqual(finding.severity, "warning")
+
+    def line_of(self, path: Path, start: str) -> int:
+        lines = path.read_text(encoding="utf-8").splitlines()
+        return next(n for n, line in enumerate(lines, 1) if line.startswith(start))
+
+    def tie_after_merge(self) -> None:
+        """Two branches applied a delta from order 1. Both merged. The specs are from one branch."""
+        self.delta("base", added("export.R1"), front="apply_order: 1")
+        self.delta("left", added("export.R2", "Left"), front="apply_order: 2")
+        self.delta("right", added("login.R1", "Right"), front="apply_order: 2")
+        self.write(f"{SPECS}/export.md", "stale text from one branch\n")
+
+    # Part 2, AC1: a tie stops apply, and the message names `stone spec sync`
+
+    def test_p2_ac1_tie_after_a_merge_stops_apply(self) -> None:
+        self.tie_after_merge()
+        self.delta("next", added("export.R3"))
+        message = self.assert_refused("next", "stone spec sync")
+        self.assertIn("left.spec.md", message)
+        self.assertIn("right.spec.md", message)
+
+    def test_p2_ac1_tie_with_specs_that_equal_the_replay_still_stops_apply(self) -> None:
+        self.delta("a", added("export.R1"), front="apply_order: 1")
+        self.delta("b", added("login.R1"), front="apply_order: 1")
+        for name, text in specs.render_specs(
+                specs.replay(specs.applied(specs.load_deltas(self.root)))).items():
+            self.write(f"{SPECS}/{name}", text)
+        self.delta("c", added("export.R2"))
+        self.assert_refused("c", "stone spec sync")
+
+    def test_p2_ac1_tie_of_three_deltas_stops_apply(self) -> None:
+        for plan, req in (("a", "export.R1"), ("b", "login.R1"), ("c", "admin.R1")):
+            self.delta(plan, added(req), front="apply_order: 4")
+        self.delta("d", added("export.R2"))
+        message = self.assert_refused("d", "stone spec sync")
+        for name in ("a.spec.md", "b.spec.md", "c.spec.md"):
+            self.assertIn(name, message)
+
+    def test_p2_ac1_no_tie_after_apply_then_sync_then_apply(self) -> None:
+        self.tie_after_merge()
+        self.sync()
+        self.delta("next", added("export.R3"))
+        self.apply("next")
+        self.assertEqual(self.meta(f"{PLANS}/next.spec.md")["apply_order"], 4)
+
+    # Part 2, AC2: `stone spec sync`
+
+    def test_p2_ac2_sync_gives_orders_1_to_n_in_replay_order(self) -> None:
+        # Replay order is (order, plan ID): a(3) < x(3) < m(7) < b(9).
+        self.delta("x", added("login.R1"), front="apply_order: 3")
+        self.delta("a", added("export.R1"), front="apply_order: 3")
+        self.delta("m", modified("export.R1"), front="apply_order: 7")
+        self.delta("b", added("admin.R1"), front="apply_order: 9")
+        self.sync()
+        orders = {plan: self.meta(f"{PLANS}/{plan}.spec.md")["apply_order"]
+                  for plan in ("a", "x", "m", "b")}
+        self.assertEqual(orders, {"a": 1, "x": 2, "m": 3, "b": 4})
+
+    def test_p2_ac2_sync_keeps_apply_order_before_plan_id(self) -> None:
+        # "z" adds R1 and "a" modifies it. A sort by plan ID only would break the replay.
+        self.delta("z", added("export.R1", "Old"), front="apply_order: 5")
+        self.delta("a", modified("export.R1", "New"), front="apply_order: 8")
+        self.sync()
+        self.assertEqual(self.meta(f"{PLANS}/z.spec.md")["apply_order"], 1)
+        self.assertEqual(self.meta(f"{PLANS}/a.spec.md")["apply_order"], 2)
+        self.assertEqual(self.requirement_headings("export"), ["## export.R1: New"])
+
+    def test_p2_ac2_sync_after_a_merge_gives_a_valid_history(self) -> None:
+        self.tie_after_merge()
+        changed = self.sync()
+        self.assertEqual(self.meta(f"{PLANS}/base.spec.md")["apply_order"], 1)
+        self.assertEqual(self.meta(f"{PLANS}/left.spec.md")["apply_order"], 2)
+        self.assertEqual(self.meta(f"{PLANS}/right.spec.md")["apply_order"], 3)
+        self.assertIn(f"{PLANS}/right.spec.md", changed)
+        self.assertNotIn(f"{PLANS}/base.spec.md", changed)
+        self.assertNotIn(f"{PLANS}/left.spec.md", changed)
+        self.assertEqual(self.requirement_headings("export"),
+                         ["## export.R1: A title", "## export.R2: Left"])
+        self.assertEqual(self.requirement_headings("login"), ["## login.R1: Right"])
+
+    def test_p2_ac2_sync_keeps_the_other_frontmatter_keys_and_the_body(self) -> None:
+        body = added("export.R1")
+        path = self.delta("p1", body, front="plan: p1\napply_order: 4\nowner: octocat\n"
+                                            "tags: [a, b]")
+        self.sync()
+        self.assertEqual(self.meta(f"{PLANS}/p1.spec.md"),
+                         {"apply_order": 1, "plan": "p1", "owner": "octocat", "tags": ["a", "b"]})
+        self.assertTrue(path.read_text(encoding="utf-8").endswith(body))
+
+    def test_p2_ac2_sync_does_not_touch_an_unapplied_delta(self) -> None:
+        self.delta("p1", added("export.R1"), front="apply_order: 3")
+        draft = self.delta("draft", added("export.R2"), front="plan: draft")
+        bare = self.delta("bare", added("login.R1"))
+        before = (draft.read_text(encoding="utf-8"), bare.read_text(encoding="utf-8"))
+        changed = self.sync()
+        self.assertEqual((draft.read_text(encoding="utf-8"), bare.read_text(encoding="utf-8")),
+                         before)
+        self.assertNotIn(f"{PLANS}/draft.spec.md", changed)
+        self.assertNotIn(f"{PLANS}/bare.spec.md", changed)
+        # The unapplied deltas are not in the specs.
+        self.assertEqual(self.requirement_headings("export"), ["## export.R1: A title"])
+        self.assertFalse((self.root / SPECS / "login.md").exists())
+
+    def test_p2_ac2_sync_writes_the_specs_when_the_folder_is_missing(self) -> None:
+        self.delta("p1", added("export.R1"), added("login.R1"), front="apply_order: 1")
+        changed = self.sync()
+        self.assertEqual(sorted(changed), [f"{SPECS}/export.md", f"{SPECS}/login.md"])
+        self.assertEqual(self.read(f"{SPECS}/export.md"), self._replay_text())
+
+    def test_p2_ac2_sync_overwrites_a_hand_edit(self) -> None:
+        self.delta("p1", added("export.R1"))
+        self.apply("p1")
+        expected = self.read(f"{SPECS}/export.md")
+        self.write(f"{SPECS}/export.md", expected + "\nA hand edit.\n")
+        self.assertEqual(self.sync(), [f"{SPECS}/export.md"])
+        self.assertEqual(self.read(f"{SPECS}/export.md"), expected)
+
+    def test_p2_ac2_sync_deletes_an_extra_spec_and_restores_a_missing_spec(self) -> None:
+        self.delta("p1", added("export.R1"), added("login.R1"))
+        self.apply("p1")
+        login = self.read(f"{SPECS}/login.md")
+        (self.root / SPECS / "login.md").unlink()
+        self.write(f"{SPECS}/extra.md", "# extra\n")
+        changed = self.sync()
+        self.assertEqual(sorted(changed), [f"{SPECS}/extra.md", f"{SPECS}/login.md"])
+        self.assertFalse((self.root / SPECS / "extra.md").exists())
+        self.assertEqual(self.read(f"{SPECS}/login.md"), login)
+
+    def test_p2_ac2_sync_after_a_deleted_applied_delta_follows_the_replay(self) -> None:
+        self.delta("p1", added("export.R1"))
+        self.apply("p1")
+        self.delta("p2", added("login.R1"))
+        self.apply("p2")
+        (self.root / PLANS / "p1.spec.md").unlink()
+        changed = self.sync()
+        self.assertIn(f"{SPECS}/export.md", changed)
+        self.assertIn(f"{PLANS}/p2.spec.md", changed)
+        self.assertFalse((self.root / SPECS / "export.md").exists())
+        self.assertEqual(self.meta(f"{PLANS}/p2.spec.md")["apply_order"], 1)
+
+    def test_p2_ac2_second_sync_changes_no_file(self) -> None:
+        self.tie_after_merge()
+        self.delta("draft", added("export.R9"))
+        self.sync()
+        before = self.snapshot()
+        self.assertEqual(self.sync(), [])
+        self.assertEqual(self.snapshot(), before)
+
+    def test_p2_ac2_sync_on_a_repo_in_order_changes_no_file(self) -> None:
+        self.delta("p1", added("export.R1"))
+        self.apply("p1")
+        self.delta("p2", added("login.R1"))
+        self.apply("p2")
+        before = self.snapshot()
+        self.assertEqual(self.sync(), [])
+        self.assertEqual(self.snapshot(), before)
+
+    def test_p2_ac2_sync_on_an_empty_repo_writes_no_file(self) -> None:
+        self.assertEqual(self.sync(), [])
+        self.assertEqual(self.snapshot(), {})
+
+    def test_p2_ac2_sync_refuses_on_a_format_error_in_an_applied_delta(self) -> None:
+        self.tie_after_merge()
+        self.delta("bad", "## CHANGED export.R5: Bad op\n\n### Scenario: s\n- WHEN a\n- THEN b\n",
+                   front="apply_order: 2")
+        self.assert_sync_refused("bad.spec.md")
+
+    def test_p2_ac2_sync_refuses_on_a_format_error_in_an_unapplied_delta(self) -> None:
+        self.tie_after_merge()
+        self.delta("draft", "## ADDED bad id: Title\n\n### Scenario: s\n- WHEN a\n- THEN b\n")
+        self.assert_sync_refused("draft.spec.md")
+
+    def test_p2_ac2_sync_refuses_on_a_bad_apply_order(self) -> None:
+        self.tie_after_merge()
+        self.delta("bad", added("admin.R1"), front="apply_order: 0")
+        self.assert_sync_refused("bad.spec.md")
+
+    def test_p2_ac2_sync_refuses_on_a_replay_conflict(self) -> None:
+        # Two branches each added export.R2. After the merge, the replay adds it two times.
+        self.delta("base", added("export.R1"), front="apply_order: 1")
+        self.delta("left", added("export.R2", "Left"), front="apply_order: 2")
+        self.delta("right", added("export.R2", "Right"), front="apply_order: 2")
+        self.write(f"{SPECS}/export.md", "stale\n")
+        self.assert_sync_refused("export.R2")
+
+    def test_p2_ac2_sync_refuses_a_specs_path_outside_the_repo(self) -> None:
+        outer = self.nested_repo()
+        self.write(".cornerstone/config.yaml", "paths:\n  specs: ../outside/\n")
+        self.delta("p1", added("export.R1"), front="apply_order: 2")
+        self.assert_sync_refused("paths.specs")
+        self.assertEqual([p.name for p in outer.iterdir()], ["repo"])
+
+    def test_p2_ac2_sync_uses_the_config_paths(self) -> None:
+        self.write(".cornerstone/config.yaml",
+                   "paths:\n  plans: work/plans/\n  specs: product/specs/\n")
+        self.delta("p1", added("export.R1"), front="apply_order: 5", folder="work/plans")
+        changed = self.sync()
+        self.assertEqual(sorted(changed), ["product/specs/export.md", "work/plans/p1.spec.md"])
+        self.assertFalse((self.root / SPECS).exists())
+
+    # Part 2, AC3: check K19
+
+    def test_p2_ac3_no_finding_with_no_delta_and_no_specs_folder(self) -> None:
+        self.assertEqual(self.k19(), [])
+
+    def test_p2_ac3_no_finding_after_apply(self) -> None:
+        self.delta("p1", added("export.R1"), added("login.R1"))
+        self.apply("p1")
+        self.delta("p2", modified("export.R1"), removed("login.R1"))
+        self.apply("p2")
+        self.delta("draft", added("export.R2"))
+        self.assertEqual(self.k19(), [])
+
+    def test_p2_ac3_format_error_is_a_warning_with_its_line(self) -> None:
+        path = self.delta("p1", added("export.R1"),
+                          "## CHANGED export.R2: Bad op\n\n### Scenario: s\n- WHEN a\n- THEN b\n",
+                          front="plan: p1")
+        findings = self.k19()
+        self.assert_all_warnings(findings)
+        self.assertEqual([(f.path, f.line) for f in findings],
+                         [(f"{PLANS}/p1.spec.md", self.line_of(path, "## CHANGED"))])
+
+    def test_p2_ac3_each_format_error_is_a_finding(self) -> None:
+        path = self.delta("p1", "## ADDED export.R1: No scenario\n\nText.\n",
+                          "## ADDED bad id: Title\n\n### Scenario: s\n- WHEN a\n- THEN b\n")
+        self.delta("p2", added("login.R1"), front="apply_order: 0")
+        findings = self.k19()
+        self.assert_all_warnings(findings)
+        self.assertEqual(sorted((f.path, f.line) for f in findings),
+                         [(f"{PLANS}/p1.spec.md", self.line_of(path, "## ADDED export.R1")),
+                          (f"{PLANS}/p1.spec.md", self.line_of(path, "## ADDED bad id")),
+                          (f"{PLANS}/p2.spec.md", 1)])
+
+    def test_p2_ac3_bad_yaml_in_a_delta_is_a_warning(self) -> None:
+        self.delta("p1", added("export.R1"), front="apply_order: [1")
+        findings = self.k19()
+        self.assert_all_warnings(findings)
+        self.assertEqual([f.path for f in findings], [f"{PLANS}/p1.spec.md"])
+
+    def test_p2_ac3_each_delta_in_a_tie_is_a_warning(self) -> None:
+        self.delta("base", added("export.R1"), front="apply_order: 1")
+        self.delta("left", added("export.R2"), front="apply_order: 2")
+        self.delta("right", added("login.R1"), front="apply_order: 2")
+        for name, text in specs.render_specs(
+                specs.replay(specs.applied(specs.load_deltas(self.root)))).items():
+            self.write(f"{SPECS}/{name}", text)
+        findings = self.k19()
+        self.assert_all_warnings(findings)
+        self.assertEqual(self.k19_paths(), [f"{PLANS}/left.spec.md", f"{PLANS}/right.spec.md"])
+        for finding in findings:
+            self.assertIn("stone spec sync", finding.message)
+
+    def test_p2_ac3_tie_of_three_deltas_gives_three_warnings(self) -> None:
+        for plan, req in (("a", "export.R1"), ("b", "login.R1"), ("c", "admin.R1")):
+            self.delta(plan, added(req), front="apply_order: 1")
+        for name, text in specs.render_specs(
+                specs.replay(specs.applied(specs.load_deltas(self.root)))).items():
+            self.write(f"{SPECS}/{name}", text)
+        self.assert_all_warnings(self.k19())
+        self.assertEqual(self.k19_paths(),
+                         [f"{PLANS}/a.spec.md", f"{PLANS}/b.spec.md", f"{PLANS}/c.spec.md"])
+
+    def test_p2_ac3_replay_conflict_is_a_warning(self) -> None:
+        self.delta("base", added("export.R1"), front="apply_order: 1")
+        self.delta("left", added("export.R2", "Left"), front="apply_order: 2")
+        self.delta("right", added("export.R2", "Right"), front="apply_order: 2")
+        findings = self.k19()
+        self.assert_all_warnings(findings)
+        self.assertTrue(any("export.R2" in f.message for f in findings), findings)
+
+    def test_p2_ac3_conflict_without_a_tie_is_a_warning(self) -> None:
+        self.delta("p1", modified("export.R1"), front="apply_order: 1")
+        findings = self.k19()
+        self.assert_all_warnings(findings)
+        self.assertTrue(any("export.R1" in f.message for f in findings), findings)
+
+    def test_p2_ac3_hand_edit_is_a_warning(self) -> None:
+        self.delta("p1", added("export.R1"), added("login.R1"))
+        self.apply("p1")
+        self.write(f"{SPECS}/export.md", self.read(f"{SPECS}/export.md") + "\nA hand edit.\n")
+        self.assert_all_warnings(self.k19())
+        self.assertEqual(self.k19_paths(), [f"{SPECS}/export.md"])
+
+    def test_p2_ac3_extra_spec_file_is_a_warning(self) -> None:
+        self.delta("p1", added("export.R1"))
+        self.apply("p1")
+        self.write(f"{SPECS}/extra.md", "# extra\n")
+        self.assert_all_warnings(self.k19())
+        self.assertEqual(self.k19_paths(), [f"{SPECS}/extra.md"])
+
+    def test_p2_ac3_spec_file_with_no_delta_is_a_warning(self) -> None:
+        self.write(f"{SPECS}/manual.md", "# manual\n")
+        self.assert_all_warnings(self.k19())
+        self.assertEqual(self.k19_paths(), [f"{SPECS}/manual.md"])
+
+    def test_p2_ac3_missing_spec_file_is_a_warning(self) -> None:
+        self.delta("p1", added("export.R1"), added("login.R1"))
+        self.apply("p1")
+        (self.root / SPECS / "login.md").unlink()
+        self.assert_all_warnings(self.k19())
+        self.assertEqual(self.k19_paths(), [f"{SPECS}/login.md"])
+
+    def test_p2_ac3_applied_delta_with_no_specs_folder_is_a_warning(self) -> None:
+        self.delta("p1", added("export.R1"), front="apply_order: 1")
+        self.assert_all_warnings(self.k19())
+        self.assertEqual(self.k19_paths(), [f"{SPECS}/export.md"])
+
+    def test_p2_ac3_deleted_applied_delta_is_a_warning(self) -> None:
+        self.delta("p1", added("export.R1"))
+        self.apply("p1")
+        self.delta("p2", added("login.R1"))
+        self.apply("p2")
+        (self.root / PLANS / "p1.spec.md").unlink()
+        self.assert_all_warnings(self.k19())
+        self.assertEqual(self.k19_paths(), [f"{SPECS}/export.md"])
+
+    def test_p2_ac3_config_path_outside_the_repo_is_a_warning(self) -> None:
+        self.nested_repo()
+        for key in ("specs", "plans"):
+            with self.subTest(key=key):
+                self.write(".cornerstone/config.yaml", f"paths:\n  {key}: ../outside/\n")
+                findings = self.k19()
+                self.assert_all_warnings(findings)
+                self.assertTrue(any(f"paths.{key}" in f.message for f in findings), findings)
+
+    def test_p2_ac3_after_sync_k19_has_no_finding(self) -> None:
+        self.tie_after_merge()
+        self.write(f"{SPECS}/extra.md", "# extra\n")
+        self.delta("draft", added("admin.R1"))
+        self.assertTrue(self.k19())
+        self.sync()
+        self.assertEqual(self.k19(), [])
+
+    def test_p2_ac3_after_sync_of_a_deleted_delta_k19_has_no_finding(self) -> None:
+        self.delta("p1", added("export.R1"))
+        self.apply("p1")
+        self.delta("p2", added("login.R1"))
+        self.apply("p2")
+        (self.root / PLANS / "p1.spec.md").unlink()
+        self.sync()
+        self.assertEqual(self.k19(), [])
+
+    def run_stone_check(self) -> tuple[int, str]:
+        framework = Path(__file__).resolve().parents[2] / "framework"
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            code = cli.main(["check", "--root", str(self.root), "--framework", str(framework)])
+        return code, out.getvalue()
+
+    def test_p2_ac3_stone_check_runs_k19_as_a_warning(self) -> None:
+        self.delta("p1", added("export.R1"))
+        self.apply("p1")
+        clean_code, clean_output = self.run_stone_check()
+        self.assertNotIn("K19", clean_output)
+        self.write(f"{SPECS}/export.md", "A hand edit.\n")
+        code, output = self.run_stone_check()
+        self.assertIn(f"{SPECS}/export.md:1: warning: K19:", output)
+        self.assertEqual(code, clean_code, "a K19 warning changed the exit code")
+
+    def test_p2_ac3_stone_check_has_no_k19_finding_after_sync(self) -> None:
+        self.tie_after_merge()
+        _, before = self.run_stone_check()
+        self.assertIn("K19", before)
+        self.sync()
+        _, after = self.run_stone_check()
+        self.assertNotIn("K19", after)
+
+    # Part 2, AC5: the CLI for `stone spec sync`
+
+    def test_p2_ac5_cli_sync_returns_0_and_lists_the_changed_files(self) -> None:
+        self.tie_after_merge()
+        code, output, _ = self.run_sync_cli()
+        self.assertEqual(code, 0)
+        for path in (f"{PLANS}/right.spec.md", f"{SPECS}/export.md", f"{SPECS}/login.md"):
+            self.assertIn(f"wrote {path}", output)
+        self.assertNotIn(f"{PLANS}/base.spec.md", output)
+        self.assertIn("stone spec sync: 3 file(s) changed", output)
+
+    def test_p2_ac5_cli_sync_with_no_change_returns_0(self) -> None:
+        self.delta("p1", added("export.R1"))
+        self.apply("p1")
+        code, output, _ = self.run_sync_cli()
+        self.assertEqual(code, 0)
+        self.assertNotIn("wrote ", output)
+        self.assertIn("stone spec sync: 0 file(s) changed", output)
+
+    def test_p2_ac5_cli_sync_error_returns_1_with_the_message_and_no_traceback(self) -> None:
+        self.write(".cornerstone/config.yaml", "paths: {plans: \n")
+        code, output, err = self.run_sync_cli()
+        self.assertEqual(code, 1)
+        self.assertIn("stone spec sync:", output)
+        self.assertIn("config.yaml", output)
+        self.assertNotIn("Traceback", output + err)
 
     # Helpers that build the expected spec text through the public replay
 
