@@ -424,6 +424,186 @@ class SpecApplyTest(unittest.TestCase):
         self.assertEqual(code, 1)
         self.assertIn("missing", output)
 
+    # Edge 1: each scenario needs a WHEN line and a THEN line
+
+    def requirement(self, *scenarios: str, req_id: str = "export.R1") -> str:
+        return f"## ADDED {req_id}: Title\n\nThe user MUST do it.\n\n" + "\n".join(scenarios)
+
+    def test_edge1_scenario_with_when_but_no_then_is_refused(self) -> None:
+        self.delta("p1", self.requirement("### Scenario: half\n- WHEN the user does it\n"))
+        self.assert_refused("p1", "export.R1")
+
+    def test_edge1_scenario_with_then_but_no_when_is_refused(self) -> None:
+        self.delta("p1", self.requirement("### Scenario: half\n- THEN it is done\n"))
+        self.assert_refused("p1", "export.R1")
+
+    def test_edge1_good_scenario_then_empty_scenario_is_refused(self) -> None:
+        self.delta("p1", self.requirement("### Scenario: good\n- WHEN a\n- THEN b\n",
+                                          "### Scenario: empty\n"))
+        self.assert_refused("p1", "export.R1")
+
+    def test_edge1_good_scenario_then_half_scenario_is_refused(self) -> None:
+        self.delta("p1", self.requirement("### Scenario: good\n- WHEN a\n- THEN b\n",
+                                          "### Scenario: half\n- WHEN c\n"))
+        self.assert_refused("p1", "export.R1")
+
+    def test_edge1_modified_with_a_half_scenario_is_refused(self) -> None:
+        self.delta("p1", added("export.R1"))
+        self.apply("p1")
+        self.delta("p2", "## MODIFIED export.R1: New\n\nNew text.\n\n"
+                         "### Scenario: half\n- WHEN a\n")
+        self.assert_refused("p2", "export.R1")
+
+    def test_edge1_two_good_scenarios_are_accepted(self) -> None:
+        self.delta("p1", self.requirement("### Scenario: one\n- WHEN a\n- THEN b\n",
+                                          "### Scenario: two\n- WHEN c\n- THEN d\n"))
+        self.apply("p1")
+        self.assertEqual(self.requirement_headings("export"), ["## export.R1: Title"])
+
+    # Edge 2: a code fence hides scenarios and `## ` lines
+
+    def test_edge2_scenario_in_a_backtick_fence_does_not_count(self) -> None:
+        self.delta("p1", self.requirement(
+            "Example:\n\n```markdown\n### Scenario: fake\n- WHEN a\n- THEN b\n```\n"))
+        self.assert_refused("p1", "export.R1")
+
+    def test_edge2_scenario_in_a_tilde_fence_does_not_count(self) -> None:
+        self.delta("p1", self.requirement(
+            "Example:\n\n~~~markdown\n### Scenario: fake\n- WHEN a\n- THEN b\n~~~\n"))
+        self.assert_refused("p1", "export.R1")
+
+    def test_edge2_half_scenario_in_a_fence_does_not_refuse_a_good_requirement(self) -> None:
+        self.delta("p1", self.requirement("### Scenario: real\n- WHEN a\n- THEN b\n",
+                                          "```\n### Scenario: example\n- WHEN only\n```\n"))
+        self.apply("p1")
+        self.assertIn("### Scenario: example", self.read(f"{SPECS}/export.md"))
+
+    def test_edge2_fenced_when_and_then_do_not_fill_a_real_scenario(self) -> None:
+        self.delta("p1", self.requirement("### Scenario: real\n- WHEN a\n\n```\n- THEN b\n```\n"))
+        self.assert_refused("p1", "export.R1")
+
+    def test_edge2_heading_in_a_tilde_fence_is_body(self) -> None:
+        text = ("Example:\n\n~~~markdown\n## Not a change\n"
+                "## ADDED other.R1: Not a change\n~~~")
+        self.delta("p1", added("export.R1", "With code", text))
+        self.apply("p1")
+        spec = self.read(f"{SPECS}/export.md")
+        self.assertIn("## ADDED other.R1: Not a change", spec)
+        self.assertFalse((self.root / SPECS / "other.md").exists())
+        self.assertEqual(self.requirement_headings("export")[0], "## export.R1: With code")
+
+    def test_edge2_backtick_line_in_a_tilde_fence_does_not_end_the_fence(self) -> None:
+        # In Markdown, a ~~~ fence ends only at a ~~~ line. A ``` line in it is text.
+        text = ("Example:\n\n~~~markdown\n```\n## ADDED other.R1: Not a change\n"
+                "```\n~~~")
+        self.delta("p1", added("export.R1", "With code", text))
+        self.apply("p1")
+        self.assertFalse((self.root / SPECS / "other.md").exists())
+        self.assertIn("## ADDED other.R1: Not a change", self.read(f"{SPECS}/export.md"))
+
+    # Edge 3: a #### heading does not end a scenario
+
+    def test_edge3_level_4_heading_in_a_scenario_keeps_the_scenario(self) -> None:
+        self.delta("p1", self.requirement(
+            "### Scenario: with a note\n- WHEN a\n\n#### Note\n\nSome text.\n\n- THEN b\n"))
+        self.apply("p1")
+        self.assertIn("#### Note", self.read(f"{SPECS}/export.md"))
+
+    def test_edge3_level_4_heading_does_not_hide_a_missing_then(self) -> None:
+        self.delta("p1", self.requirement("### Scenario: s\n- WHEN a\n\n#### Note\n\nText.\n"))
+        self.assert_refused("p1", "export.R1")
+
+    def test_edge3_level_3_heading_ends_the_scenario(self) -> None:
+        # A THEN line after a `### ` heading is not in the scenario.
+        self.delta("p1", self.requirement("### Scenario: s\n- WHEN a\n\n### Notes\n\n- THEN b\n"))
+        self.assert_refused("p1", "export.R1")
+
+    # Edge 4: bad YAML is an error with exit 1, not a traceback
+
+    def test_edge4_bad_yaml_in_the_delta_frontmatter(self) -> None:
+        for front in ("apply_order: [1", "plan: p1\n  bad: : indent", "key: \"open"):
+            with self.subTest(front=front):
+                self.delta("p1", added("export.R1"), front=front)
+                self.assert_refused("p1", "p1.spec.md")
+
+    def test_edge4_frontmatter_that_is_not_a_mapping(self) -> None:
+        for front in ("- a\n- b", "just text", "42"):
+            with self.subTest(front=front):
+                self.delta("p1", added("export.R1"), front=front)
+                self.assert_refused("p1", "p1.spec.md")
+
+    def test_edge4_bad_yaml_in_another_delta_stops_apply(self) -> None:
+        self.delta("good", added("export.R1"))
+        self.delta("other", added("login.R1"), front="apply_order: [1")
+        self.assert_refused("good", "other.spec.md")
+
+    def test_edge4_list_frontmatter_in_another_delta_stops_apply(self) -> None:
+        self.delta("good", added("export.R1"))
+        self.delta("other", added("login.R1"), front="- a\n- b")
+        self.assert_refused("good", "other.spec.md")
+
+    def test_edge4_bad_yaml_in_the_config(self) -> None:
+        self.write(".cornerstone/config.yaml", "paths:\n  plans: [docs/plans\n")
+        self.delta("p1", added("export.R1"))
+        self.assert_refused("p1", "config.yaml")
+
+    def test_edge4_cli_prints_no_traceback(self) -> None:
+        self.write(".cornerstone/config.yaml", "paths: {plans: \n")
+        self.delta("p1", added("export.R1"), front="apply_order: [1")
+        err = io.StringIO()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = cli.main(["spec", "apply", "p1", "--root", str(self.root)])
+        self.assertEqual(code, 1)
+        self.assertNotIn("Traceback", out.getvalue() + err.getvalue())
+        self.assertIn("stone spec apply:", out.getvalue())
+
+    # Edge 5: a path outside the repo stops apply before it writes
+
+    def nested_repo(self) -> Path:
+        """Move the repo root one level down, so that '../outside/' stays in the temp folder."""
+        outer = self.root
+        self.root = outer / "repo"
+        self.root.mkdir()
+        return outer
+
+    def test_edge5_specs_path_outside_the_repo_writes_nothing(self) -> None:
+        outer = self.nested_repo()
+        for value in ("../outside/", "../repo-specs/", "docs/../../outside/"):
+            with self.subTest(value=value):
+                self.write(".cornerstone/config.yaml", f"paths:\n  specs: {value}\n")
+                delta = self.delta("p1", added("export.R1"))
+                before = delta.read_text(encoding="utf-8")
+                self.assert_refused("p1", "paths.specs")
+                self.assertEqual(delta.read_text(encoding="utf-8"), before,
+                                 "the delta was marked as applied")
+                self.assertEqual([p.name for p in outer.iterdir()], ["repo"])
+
+    def test_edge5_absolute_specs_path_outside_the_repo_writes_nothing(self) -> None:
+        outer = self.nested_repo()
+        self.write(".cornerstone/config.yaml", f"paths:\n  specs: {outer / 'outside'}\n")
+        self.delta("p1", added("export.R1"))
+        self.assert_refused("p1", "paths.specs")
+        self.assertFalse((outer / "outside").exists())
+
+    def test_edge5_plans_path_outside_the_repo_writes_nothing(self) -> None:
+        outer = self.nested_repo()
+        self.write(".cornerstone/config.yaml", "paths:\n  plans: ../outside/\n")
+        delta = outer / "outside" / "p1.spec.md"
+        delta.parent.mkdir()
+        delta.write_text(added("export.R1"), encoding="utf-8")
+        self.assert_refused("p1", "paths.plans")
+        self.assertEqual(delta.read_text(encoding="utf-8"), added("export.R1"))
+        self.assertEqual(sorted(p.name for p in (outer / "outside").iterdir()), ["p1.spec.md"])
+        self.assertFalse((self.root / SPECS).exists())
+
+    def test_edge5_path_that_stays_in_the_repo_is_accepted(self) -> None:
+        self.nested_repo()
+        self.write(".cornerstone/config.yaml", "paths:\n  specs: docs/../product/specs/\n")
+        self.delta("p1", added("export.R1"))
+        changed = self.apply("p1")
+        self.assertEqual(sorted(changed), [f"{PLANS}/p1.spec.md", "product/specs/export.md"])
+
     # Helpers that build the expected spec text through the public replay
 
     def _replay_text(self) -> str:
