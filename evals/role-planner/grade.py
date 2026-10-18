@@ -73,8 +73,9 @@ PART_LINE = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)?\s*"
 # A bold label, such as "**Context:**" or "**Why it matters**:". It does not start a question.
 BOLD_LABEL = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*[^*]+:\*\*|__[^_]+:__|\*\*[^*]+\*\*:|"
                         r"__[^_]+__:)")
-# A parameter default in code, not the default of the plan: "(default `date.today()`)".
-CODE_DEFAULT = re.compile(r"^[:=]?\s*`[^`]*`\s*\)")
+# A parameter default in code, not the default of the plan: "(default `date.today()`)" and "with a
+# default of `date.today()`". The code has "(" or "=". "Default: `UnknownCode`" is a plan default.
+CODE_DEFAULT = re.compile(r"^\s*(?:of\s+|[:=]\s*)?`[^`]*[(=][^`]*`")
 OPEN_NOTE = re.compile(r"\bopen question\b|\bnot (yet )?(decided|approved)\b", re.I)
 TABLE_RULE = re.compile(r"^\s*\|?(\s*:?-+:?\s*\|)+\s*:?-*:?\s*$")  # | --- | :-: |
 
@@ -375,8 +376,7 @@ def _says(lines: list[str], words: re.Pattern[str]) -> bool:
     """
     for index, line in enumerate(lines):
         for match in words.finditer(line):
-            if NEGATED.search(line[:match.start()]) or (
-                    line[:match.start()].endswith("(") and CODE_DEFAULT.match(line[match.end():])):
+            if NEGATED.search(line[:match.start()]) or CODE_DEFAULT.match(line[match.end():]):
                 continue
             rest = line[match.end():]
             rest = (rest.split(":", 1)[1] if ":" in rest else rest).strip(" \t*_:.-")
