@@ -1,7 +1,7 @@
 ---
 id: app-slice
 name: App slice
-version: 0.2.0
+version: 0.3.0
 purpose: Deliver one vertical feature through all layers (UI, API, data) as a small set of PRs.
 triggers: [command, label:agent-ready]
 stages: [intake, shape, plan, build, test, verify, review, deliver, learn]
@@ -14,7 +14,7 @@ gates:
   G3: required
   G4: human
   G5: if-needed
-checks: [K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K13, K14, K17, K18]
+checks: [K1, K2, K3, K4, K5, K6, K7, K8, K9, K10, K13, K14, K17, K18, K19]
 limits:
   pr_changed_lines: 600
 outputs: [plan, pr]
@@ -37,7 +37,8 @@ outputs: [plan, pr]
 1. Run the shaper with the human until the ticket meets the Definition of Ready (G1). The ticket
    names the personas that the slice serves.
 2. Start the planner in a fresh session. It writes the plan artifact and the progress file. The
-   plan maps each acceptance criterion to a job story.
+   plan maps each acceptance criterion to a job story. If the slice changes a behavior, the
+   planner also writes the spec delta (see [Specs](../workflow-model.md#specs)).
 3. The progress file lists each task with its acceptance test steps. Each task starts with
    `passes: false`.
 4. A human reads the plan and approves it (G2). The human edits the plan, not the code.
@@ -47,7 +48,8 @@ outputs: [plan, pr]
       the integration tests for the task.
    3. Run the checks (G3). If they pass, set `passes: true` for the task.
 6. Start the reviewer in a fresh session. It compares the diff with the plan and reports scope drift.
-7. Open one PR for each group of tasks that stays under the size limit.
+7. Run `stone spec apply <id>` if the plan has a spec delta. Commit its output alone, with
+   `Role: generator`. Open one PR for each group of tasks that stays under the size limit.
 8. A human approves each PR (G4).
 
 ## Exit criteria
@@ -55,6 +57,7 @@ outputs: [plan, pr]
 - All tasks in the progress file have `passes: true`.
 - Acceptance tests run the feature end to end, as the persona does.
 - Each acceptance criterion maps to a job story, and K18 passes.
+- The spec delta is applied, and K19 passes.
 - Fitness checks (K8) pass.
 
 ## Failure handling

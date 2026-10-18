@@ -113,13 +113,13 @@ def load_profiles(framework: Path, names: list[str]) -> list[dict[str, Any]]:
     return profiles
 
 
-def plans_folder(value: Any) -> str:
-    """Return the plans path as one folder that ends with '/'. Templates add the file name to it."""
+def one_folder(value: Any, key: str = "plans") -> str:
+    """Return a path as one folder that ends with '/'. Templates add the file name to it."""
     if isinstance(value, list):
         if len(value) != 1:
-            raise RenderError(f"{CONFIG}: 'paths.plans' must be one folder, not {len(value)}.")
+            raise RenderError(f"{CONFIG}: 'paths.{key}' must be one folder, not {len(value)}.")
         value = value[0]
-    folder = str(value or "docs/plans/").strip()
+    folder = str(value or f"docs/{key}/").strip()
     return folder if folder.endswith("/") else folder + "/"
 
 
@@ -135,13 +135,15 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
                                   if isinstance(value, list) else str(value))
     for key, value in (config.get("branches") or {}).items():
         values[f"branch_{key}"] = str(value)
-    values["paths_plans"] = plans_folder(_get(config, "paths.plans"))
+    values["paths_plans"] = one_folder(_get(config, "paths.plans"))
+    values["paths_specs"] = one_folder(_get(config, "paths.specs"), "specs")
     values["plans_json"] = json.dumps([values["paths_plans"]])
     tests = list(_get(config, "paths.tests") or [])
     checks = list(_get(config, "paths.checks") or [])
     if tests and checks:
         values["tests_json"] = json.dumps(tests)
-        values["protected_json"] = json.dumps(sorted(set(tests + checks + ALWAYS_PROTECTED)))
+        protected = tests + checks + ALWAYS_PROTECTED + [values["paths_specs"]]
+        values["protected_json"] = json.dumps(sorted(set(protected)))
     return {key: value for key, value in values.items() if "TODO(" not in value}
 
 

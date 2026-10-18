@@ -6,13 +6,11 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
-import yaml
-
+from stone import specs
 from stone.findings import Finding
 
 CHECK = "K18"
 PERSONAS_FILE = Path("constitution") / "personas.md"
-DEFAULT_PLANS = "docs/plans/"
 FIELDS = ["id", "who", "jobs", "limits", "evidence"]
 LIMITS = ["device", "skill", "access"]
 EVIDENCE = {"assumed", "validated"}
@@ -121,13 +119,12 @@ def _check_jobs(persona: Persona, pid: str, job_ids: set[str], label: str) -> li
     return findings
 
 
-def plans_folder(root: Path) -> Path:
-    config = root / ".cornerstone" / "config.yaml"
-    plans = DEFAULT_PLANS
-    if config.exists():
-        data = yaml.safe_load(config.read_text(encoding="utf-8")) or {}
-        plans = (data.get("paths") or {}).get("plans") or DEFAULT_PLANS
-    return root / plans
+def plans_folder(root: Path) -> Path | None:
+    """Return the plans folder, or None if the config path is not valid (K19 reports it)."""
+    try:
+        return specs.config_path(root, "plans")
+    except specs.SpecError:
+        return None
 
 
 def check_plans(root: Path, persona_ids: set[str] | None, job_ids: set[str]) -> list[Finding]:
@@ -136,8 +133,9 @@ def check_plans(root: Path, persona_ids: set[str] | None, job_ids: set[str]) -> 
     `persona_ids` is None when the personas file does not exist.
     """
     findings: list[Finding] = []
-    for path in sorted(plans_folder(root).glob("*.md")):
-        label = str(path.relative_to(root))
+    folder = plans_folder(root)
+    for path in sorted(folder.glob("*.md")) if folder else []:
+        label = path.relative_to(root.resolve()).as_posix()
         in_code = False
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             if line.lstrip().startswith("```"):

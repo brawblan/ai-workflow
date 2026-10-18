@@ -96,6 +96,7 @@ the workflow profiles where it applies, and the framework principle that it supp
 | D11 | The first tickets you create are the most important. They set the pattern for the rest. | [S2] | FP | P3 |
 | D12 | A persona describes one specific type of user, with goals and limits. A team designs for that person, not for an abstract "user". | [S31] | FP AS | P3 |
 | D13 | A job story states the situation, the motivation, and the expected outcome: "When ..., I want to ..., so that ...". It gives the context that a user story with a role does not. | [S32] | FP AS ST | P3 |
+| D14 | Keep the current specs apart from the proposed changes. Each change holds spec deltas (added, modified, and removed requirements, each with scenarios). When the change is done, the deltas merge into the current specs. The specs then show the system as it is, and the changes show why. | [S34] | FP AS RM | P3, P8 |
 
 ### E. Sessions, state, and roles
 
@@ -247,3 +248,4 @@ in this repo.
 | S31 | Alan Cooper, The Inmates Are Running the Asylum, Sams, 1999. |
 | S32 | Alan Klement, "Replacing the User Story with the Job Story", JTBD.info, 2013. |
 | S33 | Zheng, Pei, Logeswaran, Lee, Jurgens, [When "A Helpful Assistant" Is Not Really Helpful: Personas in System Prompts Do Not Improve Performances of Large Language Models](https://arxiv.org/abs/2311.10054), arXiv 2311.10054, Findings of EMNLP 2024. |
+| S34 | Fission AI, [OpenSpec](https://github.com/Fission-AI/OpenSpec), MIT license. The idea of spec deltas that merge into current specs. Cornerstone uses the idea, not the tool (D18, D21). |

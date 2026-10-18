@@ -1,6 +1,6 @@
 {
   "name": "workflow",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Skills for Cornerstone setup, project setup, PR delivery, backlog sequencing, and Simplified Technical English writing.",
   "author": {
     "name": "Brandon Blankenstein"

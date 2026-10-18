@@ -9,7 +9,7 @@ the same rule. Usage: protected_paths.py <base>
 import subprocess
 import sys
 
-PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "stone/tests/"]
+PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "stone/tests/"]
 
 
 def git(*args: str) -> str:

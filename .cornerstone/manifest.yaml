@@ -14,7 +14,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .cornerstone/checks/protected_paths.py
-  hash: 72a81068c250e9f1ef32f75d68f51757c91f5fd654e3d440654f5d2e083a2e6d
+  hash: ab4d016544f83b92279aa1c9392e5a258f89b147310140211c1fc097c96fd51a
 - id: ci-job.checks
   kind: ci-job
   purpose: G3. Run K6, K14, and the repo checks on each pull request.
@@ -44,7 +44,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .cornerstone/hooks/protect-paths.py
-  hash: d409db292f93f0f7b907760a3233d84f3ac6712e1a07ae7b5c4ec5c2e08470e5
+  hash: c5e9fde56224da2d031d4122e8596dc67b45c0e9e4927597e45fea7a3fa40e19
 - id: hook.settings
   kind: hook
   purpose: Register the protected-path hook in the harness settings. Other keys stay
@@ -89,7 +89,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/reviewer.md
-  hash: 2a821ff259b781ee289fcc25813a79797a6449812d1b17ceab8f79c79998f92a
+  hash: a4e1c8cafcb4d0b3869aca58abce967ad15df3b0e337189ec3d422a350c9c6b8
 - id: role.shaper
   kind: role
   purpose: Interview the human until the ticket meets the Definition of Ready.
@@ -117,4 +117,4 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/tester.md
-  hash: 334abdedcf3a7e0370ce41ad7d32e2637a47faa5423b0f1a4b3b3b518261a8c2
+  hash: 7a50846651a4dabd12cd3c45cb1d7191d9930a90fda2f104d2a131859397c248
