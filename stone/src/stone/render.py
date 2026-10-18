@@ -24,7 +24,8 @@ REQUIRED_FIELDS = ["framework_version", "harness", "model_profile", "profiles", 
 REVIEW_MONTHS = 6
 CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches"}
 PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
-                    "protected_json": "paths.tests and paths.checks"}
+                    "protected_json": "paths.tests and paths.checks",
+                    "branch_main_json": "branches.main"}
 MODEL_VALUES = {"instruction_file_max_lines"}  # template values from `defaults` in the model profile
 FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "docs/reports/"}
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
@@ -168,6 +169,7 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
                                   if isinstance(value, list) else str(value))
     for key, value in (config.get("branches") or {}).items():
         values[f"branch_{key}"] = str(value)
+        values[f"branch_{key}_json"] = json.dumps(str(value))  # a quoted YAML string
     values["paths_plans"] = one_folder(_get(config, "paths.plans"))
     values["paths_specs"] = one_folder(_get(config, "paths.specs"), "specs")
     values["paths_reports"] = one_folder(_get(config, "paths.reports"), "reports")

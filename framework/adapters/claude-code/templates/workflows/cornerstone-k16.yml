@@ -22,7 +22,7 @@ jobs:
         env:
           HEAD_REF: $${{ github.head_ref }}
           BASE_REF: $${{ github.base_ref }}
-          MAIN_BRANCH: "$branch_main"
+          MAIN_BRANCH: $branch_main_json
         run: |
           case "$${HEAD_REF}" in
             spike/*)
