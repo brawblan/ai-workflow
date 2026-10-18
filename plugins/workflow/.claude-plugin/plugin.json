@@ -1,6 +1,6 @@
 {
   "name": "workflow",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Skills for Cornerstone setup, PR delivery, spec-driven development with OpenSpec, backlog sequencing, and Simplified Technical English writing.",
   "author": {
     "name": "Brandon Blankenstein"

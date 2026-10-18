@@ -1,70 +1,80 @@
 ---
 name: ticket-delivery
-description: "Check whether a ticket's COAs or acceptance criteria are met, or if no ticket context exists, summarize the work completed. After the work is verified, create a branch from the repo's integration branch (default dev), organize commits into logical groups, and open a PR into it. Use when asked to verify a ticket, check COAs, confirm acceptance criteria, summarize completed work, create a branch, organize commits, or open a PR."
+description: "Collect the evidence that a ticket's acceptance criteria (COAs) are met: the tester's tests, the check output, and the reviewer's findings, each from its own session. Then open the PR with the dev-pr skill, with the evidence sections filled. It does not verify its own work. If no ticket exists, summarize the work instead. Use when asked to verify a ticket, check COAs, confirm acceptance criteria, collect evidence, summarize completed work, or deliver a ticket as a PR."
 ---
 
 # Ticket Delivery
 
-Use this skill when the user wants a delivery pass on current work before it is handed off in git.
+A delivery pass on finished work. This skill collects evidence. It does not make it. The session
+that wrote the code cannot judge it (P2), so the tests and the review come from other sessions.
 
-## Goals
+## 1. Find the delivery basis
 
-- Decide whether the current work satisfies the ticket's COAs or acceptance criteria.
-- If there is no ticket context, provide a short work summary from the current diff and recent validation.
-- Only after verification, prepare the git history and open a PR.
+- Find the ticket in the conversation, the branch name, the linked issue, or the plan files.
+- Extract each acceptance criterion (COA). The COAs are the source of truth.
+- If there is no ticket, go to step 5. Do not invent criteria.
 
-## Workflow
+## 2. Check that the independent work exists
 
-### 1. Identify the delivery basis
+Each item must come from a session other than the one that wrote the code:
 
-- If the conversation, branch, files, or linked docs contain ticket details, extract the COAs or acceptance criteria first.
-- Treat COAs and acceptance criteria as the source of truth for verification.
-- If no ticket context is available, switch to a concise work-done summary instead of inventing criteria.
+| Evidence | Made by | Where to find it |
+| --- | --- | --- |
+| Tests for each COA, and a test report | tester | Test commits (trailer `Role: tester`), a PR comment, or a report file |
+| Review findings, confidence, and open risks | reviewer | A PR review, a PR comment, or a report file |
+| Decision log | implementer | `docs/plans/<id>.decisions.md`, or the path in the repo config |
 
-### 2. Verify the work
+If the tester or the reviewer has not run, stop. Tell the user to start that role in a new session
+with the ticket and the diff. Use the repo's role file if it has one (for example
+`.claude/agents/tester.md`). Do not write the tests or the review in this session.
 
-- Compare each COA against the actual code, tests, and command results.
-- Mark each item as `met`, `not met`, or `unknown`.
-- For `not met` or `unknown`, explain the missing behavior, missing test coverage, or missing evidence.
-- Prefer executable verification over inspection alone: run the narrowest relevant tests, checks, or build commands first.
-- Do not create branches, commits, or PRs until the current state has been verified or the user explicitly accepts the risk.
+## 3. Run the checks
 
-### 3. Fallback when no ticket exists
+- Run the repo's check command from `AGENTS.md` or `.cornerstone/config.yaml` (`commands.all_checks`).
+- Checks are programs, so this session can run them. Record each command and its result.
+- If a check fails, stop. Report the output. The implementer fixes it, not this skill.
 
-- Summarize the work in a short list based on the current diff, touched files, and recent validation.
-- Keep that summary factual: what changed, what was validated, and what remains unverified.
+## 4. Map the evidence to each COA
 
-### 4. Prepare delivery after verification
+Mark each COA with one status:
 
-- Default the base branch to the repo's integration branch unless the user names another target.
-  Find it in `CLAUDE.md`, `AGENTS.md`, or `CONTRIBUTING.md`. If the docs do not name one, use `dev` if it
-  exists on `origin`. Otherwise use the repo's default branch.
-- Create a new branch from the base branch when the worktree allows it.
-- If the worktree is already dirty on another branch, avoid destructive cleanup. Preserve local changes, then choose the safest path: create a new branch from the current state, or commit and rebase/cherry-pick onto the base branch.
-- Organize commits by logical unit, not by file count. Typical groups are behavior change, test coverage, and tooling/docs.
-- Keep commit messages short and specific.
+| Status | When |
+| --- | --- |
+| `met` | A tester test covers the COA, the test passes, and the reviewer has no open finding on it. |
+| `not met` | A test for the COA fails, or the reviewer has an open finding on it. |
+| `no evidence` | No tester test covers the COA, or the reviewer did not check it. |
 
-### 5. Open the pull request
+Give the evidence for each status: the test name, the command and its result, or the finding. Do
+not mark a COA `met` from your own reading of the code.
 
-- Push the branch and open a PR into the chosen target branch, defaulting to the base branch.
-- The PR description should include:
-  - `Closes #<issue number>` (when resolving a ticket/issue)
-  - A short summary of the change
-  - COA status or the fallback work summary
-  - Validation that was run
-  - Any remaining risks, gaps, or follow-up work
+## 5. Fallback when no ticket exists
+
+Summarize the work from the diff: what changed, which checks ran and their results, and what is not
+verified. Say that no COAs exist, so the PR has no COA evidence.
+
+## 6. Open the PR
+
+Follow the `dev-pr` skill. Fill its evidence sections from steps 2 to 5:
+
+- **Evidence:** the COA table from step 4, or the summary from step 5.
+- **Decision log:** the link or the list from step 2.
+- **Review findings:** the reviewer's findings, or "None" with the reviewer's report link.
+- **Confidence:** the reviewer's confidence and open risks. Add each `not met` or `no evidence` COA
+  as a risk.
+
+Add `Closes #<n>` only if all COAs are `met`. Otherwise use `Related #<n>`.
 
 ## Response shape
 
-When using this skill, structure the result in this order:
-
-1. COA status or fallback work summary
-2. Verification results
-3. Branch and commit plan
+1. COA status table, or the work summary
+2. Check results
+3. Missing evidence, and who must make it
 4. PR status and link
 
 ## Guardrails
 
-- Never claim a COA is met without code or command evidence.
-- Never discard unrelated local changes just to create a clean branch.
-- If branch creation or PR creation is blocked by auth, remotes, conflicts, or uncommitted unrelated work, say exactly what is blocked and choose the safest non-destructive alternative.
+- Never mark a COA `met` without a test from the tester and a passing result.
+- Never write tests or a review for code that this session wrote.
+- Never discard unrelated local changes to make a clean branch.
+- If a branch or PR step is blocked (auth, remotes, conflicts, unrelated work), say what is blocked.
+  Choose the safest non-destructive path.
