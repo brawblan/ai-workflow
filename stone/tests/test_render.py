@@ -316,6 +316,68 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(self.run_hook(tree + "src/a.py", "planner"), 2)
         self.assertEqual(self.run_hook(tree + "tests/test_a.py", "planner"), 2)
 
+    def rendered_files(self) -> dict[str, str]:
+        return {str(p.relative_to(self.root)): p.read_text(encoding="utf-8")
+                for p in sorted(self.root.rglob("*")) if p.is_file()
+                and p.relative_to(self.root).as_posix() != ".cornerstone/config.yaml"}
+
+    def test_plans_path_with_no_trailing_slash_gets_one(self) -> None:
+        self.app_slice("docs/plans")
+        self.render()
+        planner = (self.root / PLANNER).read_text(encoding="utf-8")
+        self.assertIn("Write only in `docs/plans/`", planner)
+        self.assertIn("`docs/plans/<ticket-id>.md`", planner)
+        self.assertIn("`docs/plans/<ticket-id>.progress.json`", planner)
+        self.assertNotIn("docs/plans<", planner)
+        self.assertEqual(self.run_hook("docs/plans/x.md", "planner"), 0)
+        self.assertEqual(self.run_hook("docs/plans/x.progress.json", "planner"), 0)
+        self.assertEqual(self.run_hook("docs/plansx/x.md", "planner"), 2)
+        self.assertEqual(self.run_hook("docs/plans.md", "planner"), 2)
+        self.assertEqual(self.run_hook("src/a.py", "planner"), 2)
+
+    def test_plans_path_with_and_without_slash_render_the_same(self) -> None:
+        self.app_slice("docs/plans/")
+        self.render()
+        with_slash = self.rendered_files()
+        self.folder.cleanup()
+        self.setUp()
+        self.app_slice("docs/plans")
+        self.render()
+        self.assertEqual(self.rendered_files(), with_slash)
+
+    def test_plans_list_of_one_folder_renders_the_same_as_the_string(self) -> None:
+        self.app_slice("docs/plans/")
+        self.render()
+        as_string = self.rendered_files()
+        self.folder.cleanup()
+        self.setUp()
+        self.app_slice("[docs/plans/]")
+        self.render()
+        self.assertEqual(self.rendered_files(), as_string)
+        self.assertEqual(self.run_hook("docs/plans/x.md", "planner"), 0)
+        self.assertEqual(self.run_hook("src/a.py", "planner"), 2)
+
+    def test_plans_list_of_two_folders_stops_before_any_write(self) -> None:
+        for plans in ("[docs/plans/, work/specs/]", "[a/, b/, c/]"):
+            with self.subTest(plans=plans):
+                self.app_slice(plans)
+                with self.assertRaisesRegex(render.RenderError, r"paths\.plans"):
+                    self.render()
+                self.assertFalse((self.root / ".claude").exists())
+                self.assertFalse((self.root / ".github").exists())
+                self.assertFalse((self.root / render.MANIFEST).exists())
+                self.assertEqual(sorted(p.name for p in (self.root / ".cornerstone").iterdir()),
+                                 ["config.yaml"])
+
+    def test_plans_list_of_two_folders_changes_no_rendered_file(self) -> None:
+        self.app_slice()
+        self.render()
+        before = self.rendered_files()
+        self.app_slice("[docs/plans/, work/specs/]")
+        with self.assertRaisesRegex(render.RenderError, r"paths\.plans"):
+            self.render()
+        self.assertEqual(self.rendered_files(), before)
+
     def test_app_slice_hook_keeps_the_other_role_rules(self) -> None:
         self.app_slice()
         self.render()
