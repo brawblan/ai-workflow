@@ -34,7 +34,7 @@ repo config.
 | Command | Does |
 | --- | --- |
 | `stone init` | Make `.cornerstone/config.yaml` with `TODO(<owner>)` values. |
-| `stone render` | Write all files from the inputs. Safe to run again. **Built in v0.2 for the single-ticket profile: role files, the protected-path hook, K6, the G3 CI workflow, and the manifest. Version 0.4 adds the app-slice profile and the planner role. Version 0.7 adds K14 to the G3 workflow (D23). Version 0.8 derives profile support from the role files of the adapter, and filters components with `when` (D24).** No profile overrides yet. |
+| `stone render` | Write all files from the inputs. Safe to run again. **Built in v0.2 for the single-ticket profile: role files, the protected-path hook, K6, the G3 CI workflow, and the manifest. Version 0.4 adds the app-slice profile and the planner role. Version 0.7 adds K14 to the G3 workflow (D23). Version 0.8 derives profile support from the role files of the adapter, and filters components with `when` (D24). Item 6b adds check K7 to the G3 workflow (D27).** No profile overrides yet. |
 | `stone spec apply <plan>` | Apply the spec delta of one plan, and write the specs (D21). **Built in v0.5.** |
 | `stone spec sync` | Renumber the applied deltas and write the specs again, after a merge (D22). **Built in v0.6.** |
 | `stone check` | Validate the config, the profiles, and the manifest. Report drift between files and templates. **Built in v0.1 (no manifest or drift yet).** |

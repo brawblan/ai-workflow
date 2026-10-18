@@ -86,6 +86,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D23 | The G3 workflow that `stone render` writes runs K14 on the PR body in `--mode warn`. It installs stone in a venv from the tag `v<framework_version>`. The step is in each render, because each supported profile lists K14. | [generator/design.md](generator/design.md), [customization.md](customization.md) |
 | D24 | Version 1 supports all 10 profiles. `stone render` writes each component that a selected profile needs, and a trigger workflow for each trigger that is not `command`. Each role has one role file for all profiles. The pipeline gives the profile steps to the role at run time. A profile is supported when the adapter has a role file for each of its roles. A component with `when` renders only for a profile with that gate or check. | [generator/design.md](generator/design.md), [profiles/README.md](profiles/README.md) |
 | D25 | The investigator writes only in `paths.reports` (default `docs/reports/`). On a `spike/` branch it can write any file, except the harness and Cornerstone files, because K16 stops the merge. So it has the Edit and Write tools, and the hook limits the paths. | [workflow-model.md](workflow-model.md#roles) |
+| D27 | K7 is a script that `stone render` writes, with the limit of each selected profile in it. The limit is the profile limit, or `limits.pr_changed_lines` if that is smaller. CI does not know the profile of a PR, so the PR body names it on a `Profile: <id>` line. With no line, or with an unknown profile, the smallest limit applies. A `Waiver (P10)` section with text passes, with a notice. The G3 step reads the body through `env` and starts in `--mode warn`. | [checks.md](checks.md), [customization.md](customization.md) |
 
 ## Open questions
 
@@ -127,7 +128,8 @@ Do these items in order. Each item is one PR or more.
 6. Version 1: support all 10 profiles (D24). Items 6b to 6h can run in parallel after 6a.
    - 6a. Done in stone 0.8: profile support from the adapter role files, the `when` filter, and the
      investigator role with its hook rule (D24, D25).
-   - 6b. K7 (change size) as a generated check in the G3 workflow. All code profiles need it.
+   - 6b. Done: K7 (change size) as a generated check in the G3 workflow (D27). Two weeks after the
+     merge, change K7 to `--mode block` in the G3 workflow template.
    - 6c. K15 (instruction size) for full-project. Golden-file test for full-project.
    - 6d. K10 and K12 as repo commands for refactor-migration. Golden-file test for it.
    - 6e. K16 (no merge to main) for spike. Golden-file tests for spike, bug-triage, and code-audit.

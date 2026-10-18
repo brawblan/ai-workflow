@@ -67,6 +67,10 @@ writing:
 waivers: []
 ```
 
+Check K7 uses `limits.pr_changed_lines` only if it is smaller than the profile limit. To loosen a
+limit for one PR, add a `Waiver (P10)` section to the PR body. Name the profile of the PR on a
+`Profile: <id>` line in the PR body. Without it, K7 uses the smallest limit.
+
 The generator fills the facts that it can find. It asks a human for the rest. It writes
 `TODO(<owner>)` for an unknown value. It does not guess.
 
