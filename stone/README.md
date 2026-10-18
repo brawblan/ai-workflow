@@ -134,7 +134,7 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 | A K17 finding on a correct use of a word | Add `<!-- ste-ignore -->` at the end of that line. A reviewer checks each mark. |
 | `No framework folder` | Run `stone` from the repo root, or pass `--framework <path>`. |
 | `render`: `'<field>' is a TODO value` | Write the real value in `.cornerstone/config.yaml`. |
-| `render`: `profile <id> lists K10, but ... has no commands.mutation` | Add the command to `.cornerstone/config.yaml`, then render again. Or record a waiver for the check. |
+| `render`: `profile <id> lists K10, but ... has no commands.mutation` | Add the command to `.cornerstone/config.yaml`, then render again. |
 | `render`: `drift <path>` | A person changed a generated file. Move the change to the repo config. Then delete the file and render again. |
 
 ## Limits

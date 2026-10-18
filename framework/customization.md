@@ -91,11 +91,12 @@ writes a warning.
 | K4 | `test_integration` | `pytest tests/integration` |
 | K5 | `test_acceptance` | `npx playwright test` |
 | K8 | `architecture` | `lint-imports` |
-| K10 | `mutation` | `mutmut run --paths-to-mutate src/` |
+| K10 | `mutation` | `scripts/mutation-score.sh` |
 | K11 | `property` | `pytest tests/property` |
 | K12 | `differential` | `pytest tests/differential` |
 
-The K10 step gives two environment variables to the command:
+The K10 step gives two environment variables to the command. The command MUST read them. Most
+mutation tools do not read them, so wrap the tool in a repo script:
 
 | Variable | Value |
 | --- | --- |
@@ -105,6 +106,9 @@ The K10 step gives two environment variables to the command:
 The K10 step needs `limits.mutation_score_changed_code`. If it has no value, render stops.
 
 A new step warns for 2 weeks (`continue-on-error`). Then the framework makes it block.
+
+CI does not know the profile of a PR. So each step runs on each PR in the repo. For example, a repo
+with single-ticket and refactor-migration runs K10 on each single-ticket PR too.
 
 ## Profile override (`.cornerstone/profiles/<profile>.yaml`)
 

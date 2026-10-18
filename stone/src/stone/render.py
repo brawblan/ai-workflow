@@ -176,7 +176,8 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     for key, value in (config.get("branches") or {}).items():
         values[f"branch_{key}"] = str(value)
     for key, value in (config.get("limits") or {}).items():
-        values[f"limit_{key}"] = str(value)
+        if value is not None and str(value).strip():  # an empty limit has no value
+            values[f"limit_{key}"] = str(value)
     values["paths_plans"] = one_folder(_get(config, "paths.plans"))
     values["paths_specs"] = one_folder(_get(config, "paths.specs"), "specs")
     values["paths_reports"] = one_folder(_get(config, "paths.reports"), "reports")
