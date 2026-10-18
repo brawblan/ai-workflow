@@ -54,7 +54,8 @@ higher layer.
 4. Work with the generated skills, roles, hooks, and CI checks.
 5. Every 6 months, or when the model changes, run the lifecycle review.
 
-The generator is mostly a design. The [`stone`](../stone/README.md) CLI has `stone check` and the K17 writing check. See [generator/design.md](generator/design.md).
+The generator is mostly a design. The [`stone`](../stone/README.md) CLI has `stone check`, the K17
+writing check, and the first part of `stone render`. See [generator/design.md](generator/design.md).
 
 ## Decisions
 
@@ -71,6 +72,8 @@ The generator is mostly a design. The [`stone`](../stone/README.md) CLI has `sto
 | D9 | Human-facing text follows ASD-STE100. Agent-facing text uses STE only where an eval shows a gain. | [writing.md](writing.md#scope) |
 | D10 | Check K17 tests the measurable STE rules and warns for 2 weeks, then blocks. The writing skill covers the rest. | [writing.md](writing.md#enforcement) |
 | D11 | STE stays only while review time, rework, and a quarterly blind A/B show that it helps. | [writing.md](writing.md#evidence-p5) |
+| D12 | Templates use `string.Template` from the standard library, not Jinja2. The CLI keeps one dependency (PyYAML). | [generator/design.md](generator/design.md#assumptions) |
+| D13 | The generator owns whole files (no markers, hash in the manifest) or marked blocks in shared files. | [generator/design.md](generator/design.md#constraints) |
 
 ## Open questions
 

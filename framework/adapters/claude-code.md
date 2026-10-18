@@ -4,6 +4,10 @@ Status: draft v0. Facts marked `[TO CONFIRM]` must be tested on the current Clau
 
 Model profiles for this harness: [claude-code/models/](claude-code/models/claude-5.yaml).
 
+Templates: `claude-code/templates/`. The component list
+[claude-code/components.yaml](claude-code/components.yaml) names the template and the target path of
+each component that `stone render` writes.
+
 ## Mapping
 
 | Concept | Target | Support | Notes |

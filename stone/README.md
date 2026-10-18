@@ -1,11 +1,12 @@
 # stone
 
-The Cornerstone CLI. Version 0.1 has two commands:
+The Cornerstone CLI. Version 0.2 has three commands:
 
 | Command | Does |
 | --- | --- |
 | `stone check` | Validates the framework: profile frontmatter, gate rules, check IDs, the gates table, relative links, and P12 (no vendor names in the core). If `.cornerstone/config.yaml` exists, it validates it too. |
 | `stone check-writing` | Check K17. Tests human-facing Markdown against the measurable rules of the [writing standard](../framework/writing.md). |
+| `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.2 writes the role files for the single-ticket profile. |
 
 The other commands in [the generator design](../framework/generator/design.md) are not built yet.
 
@@ -50,6 +51,15 @@ pip install ./stone
 
 Add `--format github` to show the findings as annotations in a GitHub Actions run.
 
+5. Render the generated files into a target repo. Write `.cornerstone/config.yaml` first (see
+   [customization.md](../framework/customization.md)):
+
+   ```bash
+   stone render --root <target-repo> --framework <this-repo>/framework --dry-run
+   ```
+
+   Remove `--dry-run` to write the files. A second run changes only the files whose input changed.
+
 ## Outputs
 
 Each finding is one line: path, line, severity, check, and a message with the fix.
@@ -60,9 +70,11 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 
 | Exit code | Meaning |
 | --- | --- |
-| 0 | No blocking finding. In `--mode warn`, K17 always exits with 0. |
-| 1 | One or more blocking findings. |
-| 2 | Wrong arguments. |
+| 0 | No blocking finding. In `--mode warn`, K17 always exits with 0. `render`: no drift. |
+| 1 | One or more blocking findings. `render`: an input is not valid, and no file was written. |
+| 2 | Wrong arguments. `render`: drift in one or more files. Render did not change those files. |
+
+`stone render` logs one line for each file to standard error: `wrote`, `skipped`, or `drift`.
 
 ## Errors
 
@@ -70,12 +82,16 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 | --- | --- |
 | A K17 finding on a correct use of a word | Add `<!-- ste-ignore -->` at the end of that line. A reviewer checks each mark. |
 | `No framework folder` | Run `stone` from the repo root, or pass `--framework <path>`. |
+| `render`: `'<field>' is a TODO value` | Write the real value in `.cornerstone/config.yaml`. |
+| `render`: `drift <path>` | A person changed a generated file. Move the change to the repo config. Then delete the file and render again. |
 
 ## Limits
 
 - K17 skips agent-facing files (skills, `AGENTS.md`, `CLAUDE.md`, `.claude/`, templates), code, inline code, URLs, and quoted text.
 - In `--diff` mode, K17 reports a finding only if the sentence starts on a changed line.
 - The tense test (rule 2) and the passive test (rule 11) are warnings, because they also match some adjectives.
+- `render` supports only the `claude-code` harness and the `single-ticket` profile. It skips other profiles with a log line.
+- `render` does not check `framework_version` against the framework folder. Check out the tag yourself.
 
 ## Test
 

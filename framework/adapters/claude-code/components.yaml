@@ -1,0 +1,39 @@
+# Components that `stone render` writes for this harness: one template and one target path each.
+# A role is rendered only if a selected profile uses it. eval: the planned eval folder (lifecycle.md).
+
+components:
+  - id: role.shaper
+    kind: role
+    role: shaper
+    purpose: Interview the human until the ticket meets the Definition of Ready.
+    principle: [P3]
+    template: agents/shaper.md
+    target: .claude/agents/shaper.md
+    eval: evals/role-shaper/
+
+  - id: role.implementer
+    kind: role
+    role: implementer
+    purpose: Change the code to meet the ticket. Write the decision log.
+    principle: [P2, P8]
+    template: agents/implementer.md
+    target: .claude/agents/implementer.md
+    eval: evals/role-implementer/
+
+  - id: role.tester
+    kind: role
+    role: tester
+    purpose: Write independent tests from the ticket and the diff.
+    principle: [P2]
+    template: agents/tester.md
+    target: .claude/agents/tester.md
+    eval: evals/role-tester/
+
+  - id: role.reviewer
+    kind: role
+    role: reviewer
+    purpose: Find defects and scope drift in a fresh session.
+    principle: [P2, P11]
+    template: agents/reviewer.md
+    target: .claude/agents/reviewer.md
+    eval: evals/role-reviewer/

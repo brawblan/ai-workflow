@@ -1,6 +1,7 @@
 # Generator design
 
-Status: design. `stone check` and `stone check-writing` are built (see [stone/](../../stone/README.md)). The other commands are not built yet.
+Status: design. `stone check`, `stone check-writing`, and part of `stone render` are built (see
+[stone/](../../stone/README.md)). The other commands are not built yet.
 
 ## Goal
 
@@ -24,14 +25,15 @@ repo config.
 | --- | --- |
 | `stone` CLI (Python 3) | Read the inputs, validate them, render the templates, write the files and the manifest. |
 | `cornerstone-setup` skill | The entry skill. Run `project-setup` as the Shape step (constitution and `AGENTS.md`). Then survey the repo, interview the human for missing facts, write `.cornerstone/config.yaml`, and run the CLI. `project-setup` stays usable alone. |
-| Templates | Jinja2 files in `framework/adapters/<adapter>/templates/`. |
+| Templates | Text files with `$name` placeholders in `framework/adapters/<adapter>/templates/` (D12). |
+| Component list | `framework/adapters/<adapter>/components.yaml`: the id, kind, purpose, principle, eval, template, and target path of each component. |
 
 ## Commands
 
 | Command | Does |
 | --- | --- |
 | `stone init` | Make `.cornerstone/config.yaml` with `TODO(<owner>)` values. |
-| `stone render` | Write all files from the inputs. Safe to run again. |
+| `stone render` | Write all files from the inputs. Safe to run again. **Built in v0.2 for the role files of the single-ticket profile and the manifest.** |
 | `stone check` | Validate the config, the profiles, and the manifest. Report drift between files and templates. **Built in v0.1 (no manifest or drift yet).** |
 | `stone check-writing` | Run K17 on files, on the changed lines since a base, or on a PR body. **Built in v0.1.** |
 | `stone review` | List the components past `review_by`. Exit code 1 if there are any. |
@@ -42,7 +44,11 @@ repo config.
 
 - Python 3.11 or later. Type hints. No network access during `render`.
 - Idempotent: a second `render` with the same inputs changes no file.
-- Generated content sits between markers. Content outside the markers belongs to the human.
+- The generator owns a whole file, or a block in a shared file (D13):
+  - A whole file (a role file, a hook, a check script, a CI workflow) has no markers. The manifest
+    has its hash. A file that does not match that hash is drift.
+  - A block in a shared file (for example the instruction file) sits between markers. Content
+    outside the markers belongs to the human.
 
 ```text
 <!-- stone:begin id=instruction.commands hash=<sha256> -->
@@ -66,9 +72,11 @@ repo config.
 5. Build the component list from the profiles, the modes, the adapters, and `.cornerstone/local/`.
 6. Render each component to memory.
 7. Compare each rendered block with the file on disk:
-   - Same hash: skip.
-   - The disk block changed since the last render: report drift. Do not overwrite. Exit code 2.
-   - Otherwise: write the new block.
+   - Same content: skip.
+   - No file on disk: write it.
+   - The disk content has the hash in the manifest: write the new content.
+   - Otherwise (a human changed the file, or wrote it before the first render): report drift. Do
+     not overwrite. Exit code 2.
 8. Write the manifest. Keep `added`, `owner`, and `review_by` for existing components.
 9. Print a summary: files written, files skipped, drift found.
 
@@ -103,5 +111,7 @@ repo config.
 ## Assumptions
 
 - Target repos use git and GitHub.
-- Jinja2 is the template engine. A template-tool option (Copier) was not selected.
+- The template engine is `string.Template` from the Python standard library (D12). A template has
+  no logic. The CLI builds lists and conditions in code. A template-tool option (Copier) and Jinja2
+  were not selected, because they add a dependency.
 - v0 has one harness adapter (see [adapters/](../adapters/contract.md)). Other harness adapters come later.
