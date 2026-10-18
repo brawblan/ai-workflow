@@ -124,7 +124,10 @@ Do these items in order. Each item is one PR or more.
      (D23). Done in stone 0.8: render writes that workflow only for a profile with G3 (D24).
 4. Write the evals for the first model profile. Set its status to `active` when they pass.
    - 4a. Done in stone 0.9: the `stone eval` runner and the scenario format (D26).
-   - 4b. Next: the evals for `role.tester`, then for `role.planner`.
+   - 4b. Done: the `role.tester` eval (T1 to T4, k = 3). The outcome rate is the same with and
+     without the role (1.00). The role gives the contract (commit trailers and requirement IDs) and
+     costs about 35% less. Result: `evals/results/`.
+   - 4c. Next: the eval for `role.planner`.
 5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
    of Q4 2026.
 6. Version 1: support all 10 profiles (D24). Items 6b to 6h can run in parallel after 6a.
