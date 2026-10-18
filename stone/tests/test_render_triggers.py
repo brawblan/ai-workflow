@@ -6,6 +6,7 @@ import contextlib
 import io
 import json
 import re
+import shlex
 import unittest
 
 import yaml
@@ -150,9 +151,11 @@ class TriggerContentTest(TriggerBase):
                 self.assertRegex(step["uses"], r"^[^@\s]+@[0-9a-f]{40}$")
                 self.assertIn(f"You are the {role}.", step["with"]["prompt"])
                 self.assertIn(flow(name), step["with"]["prompt"])
-                args = step["with"]["claude_args"].split()
+                args = shlex.split(step["with"]["claude_args"])
                 self.assertEqual(args[args.index("--agent") + 1], role)
-                self.assertEqual(args[args.index("--allowedTools") + 1], "Read,Grep,Glob")
+                # D32: each allow rule has a path. A rule with no path allows reads anywhere.
+                allowed = args[args.index("--allowedTools") + 1].split(",")
+                self.assertEqual(allowed, ["Read(./**)", "Read(/${{ runner.temp }}/cornerstone/**)"])
                 denied = args[args.index("--disallowedTools") + 1].split(",")
                 self.assertLessEqual({"Bash", "Edit", "Write"}, set(denied))
 
