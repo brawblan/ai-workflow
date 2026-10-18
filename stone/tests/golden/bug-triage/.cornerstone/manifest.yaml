@@ -1,0 +1,48 @@
+framework_version: 0.8.0
+components:
+- id: hook.protect-paths
+  kind: hook
+  purpose: Block an edit to a path that the current role must not change.
+  principle:
+  - P2
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .cornerstone/hooks/protect-paths.py
+  hash: 192d8f92803a6cf7a7802ac9e9aa79828dba20e3fef9de8e458f695bfb9b15d5
+- id: hook.settings
+  kind: hook
+  purpose: Register the protected-path hook in the harness settings. Other keys stay
+    as they are.
+  principle:
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/settings.json
+  hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+- id: role.investigator
+  kind: role
+  purpose: Read, run, and report. Write only in the reports path, or anywhere on a
+    spike branch.
+  principle:
+  - P2
+  - P11
+  source: framework
+  owner: octocat
+  eval: evals/role-investigator/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/investigator.md
+  hash: 669723c9e13aacf308b32d803f35f6f30e960a9dec72ca48daeaf49b97192e8d
