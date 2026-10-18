@@ -168,6 +168,8 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
         values[f"paths_{key}"] = (", ".join(f"`{item}`" for item in value)
                                   if isinstance(value, list) else str(value))
     for key, value in (config.get("branches") or {}).items():
+        if value is None or not str(value).strip():
+            continue  # no branch name: a template that needs it raises an error that names it
         values[f"branch_{key}"] = str(value)
         values[f"branch_{key}_json"] = json.dumps(str(value))  # a quoted YAML string
     values["paths_plans"] = one_folder(_get(config, "paths.plans"))

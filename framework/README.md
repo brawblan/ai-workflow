@@ -151,7 +151,8 @@ Do these items in order. Each item is one PR or more.
 
    - `stone render` writes every component that each of the 10 profiles lists, with a golden-file
      test for each profile.
-   - Each generated check (K6, K7, K14, K15, K16) blocks, after its 2-week warning time.
+   - Each generated check (K6, K7, K14, K15, K16) blocks. K16 blocks from the start (D30). The
+     others block after their 2-week warning time.
    - Each new component has an eval plan and a review date in the manifest (P5).
    - Then tag `v1.0.0`.
 
