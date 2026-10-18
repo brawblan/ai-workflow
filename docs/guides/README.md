@@ -13,12 +13,12 @@ two parts:
 
 | Situation | Guide | Profile | Default mode | Status |
 | --- | --- | --- | --- | --- |
-| I have an empty folder and an idea | [Start a project](start-a-project.md) | full-project | hybrid | Partial |
+| I have an empty folder and an idea | Start a project | full-project | hybrid | Partial |
 | I have a repo with no agent framework | [Add Cornerstone to a repo](add-to-a-repo.md) | single-ticket | agent-centric | Works today |
-| I use Spec Kit, OpenSpec, BMAD, or rule files | [Migrate to Cornerstone](migrate.md) | (setup) | — | Partial |
+| I use Spec Kit, OpenSpec, BMAD, or rule files | Migrate to Cornerstone | (setup) | — | Partial |
 | I want to make one small, clear change | [Make a small change](small-change.md) | single-ticket | agent-centric | Works today |
-| I have a confirmed bug | [Fix a bug](fix-a-bug.md) | debugging | hybrid | Partial |
-| I want a feature that touches many layers | [Build a feature](build-a-feature.md) | app-slice | hybrid | Partial |
+| I have a confirmed bug | Fix a bug | debugging | hybrid | Partial |
+| I want a feature that touches many layers | Build a feature | app-slice | hybrid | Partial |
 
 All guides use [Run the roles](run-the-roles.md). It shows how to start each role in its own
 session, and how to commit its work.

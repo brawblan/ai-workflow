@@ -11,8 +11,8 @@ two sentences.
 | Status | Works today |
 
 Do not use this guide if the change crosses several layers or needs a design decision. Use
-[Build a feature](build-a-feature.md). If you do not know the cause of a defect, use
-[Fix a bug](fix-a-bug.md).
+Build a feature. If you do not know the cause of a defect, use
+Fix a bug.
 
 ## Flow
 

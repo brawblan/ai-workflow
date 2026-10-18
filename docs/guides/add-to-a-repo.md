@@ -2,7 +2,7 @@
 
 Use this guide when a repo has code but no agent framework. A repo with only an `AGENTS.md`,
 `CLAUDE.md`, or other rule files also starts here. For Spec Kit, OpenSpec, or BMAD, read
-[Migrate to Cornerstone](migrate.md) first.
+Migrate to Cornerstone first.
 
 | | |
 | --- | --- |
@@ -91,5 +91,5 @@ In the GitHub settings of the repo:
 
 ## Next
 
-Pick the work: [a small change](small-change.md), [a bug](fix-a-bug.md), or
-[a feature](build-a-feature.md).
+Pick the work: [a small change](small-change.md), a bug, or
+a feature.
