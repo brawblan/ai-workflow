@@ -61,3 +61,19 @@ components:
   files:
   - .claude/agents/reviewer.md
   hash: f8197133228034ca5d404252068295ef03b6ca9bfbdb4f091f05dbb8e219195b
+- id: trigger.schedule.code-audit
+  kind: ci-job
+  purpose: Start the first role of the profile on its schedule. Post its report as
+    an issue.
+  principle:
+  - P6
+  - P9
+  source: framework
+  owner: octocat
+  eval: evals/trigger-schedule/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .github/workflows/cornerstone-code-audit-schedule.yml
+  hash: ef443ad7b2a0b5222e25246ca2b38c59dc103fe33bb34f117416e0e8aa3edd19

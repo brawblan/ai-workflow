@@ -46,3 +46,19 @@ components:
   files:
   - .claude/agents/investigator.md
   hash: 669723c9e13aacf308b32d803f35f6f30e960a9dec72ca48daeaf49b97192e8d
+- id: trigger.schedule.bug-triage
+  kind: ci-job
+  purpose: Start the first role of the profile on its schedule. Post its report as
+    an issue.
+  principle:
+  - P6
+  - P9
+  source: framework
+  owner: octocat
+  eval: evals/trigger-schedule/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .github/workflows/cornerstone-bug-triage-schedule.yml
+  hash: 82db5a9b4fa971ebf845efdaa5f1f6ee8c0ee00d12282520a630751073e1005b

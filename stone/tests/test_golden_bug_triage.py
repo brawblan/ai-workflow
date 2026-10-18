@@ -49,13 +49,18 @@ CONFIG_PATH = ".cornerstone/config.yaml"
 MANIFEST = ".cornerstone/manifest.yaml"
 HINT = f"If the change is intended, run with {UPDATE_ENV}=1 to write the fixtures again."
 
-# Pins from framework/profiles/bug-triage.md: roles [investigator], G3 skip, checks [K17].
+# Pins from framework/profiles/bug-triage.md: roles [investigator], G3 skip, checks [K17],
+# triggers [ci:issue-opened, schedule:daily, command]. D31: render writes one workflow for each
+# trigger that is not `command` and that the adapter has a template for. The adapter has no
+# template for `ci:issue-opened`, so render writes only the schedule workflow.
 FILES = [".claude/agents/investigator.md", ".claude/settings.json",
-         ".cornerstone/hooks/protect-paths.py", MANIFEST]
+         ".cornerstone/hooks/protect-paths.py", MANIFEST,
+         f".github/workflows/cornerstone-{PROFILE}-schedule.yml"]
 NOT_WRITTEN = [".github/workflows/cornerstone-checks.yml",
                ".github/workflows/cornerstone-k16.yml",
                ".cornerstone/checks/protected_paths.py"]
-COMPONENTS = ["hook.protect-paths", "hook.settings", "role.investigator"]
+COMPONENTS = ["hook.protect-paths", "hook.settings", "role.investigator",
+              f"trigger.schedule.{PROFILE}"]
 
 
 def tree_files(folder: Path, skip: frozenset[str] = frozenset()) -> dict[str, bytes]:

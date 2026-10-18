@@ -49,13 +49,17 @@ CONFIG_PATH = ".cornerstone/config.yaml"
 MANIFEST = ".cornerstone/manifest.yaml"
 HINT = f"If the change is intended, run with {UPDATE_ENV}=1 to write the fixtures again."
 
-# Pins from framework/profiles/code-audit.md: roles [investigator, reviewer], G3 skip, [K17].
+# Pins from framework/profiles/code-audit.md: roles [investigator, reviewer], G3 skip, [K17],
+# triggers [command, schedule:monthly]. D31: render writes one workflow for each trigger that is
+# not `command`.
 FILES = [".claude/agents/investigator.md", ".claude/agents/reviewer.md",
-         ".claude/settings.json", ".cornerstone/hooks/protect-paths.py", MANIFEST]
+         ".claude/settings.json", ".cornerstone/hooks/protect-paths.py", MANIFEST,
+         f".github/workflows/cornerstone-{PROFILE}-schedule.yml"]
 NOT_WRITTEN = [".github/workflows/cornerstone-checks.yml",
                ".github/workflows/cornerstone-k16.yml",
                ".cornerstone/checks/protected_paths.py"]
-COMPONENTS = ["hook.protect-paths", "hook.settings", "role.investigator", "role.reviewer"]
+COMPONENTS = ["hook.protect-paths", "hook.settings", "role.investigator", "role.reviewer",
+              f"trigger.schedule.{PROFILE}"]
 
 
 def tree_files(folder: Path, skip: frozenset[str] = frozenset()) -> dict[str, bytes]:
