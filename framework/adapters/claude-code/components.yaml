@@ -1,6 +1,8 @@
 # Components that `stone render` writes for this harness: one template and one target path each.
 # A role is rendered only if a selected profile uses it. A component with `when` is rendered only if
 # a selected profile has that gate (not `skip`) or that check. Other components are always rendered.
+# ci_step: a step template for the G3 workflow. The workflow has it at `$ci_step_<id>` (dots become
+# underscores) only if the component is rendered. Otherwise render removes that placeholder line.
 # eval: the planned eval folder (lifecycle.md).
 
 components:
@@ -92,6 +94,16 @@ components:
     template: checks/change_size.py
     target: .cornerstone/checks/change_size.py
     eval: evals/check-k7/
+
+  - id: check.k15
+    kind: check
+    purpose: K15. Fail if the instruction file is over the line limit of the model profile.
+    principle: [P4, P6]
+    when: {check: K15}
+    template: checks/instruction_size.py
+    target: .cornerstone/checks/instruction_size.py
+    ci_step: workflows/steps/instruction-size.yml
+    eval: evals/check-k15/
 
   - id: ci-job.checks
     kind: ci-job

@@ -7,7 +7,7 @@ Use this guide when you have an empty folder and an idea.
 | Profile | [full-project](../../framework/profiles/full-project.md) |
 | Default mode | hybrid: you own the design, an agent helps |
 | Gates | G1 (foundation), G2 (plan and backlog), G3, G4 |
-| Status | Partial. `stone render` writes the shaper, planner, and reviewer roles for full-project. It does not write check K15 yet. |
+| Status | Partial. `stone render` writes the shaper, planner, and reviewer roles for full-project, and check K15. K15 warns for 2 weeks, then blocks. |
 
 The full-project profile does not build features. It makes the foundation and the backlog. Each
 feature then runs as its own [feature](build-a-feature.md) or [small change](small-change.md).
@@ -117,7 +117,7 @@ Start each backlog item with [Build a feature](build-a-feature.md) or
 | Foundation | `project-setup` skill | The shaper role interviews you. Same files. |
 | Plan | A prompt in a new session | The planner role, in a fresh session |
 | Architecture rules | Rules that you add to CI by hand | Fitness checks (K8) that the generator wires |
-| Instruction file size | Not checked | K15 fails if `AGENTS.md` is over the line limit |
+| Instruction file size | K15 warns if `AGENTS.md` is over the line limit | K15 fails if `AGENTS.md` is over the line limit |
 | Personas file | K18 warns | K18 fails on a format error |
 
 The order stays the same. The foundation comes first, and the render comes after the skeleton.

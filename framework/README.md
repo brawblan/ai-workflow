@@ -88,6 +88,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D25 | The investigator writes only in `paths.reports` (default `docs/reports/`). On a `spike/` branch it can write any file, except the harness and Cornerstone files, because K16 stops the merge. So it has the Edit and Write tools, and the hook limits the paths. | [workflow-model.md](workflow-model.md#roles) |
 | D26 | `stone eval` runs a component eval with and without the component, in a temp git repo. The harness adapter gives the run command in `eval.yaml`. Checks are code first. An `outcome` check tests behavior, and a `contract` check tests the format of the component. The variants get the same prompt and tools. Runs are local, not in CI. | [lifecycle.md](lifecycle.md#eval-design), [generator/design.md](generator/design.md) |
 | D27 | K7 is a script that `stone render` writes, with the limit of each selected profile in it. The limit is the profile limit, or `limits.pr_changed_lines` if that is smaller. CI does not know the profile of a PR, so the PR body names it on a `Profile: <id>` line. With no line, or with an unknown profile, the smallest limit applies. A `Waiver (P10)` section with text passes, with a notice. The G3 step reads the body through `env` and starts in `--mode warn`. | [checks.md](checks.md), [customization.md](customization.md) |
+| D28 | Check K15 is a script that `stone render` writes for a profile with K15. The limit is `instruction_file_max_lines` in the model profile, and the adapter names the instruction file. A component with `ci_step` adds its step to the G3 workflow only if the component renders. The K15 step starts in `--mode warn`. | [checks.md](checks.md), [generator/design.md](generator/design.md) |
 
 ## Open questions
 
@@ -133,7 +134,8 @@ Do these items in order. Each item is one PR or more.
      investigator role with its hook rule (D24, D25).
    - 6b. Done: K7 (change size) as a generated check in the G3 workflow (D27). Two weeks after the
      merge, change K7 to `--mode block` in the G3 workflow template.
-   - 6c. K15 (instruction size) for full-project. Golden-file test for full-project.
+   - 6c. Done: K15 (instruction size) for full-project, and a golden-file test for full-project
+     (D28). Two weeks after the merge, change K15 to `--mode block` in the G3 step template.
    - 6d. K10 and K12 as repo commands for refactor-migration. Golden-file test for it.
    - 6e. K16 (no merge to main) for spike. Golden-file tests for spike, bug-triage, and code-audit.
    - 6f. Done: golden-file tests for debugging, dependency-upgrade, and adapter-refresh.
