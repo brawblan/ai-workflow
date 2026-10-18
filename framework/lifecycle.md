@@ -135,7 +135,7 @@ outcome rate to compare the variants.
 
 ### Runner
 
-`stone eval <component-id>` does these steps for each scenario, variant, and trial (D23):
+`stone eval <component-id>` does these steps for each scenario, variant, and trial (D26):
 
 ```mermaid
 flowchart LR

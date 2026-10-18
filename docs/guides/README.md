@@ -3,8 +3,8 @@
 How to use Cornerstone, one situation at a time. Each guide names its
 [profile](../../framework/profiles/README.md) and its default [mode](../../framework/modes.md).
 
-Cornerstone is draft v0. `stone render` supports only the single-ticket profile. So each guide has
-two parts:
+Cornerstone is draft v0. `stone render` writes the role files for all 10 profiles. Some profile
+checks and the triggers are not rendered yet. So each guide has two parts:
 
 - **Today:** the steps that work now, with the tools in this repo.
 - **When the profile ships:** the target flow from the framework. Use it to know what changes later.

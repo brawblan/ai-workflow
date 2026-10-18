@@ -18,7 +18,7 @@ each component that `stone render` writes.
 | Role | `.claude/agents/<role>.md` with `name`, `description`, `tools`, `model` | partial | Tools can be limited. Paths cannot be limited by the role file. See "Protected paths". |
 | Fresh session for each role | A separate `claude -p` run for each role | full | A sub-agent also has a fresh context, but the lead agent starts it. Use separate runs where P2 applies. |
 | Headless run | `claude -p "<prompt>" --output-format json` | full | |
-| Eval run | [claude-code/eval.yaml](claude-code/eval.yaml): the argv for each variant, the env, the tools of each role, and the JSON paths of the result | full | `stone eval` reads it (D23). `[TO CONFIRM]` that `--setting-sources project` keeps the user instruction file out of the run. |
+| Eval run | [claude-code/eval.yaml](claude-code/eval.yaml): the argv for each variant, the env, the tools of each role, and the JSON paths of the result | full | `stone eval` reads it (D26). `[TO CONFIRM]` that `--setting-sources project` keeps the user instruction file out of the run. |
 | Select the role for a headless run | `claude -p --agent <role>` loads `.claude/agents/<role>.md` | full | Confirmed on 2026-10-18 (Claude Code 2.1): the tester and reviewer runs for `stone eval` followed their role files. `[TO CONFIRM]` if the `model` field of the role file or `--model` wins. |
 | Hook before a file edit | `PreToolUse` hook with matcher `Edit\|Write` in `.claude/settings.json`. Exit code 2 blocks the edit. | full | |
 | Hook before the session ends | `Stop` hook that runs the checks | full | Do not loop forever. The harness caps repeated blocks. |
@@ -108,7 +108,7 @@ file, and K6 catches that change in CI.
 | implementer | Read, Grep, Glob, Edit, Write, Bash | repo config |
 | tester | Read, Grep, Glob, Edit, Write (tests path only, enforced by hook), Bash | repo config |
 | reviewer | Read, Grep, Glob, Bash (read-only commands) | repo config |
-| investigator | Read, Grep, Glob, Bash | repo config |
+| investigator | Read, Grep, Glob, Edit, Write (reports path, or a `spike/` branch, enforced by hook), Bash | repo config |
 
 ## Existing plugin skills
 

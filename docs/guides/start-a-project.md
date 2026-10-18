@@ -7,7 +7,7 @@ Use this guide when you have an empty folder and an idea.
 | Profile | [full-project](../../framework/profiles/full-project.md) |
 | Default mode | hybrid: you own the design, an agent helps |
 | Gates | G1 (foundation), G2 (plan and backlog), G3, G4 |
-| Status | Partial. `stone render` does not support full-project yet. You do the planner steps in a pair session. |
+| Status | Partial. `stone render` writes the shaper, planner, and reviewer roles for full-project. It does not write check K15 yet. |
 
 The full-project profile does not build features. It makes the foundation and the backlog. Each
 feature then runs as its own [feature](build-a-feature.md) or [small change](small-change.md).

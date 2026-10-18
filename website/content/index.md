@@ -131,7 +131,7 @@ selects the gates that apply. See the [workflow model](framework/workflow-model.
 ## Status
 
 Draft v0. The framework is complete enough to use on one profile. The `stone` CLI validates the
-framework, checks the writing standard, and renders the single-ticket profile. Claude Code is the
+framework, checks the writing standard, and renders the roles of all 10 profiles. Claude Code is the
 first harness adapter. The next steps are in the [roadmap](framework/README.md#roadmap).
 
 Each rule cites its evidence in the [research dossier](docs/research/dossier.md).

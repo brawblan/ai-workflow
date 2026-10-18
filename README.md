@@ -36,7 +36,7 @@ Draft v0. The framework is complete enough to use on one profile. Other parts ar
 | --- | --- |
 | [Framework](framework/README.md): principles, workflow model, gates, checks, modes, 10 profiles | Draft v0 |
 | [Harness adapter](framework/adapters/claude-code.md) and [model profile](framework/adapters/claude-code/models/claude-5.yaml) | First adapter. The model profile evals are not written yet. |
-| [`stone`](stone/README.md) 0.7 | `stone check`, `stone check-writing` (K17), `stone check-evidence` (K14), `stone spec apply` and `sync`, `stone render` for the single-ticket and app-slice profiles, and `stone eval` |
+| [`stone`](stone/README.md) 0.9 | `stone check`, `stone check-writing` (K17), `stone check-evidence` (K14), `stone spec apply` and `sync`, `stone render` for the roles of all 10 profiles, and `stone eval`. Some profile checks and the triggers are not rendered yet. |
 | [`workflow` plugin](plugins/workflow/) 0.6.0 | Six skills. `cornerstone-setup` is the entry skill. |
 | This repo | Uses Cornerstone on itself: [`.cornerstone/config.yaml`](.cornerstone/config.yaml) and CI in [`stone.yml`](.github/workflows/stone.yml) |
 
@@ -107,8 +107,9 @@ For the single-ticket profile, `stone render` writes:
 .cornerstone/manifest.yaml what stone render owns, with a hash for each file
 ```
 
-For the app-slice profile, it also writes the planner role. A second run changes only the files
-whose input changed. The repo config fields are in
+For the app-slice profile, it also writes the planner role. Profiles with the investigator role write
+that role too. A profile with no G3 gate writes no CI workflow and no K6. A second run changes only
+the files whose input changed. The repo config fields are in
 [customization.md](framework/customization.md).
 
 ## The skills

@@ -11,11 +11,13 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import yaml
 
-from stone import render
+from stone import cli, render
+from stone.markdown import split_frontmatter
 
 FRAMEWORK = Path(__file__).resolve().parents[2] / "framework"
 TODAY = dt.date(2026, 10, 17)
@@ -40,6 +42,7 @@ OTHER_FILES = [".claude/settings.json", ".cornerstone/checks/protected_paths.py"
                ".cornerstone/hooks/protect-paths.py", ".cornerstone/manifest.yaml",
                ".github/workflows/cornerstone-checks.yml"]
 PLANNER = ".claude/agents/planner.md"
+WORKFLOW = ".github/workflows/cornerstone-checks.yml"
 
 
 class RenderTest(unittest.TestCase):
@@ -561,6 +564,147 @@ class RenderTest(unittest.TestCase):
         self.assertIn("stale role.planner", log.getvalue())
         self.assertTrue((self.root / PLANNER).exists())
         self.assertNotIn("role.planner", [c["id"] for c in self.manifest()["components"]])
+
+    # K14 in the rendered G3 workflow (D23).
+
+    def workflow_text(self) -> str:
+        return (self.root / WORKFLOW).read_text(encoding="utf-8")
+
+    def workflow_steps(self) -> list[dict]:
+        return yaml.safe_load(self.workflow_text())["jobs"]["checks"]["steps"]
+
+    def step(self, name: str) -> dict:
+        steps = [s for s in self.workflow_steps() if s.get("name") == name]
+        self.assertEqual(len(steps), 1, f"want one step named {name!r}")
+        return steps[0]
+
+    def render_log(self, version: str) -> str:
+        self.write_config(CONFIG.replace("framework_version: 0.1.0",
+                                         f"framework_version: {version}"))
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            result = render.render(self.root, FRAMEWORK, today=TODAY)
+        self.assertEqual(result.exit_code, 0)
+        self.assertTrue((self.root / WORKFLOW).exists())
+        return log.getvalue()
+
+    def test_workflow_installs_stone_from_the_framework_tag(self) -> None:
+        for version in ("0.1.0", "0.5.0", "1.2.3"):
+            with self.subTest(version=version):
+                self.render_log(version)
+                install = self.step("Install stone")
+                self.assertEqual(install["env"]["STONE_TAG"], f"v{version}")
+                self.assertIn("git+https://github.com/brawblan/ai-workflow@${STONE_TAG}"
+                              "#subdirectory=stone", install["run"])
+                self.assertNotIn("$framework_version", self.workflow_text())
+
+    def test_install_stone_uses_the_package_name_of_the_cli(self) -> None:
+        self.render()
+        pyproject = (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text("utf-8")
+        name = next(line.split("=", 1)[1].strip().strip('"')
+                    for line in pyproject.splitlines() if line.startswith("name"))
+        self.assertIn(f'"{name} @ git+', self.step("Install stone")["run"])
+
+    def test_k14_step_reads_the_pr_body_through_env(self) -> None:
+        self.render()
+        k14 = self.step("K14 PR evidence")
+        self.assertEqual(k14["env"]["PR_BODY"], "${{ github.event.pull_request.body }}")
+        self.assertNotIn("github.event.pull_request.body", k14["run"])
+        self.assertIn("PR_BODY", k14["run"])
+        self.assertIn("check-evidence", k14["run"])
+        self.assertIn("--mode warn", k14["run"])
+        self.assertNotIn("--mode block", k14["run"])
+
+    def test_no_run_text_has_an_expression(self) -> None:
+        self.render()
+        for step in self.workflow_steps():
+            with self.subTest(step=step.get("name", step.get("uses"))):
+                self.assertNotIn("${{", step.get("run", ""))
+
+    def test_k14_in_warn_mode_does_not_fail_on_an_empty_body(self) -> None:
+        stdout = io.StringIO()
+        with (contextlib.redirect_stdout(stdout),
+              unittest.mock.patch("sys.stdin", io.StringIO("\n"))):
+            code = cli.main(["check-evidence", "-", "--mode", "warn", "--format", "github"])
+        self.assertEqual(code, 0)
+        self.assertIn("mode warn", stdout.getvalue())
+
+    def test_workflow_parses_and_keeps_the_step_order(self) -> None:
+        self.render()
+        names = [s["name"] for s in self.workflow_steps() if "name" in s]
+        self.assertEqual(len(names), 5, names)
+        self.assertTrue(names[0].startswith("K6"), names)
+        self.assertEqual(names[1], "Install stone")
+        self.assertTrue(names[2].startswith("K14"), names)
+        self.assertEqual(names[3:], ["Install", "All checks"])
+        self.assertEqual(self.step("Install")["run"], "pip install .")
+        self.assertEqual(self.step("All checks")["run"], "make check")
+
+    def test_old_framework_version_warns(self) -> None:
+        for version in ("0.1.0", "0.4.9", "0.4.99"):
+            with self.subTest(version=version):
+                log = self.render_log(version)
+                self.assertIn("warning: framework_version", log)
+                self.assertIn(version, log)
+                self.assertIn("0.5.0", log)
+
+    def test_framework_version_from_0_5_0_does_not_warn(self) -> None:
+        for version in ("0.5.0", "0.5.1", "0.6.0", "0.10.0", "1.0.0"):
+            with self.subTest(version=version):
+                self.assertNotIn("framework_version", self.render_log(version))
+
+    def assert_full_tag_warning(self, log: str, shown: str) -> None:
+        self.assertIn(f"warning: framework_version {shown} is not a tag with "
+                      "'stone check-evidence'.", log)
+        self.assertIn("Use a full tag, 0.5.0 or later.", log)
+
+    def test_old_framework_version_warns_with_the_full_tag_text(self) -> None:
+        for version in ("0.1.0", "0.4.9"):
+            with self.subTest(version=version):
+                self.assert_full_tag_warning(self.render_log(version), version)
+
+    def test_framework_version_0_5_with_two_parts_warns(self) -> None:
+        # Owner decision 2026-10-18: v0.5 is not a tag, so '0.5' must warn.
+        log = self.render_log("'0.5'")
+        self.assert_full_tag_warning(log, "0.5")
+        self.assertEqual(log.count("warning: framework_version"), 1, log)
+
+    def test_framework_version_0_5_as_a_yaml_number_warns(self) -> None:
+        # Without quotes, YAML reads 0.5 as a float. It must warn the same way.
+        self.assert_full_tag_warning(self.render_log("0.5"), "0.5")
+
+    def test_framework_version_with_two_parts_below_0_5_warns(self) -> None:
+        for version in ("'0.4'", "'0.1'"):
+            with self.subTest(version=version):
+                self.assert_full_tag_warning(self.render_log(version), version.strip("'"))
+
+    def test_framework_version_1_0_with_two_parts_does_not_warn(self) -> None:
+        # (1, 0) >= (0, 5, 0), so '1.0' does not warn (ticket criterion 2).
+        for version in ("'1.0'", "1.0", "'0.6'"):
+            with self.subTest(version=version):
+                self.assertNotIn("framework_version", self.render_log(version))
+
+    def test_framework_version_that_is_not_numbers_does_not_warn_or_crash(self) -> None:
+        for version in ("main", "v0.5.0", "0.5.0-rc1", "'0.x'", "latest"):
+            with self.subTest(version=version):
+                self.assertNotIn("framework_version", self.render_log(version))
+
+    def test_each_profile_with_g3_lists_k6_and_k14(self) -> None:
+        # The rendered G3 workflow runs K6 and K14, so each profile with G3 must list both.
+        names = sorted(p.stem for p in (FRAMEWORK / "profiles").glob("*.md")
+                       if p.stem not in {"README", "_template"})
+        with_g3 = []
+        for name in names:
+            text = (FRAMEWORK / "profiles" / f"{name}.md").read_text(encoding="utf-8")
+            profile = split_frontmatter(text)[0]
+            if profile["gates"].get("G3", "skip") == "skip":
+                continue
+            with_g3.append(name)
+            with self.subTest(profile=name):
+                self.assertIn("K6", profile["checks"])
+                self.assertIn("K14", profile["checks"])
+        self.assertIn("single-ticket", with_g3)
+        self.assertIn("app-slice", with_g3)
 
 
 if __name__ == "__main__":
