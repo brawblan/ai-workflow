@@ -238,10 +238,14 @@ def trigger_components(framework: Path, harness: Path, registry: list[dict[str, 
     """Return one workflow for each profile trigger that is not `command` (D31)."""
     entries = {entry["trigger"]: entry for entry in registry if "trigger" in entry}
     found = triggers.profile_triggers(profiles)
+    # A value that one entry sets is empty in the others, so each template can use it.
+    defaults = {key: "" for entry in entries.values() for key in (entry.get("values") or {})}
     components, targets = [], []
     for trigger in triggers.supported(found, set(entries)):
         entry = entries[trigger.key]
         values = template_values(config, "")
+        values.update(defaults)
+        values.update({key: str(value) for key, value in (entry.get("values") or {}).items()})
         values.update(triggers.values(trigger, found, role_models))
         text = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
         for name, part in (entry.get("parts") or {}).items():

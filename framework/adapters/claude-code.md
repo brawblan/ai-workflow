@@ -82,12 +82,16 @@ selected profile that is not `command` (D31). The templates are `workflows/trigg
 shared run step is `workflows/parts/run-role.yml`.
 
 Before the first run, add the repository secret `CLAUDE_CODE_OAUTH_TOKEN`. Make each trigger label,
-and `profile:<id>` if two selected profiles use one label.
+and `profile:<id>` if two selected profiles use one label. For `ci:dependency-pr`, add the same
+secret as a Dependabot secret too. A run that Dependabot starts gets only Dependabot secrets, and a
+read-only token unless the workflow `permissions` raise it.
 
 | Trigger | GitHub event | Run job token | Post job token | Report goes to |
 | --- | --- | --- | --- | --- |
 | `label:<name>` | `issues: [labeled]`, with the label name in the job `if` | `contents: read`, `issues: read` | `issues: write` | An issue comment |
 | `schedule:<value>` | `schedule` (daily `0 6 * * *`, weekly `0 6 * * 1`, monthly `0 6 1 * *`, or the cron line), and `workflow_dispatch` | `contents: read`, `issues: read` | `issues: write` | A new issue |
+| `ci:issue-opened` | `issues: [opened]` | `contents: read`, `issues: read` | `issues: write` | An issue comment |
+| `ci:dependency-pr` | `pull_request: [opened, reopened]` by `dependabot[bot]` or `renovate[bot]` | `contents: read`, `pull-requests: read` | `pull-requests: write` | A PR comment |
 
 The run job:
 
@@ -107,18 +111,26 @@ The action returns the report in `structured_output`. The post job reads it from
 gives it to `gh` through `env`.
 
 The action checks that the actor has write access for issue events. For `schedule` and
-`workflow_dispatch`, GitHub needs write access to start the run.
+`workflow_dispatch`, GitHub needs write access to start the run. Two entries in
+`components.yaml` change this check with `values`:
+
+| Trigger | Action input | Why |
+| --- | --- | --- |
+| `ci:issue-opened` | `allowed_non_write_users: '*'` | Any user can report a bug. The action then scrubs secrets from the environment of each command. |
+| `ci:dependency-pr` | `allowed_bots: 'dependabot[bot],renovate[bot]'` | The bot opens the PR. The job `if` accepts only these two authors. |
 
 ### Prompt-injection limits
 
-Issue text is untrusted. A report profile such as bug-triage reads it. These limits apply:
+Issue text, PR text, and release notes are untrusted. Bug-triage reads issues from any user. These
+limits apply:
 
 | Limit | Effect |
 | --- | --- |
 | No write token in the run job | An injected instruction cannot change the repo, issues, or labels. |
 | Tool allowlist: Read, Grep, Glob | No shell, no edits, no web fetch. The only output is the report. |
 | Event text in a file, not in the prompt or a `run` script | The text cannot inject shell commands (dossier F8). |
-| The post job posts the report as text | A report cannot apply labels. A human approves labels and severity at G4. |
+| The post job posts the report as text | A report cannot apply labels. The investigator proposes labels, and a human approves them and the severity at G4. |
+| Bug-triage: the post job has only `issues: write` | No write token beyond comments and labels. No contents, PR, or workflow write. |
 | GitHub redacts a job output that contains a secret | A report with the harness secret or the job token is not posted (dossier F9). |
 | `github.token` expires when the job ends | A leaked token is read-only and short-lived. |
 
