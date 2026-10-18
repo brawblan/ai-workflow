@@ -44,6 +44,8 @@ jobs:
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           github_token: ${{ github.token }}
+          allowed_non_write_users: ''
+          allowed_bots: ''
           prompt: |
             You are the investigator. Profile: Bug triage (bug-triage). Trigger: schedule:daily.
             The event data is in the file ${{ runner.temp }}/cornerstone/event.json.
