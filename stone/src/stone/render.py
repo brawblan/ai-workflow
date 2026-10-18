@@ -27,6 +27,7 @@ PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
 FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "docs/reports/"}
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
+DEFAULT_PR_LINES = 600  # D4, customization.md
 
 
 class RenderError(Exception):
@@ -130,6 +131,19 @@ def needed(entry: dict[str, Any], profiles: list[dict[str, Any]]) -> bool:
     return bool(profiles)
 
 
+def size_limits(config: dict[str, Any], profiles: list[dict[str, Any]]) -> dict[str, int]:
+    """Return the K7 limit of each selected profile with K7 (D27). The repo limit only tightens."""
+    repo = _get(config, "limits.pr_changed_lines")
+    if repo is not None and (isinstance(repo, bool) or not isinstance(repo, int) or repo < 1):
+        raise RenderError(f"{CONFIG}: 'limits.pr_changed_lines' must be a whole number above 0.")
+    limits = {}
+    for profile in profiles:
+        if "K7" in profile["checks"]:
+            own = (profile.get("limits") or {}).get("pr_changed_lines", DEFAULT_PR_LINES)
+            limits[profile["id"]] = min(own, repo) if repo else own
+    return limits
+
+
 def one_folder(value: Any, key: str = "plans") -> str:
     """Return a path as one folder that ends with '/'. Templates add the file name to it."""
     if isinstance(value, list):
@@ -182,6 +196,7 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     adapter_roles = {entry["role"] for entry in registry if entry["kind"] == "role"}
     profiles = load_profiles(framework, config["profiles"], adapter_roles)
     role_models = model_profile["defaults"]["role_models"]
+    limits_json = json.dumps(size_limits(config, profiles), sort_keys=True)
 
     components = []
     for entry in registry:
@@ -189,6 +204,7 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
             continue
         model = role_models.get(entry.get("role", ""), "")
         values = template_values(config, model)
+        values["size_limits_json"] = limits_json
         template = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
         try:
             content = Template(template).substitute(values)
