@@ -138,6 +138,8 @@ Limits that stay:
 
 - The report can carry injected text or wrong labels. A human reads each report before acting.
 - The run job can read all repo files. Do not keep private data in a repo that runs these workflows.
+- The role has no web tools. A step that reads a web page, for example release notes, uses only the
+  event data and the repo. Do that step in a local run (`command`) if the report needs more.
 - The action process has the harness secret. The allowlist blocks the tools that could read the
   environment, but the risk is not zero (dossier F10).
 
