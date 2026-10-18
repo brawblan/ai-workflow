@@ -85,10 +85,33 @@ def profile_needs(component: dict, profile: dict) -> bool:
     return True
 
 
+def trigger_key(text: str) -> str:
+    """Return the `trigger` field that a profile trigger needs: "label:x" gives "label" (D31)."""
+    return text if text.startswith("ci:") else text.partition(":")[0]
+
+
+def trigger_components(profile: dict) -> list[dict]:
+    """Return one component for each profile trigger that has a `trigger` entry in components.yaml.
+
+    The entry `trigger.label` gives `trigger.label.<profile>`, and `$profile` in its target is the
+    profile id. The `command` trigger has no entry, so it gives no component.
+    """
+    entries = {entry["trigger"]: entry for entry in adapter_components() if "trigger" in entry}
+    found = []
+    for text in profile.get("triggers", []):
+        entry = entries.get(trigger_key(str(text)))
+        if entry is not None:
+            found.append({**entry, "id": f"{entry['id']}.{profile['id']}",
+                          "target": entry["target"].replace("$profile", profile["id"])})
+    return found
+
+
 def expected_components() -> list[dict]:
-    """Return the components.yaml entries that the profile frontmatter selects."""
+    """Return the components that the profile frontmatter selects, with its trigger workflows."""
     profile = profile_frontmatter()
-    return [component for component in adapter_components() if profile_needs(component, profile)]
+    plain = [component for component in adapter_components()
+             if "trigger" not in component and profile_needs(component, profile)]
+    return plain + trigger_components(profile)
 
 
 def render_profile(root: Path) -> tuple[render.Result, str]:
@@ -341,12 +364,20 @@ class ProfilePinTest(RenderedRepo):
         derived = {component["id"] for component in expected_components()}
         self.assertLessEqual(PINNED_IDS, derived, sorted(PINNED_IDS - derived))
 
+    def test_ac8_each_profile_trigger_except_command_has_one_trigger_component(self) -> None:
+        # This guards the trigger derivation. If it finds no entry for a trigger, this test fails.
+        triggers = [str(text) for text in profile_frontmatter()["triggers"] if text != "command"]
+        derived = trigger_components(profile_frontmatter())
+        self.assertEqual(len(derived), len(triggers), [component["id"] for component in derived])
+        self.assertNotIn("skipped trigger", self.log)
+
     def test_ac8_written_files_are_the_targets_of_the_expected_components(self) -> None:
         want = sorted([component["target"] for component in expected_components()] + [MANIFEST])
         self.assertEqual(sorted(self.files), want)
 
     def test_ac8_each_manifest_entry_matches_its_components_yaml_entry(self) -> None:
-        source = {component["id"]: component for component in adapter_components()}
+        # A trigger component maps to its `trigger` entry, with the profile id in the id and target.
+        source = {component["id"]: component for component in expected_components()}
         for entry in self.manifest()["components"]:
             with self.subTest(component=entry["id"]):
                 component = source[entry["id"]]

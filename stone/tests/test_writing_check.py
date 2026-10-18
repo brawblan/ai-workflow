@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import contextlib
+import io
 import subprocess
 import tempfile
 import unittest
 from pathlib import Path
 
+from stone import cli
 from stone.writing_check import (DEFAULT_EXCLUDE, Rules, changed_lines, check_text, load_rules,
                                  run)
 
@@ -163,6 +166,91 @@ class ChangedLinesTest(unittest.TestCase):
         findings = run(self.root, [], "main", rules(), [])
         self.assertEqual(sorted((f.path, f.line) for f in findings),
                          [("doc.md", 4), ("new.md", 3)])
+
+
+class ClaudeFolderTest(unittest.TestCase):
+    """AC12: K17 skips Markdown under a `.claude/` folder at any depth. Agent text is out of scope.
+
+    D28: K17 also skips every file under a `golden/` folder.
+    """
+
+    BAD = "# Doc\n\nJust erase the cache.\n"
+    SKIPPED = [".claude/agents/a.md",
+               "plugins/x/.claude/a.md",
+               "stone/tests/golden/x/expected/.claude/agents/a.md"]
+    GOLDEN = ["stone/tests/golden/x/expected/docs/c.md"]
+    TESTED = ["docs/b.md",
+              "plugins/x/docs/c.md",
+              "docs/claude/d.md",
+              "docs/.claude-notes/e.md"]
+
+    def setUp(self) -> None:
+        self._folder = tempfile.TemporaryDirectory()
+        self.root = Path(self._folder.name) / "repo"
+        self.root.mkdir()
+        # The rule file is outside the repo, so --diff does not test it.
+        self.rules_path = Path(self._folder.name) / "ste.md"
+        self.rules_path.write_text(RULES_MD, encoding="utf-8")
+        subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                        "-c", "commit.gpgsign=false", "init", "-q", "-b", "main"],
+                       cwd=self.root, check=True, capture_output=True)
+        subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                        "-c", "commit.gpgsign=false", "commit", "-q", "--allow-empty",
+                        "-m", "base"], cwd=self.root, check=True, capture_output=True)
+        for name in self.SKIPPED + self.GOLDEN + self.TESTED:
+            path = self.root / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(self.BAD, encoding="utf-8")
+
+    def tearDown(self) -> None:
+        self._folder.cleanup()
+
+    def paths(self, findings: list) -> set[str]:
+        return {Path(f.path).as_posix() for f in findings}
+
+    def test_ac12_diff_skips_claude_folders_at_any_depth(self) -> None:
+        found_paths = self.paths(run(self.root, [], "main", rules(), DEFAULT_EXCLUDE))
+        for name in self.SKIPPED:
+            with self.subTest(path=name):
+                self.assertNotIn(name, found_paths)
+
+    def test_ac12_diff_skips_golden_folders(self) -> None:
+        found_paths = self.paths(run(self.root, [], "main", rules(), DEFAULT_EXCLUDE))
+        for name in self.GOLDEN:
+            with self.subTest(path=name):
+                self.assertNotIn(name, found_paths)
+
+    def test_ac12_diff_still_tests_other_files(self) -> None:
+        found_paths = self.paths(run(self.root, [], "main", rules(), DEFAULT_EXCLUDE))
+        self.assertEqual(found_paths, set(self.TESTED))
+
+    def test_ac12_folder_path_skips_nested_claude_folder(self) -> None:
+        findings = run(self.root, ["plugins/x"], None, rules(), DEFAULT_EXCLUDE)
+        self.assertEqual(self.paths(findings), {"plugins/x/docs/c.md"})
+
+    def test_ac12_folder_path_skips_golden_folder(self) -> None:
+        findings = run(self.root, ["stone/tests/golden"], None, rules(), DEFAULT_EXCLUDE)
+        self.assertEqual(self.paths(findings), set())
+
+    def cli_block(self) -> tuple[int, str]:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = cli.main(["check-writing", "--root", str(self.root), "--rules",
+                             str(self.rules_path), "--diff", "main", "--mode", "block"])
+        return code, out.getvalue()
+
+    def test_ac12_cli_block_mode_passes_with_only_claude_files(self) -> None:
+        for name in self.TESTED:
+            (self.root / name).unlink()
+        code, out = self.cli_block()
+        self.assertEqual(code, 0, out)
+        self.assertIn("K17: 0 error(s)", out)
+
+    def test_ac12_cli_block_mode_still_fails_on_other_files(self) -> None:
+        code, out = self.cli_block()
+        self.assertEqual(code, 1, out)
+        self.assertIn("docs/b.md", out)
+        self.assertNotIn(".claude/", out)
 
 
 class DefaultExcludeTest(unittest.TestCase):
