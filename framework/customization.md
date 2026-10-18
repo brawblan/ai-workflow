@@ -76,6 +76,10 @@ Check K7 uses `limits.pr_changed_lines` only if it is smaller than the profile l
 limit for one PR, add a `Waiver (P10)` section to the PR body. Name the profile of the PR on a
 `Profile: <id>` line in the PR body. Without it, K7 uses the smallest limit.
 
+Write each `branches.*` value as a quoted YAML string if it could parse as a number or a boolean
+(`"1.10"`, `"yes"`). YAML reads `1.10` as `1.1` and `yes` as `True`, and K16 then compares the wrong
+name. `stone render` and `stone check` fail on a `branches.*` value that is not a string (D34).
+
 The generator fills the facts that it can find. It asks a human for the rest. It writes
 `TODO(<owner>)` for an unknown value. It does not guess.
 

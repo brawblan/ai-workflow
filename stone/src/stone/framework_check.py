@@ -142,6 +142,16 @@ def check_neutral(framework: Path) -> list[Finding]:
     return findings
 
 
+def branch_name_problems(config: dict[str, Any]) -> list[str]:
+    """Name each `branches.*` value that YAML did not parse as a string (1.10 is 1.1, yes is True)."""
+    branches = config.get("branches")
+    if not isinstance(branches, dict):
+        return []
+    return [f"'branches.{key}' is {value!r}, not a YAML string. Quote the value, "
+            f'for example {key}: "{value}".'
+            for key, value in branches.items() if value is not None and not isinstance(value, str)]
+
+
 def check_config(root: Path, framework: Path) -> list[Finding]:
     path = root / ".cornerstone" / "config.yaml"
     if not path.exists():
@@ -152,6 +162,8 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     def add(message: str) -> None:
         findings.append(Finding(str(path.relative_to(root)), 1, CHECK, message))
 
+    for problem in branch_name_problems(config):
+        add(problem)
     harness = config.get("harness", "")
     if not (framework / "adapters" / f"{harness}.md").exists():
         add(f"The harness '{harness}' has no adapter file. Use a file name in adapters/.")
