@@ -26,7 +26,7 @@ REQUIREMENT_ID = re.compile(r"^(?P<capability>[a-z][a-z0-9-]*)\.R(?P<number>[1-9
 SCENARIO = re.compile(r"^### Scenario: \S")
 STEP = re.compile(r"^\s*(?:[-*]\s+)?\**(?P<word>WHEN|THEN)\b")
 HEADING = re.compile(r"^#{1,3} ")  # a #### heading can be part of a scenario
-FENCE = ("```", "~~~")
+FENCE = re.compile(r"^\s{0,3}(?P<mark>`{3,}|~{3,})")
 ORDER_LINE = re.compile(r"^apply_order:.*$", re.M)
 
 
@@ -79,6 +79,18 @@ def config_path(root: Path, key: str) -> Path:
     return path
 
 
+def fence_step(line: str, fence: str) -> str:
+    """Return the open code fence after this line: an empty string if no fence is open."""
+    match = FENCE.match(line)
+    if not match:
+        return fence
+    mark = match["mark"]
+    if not fence:
+        return mark
+    closes = mark[0] == fence[0] and len(mark) >= len(fence) and not line.strip()[len(mark):]
+    return "" if closes else fence
+
+
 def parse_delta(path: Path) -> Delta:
     """Read one delta. Record each format error with its line number."""
     text = path.read_text(encoding="utf-8")
@@ -98,11 +110,10 @@ def parse_delta(path: Path) -> Delta:
         delta.order = order
     current: Change | None = None
     body: list[str] = []
-    in_code = False
+    fence = ""
     for number, line in enumerate(text.splitlines()[skip:], skip + 1):
-        if line.lstrip().startswith(FENCE):
-            in_code = not in_code
-        if not in_code and line.startswith("## "):
+        was_open, fence = fence, fence_step(line, fence)
+        if not was_open and not fence and line.startswith("## "):
             _close(delta, current, body)
             current, body = _open(delta, line, number), []
         elif current:
@@ -146,11 +157,10 @@ def _close(delta: Delta, change: Change | None, body: list[str]) -> None:
 def _scenario_problem(body: list[str]) -> str:
     """Return what is wrong with the scenarios of one requirement, or an empty string."""
     scenarios: list[set[str]] = []
-    in_scenario = in_code = False
+    in_scenario, fence = False, ""
     for line in body:
-        if line.lstrip().startswith(FENCE):
-            in_code = not in_code
-        elif in_code:
+        was_open, fence = fence, fence_step(line, fence)
+        if was_open or fence:
             continue
         elif SCENARIO.match(line):
             scenarios.append(set())
