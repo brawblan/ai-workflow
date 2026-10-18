@@ -128,6 +128,9 @@ the workflow profiles where it applies, and the framework principle that it supp
 | F5 | Use permission allowlists and OS-level sandboxing. Auto mode uses a classifier to block risky actions. | [S10] | ALL | P9 |
 | F6 | When the AI touches a check, flag it. | [S1] | ALL | P2, P6 |
 | F7 | Ask "How certain are you?" before you approve. Ask again before you merge. | [S3] | ALL | P11 |
+| F8 | Event text (an issue title or body, a PR title, a label) in an inline CI expression can inject shell commands. Pass it to the step through an environment variable. | [S35] [S36] | ALL | P9 |
+| F9 | A CI job output that contains a secret is redacted, and the next job does not get it. | [S36] | ALL | P9 |
+| F10 | An agent that reads untrusted issue text in CI needs a short-lived token with minimum permissions and a tool allowlist. A secret scrub reduces prompt-injection risk, but does not remove it. | [S37] | ALL | P9 |
 
 ### G. Measurement and component lifecycle
 
@@ -249,3 +252,6 @@ in this repo.
 | S32 | Alan Klement, "Replacing the User Story with the Job Story", JTBD.info, 2013. |
 | S33 | Zheng, Pei, Logeswaran, Lee, Jurgens, [When "A Helpful Assistant" Is Not Really Helpful: Personas in System Prompts Do Not Improve Performances of Large Language Models](https://arxiv.org/abs/2311.10054), arXiv 2311.10054, Findings of EMNLP 2024. |
 | S34 | Fission AI, [OpenSpec](https://github.com/Fission-AI/OpenSpec), MIT license. The idea of spec deltas that merge into current specs. Cornerstone uses the idea, not the tool (D18, D21). |
+| S35 | GitHub Security Lab, [Keeping your GitHub Actions and workflows secure Part 2: Untrusted input](https://securitylab.github.com/resources/github-actions-untrusted-input/). |
+| S36 | GitHub Docs, [Secure use reference](https://docs.github.com/en/actions/reference/security/secure-use), and the workflow syntax for job outputs. Read 2026-10-18. |
+| S37 | Anthropic, [claude-code-action security](https://github.com/anthropics/claude-code-action/blob/main/docs/security.md), v1.0.252. Read 2026-10-18. |

@@ -3,6 +3,8 @@
 # a selected profile has that gate (not `skip`) or that check. Other components are always rendered.
 # ci_step: a step template for the G3 workflow. The workflow has it at `$ci_step_<id>` (dots become
 # underscores) only if the component is rendered. Otherwise render removes that placeholder line.
+# A component with `trigger` is rendered once for each selected profile with that trigger type, as
+# `<id>.<profile>` (D31). `parts` are fragments that render puts in the template at a `$name` line.
 # eval: the planned eval folder (lifecycle.md).
 
 components:
@@ -113,3 +115,23 @@ components:
     template: workflows/cornerstone-checks.yml
     target: .github/workflows/cornerstone-checks.yml
     eval: evals/ci-job-checks/
+
+  - id: trigger.label
+    kind: ci-job
+    trigger: label
+    purpose: Start the first role of the profile when a human adds the trigger label to an issue.
+    principle: [P6, P9]
+    template: workflows/trigger-label.yml
+    parts: {run_role: workflows/parts/run-role.yml}
+    target: .github/workflows/cornerstone-$profile-label.yml
+    eval: evals/trigger-label/
+
+  - id: trigger.schedule
+    kind: ci-job
+    trigger: schedule
+    purpose: Start the first role of the profile on its schedule. Post its report as an issue.
+    principle: [P6, P9]
+    template: workflows/trigger-schedule.yml
+    parts: {run_role: workflows/parts/run-role.yml}
+    target: .github/workflows/cornerstone-$profile-schedule.yml
+    eval: evals/trigger-schedule/

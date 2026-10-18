@@ -25,8 +25,8 @@ each component that `stone render` writes.
 | Hook before the session ends | `Stop` hook that runs the checks | full | Do not loop forever. The harness caps repeated blocks. |
 | Model for each role | `model` field in the role file, from `defaults.role_models` in the model profile | full | |
 | Permissions | `permissions` allow and deny lists in `.claude/settings.json`, and sandbox mode | full | |
-| CI trigger | `anthropics/claude-code-action`, pinned to a commit SHA | full | |
-| CI authentication | Repository secret `[CLAUDE_CODE_OAUTH_TOKEN]`, made with `claude setup-token` | full | Uses the subscription, not an API key. `[TO CONFIRM]` usage limits for CI. |
+| CI trigger | `anthropics/claude-code-action`, pinned to a commit SHA | full | v1.0.252 is `f27be6b65a4652f08a2ba3cff79114829b588967`. See "Trigger workflows". |
+| CI authentication | Repository secret `CLAUDE_CODE_OAUTH_TOKEN`, made with `claude setup-token`. It is `[HARNESS_TOKEN]` in the core. | full | Uses the subscription, not an API key. `[TO CONFIRM]` usage limits for CI: the action docs do not give them. |
 
 ## Protected paths
 
@@ -74,6 +74,60 @@ file, and K6 catches that change in CI.
   }
 }
 ```
+
+## Trigger workflows
+
+`stone render` writes `.github/workflows/cornerstone-<profile>-<type>.yml` for each trigger of a
+selected profile that is not `command` (D31). The templates are `workflows/trigger-<type>.yml`. The
+shared run step is `workflows/parts/run-role.yml`.
+
+Before the first run, add the repository secret `CLAUDE_CODE_OAUTH_TOKEN`. Make each trigger label,
+and `profile:<id>` if two selected profiles use one label.
+
+| Trigger | GitHub event | Run job token | Post job token | Report goes to |
+| --- | --- | --- | --- | --- |
+| `label:<name>` | `issues: [labeled]`, with the label name in the job `if` | `contents: read`, `issues: read` | `issues: write` | An issue comment |
+| `schedule:<value>` | `schedule` (daily `0 6 * * *`, weekly `0 6 * * 1`, monthly `0 6 1 * *`, or the cron line), and `workflow_dispatch` | `contents: read`, `issues: read` | `issues: write` | A new issue |
+
+The run job:
+
+1. Checks out the repo with `persist-credentials: false`, so no token stays in `.git/config`.
+2. Saves the event data with `gh` to `$RUNNER_TEMP/cornerstone/event.json`. The issue number comes
+   to the step through `env`.
+3. Starts `anthropics/claude-code-action` with these inputs:
+
+| Input | Value | Why |
+| --- | --- | --- |
+| `claude_code_oauth_token` | `secrets.CLAUDE_CODE_OAUTH_TOKEN` | The harness secret |
+| `github_token` | `github.token` | The job `permissions` limit this token. The action does not get its app token. |
+| `prompt` | The role, the profile, the trigger, the event file path, and the profile steps | The pipeline gives the profile steps at run time (D24). |
+| `claude_args` | `--agent <role> --model <model> --add-dir <event folder> --allowedTools Read,Grep,Glob --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch --json-schema <report schema>` | The role reads and reports. It cannot change files, run commands, or send data out. |
+
+The action returns the report in `structured_output`. The post job reads it from the job output and
+gives it to `gh` through `env`.
+
+The action checks that the actor has write access for issue events. For `schedule` and
+`workflow_dispatch`, GitHub needs write access to start the run.
+
+### Prompt-injection limits
+
+Issue text is untrusted. A report profile such as bug-triage reads it. These limits apply:
+
+| Limit | Effect |
+| --- | --- |
+| No write token in the run job | An injected instruction cannot change the repo, issues, or labels. |
+| Tool allowlist: Read, Grep, Glob | No shell, no edits, no web fetch. The only output is the report. |
+| Event text in a file, not in the prompt or a `run` script | The text cannot inject shell commands (dossier F8). |
+| The post job posts the report as text | A report cannot apply labels. A human approves labels and severity at G4. |
+| GitHub redacts a job output that contains a secret | A report with the harness secret or the job token is not posted (dossier F9). |
+| `github.token` expires when the job ends | A leaked token is read-only and short-lived. |
+
+Limits that stay:
+
+- The report can carry injected text or wrong labels. A human reads each report before acting.
+- The run job can read all repo files. Do not keep private data in a repo that runs these workflows.
+- The action process has the harness secret. The allowlist blocks the tools that could read the
+  environment, but the risk is not zero (dossier F10).
 
 ## Modes
 
