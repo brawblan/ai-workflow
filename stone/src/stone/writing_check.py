@@ -109,11 +109,20 @@ def check_text(path: str, text: str, rules: Rules) -> list[Finding]:
     return findings
 
 
+def _git(root: Path, *args: str) -> str:
+    return subprocess.run(["git", *args], cwd=root, capture_output=True, text=True,
+                          check=True).stdout
+
+
 def changed_lines(base: str, root: Path) -> dict[str, set[int]]:
-    """Return the added or changed line numbers of each Markdown file since `base`."""
-    diff = subprocess.run(["git", "diff", "--unified=0", "--no-color", f"{base}...HEAD", "--",
-                           "*.md"],
-                          cwd=root, capture_output=True, text=True, check=True).stdout
+    """Return the added or changed line numbers of each Markdown file since `base`.
+
+    The diff starts at the merge base of `base` and HEAD, and ends at the working tree. Thus it
+    includes commits, staged changes, unstaged changes, and untracked files. In a clean tree
+    (for example in CI), the result is the same as `git diff base...HEAD`.
+    """
+    merge_base = _git(root, "merge-base", base, "HEAD").strip()
+    diff = _git(root, "diff", "--unified=0", "--no-color", merge_base, "--", "*.md")
     result: dict[str, set[int]] = {}
     current = ""
     for line in diff.splitlines():
@@ -124,6 +133,12 @@ def changed_lines(base: str, root: Path) -> dict[str, set[int]]:
             if match:
                 start, count = int(match.group(1)), int(match.group(2) or "1")
                 result.setdefault(current, set()).update(range(start, start + count))
+    # git diff does not show untracked files. Each line of a new file is a changed line.
+    for name in _git(root, "ls-files", "--others", "--exclude-standard", "-z", "--",
+                     "*.md").split("\0"):
+        if name:
+            count = len((root / name).read_text(encoding="utf-8").splitlines())
+            result[name] = set(range(1, count + 1))
     return result
 
 
