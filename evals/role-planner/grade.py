@@ -35,13 +35,16 @@ ASKS = re.compile(r"\?|\b(unclear|not clear|ambiguous|unspecified|undefined|deci
                   r"clarify|clarification)\b|\b(does|do|did) not (say|state|specify|define|cover)\b",
                   re.I)
 # open_question: the words that give a recommendation, name the default, and start the options.
-# "I suggest an argument" and "the author may prefer" are not a recommendation of an answer.
-RECOMMENDS = re.compile(r"\b(recommend\w*|suggestion|suggested|preferred|I prefer)\b", re.I)
+# "I suggest (b)" and "Suggested answer: (b)" recommend. "The ticket suggested nothing", "I suggest
+# an optional argument", and "the author may prefer" do not.
+RECOMMENDS = re.compile(r"\b(recommend\w*|suggestion|preference|"
+                        r"(I|we)('d| would)? (suggest|prefer)(?= \(?[a-e1-9]\b| option| answer)|"
+                        r"suggested(?=:| answer| option)|preferred(?=:| answer| option|\)))", re.I)
 DEFAULTS = re.compile(r"\bdefault\b|\b(plan|build) (uses|assumes|treats|raises|takes)\b|"
                       r"\bin the meantime\b|\bmeanwhile\b", re.I)
 OPTIONS = re.compile(r"\boptions?\b", re.I)
 # An option label: "(a)", "(1)", "a)", "A.", "A:", "Option A", or "Option 1".
-OPTION_LABEL = re.compile(r"(?:^|(?<=[\s(*]))(?:\(([a-e1-9])\)|([a-e])[).:](?=[\s*]|$)|"
+OPTION_LABEL = re.compile(r"(?:^|(?<=[\s(*_]))(?:\(([a-e1-9])\)|([a-e])[).:](?=[\s*_]|$)|"
                           r"option\s+([a-e1-9])\b)", re.I)
 # The text before a word that says that the word has no value: "No default", "not recommended".
 # A value that says that there is no value: "none", "n/a", "tbd". "no discount" is a value.
@@ -53,12 +56,18 @@ CHANGE = re.compile(r"^## (?:ADDED|MODIFIED)\s+(\S+?):?(?:\s|$)")
 # A list item that gives a recommendation or a default, not an option: "- Recommendation: (b)",
 # "- I recommend (b)", "- Default until G2: (a)". "- Raise ExpiredCode (recommended)" is an option.
 PART_ITEM = re.compile(r"^\W*(\w+\s+){0,2}?(recommend|suggest|prefer|default|the plan uses)", re.I)
-# The first line of one question in a block of questions: a heading, a "Q1" or "Question 1" line,
-# or a line that starts with bold text, with or without a list marker, at the left margin.
-QUESTION_START = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__|Q\d+\b|Question \d+\b)", re.I)
-# A bold line that starts an option, a recommendation, or a default, not a question.
-NOT_QUESTION = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)?\s*(?:option\b|\(?[a-e][).:]|"
-                          r"(?:(?:plan|my|our|the)\s+)?(?:recommend|default)|the plan uses)", re.I)
+# The styles of a line that can start a question, from the strongest: a heading, a "Q1" or
+# "Question 1" line, a numbered item, a line that starts with bold text, and a bullet item.
+STYLES = ("heading", "q", "numbered", "bold", "bullet")
+Q_LINE = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)?\s*(?:Q\d+|Question \d+)\b", re.I)
+# A line that gives a part of a question, not a new question: an option, a recommendation, or a
+# default ("**Options:**", "- (a) ...", "I recommend (a)", "**Interim default:** (a)").
+PART_LINE = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*|__)?\s*(?:options?\b|\(?[a-e][).:]\s|"
+                       r"(?:\w+\s+){0,2}?(?:recommend|default\b|suggest|prefer)|the plan uses|"
+                       r"until G2)", re.I)
+# A bold label, such as "**Context:**" or "**Why it matters**:". It does not start a question.
+BOLD_LABEL = re.compile(r"^(?:(?:[-*+]|\d+[.)])\s+)?(?:\*\*[^*]+:\*\*|__[^_]+:__|\*\*[^*]+\*\*:|"
+                        r"__[^_]+__:)")
 # A parameter default in code, not the default of the plan: "(default `date.today()`)".
 CODE_DEFAULT = re.compile(r"^[:=]?\s*`[^`]*`\s*\)")
 OPEN_NOTE = re.compile(r"\bopen question\b|\bnot (yet )?(decided|approved)\b", re.I)
@@ -175,14 +184,16 @@ def names_gap(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
 def _join(lines: list[str]) -> list[str]:
     """Join each wrapped line to the line before it.
 
-    A blank line, a heading, a list item, and a table row start a new line. A line after a blank
-    line, a heading, or a table row also starts a new line.
+    A blank line, a heading, a list item, a table row, and a line at the left margin that starts
+    with bold text or "Q1" start a new line. A line after a blank line, a heading, or a table row
+    also starts a new line.
     """
     out: list[str] = []
     joins = False
     for line in lines:
         starts = (not line.strip() or _level(line) or LIST_ITEM.match(line)
-                  or line.lstrip().startswith("|"))
+                  or line.lstrip().startswith("|") or re.match(r"(\*\*|__)", line)
+                  or Q_LINE.match(line))
         if joins and not starts:
             out[-1] = out[-1].rstrip() + " " + line.strip()
         else:
@@ -208,19 +219,87 @@ def _units(text: str, pattern: re.Pattern[str], report: bool) -> list[list[str]]
     if report and any(pattern.search(line) and ASKS.search(line) and not NONE.match(line)
                       for line in _join(text.splitlines())):
         blocks.append(_join(text.splitlines()))
-    units = [_flatten_tables(question) for lines in blocks for question in _questions(lines)]
+    units = [_flatten_tables(question) for lines in blocks
+             for question in _questions(lines, pattern)]
     return [unit for unit in units
             if any(pattern.search(line) and not NONE.match(line) for line in unit)]
 
 
-def _questions(lines: list[str]) -> list[list[str]]:
+def _style(line: str) -> tuple[int, int] | None:
+    """Return (the index in STYLES, the heading level) of a line that can start a question.
+
+    Only a heading or a line at the left margin can start a question. A PART_LINE or a BOLD_LABEL
+    line cannot.
+    """
+    level = _level(line)
+    if level:
+        return 0, level
+    if not line.strip() or line[0].isspace():
+        return None
+    if Q_LINE.match(line):
+        return 1, 0
+    if PART_LINE.match(line) or BOLD_LABEL.match(line):
+        return None
+    if re.match(r"\d+[.)]\s", line):
+        return 2, 0
+    if re.match(r"(?:[-*+]\s+)?(?:\*\*|__)", line):
+        return 3, 0
+    if LIST_ITEM.match(line):
+        return 4, 0
+    return None
+
+
+def _questions(lines: list[str], pattern: re.Pattern[str]) -> list[list[str]]:
     """Split the lines of a block into questions, so that the parts of one question do not count
     for a different question.
 
-    Each table row is a question, with the header row and the rule row. A heading or a
-    QUESTION_START line that is not a NOT_QUESTION line starts a question. The lines before the
-    first start are a question too. A block with no start is one question.
+    The first line that names the gap sets the split. If it is a table row, each row is a
+    question. If not, the strongest style of the lines up to that line (STYLES) is the style of a
+    question start (`_starts`). If no line up to it has a style, the question is in a paragraph,
+    and the strongest style of a later line after a blank line (not a bullet) is used. A block with
+    no style is one question, so that a question in a paragraph keeps the options list after it.
     """
+    gap = next((index for index, line in enumerate(lines)
+                if pattern.search(line) and not NONE.match(line)), None)
+    if gap is None:
+        return [lines]
+    if lines[gap].lstrip().startswith("|"):
+        return _rows(lines)
+    styles = [style for style in map(_style, lines[:gap + 1]) if style]
+    if not styles:  # a question in a paragraph: a later question after a blank line sets the style
+        styles = [style for index, style in enumerate(map(_style, lines))
+                  if index > gap and style and style[0] != 4 and not lines[index - 1].strip()]
+    if not styles:
+        return [lines]
+    kind, level = min(styles)
+    questions: list[list[str]] = [[]]
+    for index, line in enumerate(lines):
+        if _starts(_style(line), index > 0 and not lines[index - 1].strip(), kind, level):
+            questions.append([])
+        questions[-1].append(line)
+    return [question for question in questions if question]
+
+
+def _starts(style: tuple[int, int] | None, after_blank: bool, kind: int, level: int) -> bool:
+    """A line of this style starts a question in a block with questions of style `kind`.
+
+    A heading starts one (for headings, at `level` or higher). A line of the same style and a "Q1"
+    line start one. For a list of questions, a bold line after a blank line also starts one: in
+    Markdown, a line at the left margin after a blank line ends the list item. A bullet line with
+    no bold does not, so that an options list stays in its question.
+    """
+    if style is None:
+        return False
+    if style[0] == 0:
+        return kind != 0 or style[1] <= level
+    if style[0] in (kind, 1):
+        return True
+    return kind in (2, 4) and after_blank and style[0] == 3
+
+
+def _rows(lines: list[str]) -> list[list[str]]:
+    """Split the lines into questions: each table row (with its header row), and the lines before
+    and after each table."""
     questions: list[list[str]] = [[]]
     header: list[str] = []
     for index, line in enumerate(lines):
@@ -232,8 +311,8 @@ def _questions(lines: list[str]) -> list[list[str]]:
             else:
                 questions.append(header + [line])
             continue
-        header = []
-        if _level(line) or (QUESTION_START.match(line) and not NOT_QUESTION.match(line)):
+        if header:  # the first line after a table starts a new question
+            header = []
             questions.append([])
         questions[-1].append(line)
     return [question for question in questions if question]
@@ -266,6 +345,14 @@ def _flatten_tables(lines: list[str]) -> list[str]:
     return out
 
 
+def _label(line: str) -> bool:
+    """The line is a label for the next line: it ends in ":", it is a heading, or it is only bold
+    text ("**Recommendation**")."""
+    text = line.strip()
+    return (text.rstrip(" \t*_").endswith(":") or bool(_level(line))
+            or bool(re.fullmatch(r"(?:[-*+]\s+)?(\*\*[^*]+\*\*|__[^_]+__)", text)))
+
+
 def _says(lines: list[str], words: re.Pattern[str]) -> bool:
     """A line has one of `words` and a value after it that is not "none".
 
@@ -282,7 +369,7 @@ def _says(lines: list[str], words: re.Pattern[str]) -> bool:
                 continue
             rest = line[match.end():]
             rest = (rest.split(":", 1)[1] if ":" in rest else rest).strip(" \t*_:.-")
-            if not rest and line.rstrip(" \t*_").endswith(":"):
+            if not rest and _label(line):
                 after = next((n for n in lines[index + 1:] if n.strip()), "")
                 part = OPTIONS.search(after) or RECOMMENDS.search(after) or DEFAULTS.search(after)
                 rest = "" if part else after.strip(" \t*_-")
@@ -303,12 +390,15 @@ def _option_count(lines: list[str]) -> int:
     - the different option labels, for example "(a)", "B.", or "Option 2";
     - the parts of the text after the word "option" or "options" up to a recommendation or a
       default, split at ";", ",", "or", and " / ";
-    - the list items after a line with the word that ends in ":", except an item that starts with
-      a recommendation or a default.
+    - the list items after a label line with the word (it ends in ":", or it is a heading or only
+      bold text), except an item that starts with a recommendation or a default;
+    - the list items that start with bold text that is not a label, for example "- **Reject it**".
     """
     labels = {next(group for group in match.groups() if group).lower()
               for line in lines for match in OPTION_LABEL.finditer(line)}
-    best = len(labels)
+    best = max(len(labels), sum(1 for line in lines if LIST_ITEM.match(line) and re.match(
+        r"\s*(\*\*|__)", LIST_ITEM.sub("", line, count=1))
+        and not BOLD_LABEL.match(line.strip()) and not PART_LINE.match(line.strip())))
     for index, line in enumerate(lines):
         match = OPTIONS.search(line)
         if not match:
@@ -318,7 +408,7 @@ def _option_count(lines: list[str]) -> int:
         rest = (rest[:end.start()] if end else rest).strip(" \t*_:")
         if rest and not EMPTY.match(rest):
             best = max(best, sum(1 for part in SPLIT.split(rest) if re.search(r"\w", part)))
-        if line.rstrip(" \t*_").endswith(":"):  # "Options:", "The options are:", "Options for X:"
+        if _label(line):  # "Options:", "The options are:", "Options for X:", "#### Options"
             items = 0
             for after in lines[index + 1:]:
                 if not after.strip():
