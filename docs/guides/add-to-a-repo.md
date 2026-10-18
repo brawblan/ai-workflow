@@ -1,0 +1,95 @@
+# Add Cornerstone to a repo
+
+Use this guide when a repo has code but no agent framework. A repo with only an `AGENTS.md`,
+`CLAUDE.md`, or other rule files also starts here. For Spec Kit, OpenSpec, or BMAD, read
+Migrate to Cornerstone first.
+
+| | |
+| --- | --- |
+| Profile | [single-ticket](../../framework/profiles/single-ticket.md), the default for a new config |
+| Status | Works today |
+| Time | About 30 minutes. Most of it is the interview. |
+
+## What you get
+
+| Before | After |
+| --- | --- |
+| Agent rules, if any, in one long file | A short `AGENTS.md`, and `constitution/` for the mission, personas, principles, stack, and roadmap |
+| An agent that writes code and its own tests | The implementer, tester, and reviewer roles, each in its own session |
+| "Done" when the agent says so | "Done" when CI passes (G3) and a human approves (G4) |
+| No limit on what an agent can change | A hook and check K6 that stop the implementer from changing tests and checks |
+
+## Before you start
+
+1. Clone this repo and install the CLI:
+
+   ```bash
+   git clone https://github.com/brawblan/ai-workflow.git ~/Repos/ai-workflow
+   pip install ~/Repos/ai-workflow/stone
+   ```
+
+2. Install the `workflow` plugin. See the [install steps](../../README.md#install-the-plugin-for-claude-code).
+3. Make sure that the repo has a test command, and that CI runs it.
+
+## Steps
+
+1. Make a branch:
+
+   ```bash
+   git switch -c chore/cornerstone-setup
+   ```
+
+2. Start Claude Code in the repo, and run `/workflow:cornerstone-setup`.
+3. Answer the questions. The skill reads the repo first, so it asks only for missing facts.
+
+The skill does these steps in order:
+
+| Step | What happens | You do |
+| --- | --- | --- |
+| Shape | `project-setup` shows a file map: which docs it moves, fills, or asks about | Approve the map |
+| Interview | It asks for the facts that the repo does not have, 4 at a time or fewer | Answer, or say "I do not know". It writes a `TODO(<owner>)`. |
+| Config | It writes `.cornerstone/config.yaml` and shows the diff | Read the commands and the protected paths |
+| Render | It runs `stone render --dry-run`, then `stone render` | Read the list of files |
+| Check | It runs `stone check` | Nothing, if it passes |
+
+Check these config fields with care. They decide what the agent can change.
+
+| Field | Why it matters |
+| --- | --- |
+| `commands.all_checks` | The roles run it. CI runs it for G3. |
+| `paths.tests` | The implementer cannot change these paths. The tester can change only these paths. |
+| `paths.checks` | The implementer and the tester cannot change these paths. Put your CI and lint config here. |
+| `owners.solo` | Set `true` only if you are the only human. It allows the [solo developer rule](../../framework/modes.md#solo-developer). |
+
+## Commit the result
+
+Make two commits. K6 needs the render output in its own commit.
+
+1. The docs: `AGENTS.md`, `CLAUDE.md`, and `constitution/`. Use the trailers `Role: implementer` and
+   `Actor: agent`.
+2. The config and the render output: `.cornerstone/`, `.claude/`, and the CI workflow. Use the
+   trailers `Role: generator` and `Actor: agent`.
+
+Then open the PR with `/workflow:dev-pr`. Your approval of that PR is G4.
+
+## Turn on the gates
+
+In the GitHub settings of the repo:
+
+1. Make the `cornerstone-checks` job a required status check (G3).
+2. Require a PR review before a merge (G4).
+
+## Keep it current
+
+- Do not edit a generated file. Change `.cornerstone/config.yaml`, and run `stone render` again.
+- If `stone render` exits with code 2, a person changed a generated file. Move the change into the
+  config, or restore the file.
+- To use a new framework version, update the clone and change `framework_version` in the config.
+  Then render again.
+- Each open `TODO(` in `.cornerstone/` is a fact that a role can need. Run
+  `grep -rn "TODO(" .cornerstone/` to find them.
+
+## Next
+
+Pick the work: [a small change](small-change.md), a bug, or
+a feature.
