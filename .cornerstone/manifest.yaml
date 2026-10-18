@@ -1,4 +1,4 @@
-framework_version: 0.1.0
+framework_version: 0.5.0
 components:
 - id: check.k6
   kind: check
@@ -17,7 +17,7 @@ components:
   hash: 72a81068c250e9f1ef32f75d68f51757c91f5fd654e3d440654f5d2e083a2e6d
 - id: ci-job.checks
   kind: ci-job
-  purpose: G3. Run K6 and the repo checks on each pull request.
+  purpose: G3. Run K6, K14, and the repo checks on each pull request.
   principle:
   - P1
   - P6
@@ -29,7 +29,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .github/workflows/cornerstone-checks.yml
-  hash: 45f1748e523737899b578302c0320c46c71b8674e31019cb9cf9e84c617a6596
+  hash: 61f4a5d563b436f315f9049d5780efbff7838f7dae58fd6a610fc5372af73158
 - id: hook.protect-paths
   kind: hook
   purpose: Block an edit to a path that the current role must not change.
