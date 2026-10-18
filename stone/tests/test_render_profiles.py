@@ -68,11 +68,22 @@ def role_file(role: str) -> str:
     return f".claude/agents/{role}.md"
 
 
+def trigger_files(names: list[str]) -> list[str]:
+    """Return the trigger workflows for the profiles: one for each label or schedule (D31)."""
+    files = []
+    for name in names:
+        for trigger in profile_data(name).get("triggers", []):
+            kind = str(trigger).partition(":")[0]
+            if kind in ("label", "schedule"):
+                files.append(f".github/workflows/cornerstone-{name}-{kind}.yml")
+    return files
+
+
 def expected_files(names: list[str]) -> list[str]:
     """Return the files that render must write for the profiles, from the ticket rules."""
     profiles = [profile_data(name) for name in names]
     roles = {role for profile in profiles for role in profile["roles"]}
-    files = [role_file(role) for role in roles] + ALWAYS
+    files = [role_file(role) for role in roles] + ALWAYS + trigger_files(names)
     if any(profile["gates"].get("G3", "skip") != "skip" for profile in profiles):
         files.append(WORKFLOW)
     if any("K6" in profile["checks"] for profile in profiles):
@@ -616,7 +627,8 @@ class AllProfilesTest(RenderBase):
         result, log = self.render()
         self.assertEqual(result.exit_code, 0)
         self.assertNotIn("skipped profile", log)
-        want = [role_file(role) for role in ALL_ROLES] + ALWAYS + [WORKFLOW, K6, K7]
+        want = ([role_file(role) for role in ALL_ROLES] + ALWAYS + [WORKFLOW, K6, K7]
+                + trigger_files(profile_names()))
         if any("K15" in profile_data(name)["checks"] for name in profile_names()):
             want.append(K15)
         self.assertEqual(sorted(result.wrote), sorted(want))

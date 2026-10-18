@@ -44,6 +44,9 @@ OTHER_FILES = [".claude/settings.json", ".cornerstone/checks/change_size.py",
                ".github/workflows/cornerstone-checks.yml"]
 PLANNER = ".claude/agents/planner.md"
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
+# Trigger workflows (D31): single-ticket and app-slice have the trigger label:agent-ready.
+ST_LABEL = ".github/workflows/cornerstone-single-ticket-label.yml"
+APP_LABEL = ".github/workflows/cornerstone-app-slice-label.yml"
 
 
 class RenderTest(unittest.TestCase):
@@ -68,13 +71,12 @@ class RenderTest(unittest.TestCase):
 
     def test_writes_role_files_and_manifest(self) -> None:
         result = self.render()
-        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + OTHER_FILES))
+        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + OTHER_FILES + [ST_LABEL]))
         tester = (self.root / ".claude/agents/tester.md").read_text(encoding="utf-8")
         self.assertIn("model: claude-opus-5-5", tester)
         self.assertIn("Write tests only here: `tests/`", tester)
         self.assertIn("Run `python -m unittest`", tester)
-        entry = self.manifest()["components"][-2]
-        self.assertEqual(entry["id"], "role.shaper")
+        entry = {c["id"]: c for c in self.manifest()["components"]}["role.shaper"]
         self.assertEqual((entry["owner"], entry["added"], entry["review_by"]),
                          ("octocat", "2026-10-17", "2027-04-17"))
 
@@ -238,7 +240,8 @@ class RenderTest(unittest.TestCase):
     def test_app_slice_writes_the_planner_role(self) -> None:
         self.app_slice()
         result = self.render()
-        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + [PLANNER] + OTHER_FILES))
+        self.assertEqual(sorted(result.wrote),
+                         sorted(ROLE_FILES + [PLANNER] + OTHER_FILES + [APP_LABEL]))
         planner = (self.root / PLANNER).read_text(encoding="utf-8")
         self.assertIn(f"model: {self.planner_model()}", planner)
         self.assertIn("Write only in `docs/plans/`", planner)
@@ -282,7 +285,8 @@ class RenderTest(unittest.TestCase):
     def test_app_slice_with_single_ticket_writes_the_planner_once(self) -> None:
         self.write_config(CONFIG.replace("[single-ticket]", "[single-ticket, app-slice]"))
         result = self.render()
-        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + [PLANNER] + OTHER_FILES))
+        self.assertEqual(sorted(result.wrote),
+                         sorted(ROLE_FILES + [PLANNER] + OTHER_FILES + [ST_LABEL, APP_LABEL]))
 
     def test_hook_limits_the_planner_to_the_plans_path(self) -> None:
         self.app_slice("work/specs/")
@@ -393,7 +397,7 @@ class RenderTest(unittest.TestCase):
 
     def test_single_ticket_does_not_write_the_planner(self) -> None:
         result = self.render()
-        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + OTHER_FILES))
+        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + OTHER_FILES + [ST_LABEL]))
         self.assertFalse((self.root / PLANNER).exists())
         self.assertNotIn("role.planner", [c["id"] for c in self.manifest()["components"]])
         self.assertEqual(len(self.render(dry_run=True).skipped), 10)
