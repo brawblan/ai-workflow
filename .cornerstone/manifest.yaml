@@ -133,3 +133,19 @@ components:
   files:
   - .claude/agents/tester.md
   hash: 7a50846651a4dabd12cd3c45cb1d7191d9930a90fda2f104d2a131859397c248
+- id: trigger.label.single-ticket
+  kind: ci-job
+  purpose: Start the first role of the profile when a human adds the trigger label
+    to an issue.
+  principle:
+  - P6
+  - P9
+  source: framework
+  owner: brawblan
+  eval: evals/trigger-label/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .github/workflows/cornerstone-single-ticket-label.yml
+  hash: 4f1902b9caa48f266c943568cab47388e40a68cf873c880fd80b1fa84b70959e

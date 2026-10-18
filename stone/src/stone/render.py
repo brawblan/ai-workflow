@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from stone import framework_check
+from stone import framework_check, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -214,7 +214,7 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
 
     components = []
     for entry in registry:
-        if not needed(entry, profiles):
+        if "trigger" in entry or not needed(entry, profiles):
             continue
         model = defaults["role_models"].get(entry.get("role", ""), "")
         values = {**template_values(config, model), **model_values,
@@ -224,6 +224,38 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
+    try:
+        components.extend(trigger_components(framework, harness, registry, profiles, config,
+                                             defaults["role_models"]))
+    except triggers.TriggerError as error:
+        raise RenderError(str(error)) from None
+    return components
+
+
+def trigger_components(framework: Path, harness: Path, registry: list[dict[str, Any]],
+                       profiles: list[dict[str, Any]], config: dict[str, Any],
+                       role_models: dict[str, str]) -> list[Component]:
+    """Return one workflow for each profile trigger that is not `command` (D31)."""
+    entries = {entry["trigger"]: entry for entry in registry if "trigger" in entry}
+    found = triggers.profile_triggers(profiles)
+    components, targets = [], []
+    for trigger in triggers.supported(found, set(entries)):
+        entry = entries[trigger.key]
+        values = template_values(config, "")
+        values.update(triggers.values(trigger, found, role_models))
+        text = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
+        for name, part in (entry.get("parts") or {}).items():
+            text = triggers.insert_block(
+                text, name, (harness / "templates" / part).read_text(encoding="utf-8"))
+        steps = triggers.flow_steps(framework, trigger.profile["id"]).replace("$", "$$")
+        text = triggers.insert_block(text, "profile_steps", steps)
+        component_id = f"{entry['id']}.{trigger.profile['id']}"
+        target = fill(entry["target"], entry["template"], values, config)
+        targets.append((trigger.text, target))
+        components.append(Component(component_id, entry["kind"], entry["purpose"],
+                                    entry["principle"], entry["eval"],
+                                    {target: fill(text, entry["template"], values, config)}))
+    triggers.check_targets(targets)
     return components
 
 
@@ -239,6 +271,12 @@ def substitute(harness: Path, template_name: str, values: dict[str, str],
     for name, step in steps.items():
         if step is None:
             template = template.replace(f"${name}\n", "").replace(f"${{{name}}}\n", "")
+    return fill(template, template_name, values, config)
+
+
+def fill(template: str, template_name: str, values: dict[str, str],
+         config: dict[str, Any]) -> str:
+    """Substitute the values into a template text. Name the missing fact in the error."""
     try:
         return Template(template).substitute(values)
     except ValueError as error:
