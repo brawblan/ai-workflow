@@ -1,6 +1,6 @@
 # stone
 
-The Cornerstone CLI. Version 0.7 has six commands:
+The Cornerstone CLI. Version 0.9 has seven commands:
 
 | Command | Does |
 | --- | --- |
@@ -9,6 +9,7 @@ The Cornerstone CLI. Version 0.7 has six commands:
 | `stone check-evidence` | Check K14. Fails if a required section of a PR body is missing or empty: Evidence, Decision log, Review findings, or Confidence. |
 | `stone spec apply <plan>` | Applies the spec delta of one plan (`<plans>/<plan>.spec.md`). It gives the delta the next `apply_order`, and writes the specs in `<specs>/`. It stops if a spec is not the same as a replay of the applied deltas. See [Specs](../framework/workflow-model.md#specs). |
 | `stone spec sync` | After a merge of the base branch: gives the applied deltas the orders 1 to n, and writes the specs from a replay. It overwrites a spec that is not the same as the replay. |
+| `stone eval <component-id>` | Runs the eval of one component, with the component and without it. It writes a result table to `evals/results/`. See [Eval design](../framework/lifecycle.md#eval-design). |
 | `stone render` | Writes the generated files and `.cornerstone/manifest.yaml` into a target repo. Version 0.4 supports the single-ticket and app-slice profiles: role files, the protected-path hook, check K6, and the G3 CI workflow. Version 0.7 adds a K14 step on the PR body to that workflow. Version 0.8 renders the roles of all 10 profiles, with the new investigator role. It writes the G3 workflow and K6 only for a profile that has them (D24, D25). |
 
 The other commands in [the generator design](../framework/generator/design.md) are not built yet.
@@ -81,6 +82,21 @@ Add `--format github` to show the findings as annotations in a GitHub Actions ru
 7. Commit the render output alone, with the trailers `Role: generator` and `Actor: human`. K6 counts
    a commit with no `Role:` trailer as an implementer commit, and the output is in protected paths.
 
+8. Validate the scenarios of a component eval. This step starts no run:
+
+   ```bash
+   stone eval role.tester --check-only
+   ```
+
+9. Run the eval with 3 trials for each scenario and variant:
+
+   ```bash
+   stone eval role.tester --trials 3
+   ```
+
+   Each run starts the harness, so it costs tokens and time. Use `--scenario <id>` to run one
+   scenario. Use `--keep` to keep the workspace of each run for a review.
+
 ## Outputs
 
 Each finding is one line: path, line, severity, check, and a message with the fix.
@@ -92,8 +108,8 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 | Exit code | Meaning |
 | --- | --- |
 | 0 | No blocking finding. In `--mode warn`, K17 and K14 always exit with 0. `render`: no drift. |
-| 1 | One or more blocking findings. `render`: an input is not valid, and no file was written. |
-| 2 | Wrong arguments, or `check-evidence` cannot read the PR body. `render`: drift in one or more files. Render did not change those files. |
+| 1 | One or more blocking findings. `render`: an input is not valid, and no file was written. `eval`: one or more runs with the component failed. |
+| 2 | Wrong arguments, or `check-evidence` cannot read the PR body. `eval`: the scenarios or the run config are not valid, and no run started. `render`: drift in one or more files. Render did not change those files. |
 
 `stone render` logs one line for each file to standard error: `wrote`, `skipped`, or `drift`.
 
@@ -117,6 +133,9 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 - `render` does not write K7, K15, K16, or the trigger workflows yet. The [roadmap](../framework/README.md#roadmap) lists them for v1.
 - `render` does not check `framework_version` against the framework folder. Check out the tag yourself.
 - `render` does not read profile overrides (`.cornerstone/profiles/`) yet.
+- `eval` runs on the local machine, not in CI. The runs need harness authentication and cost tokens.
+- `eval` puts each workspace in the system temp folder, so that no instruction file in a parent folder goes into the run.
+- `eval --model` sets the model on the command line. If the role file also sets a model, the harness decides which one wins. Use the model in the model profile, or check the adapter doc.
 - If the hook entry in `.claude/settings.json` changes in a new framework version, `render` adds the new entry. Remove the old entry by hand.
 
 ## Test
