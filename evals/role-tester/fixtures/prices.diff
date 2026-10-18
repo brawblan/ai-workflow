@@ -1,0 +1,16 @@
+diff --git a/src/prices.py b/src/prices.py
+index 69041a1..b988f8e 100644
+--- a/src/prices.py
++++ b/src/prices.py
+@@ -1 +1,11 @@
+ """Price helpers."""
++
++
++def total(items: list[tuple[float, int]], discount_pct: float = 0) -> float:
++    """Return the sum of price * quantity, less the discount in percent."""
++    if not 0 <= discount_pct <= 100:
++        raise ValueError("discount_pct must be from 0 to 100")
++    subtotal = sum(price * quantity for price, quantity in items)
++    if discount_pct:
++        return subtotal * discount_pct / 100
++    return subtotal

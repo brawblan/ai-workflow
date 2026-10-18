@@ -1,0 +1,15 @@
+diff --git a/src/stats.py b/src/stats.py
+index 09f6e60..a471ef5 100644
+--- a/src/stats.py
++++ b/src/stats.py
+@@ -1 +1,10 @@
+ """Statistics helpers."""
++
++
++def median(values: list[float]) -> float:
++    """Return the median of a list of numbers. The list is not changed."""
++    ordered = sorted(values)
++    middle = len(ordered) // 2
++    if len(ordered) % 2:
++        return ordered[middle]
++    return (ordered[middle - 1] + ordered[middle]) / 2

@@ -1,0 +1,13 @@
+diff --git a/src/cart.py b/src/cart.py
+index 4aeaa96..08cccf3 100644
+--- a/src/cart.py
++++ b/src/cart.py
+@@ -11,7 +11,7 @@ class Cart:
+         self.items[name] = self.items.get(name, 0) + quantity
+ 
+     def remove(self, name: str) -> None:
+-        del self.items[name]
++        self.items.pop(name, None)
+ 
+     def quantity(self, name: str) -> int:
+         return self.items.get(name, 0)

@@ -1,0 +1,13 @@
+diff --git a/src/cart.py b/src/cart.py
+index 4aeaa96..285997c 100644
+--- a/src/cart.py
++++ b/src/cart.py
+@@ -8,7 +8,7 @@ class Cart:
+         self.items: dict[str, int] = {}
+ 
+     def add(self, name: str, quantity: int = 1) -> None:
+-        self.items[name] = self.items.get(name, 0) + quantity
++        self.items[name] = quantity
+ 
+     def remove(self, name: str) -> None:
+         del self.items[name]
