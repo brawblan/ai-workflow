@@ -43,6 +43,10 @@ pip install ./stone
    stone check-writing --diff origin/main
    ```
 
+   The diff starts at the merge base of the base branch and `HEAD`. It ends at the working tree.
+   Thus K17 tests your commits, staged changes, unstaged changes, and new Markdown files. You can
+   run it before `git commit`.
+
 4. Make K17 fail on errors. Use this mode after the 2-week warning period:
 
    ```bash
@@ -92,6 +96,7 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 
 - K17 skips agent-facing files (skills, `AGENTS.md`, `CLAUDE.md`, `.claude/`, templates), code, inline code, URLs, and quoted text.
 - In `--diff` mode, K17 reports a finding only if the sentence starts on a changed line.
+- In `--diff` mode, K17 tests each line of an untracked Markdown file. It skips a file that git ignores.
 - The tense test (rule 2) and the passive test (rule 11) are warnings, because they also match some adjectives.
 - `render` supports only the `claude-code` harness and the `single-ticket` profile. It skips other profiles with a log line.
 - `render` does not check `framework_version` against the framework folder. Check out the tag yourself.
