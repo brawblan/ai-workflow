@@ -39,6 +39,7 @@ ROLE_FILES = [".claude/agents/implementer.md", ".claude/agents/reviewer.md",
 OTHER_FILES = [".claude/settings.json", ".cornerstone/checks/protected_paths.py",
                ".cornerstone/hooks/protect-paths.py", ".cornerstone/manifest.yaml",
                ".github/workflows/cornerstone-checks.yml"]
+PLANNER = ".claude/agents/planner.md"
 
 
 class RenderTest(unittest.TestCase):
@@ -219,6 +220,137 @@ class RenderTest(unittest.TestCase):
         run = subprocess.run([*k6[:2], "HEAD~3"], cwd=self.root, capture_output=True, text=True)
         self.assertEqual(run.returncode, 1)
         self.assertIn("changes tests/test_b.py, a protected path", run.stdout)
+
+    def app_slice(self, plans: str | None = "docs/plans/") -> None:
+        text = CONFIG.replace("[single-ticket]", "[app-slice]")
+        line = "  plans: docs/plans/\n"
+        self.write_config(text.replace(line, f"  plans: {plans}\n" if plans else ""))
+
+    def planner_model(self) -> str:
+        profile = FRAMEWORK / "adapters/claude-code/models/claude-5.yaml"
+        data = yaml.safe_load(profile.read_text(encoding="utf-8"))
+        return data["defaults"]["role_models"]["planner"]
+
+    def test_app_slice_writes_the_planner_role(self) -> None:
+        self.app_slice()
+        result = self.render()
+        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + [PLANNER] + OTHER_FILES))
+        planner = (self.root / PLANNER).read_text(encoding="utf-8")
+        self.assertIn(f"model: {self.planner_model()}", planner)
+        self.assertIn("Write only in `docs/plans/`", planner)
+        self.assertIn("`docs/plans/<ticket-id>.md`", planner)
+        self.assertIn("`docs/plans/<ticket-id>.progress.json`", planner)
+        self.assertNotIn("$", planner)
+        entry = {c["id"]: c for c in self.manifest()["components"]}["role.planner"]
+        self.assertEqual((entry["owner"], entry["added"], entry["review_by"], entry["files"]),
+                         ("octocat", "2026-10-17", "2027-04-17", [PLANNER]))
+
+    def test_planner_uses_a_non_default_plans_path(self) -> None:
+        self.app_slice("work/specs/")
+        self.render()
+        planner = (self.root / PLANNER).read_text(encoding="utf-8")
+        self.assertIn("Write only in `work/specs/`", planner)
+        self.assertIn("`work/specs/<ticket-id>.md`", planner)
+        self.assertIn("`work/specs/<ticket-id>.progress.json`", planner)
+        self.assertNotIn("docs/plans", planner)
+
+    def test_planner_uses_the_default_plans_path_when_the_config_has_none(self) -> None:
+        self.app_slice(plans=None)
+        self.render()
+        self.assertIn("Write only in `docs/plans/`",
+                      (self.root / PLANNER).read_text(encoding="utf-8"))
+
+    def test_new_plans_path_updates_the_planner_file(self) -> None:
+        self.app_slice()
+        self.render()
+        self.app_slice("work/specs/")
+        result = self.render()
+        self.assertEqual(result.drift, [])
+        self.assertIn(PLANNER, result.wrote)
+        self.assertIn(".cornerstone/hooks/protect-paths.py", result.wrote)
+        self.assertIn("`work/specs/`", (self.root / PLANNER).read_text(encoding="utf-8"))
+
+    def test_second_app_slice_render_writes_nothing(self) -> None:
+        self.app_slice()
+        self.render()
+        self.assertEqual(self.render().wrote, [])
+
+    def test_app_slice_with_single_ticket_writes_the_planner_once(self) -> None:
+        self.write_config(CONFIG.replace("[single-ticket]", "[single-ticket, app-slice]"))
+        result = self.render()
+        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + [PLANNER] + OTHER_FILES))
+
+    def test_hook_limits_the_planner_to_the_plans_path(self) -> None:
+        self.app_slice("work/specs/")
+        self.render()
+        self.assertEqual(self.run_hook("work/specs/T-1.md", "planner"), 0)
+        self.assertEqual(self.run_hook("work/specs/T-1.progress.json", "planner"), 0)
+        self.assertEqual(self.run_hook("work/specs/sub/T-1.md", "planner"), 0)
+        self.assertEqual(self.run_hook("src/a.py", "planner"), 2)
+        self.assertEqual(self.run_hook("tests/test_a.py", "planner"), 2)
+        self.assertEqual(self.run_hook("docs/plans/T-1.md", "planner"), 2)
+        self.assertEqual(self.run_hook("work/specs-old/T-1.md", "planner"), 2)
+        self.assertEqual(self.run_hook("work/T-1.md", "planner"), 2)
+        self.assertEqual(self.run_hook(".claude/agents/planner.md", "planner"), 2)
+        self.assertEqual(self.run_hook(".cornerstone/config.yaml", "planner"), 2)
+
+    def test_hook_tells_the_planner_why_it_blocks(self) -> None:
+        self.app_slice()
+        self.render()
+        event = json.dumps({"tool_input": {"file_path": str(self.root / "src/a.py")}})
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(self.root), "STONE_ROLE": "planner"}
+        run = subprocess.run([sys.executable, ".cornerstone/hooks/protect-paths.py"],
+                             cwd=self.root, input=event, env=env, capture_output=True, text=True)
+        self.assertEqual(run.returncode, 2)
+        self.assertIn("src/a.py is not a plan path", run.stderr)
+        self.assertIn("docs/plans/", run.stderr)
+
+    def test_hook_limits_the_planner_in_a_worktree(self) -> None:
+        self.app_slice()
+        self.render()
+        self.git("init", "-q")
+        self.commit("README.md", "base")
+        self.git("worktree", "add", "-q", "-b", "wt", ".claude/worktrees/wt")
+        tree = ".claude/worktrees/wt/"
+        self.assertEqual(self.run_hook(tree + "docs/plans/T-1.md", "planner"), 0)
+        self.assertEqual(self.run_hook(tree + "src/a.py", "planner"), 2)
+        self.assertEqual(self.run_hook(tree + "tests/test_a.py", "planner"), 2)
+
+    def test_app_slice_hook_keeps_the_other_role_rules(self) -> None:
+        self.app_slice()
+        self.render()
+        self.assertEqual(self.run_hook("tests/test_a.py", "implementer"), 2)
+        self.assertEqual(self.run_hook("src/a.py", "implementer"), 0)
+        self.assertEqual(self.run_hook("tests/test_a.py", "tester"), 0)
+        self.assertEqual(self.run_hook("docs/plans/T-1.md", "tester"), 2)
+        self.assertEqual(self.run_hook("docs/plans/T-1.md", "reviewer"), 2)
+
+    def test_single_ticket_does_not_write_the_planner(self) -> None:
+        result = self.render()
+        self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + OTHER_FILES))
+        self.assertFalse((self.root / PLANNER).exists())
+        self.assertNotIn("role.planner", [c["id"] for c in self.manifest()["components"]])
+        self.assertEqual(len(self.render(dry_run=True).skipped), 9)
+
+    def test_single_ticket_hook_keeps_the_role_rules(self) -> None:
+        self.render()
+        self.assertEqual(self.run_hook("tests/test_a.py", "implementer"), 2)
+        self.assertEqual(self.run_hook("docs/plans/T-1.md", "implementer"), 0)
+        self.assertEqual(self.run_hook("tests/test_a.py", "tester"), 0)
+        self.assertEqual(self.run_hook("docs/plans/T-1.md", "tester"), 2)
+        self.assertEqual(self.run_hook("docs/plans/T-1.md", "reviewer"), 2)
+
+    def test_change_to_single_ticket_reports_the_planner_as_stale(self) -> None:
+        self.app_slice()
+        self.render()
+        self.write_config(CONFIG)
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            result = render.render(self.root, FRAMEWORK, today=TODAY)
+        self.assertEqual(result.exit_code, 0)
+        self.assertIn("stale role.planner", log.getvalue())
+        self.assertTrue((self.root / PLANNER).exists())
+        self.assertNotIn("role.planner", [c["id"] for c in self.manifest()["components"]])
 
 
 if __name__ == "__main__":
