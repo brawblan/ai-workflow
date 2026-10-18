@@ -38,6 +38,7 @@ jobs:
           printf '%s\n' "$${PR_BODY}" \
             | "$${RUNNER_TEMP}/stone/bin/stone" check-evidence - --mode warn --format github
 
+$ci_step_check_k15
       - name: Install
         run: $command_install
 
