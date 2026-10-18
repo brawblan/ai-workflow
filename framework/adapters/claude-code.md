@@ -45,6 +45,11 @@ the trailers for human commits.
 The protected paths are `paths.tests` and `paths.checks` from the repo config, plus `.claude/` and
 `.cornerstone/`. These two folders hold the hook, the check, and the harness settings.
 
+The hook makes the target path relative to the git work tree that holds the file. This is
+necessary because `CLAUDE_PROJECT_DIR` is the main checkout, also in a linked worktree under
+`.claude/worktrees/<name>/`. Thus a worktree gets the same rules as the main checkout. A file
+outside the project repo is not blocked.
+
 `stone render` writes the hook to `.cornerstone/hooks/protect-paths.py` and K6 to
 `.cornerstone/checks/protected_paths.py`. It merges this entry into `.claude/settings.json` and keeps
 the other keys. The hook catches edits by the file tools only. A shell command can still change a

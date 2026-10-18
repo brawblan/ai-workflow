@@ -165,6 +165,38 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(self.run_hook("src/a.py", "tester"), 2)
         self.assertEqual(self.run_hook("src/a.py", "reviewer"), 2)
 
+    def test_hook_uses_the_main_checkout_root(self) -> None:
+        self.render()
+        self.git("init", "-q")
+        self.assertEqual(self.run_hook("src/a.py", "implementer"), 0)
+        self.assertEqual(self.run_hook("tests/test_a.py", "implementer"), 2)
+        self.assertEqual(self.run_hook("tests/test_a.py", "tester"), 0)
+        self.assertEqual(self.run_hook("src/a.py", "tester"), 2)
+
+    def test_hook_uses_the_worktree_root(self) -> None:
+        self.render()
+        self.git("init", "-q")
+        self.commit("README.md", "base")
+        self.git("worktree", "add", "-q", "-b", "wt", ".claude/worktrees/wt")
+        tree = ".claude/worktrees/wt/"
+        self.assertEqual(self.run_hook(tree + "src/a.py", "implementer"), 0)
+        self.assertEqual(self.run_hook(tree + "src/new/a.py", "implementer"), 0)
+        self.assertEqual(self.run_hook(tree + "tests/test_a.py", "implementer"), 2)
+        self.assertEqual(self.run_hook(tree + ".claude/settings.json", "implementer"), 2)
+        self.assertEqual(self.run_hook(tree + "tests/test_a.py", "tester"), 0)
+        self.assertEqual(self.run_hook(tree + "src/a.py", "tester"), 2)
+        self.assertEqual(self.run_hook(".claude/settings.json", "implementer"), 2)
+
+    def test_hook_allows_a_file_outside_the_project_repo(self) -> None:
+        self.render()
+        self.git("init", "-q")
+        with tempfile.TemporaryDirectory() as other:
+            subprocess.run(["git", "init", "-q"], cwd=other, check=True)
+            for folder in (other, tempfile.gettempdir()):
+                outside = os.path.relpath(Path(folder) / "tests" / "test_a.py", self.root)
+                self.assertEqual(self.run_hook(outside, "implementer"), 0)
+                self.assertEqual(self.run_hook(outside, "reviewer"), 0)
+
     def git(self, *args: str) -> None:
         subprocess.run(["git", "-c", "user.name=t", "-c", "user.email=t@example.com", *args],
                        cwd=self.root, check=True, capture_output=True)
