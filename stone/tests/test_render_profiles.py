@@ -69,12 +69,13 @@ def role_file(role: str) -> str:
 
 
 def trigger_files(names: list[str]) -> list[str]:
-    """Return the trigger workflows for the profiles: one for each label or schedule (D31)."""
+    """Return the trigger workflows for the profiles: one for each trigger but command (D31)."""
     files = []
     for name in names:
         for trigger in profile_data(name).get("triggers", []):
-            kind = str(trigger).partition(":")[0]
-            if kind in ("label", "schedule"):
+            kind, _, event = str(trigger).partition(":")
+            kind = event if kind == "ci" else kind  # ci:issue-opened -> issue-opened
+            if kind != "command":
                 files.append(f".github/workflows/cornerstone-{name}-{kind}.yml")
     return files
 

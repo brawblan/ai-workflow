@@ -3,8 +3,12 @@
 # a selected profile has that gate (not `skip`) or that check. Other components are always rendered.
 # ci_step: a step template for the G3 workflow. The workflow has it at `$ci_step_<id>` (dots become
 # underscores) only if the component is rendered. Otherwise render removes that placeholder line.
+# A ci-job can have `steps`: each step with the same `when` rule goes into the `$check_steps` block of
+# the job template. A step with `command` needs that key in `commands` of the repo config. If the key
+# has no value, render skips the step and warns (D29). A step is part of its ci-job component.
 # A component with `trigger` is rendered once for each selected profile with that trigger type, as
 # `<id>.<profile>` (D31). `parts` are fragments that render puts in the template at a `$name` line.
+# `values` are template values of the entry. A value that another trigger entry sets is "" here.
 # eval: the planned eval folder (lifecycle.md).
 
 components:
@@ -115,6 +119,37 @@ components:
     template: workflows/cornerstone-checks.yml
     target: .github/workflows/cornerstone-checks.yml
     eval: evals/ci-job-checks/
+    steps:                                   # the "by profile" checks that run a repo command
+      - id: k4
+        name: K4 integration tests
+        when: {check: K4}
+        command: test_integration
+        template: workflows/steps/repo-command.yml
+      - id: k5
+        name: K5 acceptance tests
+        when: {check: K5}
+        command: test_acceptance
+        template: workflows/steps/repo-command.yml
+      - id: k8
+        name: K8 architecture fitness
+        when: {check: K8}
+        command: architecture
+        template: workflows/steps/repo-command.yml
+      - id: k11
+        name: K11 property and fuzz tests
+        when: {check: K11}
+        command: property
+        template: workflows/steps/repo-command.yml
+      - id: k12
+        name: K12 differential tests
+        when: {check: K12}
+        command: differential
+        template: workflows/steps/repo-command.yml
+      - id: k10                              # last: mutation testing is the slowest check
+        name: K10 mutation score
+        when: {check: K10}
+        command: mutation
+        template: workflows/steps/k10-mutation.yml
 
   - id: trigger.label
     kind: ci-job
@@ -135,3 +170,26 @@ components:
     parts: {run_role: workflows/parts/run-role.yml}
     target: .github/workflows/cornerstone-$profile-schedule.yml
     eval: evals/trigger-schedule/
+
+  - id: trigger.issue-opened
+    kind: ci-job
+    trigger: ci:issue-opened
+    purpose: Start the first role of the profile on each new issue. Post its report on the issue.
+    principle: [P6, P9]
+    template: workflows/trigger-issue-opened.yml
+    parts: {run_role: workflows/parts/run-role.yml}
+    target: .github/workflows/cornerstone-$profile-issue-opened.yml
+    # Anyone can open an issue. The run job has no write token, so the action may start for them.
+    values: {allowed_non_write_users: "*"}
+    eval: evals/trigger-issue-opened/
+
+  - id: trigger.dependency-pr
+    kind: ci-job
+    trigger: ci:dependency-pr
+    purpose: Start the first role of the profile when a dependency bot opens a PR. Post its report on the PR.
+    principle: [P6, P9]
+    template: workflows/trigger-dependency-pr.yml
+    parts: {run_role: workflows/parts/run-role.yml}
+    target: .github/workflows/cornerstone-$profile-dependency-pr.yml
+    values: {allowed_bots: "dependabot[bot],renovate[bot]"}
+    eval: evals/trigger-dependency-pr/

@@ -22,7 +22,7 @@ CONFIG = Path(".cornerstone/config.yaml")
 MANIFEST = Path(".cornerstone/manifest.yaml")
 REQUIRED_FIELDS = ["framework_version", "harness", "model_profile", "profiles", "owners.default"]
 REVIEW_MONTHS = 6
-CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches"}
+CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches", "limit": "limits"}
 PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
                     "protected_json": "paths.tests and paths.checks"}
 MODEL_VALUES = {"instruction_file_max_lines"}  # template values from `defaults` in the model profile
@@ -30,6 +30,7 @@ FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "d
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 DEFAULT_PR_LINES = 600  # D4, customization.md
+BLOCKS = ["check_steps"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
 
 class RenderError(Exception):
@@ -125,12 +126,18 @@ def needed(entry: dict[str, Any], profiles: list[dict[str, Any]]) -> bool:
     """Return True if a selected profile needs the component (D24)."""
     if entry["kind"] == "role":
         return any(entry["role"] in profile["roles"] for profile in profiles)
+    return bool(profiles_that_need(entry, profiles))
+
+
+def profiles_that_need(entry: dict[str, Any], profiles: list[dict[str, Any]]) -> list[str]:
+    """Return the IDs of the profiles that match the `when` of a component or a step."""
     when = entry.get("when") or {}
     if "gate" in when:
-        return any(profile["gates"].get(when["gate"], "skip") != "skip" for profile in profiles)
+        return [profile["id"] for profile in profiles
+                if profile["gates"].get(when["gate"], "skip") != "skip"]
     if "check" in when:
-        return any(when["check"] in profile["checks"] for profile in profiles)
-    return bool(profiles)
+        return [profile["id"] for profile in profiles if when["check"] in profile["checks"]]
+    return [profile["id"] for profile in profiles]
 
 
 def size_limits(config: dict[str, Any], profiles: list[dict[str, Any]]) -> dict[str, int]:
@@ -161,13 +168,17 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     # The framework tag. The G3 workflow installs stone from it.
     values = {"model": model, "framework_version": str(config.get("framework_version", ""))}
     for key, value in (config.get("commands") or {}).items():
-        values[f"command_{key}"] = str(value)
+        if value is not None and str(value).strip():  # an empty command has no value
+            values[f"command_{key}"] = str(value)
     for key, value in (config.get("paths") or {}).items():
         # A list becomes inline code items. A single path stays plain, so a template can extend it.
         values[f"paths_{key}"] = (", ".join(f"`{item}`" for item in value)
                                   if isinstance(value, list) else str(value))
     for key, value in (config.get("branches") or {}).items():
         values[f"branch_{key}"] = str(value)
+    for key, value in (config.get("limits") or {}).items():
+        if value is not None and str(value).strip():  # an empty limit has no value
+            values[f"limit_{key}"] = str(value)
     values["paths_plans"] = one_folder(_get(config, "paths.plans"))
     values["paths_specs"] = one_folder(_get(config, "paths.specs"), "specs")
     values["paths_reports"] = one_folder(_get(config, "paths.reports"), "reports")
@@ -220,6 +231,10 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         values = {**template_values(config, model), **model_values,
                   "size_limits_json": limits_json,
                   **{name: step for name, step in steps.items() if step is not None}}
+        for block in BLOCKS:
+            values.setdefault(block, "")
+        if entry.get("steps"):
+            values["check_steps"] = render_steps(harness, entry["steps"], profiles, values, config)
         content = substitute(harness, entry["template"], values, steps, config)
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
@@ -238,10 +253,14 @@ def trigger_components(framework: Path, harness: Path, registry: list[dict[str, 
     """Return one workflow for each profile trigger that is not `command` (D31)."""
     entries = {entry["trigger"]: entry for entry in registry if "trigger" in entry}
     found = triggers.profile_triggers(profiles)
+    # A value that one entry sets is empty in the others, so each template can use it.
+    defaults = {key: "" for entry in entries.values() for key in (entry.get("values") or {})}
     components, targets = [], []
     for trigger in triggers.supported(found, set(entries)):
         entry = entries[trigger.key]
         values = template_values(config, "")
+        values.update(defaults)
+        values.update({key: str(value) for key, value in (entry.get("values") or {}).items()})
         values.update(triggers.values(trigger, found, role_models))
         text = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
         for name, part in (entry.get("parts") or {}).items():
@@ -259,6 +278,35 @@ def trigger_components(framework: Path, harness: Path, registry: list[dict[str, 
     return components
 
 
+def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict[str, Any]],
+                 values: dict[str, str], config: dict[str, Any]) -> str:
+    """Return the optional steps that a selected profile needs, as one block of lines (D29).
+
+    A step with a `command` needs that key in `commands` of the repo config. If the key has no
+    value, render skips the step and warns: the profile lists the check, but the repo cannot run it.
+    """
+    blocks = []
+    for step in steps:
+        need = profiles_that_need(step, profiles)
+        if not need:
+            continue
+        step_values = dict(values, step_name=step.get("name", step["id"]))
+        command = step.get("command")
+        if command:
+            if f"command_{command}" not in values:
+                check = (step.get("when") or {}).get("check", step["id"])
+                subject = (f"profile {need[0]} lists" if len(need) == 1
+                           else f"profiles {', '.join(need)} list")
+                print(f"warning: {subject} {check}, but {CONFIG} has no "
+                      f"commands.{command}. The G3 workflow has no {check} step. Add the "
+                      "command and render again.", file=sys.stderr)
+                continue
+            step_values["step_command"] = values[f"command_{command}"]
+        text = substitute(harness, step["template"], step_values, {}, config)
+        blocks.append("\n" + text.rstrip("\n"))
+    return "\n".join(blocks)
+
+
 def step_name(component_id: str) -> str:
     """Return the placeholder of a component's G3 step: `check.k15` gives `ci_step_check_k15`."""
     return "ci_step_" + re.sub(r"[^a-z0-9]", "_", component_id.lower())
@@ -266,11 +314,14 @@ def step_name(component_id: str) -> str:
 
 def substitute(harness: Path, template_name: str, values: dict[str, str],
                steps: dict[str, str | None], config: dict[str, Any]) -> str:
-    """Fill one template. Remove the placeholder line of each step that is not rendered."""
+    """Fill one template. Remove the line of each step that is not rendered, or empty block."""
     template = (harness / "templates" / template_name).read_text(encoding="utf-8")
     for name, step in steps.items():
         if step is None:
             template = template.replace(f"${name}\n", "").replace(f"${{{name}}}\n", "")
+    for block in BLOCKS:
+        if not values.get(block):
+            template = re.sub(rf"^\$(?:{block}|\{{{block}\}})\n", "", template, flags=re.M)
     return fill(template, template_name, values, config)
 
 
