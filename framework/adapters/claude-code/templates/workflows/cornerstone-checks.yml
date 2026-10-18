@@ -54,3 +54,4 @@ $ci_step_check_k15
 
       - name: All checks
         run: $command_all_checks
+$check_steps
