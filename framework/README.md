@@ -81,6 +81,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D18 | The plugin does not support a spec tool. Plans use the plain spec-tool adapter, and the planner role writes them. The `sdd-plan` and `sdd-build` skills are removed. The spec-tool adapter contract stays, so a repo can add a tool. Spec tools can over-process small work (dossier D5, D6). | [adapters/spec-tools.md](adapters/spec-tools.md), [adapters/contract.md](adapters/contract.md) |
 | D19 | `stone render` supports the app-slice profile. The planner role file writes only in the plans path. The protected-path hook enforces this. | [generator/design.md](generator/design.md) |
 | D20 | Check K14 is the `stone check-evidence` command, as K17 is a `stone` command. The required sections are Evidence, Decision log, Review findings, and Confidence. A section with only `None` is empty. Write `None` and the reason. | [checks.md](checks.md), [generator/design.md](generator/design.md) |
+| D21 | The G3 workflow that `stone render` writes runs K14 on the PR body in `--mode warn`. It installs stone in a venv from the tag `v<framework_version>`. The step is in each render, because each supported profile lists K14. | [generator/design.md](generator/design.md), [customization.md](customization.md) |
 
 ## Open questions
 
@@ -93,6 +94,7 @@ Do these items in order. Each item is one PR or more.
 1. On 2026-10-31, change K17 from `--mode warn` to `--mode block` in `.github/workflows/stone.yml`.
    That date is 2 weeks after the K17 merge.
    Two weeks after the K14 step is in that workflow, change K14 to `--mode block` too.
+   Two weeks after stone 0.6 merges, change K14 to `--mode block` in the G3 workflow template.
 2. Done in stone 0.2: `stone render` for the first harness adapter and the single-ticket profile.
    It writes the role files, the protected-path hook and check K6, a CI workflow, and the manifest.
 3. Update the plugin skills from the
@@ -111,6 +113,8 @@ Do these items in order. Each item is one PR or more.
      (resolution 1 in the dossier).
    - 3c. Done in stone 0.5: check K14 (PR evidence) is `stone check-evidence` (D20). Review it
      for false positives by 2027-04-17.
+   - 3d. Done in stone 0.6: the G3 workflow that `stone render` writes runs K14 on the PR body
+     (D21). Add a profile gate when render supports a profile without K14.
 4. Write the evals for the first model profile. Set its status to `active` when they pass.
 5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
    of Q4 2026.

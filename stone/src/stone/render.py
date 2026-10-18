@@ -26,6 +26,7 @@ CONFIG_SECTION = {"command": "commands", "paths": "paths", "branch": "branches"}
 PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
                     "protected_json": "paths.tests and paths.checks"}
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
+K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 
 
 class RenderError(Exception):
@@ -89,6 +90,17 @@ def load_config(root: Path, framework: Path) -> dict[str, Any]:
     return config
 
 
+def warn_old_framework(version: Any) -> None:
+    """Warn if the framework tag has no `stone check-evidence`. The G3 workflow installs it."""
+    try:
+        parts = tuple(int(part) for part in str(version).split("."))
+    except ValueError:
+        return
+    if parts < K14_SINCE:
+        print(f"warning: framework_version {version} has no 'stone check-evidence'. The K14 step "
+              "in the G3 workflow fails. Set framework_version to 0.5.0 or later.", file=sys.stderr)
+
+
 def load_profiles(framework: Path, names: list[str]) -> list[dict[str, Any]]:
     profiles = []
     for name in names:
@@ -112,7 +124,8 @@ def plans_folder(value: Any) -> str:
 
 def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     """Return the repo facts that templates can use. TODO values are left out on purpose."""
-    values = {"model": model}
+    # The framework tag. The G3 workflow installs stone from it.
+    values = {"model": model, "framework_version": str(config.get("framework_version", ""))}
     for key, value in (config.get("commands") or {}).items():
         values[f"command_{key}"] = str(value)
     for key, value in (config.get("paths") or {}).items():
@@ -257,6 +270,7 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
     framework = framework or root / "framework"
     today = today or dt.date.today()
     config = load_config(root, framework)
+    warn_old_framework(config["framework_version"])
     components = build_components(framework, config)
     manifest = load_manifest(root)
     old_entries = {entry["id"]: entry for entry in manifest.get("components", [])}
