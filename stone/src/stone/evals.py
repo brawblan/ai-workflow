@@ -74,9 +74,20 @@ def load_scenarios(folder: Path) -> dict[str, Any]:
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as error:
         raise EvalError(f"{path}: the YAML is not valid: {error}") from None
+    if not isinstance(data, dict):
+        raise EvalError(f"{path}: the file must be a mapping with 'component', 'role', and "
+                        "'scenarios'. Fix the file.")
     problems = [f"no '{key}'" for key in ("component", "role", "scenarios") if not data.get(key)]
+    if data.get("scenarios") and not isinstance(data["scenarios"], list):
+        problems.append("'scenarios' must be a list")
     seen: set[str] = set()
     for number, scenario in enumerate(data.get("scenarios") or [], 1):
+        if not isinstance(scenario, dict):
+            problems.append(f"#{number}: a scenario must be a mapping")
+            continue
+        if not isinstance(scenario.get("expect") or [], list):
+            problems.append(f"{scenario.get('id') or f'#{number}'}: 'expect' must be a list")
+            continue
         sid = scenario.get("id") or f"#{number}"
         problems += [f"{sid}: no '{key}'" for key in ("id", "fixture", "prompt", "expect")
                      if not scenario.get(key)]
@@ -119,9 +130,14 @@ def find_component(framework: Path, harness: str, component_id: str) -> dict[str
 def load_run_config(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise EvalError(f"{path}: no file. The harness adapter must give the eval command.")
-    data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as error:
+        raise EvalError(f"{path}: the YAML is not valid: {error}") from None
+    if not isinstance(data, dict) or not isinstance(data.get("run"), dict):
+        raise EvalError(f"{path}: the file must be a mapping with 'run.with' and 'run.without'.")
     for variant in VARIANTS:
-        if not isinstance((data.get("run") or {}).get(variant), list):
+        if not isinstance(data["run"].get(variant), list):
             raise EvalError(f"{path}: 'run.{variant}' must be a list of arguments.")
     return data
 
@@ -194,7 +210,11 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
              trial: int, opts: dict[str, Any]) -> Run:
     run = Run(scenario["id"], variant, trial)
     config = opts["run_config"]
-    workspace = prepare(folder, scenario, opts["framework"], opts["role_file"], variant)
+    try:
+        workspace = prepare(folder, scenario, opts["framework"], opts["role_file"], variant)
+    except (EvalError, render.RenderError, OSError) as error:
+        run.error = f"the setup failed: {error}"  # the harness does not start
+        return run
     prompt = "\n\n".join(part for part in (data.get("task"), scenario["prompt"]) if part)
     values = {"role": data["role"], "model": opts["model"], "budget": opts["budget"],
               "prompt": prompt, "tools": (config.get("tools") or {}).get(data["role"], [])}
