@@ -1039,6 +1039,59 @@ class SpecApplyTest(unittest.TestCase):
         files = specs.render_specs(specs.replay(specs.applied(specs.load_deltas(self.root))))
         return files["export.md"]
 
+    # Spec path forms: a list of one folder is the same as the string. Another form is an error.
+
+    BAD_PATHS = ("[docs/a/, docs/b/]", "3", "{a: b}")
+
+    def config_paths(self, plans: str, specs_value: str) -> None:
+        self.write(".cornerstone/config.yaml",
+                   f"paths:\n  plans: {plans}\n  specs: {specs_value}\n")
+
+    def test_paths_list_of_one_folder_works_for_apply(self) -> None:
+        self.config_paths("[work/plans/]", "[product/specs/]")
+        self.delta("p1", added("export.R1"), folder="work/plans")
+        changed = self.apply("p1")
+        self.assertEqual(sorted(changed), ["product/specs/export.md", "work/plans/p1.spec.md"])
+
+    def test_paths_list_of_one_folder_works_for_sync(self) -> None:
+        self.config_paths("[work/plans/]", "[product/specs/]")
+        self.delta("p1", added("export.R1"), front="apply_order: 5", folder="work/plans")
+        changed = self.sync()
+        self.assertEqual(sorted(changed), ["product/specs/export.md", "work/plans/p1.spec.md"])
+
+    def test_paths_list_of_one_folder_works_for_k19(self) -> None:
+        self.config_paths("[work/plans/]", "[product/specs/]")
+        self.delta("p1", added("export.R1"), folder="work/plans")
+        self.apply("p1")
+        self.assertEqual(self.k19(), [])
+        self.write("product/specs/export.md", "A hand edit.\n")
+        self.assertEqual(self.k19_paths(), ["product/specs/export.md"])
+        _, output = self.run_stone_check()
+        self.assertIn("product/specs/export.md:1: warning: K19:", output)
+
+    def test_paths_bad_form_stops_apply_and_sync_and_writes_nothing(self) -> None:
+        for key in ("specs", "plans"):
+            for value in self.BAD_PATHS:
+                with self.subTest(key=key, value=value):
+                    self.write(".cornerstone/config.yaml", f"paths:\n  {key}: {value}\n")
+                    self.delta("p1", added("export.R1"), front="apply_order: 2")
+                    self.delta("p2", added("login.R1"))
+                    self.assert_refused("p2", f"paths.{key}")
+                    self.assert_sync_refused(f"paths.{key}")
+                    self.assertFalse((self.root / SPECS).exists())
+
+    def test_paths_bad_form_is_a_k19_warning_with_no_traceback(self) -> None:
+        for key in ("specs", "plans"):
+            for value in self.BAD_PATHS:
+                with self.subTest(key=key, value=value):
+                    self.write(".cornerstone/config.yaml", f"paths:\n  {key}: {value}\n")
+                    findings = self.k19()
+                    self.assert_all_warnings(findings)
+                    self.assertTrue(any(f"paths.{key}" in f.message for f in findings), findings)
+                    _, output = self.run_stone_check()
+                    self.assertIn("warning: K19:", output)
+                    self.assertIn(f"paths.{key}", output)
+
 
 if __name__ == "__main__":
     unittest.main()

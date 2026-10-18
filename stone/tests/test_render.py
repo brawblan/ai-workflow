@@ -519,6 +519,24 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(self.run_hook("docs/plans/T-1.md", "planner"), 0)
         self.assertEqual(self.run_hook("docs/plans/specs/export.md", "planner"), 2)
 
+    def hook_message(self, path: str, role: str) -> str:
+        event = json.dumps({"tool_input": {"file_path": str(self.root / path)}})
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(self.root), "STONE_ROLE": role}
+        run = subprocess.run([sys.executable, ".cornerstone/hooks/protect-paths.py"],
+                             cwd=self.root, input=event, env=env, capture_output=True, text=True)
+        self.assertEqual(run.returncode, 2)
+        return run.stderr
+
+    def test_hook_tells_the_planner_which_rule_blocks(self) -> None:
+        self.specs_path("docs/plans/specs/")
+        self.render()
+        inside = self.hook_message("docs/plans/specs/export.md", "planner")
+        self.assertIn("docs/plans/specs/export.md is a protected path", inside)
+        self.assertNotIn("is not a plan path", inside)
+        outside = self.hook_message("src/a.py", "planner")
+        self.assertIn("src/a.py is not a plan path", outside)
+        self.assertNotIn("protected path", outside)
+
     def test_k6_fails_on_an_implementer_commit_to_the_specs_path(self) -> None:
         self.specs_path(None)
         self.render()
