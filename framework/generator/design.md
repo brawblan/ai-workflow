@@ -27,14 +27,14 @@ repo config.
 | `stone` CLI (Python 3) | Read the inputs, validate them, render the templates, write the files and the manifest. |
 | `cornerstone-setup` skill | The entry skill. Run `project-setup` as the Shape step (constitution and `AGENTS.md`). Then survey the repo, interview the human for missing facts, write `.cornerstone/config.yaml`, and run the CLI. `project-setup` stays usable alone. |
 | Templates | Text files with `$name` placeholders in `framework/adapters/<adapter>/templates/` (D12). |
-| Component list | `framework/adapters/<adapter>/components.yaml`: the id, kind, purpose, principle, eval, template, and target path of each component. |
+| Component list | `framework/adapters/<adapter>/components.yaml`: the id, kind, purpose, principle, eval, template, and target path of each component. A component can have `when` (D24) and `ci_step`, a step that render adds to the G3 workflow (D28). |
 
 ## Commands
 
 | Command | Does |
 | --- | --- |
 | `stone init` | Make `.cornerstone/config.yaml` with `TODO(<owner>)` values. |
-| `stone render` | Write all files from the inputs. Safe to run again. **Built in v0.2 for the single-ticket profile: role files, the protected-path hook, K6, the G3 CI workflow, and the manifest. Version 0.4 adds the app-slice profile and the planner role. Version 0.7 adds K14 to the G3 workflow (D23). Version 0.8 derives profile support from the role files of the adapter, and filters components with `when` (D24).** No profile overrides yet. |
+| `stone render` | Write all files from the inputs. Safe to run again. **Built in v0.2 for the single-ticket profile: role files, the protected-path hook, K6, the G3 CI workflow, and the manifest. Version 0.4 adds the app-slice profile and the planner role. Version 0.7 adds K14 to the G3 workflow (D23). Version 0.8 derives profile support from the role files of the adapter, and filters components with `when` (D24). K15 and its G3 step render for a profile with K15 (D28).** No profile overrides yet. |
 | `stone spec apply <plan>` | Apply the spec delta of one plan, and write the specs (D21). **Built in v0.5.** |
 | `stone spec sync` | Renumber the applied deltas and write the specs again, after a merge (D22). **Built in v0.6.** |
 | `stone check` | Validate the config, the profiles, and the manifest. Report drift between files and templates. **Built in v0.1 (no manifest or drift yet).** |

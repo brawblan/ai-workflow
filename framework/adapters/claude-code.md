@@ -14,6 +14,7 @@ each component that `stone render` writes.
 | --- | --- | --- | --- |
 | Instruction file (repo) | `AGENTS.md`, and `CLAUDE.md` with one line: `@AGENTS.md` | full | Same file for all harnesses that read `AGENTS.md`. |
 | Instruction file (user) | `~/.claude/CLAUDE.md` | full | This repo links it from `global/`. |
+| Instruction size (K15) | `.cornerstone/checks/instruction_size.py` counts the lines of `AGENTS.md` | full | `CLAUDE.md` has one line, so it does not count. |
 | Skill | `.claude/skills/<name>/SKILL.md`, or a skill in the `workflow` plugin | full | Use `disable-model-invocation: true` for skills with side effects. |
 | Role | `.claude/agents/<role>.md` with `name`, `description`, `tools`, `model` | partial | Tools can be limited. Paths cannot be limited by the role file. See "Protected paths". |
 | Fresh session for each role | A separate `claude -p` run for each role | full | A sub-agent also has a fresh context, but the lead agent starts it. Use separate runs where P2 applies. |
