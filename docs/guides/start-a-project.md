@@ -7,7 +7,7 @@ Use this guide when you have an empty folder and an idea.
 | Profile | [full-project](../../framework/profiles/full-project.md) |
 | Default mode | hybrid: you own the design, an agent helps |
 | Gates | G1 (foundation), G2 (plan and backlog), G3, G4 |
-| Status | Partial. `stone render` writes the shaper, planner, and reviewer roles for full-project, and check K15. K15 warns for 2 weeks, then blocks. |
+| Status | Works today. `stone render` writes the shaper, planner, and reviewer roles, and checks K6, K7, K14, and K15. |
 
 The full-project profile does not build features. It makes the foundation and the backlog. Each
 feature then runs as its own [feature](build-a-feature.md) or [small change](small-change.md).
@@ -98,6 +98,23 @@ Commit with the trailers `Role: implementer` and `Actor: human`. See
 Follow [Add Cornerstone to a repo](add-to-a-repo.md). The repo now has the commands and paths that
 `stone render` needs.
 
+Put `full-project` in `profiles` of `.cornerstone/config.yaml`. This profile has no label trigger,
+so render writes no trigger workflow. Render writes these files:
+
+| Output | Has |
+| --- | --- |
+| `.claude/agents/` | The shaper, planner, and reviewer roles |
+| `.cornerstone/checks/` | K6 (protected paths), K7 (change size), and K15 (instruction size) |
+| `.github/workflows/cornerstone-checks.yml` | The G3 job: K6, K7, K14, K15, and `commands.all_checks` |
+
+The profile also lists K4, K5, and K8. Render adds a step for each one that has a command in the
+config: `test_integration`, `test_acceptance`, and `architecture`. This is how the architecture rules
+of the plan become checks. If a command has no value, render skips the step and warns.
+K15 reads `instruction_file_max_lines` from the model profile. K7 uses 600 changed lines.
+
+After the render, use the roles for later work. Use `claude --agent shaper` to shape each backlog
+issue. Use `STONE_ROLE=planner claude --agent planner` to change the plan.
+
 ### 6. Turn on the gates
 
 In the GitHub settings of the repo:
@@ -108,16 +125,9 @@ In the GitHub settings of the repo:
 Start each backlog item with [Build a feature](build-a-feature.md) or
 [Make a small change](small-change.md).
 
-## When the profile ships
+## Not built yet
 
-`stone render` will write the shaper and planner roles for full-project. The flow changes:
-
-| Step | Today | Target |
-| --- | --- | --- |
-| Foundation | `project-setup` skill | The shaper role interviews you. Same files. |
-| Plan | A prompt in a new session | The planner role, in a fresh session |
-| Architecture rules | Rules that you add to CI by hand | Fitness checks (K8) that the generator wires |
-| Instruction file size | K15 warns if `AGENTS.md` is over the line limit | K15 fails if `AGENTS.md` is over the line limit |
-| Personas file | K18 warns | K18 fails on a format error |
-
-The order stays the same. The foundation comes first, and the render comes after the skeleton.
+- The foundation still comes from `/workflow:project-setup`. The shaper role shapes tickets, not the
+  constitution files.
+- K15 and the K4, K5, and K8 steps warn for 2 weeks after render adds them. Then they block.
+- K18 gives a warning, not an error, for a format error in the personas file.

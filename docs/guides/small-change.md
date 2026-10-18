@@ -8,7 +8,7 @@ two sentences.
 | Profile | [single-ticket](../../framework/profiles/single-ticket.md) |
 | Default mode | agent-centric: ticket in, PR out |
 | Gates | G1 (a check on the ticket fields), G3, G4 |
-| Status | Works today |
+| Status | Works today. You start each role by hand. |
 
 Do not use this guide if the change crosses several layers or needs a design decision. Use
 [Build a feature](build-a-feature.md). If you do not know the cause of a defect, use
@@ -50,6 +50,19 @@ Personas: farmer
 Write `Personas: none` if the change does not affect users. If a field is missing, start the shaper
 (`claude --agent shaper`) with the issue number. It asks you for the missing fields.
 
+Add the label `agent-ready` when the ticket is ready. That label is G1.
+
+`stone render` also writes
+the workflow `cornerstone-single-ticket-label.yml`. The label then starts the shaper in CI. The
+shaper has read-only tools. It checks the ticket against the Definition of Ready and posts a report
+on the issue. It does not start another role.
+
+Before the first run, add the repository secret
+`CLAUDE_CODE_OAUTH_TOKEN` and the label. See the
+[adapter](../../framework/adapters/claude-code.md#trigger-workflows).
+If the repo selects more than one profile with the label `agent-ready`, add the label
+`profile:<id>` before it.
+
 ### 2. Run the roles
 
 Follow [Run the roles](run-the-roles.md). Each step is a new session.
@@ -66,6 +79,20 @@ Follow [Run the roles](run-the-roles.md). Each step is a new session.
 Run `/workflow:ticket-delivery`. It maps each acceptance criterion to its evidence and opens the PR.
 A human approves the PR.
 
+The PR body needs these parts:
+
+- The line `Profile: single-ticket`. Check K7 reads it to find the size limit (600 changed lines).
+- The sections Evidence, Decision log, Review findings, and Confidence. Check K14 tests them.
+
+To test the body before you push, run K14 on it:
+
+```bash
+gh pr view <number> --json body --jq .body | stone check-evidence -
+```
+
+The G3 workflow runs K6, K7, and K14. Make the job `cornerstone-checks` a required status check.
+K7 and K14 run in `--mode warn` for 2 weeks after render adds them. Then they block.
+
 ## Change the mode
 
 | If you want to | Do this |
@@ -77,10 +104,8 @@ A human approves the PR.
 The gates do not change with the mode. The tester is always a different session from the
 implementer.
 
-## When the profile ships
-
-The single-ticket profile works today. The next parts in the framework design are:
+## Not built yet
 
 - A run script that starts each role in order, for agent-centric mode on your computer.
-- A CI workflow for each role, started by the `agent-ready` label.
-- Check K14, which fails a PR with an empty evidence section.
+- A CI workflow that runs the implementer, the tester, and the reviewer. The label workflow starts
+  the first role only.

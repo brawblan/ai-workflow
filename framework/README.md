@@ -152,7 +152,8 @@ Do these items in order. Each item is one PR or more.
    - 6g. Trigger workflows: `label:<name>`, `schedule:<cron>`, and `ci:<event>`. Untrusted event
      text goes to a step only through `env`. The adapter names the secret. Done: the label, schedule,
      `ci:issue-opened`, and `ci:dependency-pr` workflows (D31).
-   - 6h. Update the guides from "When the profile ships" to "Today" for each profile.
+   - 6h. Done: the guides for single-ticket, debugging, app-slice, and full-project have "Today" and
+     "Not built yet" parts. The other 6 profiles have no guide yet.
 
    Exit criteria for version 1:
 
