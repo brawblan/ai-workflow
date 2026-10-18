@@ -1,0 +1,3 @@
+      # K15 warns for 2 weeks after this step is first rendered. Then the framework changes it to block.
+      - name: K15 instruction size
+        run: python3 .cornerstone/checks/instruction_size.py --mode warn --format github
