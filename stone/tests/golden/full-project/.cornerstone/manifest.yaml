@@ -30,9 +30,24 @@ components:
   files:
   - .cornerstone/checks/protected_paths.py
   hash: fd799150f510a8a1a64c68bd1cfc20e2ee3af7eb6f5f71a134b9d63dc8ec601c
+- id: check.k7
+  kind: check
+  purpose: K7. Fail if the diff is over the size limit of the PR profile and has no
+    waiver.
+  principle:
+  - P10
+  source: framework
+  owner: octocat
+  eval: evals/check-k7/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .cornerstone/checks/change_size.py
+  hash: e100dbc8d4dbc0fc206abfffd40bf5abaec129ed66c49ce4c6e5f051bcd48998
 - id: ci-job.checks
   kind: ci-job
-  purpose: G3. Run K6, K14, and the repo checks on each pull request.
+  purpose: G3. Run K6, K7, K14, and the repo checks on each pull request.
   principle:
   - P1
   - P6
@@ -44,7 +59,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .github/workflows/cornerstone-checks.yml
-  hash: 664dc7324fa62649e4bdc45de80f55c56aeb4546b3347dd60315bace5dd63a5b
+  hash: 992ca7e90703cb29bb5041e982167f42929e133205bb04e23a2a17425dd3430d
 - id: hook.protect-paths
   kind: hook
   purpose: Block an edit to a path that the current role must not change.

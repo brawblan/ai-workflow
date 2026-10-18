@@ -500,6 +500,10 @@ class K15MissingLimitTest(FrameworkCopy):
         self.set_limit(None, remove=True)
         for names in (["single-ticket"], ["bug-triage"], ["app-slice", "debugging"]):
             with self.subTest(profiles=names):
+                # A new repo for each set. Files from an earlier set (for example the K7
+                # limit of another profile) are drift, which is not what this test is about.
+                self.root = Path(self.folder.name) / ("repo-" + "-".join(names))
+                (self.root / ".cornerstone").mkdir(parents=True)
                 self.select(names)
                 result = self.render()
                 self.assertEqual(result.exit_code, 0)
