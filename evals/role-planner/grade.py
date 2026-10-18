@@ -2,7 +2,7 @@
 
 Usage: grade.py <name> --workspace <path> --args <json>. The last line of the output is JSON:
 {"pass": true|false, "detail": "..."}. The environment variable STONE_EVAL_REPORT has the final
-text of the run (D33). No grader changes the workspace.
+text of the run (D35). No grader changes the workspace.
 """
 
 from __future__ import annotations
