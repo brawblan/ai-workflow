@@ -37,7 +37,7 @@ repo config.
 | `stone render` | Write all files from the inputs. Safe to run again. **Built in v0.2 for the single-ticket profile: role files, the protected-path hook, K6, the G3 CI workflow, and the manifest. Version 0.4 adds the app-slice profile and the planner role. Version 0.7 adds K14 to the G3 workflow (D23). Version 0.8 derives profile support from the role files of the adapter, and filters components with `when` (D24). Item 6b adds check K7 to the G3 workflow (D27). K15 and its G3 step render for a profile with K15 (D28). Item 6d adds the steps for the "by profile" checks K4, K5, K8, K10, K11, and K12 (D29). Item 6g adds the trigger workflows (D31).** No profile overrides yet. |
 | `stone spec apply <plan>` | Apply the spec delta of one plan, and write the specs (D21). **Built in v0.5.** |
 | `stone spec sync` | Renumber the applied deltas and write the specs again, after a merge (D22). **Built in v0.6.** |
-| `stone check` | Validate the config, the profiles, and the manifest. Report drift between files and templates. **Built in v0.1 (no manifest or drift yet).** |
+| `stone check` | Validate the config, the profiles, and the manifest. Report drift between files and templates. **Built in v0.1. It tests the eval plan and the review date of each component (D43). No drift test yet.** |
 | `stone check-writing` | Run K17 on files, on the changed lines since a base, or on a PR body. **Built in v0.1.** |
 | `stone check-evidence` | Run K14 on a PR body: fail if a required section is missing or empty. **Built in v0.5.** |
 | `stone review` | List the components past `review_by`. Exit code 1 if there are any. |

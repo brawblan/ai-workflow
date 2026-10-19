@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import re
 from pathlib import Path
 from typing import Any
@@ -27,6 +28,7 @@ REQUIRED_KEYS = ["id", "name", "version", "purpose", "triggers", "stages", "role
 MATRIX_VALUE = {"—": "skip", "yes": "required", "if needed": "if-needed"}
 VENDOR_NAMES = ["claude", "codex", "cursor", "copilot", "gemini", "openspec", "kiro",
                 "anthropic", "openai"]
+EVAL_OPTIONAL_KINDS = {"check"}  # lifecycle.md: a check is its own test, so its eval can be ""
 
 
 def _first_column(rows: list[list[str]]) -> list[str]:
@@ -182,6 +184,53 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     return findings
 
 
+def _is_date(value: Any) -> bool:
+    if isinstance(value, dt.date):
+        return True
+    try:
+        dt.date.fromisoformat(str(value))
+    except ValueError:
+        return False
+    return True
+
+
+def component_problems(entry: dict[str, Any], needs_review_by: bool) -> list[str]:
+    """P5 (D43): name each missing eval plan or review date of one component entry."""
+    problems = []
+    if "eval" not in entry:
+        problems.append("has no 'eval' key (P5). Add the eval folder, or \"\" for a check.")
+    elif not str(entry["eval"] or "").strip() and entry.get("kind") not in EVAL_OPTIONAL_KINDS:
+        problems.append("has no eval plan (P5). Set 'eval' to its eval folder, for example "
+                        f"evals/{str(entry.get('id', '')).replace('.', '-')}/.")
+    if needs_review_by and not _is_date(entry.get("review_by")):
+        problems.append("has no valid 'review_by' date (P5). Set it to YYYY-MM-DD.")
+    return problems
+
+
+def check_components(root: Path, framework: Path) -> list[Finding]:
+    """P5 (D43): test the adapter component lists and, if present, the repo manifest.
+
+    Each component needs an eval plan (empty only for a check). Each manifest entry also needs a
+    review date. Render sets `review_by`, so the component lists do not have it.
+    """
+    paths = [(path, False) for path in sorted((framework / "adapters").glob("*/components.yaml"))]
+    manifest = root / ".cornerstone" / "manifest.yaml"
+    if manifest.exists():
+        paths.append((manifest, True))
+    findings: list[Finding] = []
+    for path, needs_review_by in paths:
+        text = path.read_text(encoding="utf-8")
+        name = str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
+        for entry in (yaml.safe_load(text) or {}).get("components") or []:
+            component_id = entry.get("id", "?")
+            match = re.search(rf"^\s*- id: {re.escape(str(component_id))}\s*$", text, re.M)
+            line = text.count("\n", 0, match.start()) + 1 if match else 1
+            for problem in component_problems(entry, needs_review_by):
+                findings.append(Finding(name, line, CHECK,
+                                        f"The component '{component_id}' {problem}"))
+    return findings
+
+
 def run(root: Path, framework: Path | None = None) -> list[Finding]:
     """Run all framework checks. `framework` defaults to `<root>/framework`."""
     framework = framework or root / "framework"
@@ -191,4 +240,5 @@ def run(root: Path, framework: Path | None = None) -> list[Finding]:
     docs = [p for p in sorted(root.rglob("*.md"))
             if ".git" not in p.parts and "node_modules" not in p.parts]
     return (check_profiles(framework) + check_links(root, docs) + check_neutral(framework)
-            + check_config(root, framework) + personas_check.run(root) + specs.check(root))
+            + check_config(root, framework) + check_components(root, framework)
+            + personas_check.run(root) + specs.check(root))
