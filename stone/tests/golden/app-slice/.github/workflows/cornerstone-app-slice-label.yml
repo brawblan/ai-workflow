@@ -63,23 +63,12 @@ jobs:
             Write your result as the `report` field. A later job posts it.
 
             Profile steps:
-            1. Run the shaper with the human until the ticket meets the Definition of Ready (G1). The ticket
-               names the personas that the slice serves.
-            2. Start the planner in a fresh session. It writes the plan artifact and the progress file. The
-               plan maps each acceptance criterion to a job story. If the slice changes a behavior, the
-               planner also writes the spec delta (see [Specs](../workflow-model.md#specs)).
-            3. The progress file lists each task with its acceptance test steps. Each task starts with
-               `passes: false`.
-            4. A human reads the plan and approves it (G2). The human edits the plan, not the code.
-            5. For each task in the progress file:
-               1. Start the implementer in a fresh session. It does one task and updates the decision log.
-               2. Start the tester in a fresh session. It writes the acceptance tests from the job stories, and
-                  the integration tests for the task.
-               3. Run the checks (G3). If they pass, set `passes: true` for the task.
-            6. Start the reviewer in a fresh session. It compares the diff with the plan and reports scope drift.
-            7. Run `stone spec apply <id>` if the plan has a spec delta. Commit its output alone, with
-               `Role: generator`. Open one PR for each group of tasks that stays under the size limit.
-            8. A human approves each PR (G4).
+            The label asks for a readiness check. No human is in this job, so nobody can answer a question.
+            1. Read the ticket in the event data.
+            2. Check the ticket against the Definition of Ready fields of your role.
+            3. Do not interview anyone. Do not ask a question. Do not start another role.
+            4. In the `report`, list each missing field, one on each line.
+            5. If no field is missing, write in the `report` that the ticket is ready.
           claude_args: >-
             --agent shaper
             --model claude-opus-5-5
