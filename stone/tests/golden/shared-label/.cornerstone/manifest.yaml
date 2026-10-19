@@ -1,0 +1,181 @@
+framework_version: 0.8.0
+components:
+- id: check.k6
+  kind: check
+  purpose: K6. Fail if an implementer commit changes a protected path.
+  principle:
+  - P2
+  - P6
+  source: framework
+  owner: octocat
+  eval: ''
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .cornerstone/checks/protected_paths.py
+  hash: fd799150f510a8a1a64c68bd1cfc20e2ee3af7eb6f5f71a134b9d63dc8ec601c
+- id: check.k7
+  kind: check
+  purpose: K7. Fail if the diff is over the size limit of the PR profile and has no
+    waiver.
+  principle:
+  - P10
+  source: framework
+  owner: octocat
+  eval: evals/check-k7/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .cornerstone/checks/change_size.py
+  hash: b2c92f8371e1cf45166da259f8789320b13fc5b0b6c553d30fc27963bfc61be8
+- id: ci-job.checks
+  kind: ci-job
+  purpose: G3. Run K6, K7, K14, and the repo checks on each pull request.
+  principle:
+  - P1
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/ci-job-checks/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .github/workflows/cornerstone-checks.yml
+  hash: 2554692f15bd73c40affe4c75814f235065182f6feecb0b23a148b1ab229d1ac
+- id: hook.protect-paths
+  kind: hook
+  purpose: Block an edit to a path that the current role must not change.
+  principle:
+  - P2
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .cornerstone/hooks/protect-paths.py
+  hash: 1cc8125cf623047cb180806f1dc56caa0fea3998b18a5deb7598deb21c8050e1
+- id: hook.settings
+  kind: hook
+  purpose: Register the protected-path hook in the harness settings. Other keys stay
+    as they are.
+  principle:
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/settings.json
+  hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+- id: role.implementer
+  kind: role
+  purpose: Change the code to meet the ticket. Write the decision log.
+  principle:
+  - P2
+  - P8
+  source: framework
+  owner: octocat
+  eval: evals/role-implementer/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/implementer.md
+  hash: f7bb2597b71cde11384f5baf00889aab4e81fc584a0890e72f2f75e87a0c5514
+- id: role.investigator
+  kind: role
+  purpose: Read, run, and report. Write only in the reports path, or anywhere on a
+    spike branch.
+  principle:
+  - P2
+  - P11
+  source: framework
+  owner: octocat
+  eval: evals/role-investigator/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/investigator.md
+  hash: 5bb2f5630dcf014f847a63f02810bf526a6be0f4c7c047fe299270a314567f27
+- id: role.reviewer
+  kind: role
+  purpose: Find defects and scope drift in a fresh session.
+  principle:
+  - P2
+  - P11
+  source: framework
+  owner: octocat
+  eval: evals/role-reviewer/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/reviewer.md
+  hash: f8197133228034ca5d404252068295ef03b6ca9bfbdb4f091f05dbb8e219195b
+- id: role.shaper
+  kind: role
+  purpose: Interview the human until the ticket meets the Definition of Ready.
+  principle:
+  - P3
+  source: framework
+  owner: octocat
+  eval: evals/role-shaper/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/shaper.md
+  hash: 75e06e816eaa3225b353e5e850b30a37d2a1ee53b9d0b64e0e8bba7d4394c2a5
+- id: role.tester
+  kind: role
+  purpose: Write independent tests from the ticket and the diff.
+  principle:
+  - P2
+  source: framework
+  owner: octocat
+  eval: evals/role-tester/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .claude/agents/tester.md
+  hash: acc8a24d3af04e92bcdd9686f0f96cd09727fec5e2875cf717d26e2678ecb6f9
+- id: trigger.label.debugging
+  kind: ci-job
+  purpose: Start the first role of the profile when a human adds the trigger label
+    to an issue.
+  principle: &id001
+  - P6
+  - P9
+  source: framework
+  owner: octocat
+  eval: evals/trigger-label/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .github/workflows/cornerstone-debugging-label.yml
+  hash: e11e49fda1cf497b63030a03913b73c44e0e3e079160d93dd5dc32e8f6dfbad6
+- id: trigger.label.single-ticket
+  kind: ci-job
+  purpose: Start the first role of the profile when a human adds the trigger label
+    to an issue.
+  principle: *id001
+  source: framework
+  owner: octocat
+  eval: evals/trigger-label/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .github/workflows/cornerstone-single-ticket-label.yml
+  hash: 66948f9bc7bc47d819a15c85a98051c211b2581156cee43c760ad772a78dbd85
