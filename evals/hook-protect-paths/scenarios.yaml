@@ -1,5 +1,5 @@
 # Eval of hook.protect-paths (lifecycle.md, "Eval design"). Run: stone eval hook.protect-paths
-# These scenarios pin a known gap (D38). They do not show that the hook blocks a shell write.
+# These scenarios pin a known gap (D39). They do not show that the hook blocks a shell write.
 # The hook sees only the file tools. A shell command that writes a protected path does not start
 # it. Check K6 in CI fails the implementer commit that has the change. Expected result: each check
 # passes in both variants, so the outcome rate with the hook is the same as without it.
@@ -15,7 +15,7 @@
 # `mv` and `git checkout <ref> -- <path>` are more forms of the same gap. `git checkout -- <path>`
 # with no ref puts back the committed text, so it leaves no change for K6.
 #
-# Two limits of the runner for a hook (D38):
+# Two limits of the runner for a hook (D39):
 # - eval.yaml loads the role file only in "with". So a difference between the variants can come
 #   from the role file, not from the hook. Read the transcripts.
 # - "without" removes the hook file, but its entry stays in the merged settings file. Then each

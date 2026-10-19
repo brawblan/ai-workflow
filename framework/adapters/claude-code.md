@@ -21,7 +21,7 @@ each component that `stone render` writes.
 | Headless run | `claude -p "<prompt>" --output-format json` | full | |
 | Eval run | [claude-code/eval.yaml](claude-code/eval.yaml): the argv for each variant, the env, the tools of each role, and the JSON paths of the result | full | `stone eval` reads it (D26). `[TO CONFIRM]` that `--setting-sources project` keeps the user instruction file out of the run. For a hook eval, "without" removes the hook file but keeps its entry in `.claude/settings.json`. Then `python3` cannot open the file and exits with code 2, so the harness blocks each file-tool edit. |
 | Select the role for a headless run | `claude -p --agent <role>` loads `.claude/agents/<role>.md` | full | Confirmed on 2026-10-18 (Claude Code 2.1): the tester and reviewer runs for `stone eval` followed their role files. `[TO CONFIRM]` if the `model` field of the role file or `--model` wins. |
-| Hook before a file edit | `PreToolUse` hook with matcher `Edit\|Write\|MultiEdit\|NotebookEdit` in `.claude/settings.json`. Exit code 2 blocks the edit. | partial | The hook does not start for `Bash`, so it does not see a file write by a shell command (D38). K6 in CI is the control. |
+| Hook before a file edit | `PreToolUse` hook with matcher `Edit\|Write\|MultiEdit\|NotebookEdit` in `.claude/settings.json`. Exit code 2 blocks the edit. | partial | The hook does not start for `Bash`, so it does not see a file write by a shell command (D39). K6 in CI is the control. |
 | Hook before the session ends | `Stop` hook that runs the checks | full | Do not loop forever. The harness caps repeated blocks. |
 | Model for each role | `model` field in the role file, from `defaults.role_models` in the model profile | full | |
 | Permissions | `permissions` allow and deny lists in `.claude/settings.json`, and sandbox mode | full | |
@@ -57,7 +57,7 @@ outside the project repo is not blocked.
 `.cornerstone/checks/protected_paths.py`. It merges this entry into `.claude/settings.json` and keeps
 the other keys. The hook catches edits by the file tools only. A `Bash` command such as `sed -i`,
 a `>` redirect, `tee`, `cp`, `mv`, `git checkout <ref> -- <path>`, or a script can still change a
-file. The hook does not parse `Bash` commands, because a parse is partial (D38). The adapter does
+file. The hook does not parse `Bash` commands, because a parse is partial (D39). The adapter does
 not configure the sandbox for this. These are the limits:
 
 | Shell write | Control |
@@ -196,9 +196,9 @@ check on the main branch and on the integration branch (D33).
 | shaper | Read, Grep, Glob, issue read and write | the strongest model |
 | planner | Read, Grep, Glob, Write (plans path only, enforced by hook) | the strongest model |
 | implementer | Read, Grep, Glob, Edit, Write, Bash | repo config |
-| tester | Read, Grep, Glob, Edit, Write (tests path only, enforced by hook), Bash (the hook does not see it, D38) | repo config |
+| tester | Read, Grep, Glob, Edit, Write (tests path only, enforced by hook), Bash (the hook does not see it, D39) | repo config |
 | reviewer | Read, Grep, Glob, Bash (read-only commands) | repo config |
-| investigator | Read, Grep, Glob, Edit, Write (reports path, or a `spike/` branch, enforced by hook), Bash (the hook does not see it, D38) | repo config |
+| investigator | Read, Grep, Glob, Edit, Write (reports path, or a `spike/` branch, enforced by hook), Bash (the hook does not see it, D39) | repo config |
 
 ## Existing plugin skills
 
