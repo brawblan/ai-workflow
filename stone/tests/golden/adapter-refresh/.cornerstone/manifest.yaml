@@ -150,4 +150,4 @@ components:
   review_by: '2027-04-18'
   files:
   - .github/workflows/cornerstone-adapter-refresh-schedule.yml
-  hash: e3afd2a327d0c3f11f05b2b373f079e87f851cdbe597708d3fec932049ed81bf
+  hash: 30ff56a7af42e84cfe6560f8848f814cbe20c85f998bcc06837fd63089c6207b
