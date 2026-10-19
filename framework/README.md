@@ -163,7 +163,7 @@ Do these items in order. Each item is one PR or more.
      `plan-only-when-unsure` idioms name their evals. Still to write: the evals for the shaper,
      the implementer, the reviewer, the investigator, and the hooks.
    - 4g. Done: the `hook.protect-paths` eval (H1 to H5) for a shell write to a protected path
-     (D39). First run: 2026-10-19, `claude-opus-5-5`, k = 3, 1.37 USD, after D44. The two checks
+     (D39). First run: 2026-10-19, with the model of the first model profile, k = 3, 1.37 USD, after D44. The two checks
      that use no model output pass in 30 of 30 runs, in both variants. So no matcher selects the
      shell tool, the hook lets the command through, and K6 fails the commit. This confirms D39.
      The check `bash_write_lands` passes in 4 of 30 runs (2 of 15 in each variant). In the other 26
