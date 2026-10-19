@@ -20,6 +20,10 @@ tools:   # the same lists as the role files, plus the commands that the role run
   tester: [Read, Grep, Glob, Edit, Write, "Bash(python -m unittest*)", "Bash(git diff*)",
            "Bash(git log*)", "Bash(git show*)", "Bash(git add*)", "Bash(git commit*)",
            "Bash(git status*)"]
+  # The hook.protect-paths eval (D38): the shell write forms of its scenarios. Not yet confirmed
+  # by a run: [TO CONFIRM] that acceptEdits allows a redirect target and a pipe into tee.
+  implementer: [Read, Grep, Glob, Edit, Write, "Bash(sed -i*)", "Bash(printf*)", "Bash(tee*)",
+                "Bash(cp*)", "Bash(python3 -c*)", "Bash(git diff*)", "Bash(git status*)"]
 
 output_where: {type: result}   # use the last JSON object with these keys and values
 
