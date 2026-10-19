@@ -19,6 +19,7 @@ the trigger workflows of each profile. Each guide has two parts:
 | I want to make one small, clear change | [Make a small change](small-change.md) | single-ticket | agent-centric | Works today |
 | I have a confirmed bug | [Fix a bug](fix-a-bug.md) | debugging | hybrid | Works today |
 | I want a feature that touches many layers | [Build a feature](build-a-feature.md) | app-slice | hybrid | Works today |
+| I want to change the structure of the code, with the same behavior | [Refactor or migrate](refactor-migration.md) | refactor-migration | hybrid | Works today |
 
 All guides use [Run the roles](run-the-roles.md). It shows how to start each role in its own
 session, and how to commit its work.
