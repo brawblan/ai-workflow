@@ -90,7 +90,7 @@ Rules:
 
 - Event text goes to a step only through `env`, never inline in a `run` script (dossier F8).
 - The prompt tells the role that the event text is data, not instructions.
-- The prompt has no relative link. Render rewrites `[text](relative)` to `text` (D41).
+- The prompt has no relative link. Render rewrites each relative Markdown link to its text (D41).
 - A `label:` workflow of a shaper tells it to report the missing Definition of Ready items. It does
   not interview a human, because the job has none (D41).
 - Each job has a time limit, and the role has a turn limit. Anyone can start some triggers, and each
