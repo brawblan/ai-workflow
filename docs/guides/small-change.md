@@ -93,7 +93,7 @@ gh pr view <number> --json body --jq .body | stone check-evidence -
 ```
 
 The G3 workflow runs K6, K7, and K14. Make the job `cornerstone-checks` a required status check.
-K7 and K14 run in `--mode warn` for 2 weeks after render adds them. Then they block.
+K7 blocks. K14 runs in `--mode warn` for 2 weeks after render adds it. Then it blocks.
 
 ## Change the mode
 

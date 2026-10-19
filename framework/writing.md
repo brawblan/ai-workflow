@@ -57,7 +57,8 @@ The dictionary test can also match a correct use of a word in another sense. To 
 positive, add `<!-- ste-ignore -->` at the end of that line. The reviewer checks each mark.
 
 K17 starts as a warning for 2 weeks in each repo, as for every new check (see
-[checks.md](checks.md#rules-for-checks)). Then it blocks new and changed text.
+[checks.md](checks.md#rules-for-checks)). Then it blocks new and changed text. In this repo it
+blocks since D45, after a replay on the merged PRs found no false positive.
 
 ## Evidence (P5)
 
