@@ -1,7 +1,9 @@
 # How `stone eval` starts one headless role run in this harness (lifecycle.md, "Eval design").
 # stone fills $role, $model, $budget, and $prompt. An argument that is only $tools becomes the
-# tool list of the role. The two variants differ only in --agent: the role file is also removed
-# from the workspace for "without". The hook and the tools stay the same in both variants.
+# tool list of the role. For a role eval, the two variants differ only in --agent: the role file is
+# also removed from the workspace for "without". The hook and the tools stay the same in both
+# variants. For any other component (a hook), the runner uses `with` for both variants, so both
+# load the same role file, and "without" removes only the component (D44).
 
 run:
   with: [claude, -p, --agent, $role, --model, $model, --output-format, stream-json, --verbose,
@@ -20,8 +22,10 @@ tools:   # the same lists as the role files, plus the commands that the role run
   tester: [Read, Grep, Glob, Edit, Write, "Bash(python -m unittest*)", "Bash(git diff*)",
            "Bash(git log*)", "Bash(git show*)", "Bash(git add*)", "Bash(git commit*)",
            "Bash(git status*)"]
-  # The hook.protect-paths eval (D39): the shell write forms of its scenarios. Not yet confirmed
-  # by a run: [TO CONFIRM] that acceptEdits allows a redirect target and a pipe into tee.
+  # The hook.protect-paths eval (D39): the shell write forms of its scenarios. Confirmed on
+  # 2026-10-19: sed -i, a redirect, and python3 -c ran under acceptEdits. A command with a second
+  # part (`; echo ...`) needed approval, so the model ran it again alone. [TO CONFIRM] tee and cp:
+  # in that run, the model started neither (it refused in 26 of 30 runs).
   implementer: [Read, Grep, Glob, Edit, Write, "Bash(sed -i*)", "Bash(printf*)", "Bash(tee*)",
                 "Bash(cp*)", "Bash(python3 -c*)", "Bash(git diff*)", "Bash(git status*)"]
 
