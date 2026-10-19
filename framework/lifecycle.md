@@ -162,7 +162,8 @@ flowchart LR
   for example a bytecode cache. If not, `unchanged` and `only_changed` count those files.
 - A run stops at `--timeout`, with each process that the harness started.
 - The runner cannot yet remove a component that is merged into a shared file. For that component,
-  use `--variant with`.
+  use `--variant with`. For a hook, "without" removes the hook file, but its entry in the shared
+  settings file stays. The adapter doc gives the effect (D38).
 - The runner writes the transcripts and `runs.jsonl` to `.cornerstone/eval-runs/`. Do not commit
   them. It writes the result table to `evals/results/`. Add the table to the PR.
 - Use `--check-only` to validate the scenarios without a run.
