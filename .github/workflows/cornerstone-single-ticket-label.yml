@@ -63,18 +63,12 @@ jobs:
             Write your result as the `report` field. A later job posts it.
 
             Profile steps:
-            1. Read the ticket. Run the G1 check for the Definition of Ready fields.
-            2. If a field is missing, run the shaper with the ticket author. Stop until the fields are complete.
-            3. Start the implementer in a fresh session. Give it the ticket only.
-            4. The implementer changes the code and writes the decision log.
-            5. Start the tester in a fresh session. Give it the ticket and the diff.
-            6. The tester writes tests for each acceptance criterion and writes the test report. If the ticket
-               names personas, the tester writes the acceptance tests from their job stories.
-            7. Run the checks (G3). If a check fails, send the output to the implementer. Stop after 3 loops.
-            8. Start the reviewer in a fresh session. Give it the ticket, the diff, the check output, and the
-               decision log.
-            9. Open the PR with the evidence, the decision log, the review findings, and a confidence statement.
-            10. A human approves or rejects the PR (G4).
+            The label asks for a readiness check. No human is in this job, so nobody can answer a question.
+            1. Read the ticket in the event data.
+            2. Check the ticket against the Definition of Ready fields of your role.
+            3. Do not interview anyone. Do not ask a question. Do not start another role.
+            4. In the `report`, list each missing field, one on each line.
+            5. If no field is missing, write in the `report` that the ticket is ready.
           claude_args: >-
             --agent shaper
             --model claude-opus-5-5
