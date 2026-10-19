@@ -16,6 +16,16 @@ SCHEDULES = {"daily": "0 6 * * *", "weekly": "0 6 * * 1", "monthly": "0 6 1 * *"
 CRON = re.compile(r"^[0-9A-Za-z*/,-]+( [0-9A-Za-z*/,-]+){4}$")
 LABEL = re.compile(r"^[A-Za-z0-9._:/-]+$")
 EXPRESSION = "${{"  # the CI starts an expression here, also in a prompt
+# A Markdown link with a relative target. A target with a scheme (https:) or a # is kept.
+RELATIVE_LINK = re.compile(r"\[([^\]]+)\]\((?![A-Za-z][A-Za-z0-9+.-]*:|#|/)[^)]*\)")
+# The shaper interviews a human in a session. A label run has no human (D41).
+READINESS_CHECK = """\
+The label asks for a readiness check. No human is in this job, so nobody can answer a question.
+1. Read the ticket in the event data.
+2. Check the ticket against the Definition of Ready fields of your role.
+3. Do not interview anyone. Do not ask a question. Do not start another role.
+4. In the `report`, list each missing field, one on each line.
+5. If no field is missing, write in the `report` that the ticket is ready."""
 
 
 class TriggerError(Exception):
@@ -76,11 +86,18 @@ def flow_steps(framework: Path, profile_id: str) -> str:
     match = re.search(r"^## Flow\n(.*?)(?=^## )", text, re.M | re.S)
     if not match:
         raise TriggerError(f"The profile {profile_id} has no '## Flow' section. Add it.")
-    steps = match.group(1).strip()
+    steps = RELATIVE_LINK.sub(r"\1", match.group(1).strip())
     if EXPRESSION in steps:
         raise TriggerError(f"The flow of {profile_id} has '{EXPRESSION}'. The CI reads it as an "
                            "expression. Remove it.")
     return steps
+
+
+def prompt_steps(framework: Path, trigger: Trigger) -> str:
+    """Return the steps for the prompt. A label run of the shaper only reports (D41)."""
+    if trigger.key == "label" and trigger.profile["roles"][0] == "shaper":
+        return READINESS_CHECK
+    return flow_steps(framework, trigger.profile["id"])
 
 
 def values(trigger: Trigger, triggers: list[Trigger],

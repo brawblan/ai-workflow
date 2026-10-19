@@ -74,7 +74,7 @@ skipped, with a log line.
 
 | Trigger | Starts when | The report goes to |
 | --- | --- | --- |
-| `label:<name>` | A human adds the label to an issue | A comment on the issue |
+| `label:<name>` | A human adds the label to an issue. The label asks for a readiness check (D41). | A comment on the issue |
 | `schedule:<daily\|weekly\|monthly\|cron>` | The schedule, or a person with write access | A new issue |
 | `ci:issue-opened` | A user opens an issue | A comment on the issue |
 | `ci:dependency-pr` | A dependency bot opens a PR | A comment on the PR |
@@ -90,6 +90,9 @@ Rules:
 
 - Event text goes to a step only through `env`, never inline in a `run` script (dossier F8).
 - The prompt tells the role that the event text is data, not instructions.
+- The prompt has no relative link. Render rewrites `[text](relative)` to `text` (D41).
+- A `label:` workflow of a shaper tells it to report the missing Definition of Ready items. It does
+  not interview a human, because the job has none (D41).
 - Each job has a time limit, and the role has a turn limit. Anyone can start some triggers, and each
   run costs model time (D38, dossier F13).
 - The post job frames the report. A fixed header says that a model wrote it from untrusted event

@@ -194,7 +194,7 @@ Limits that stay:
 
 | Gate | GitHub feature |
 | --- | --- |
-| G1 | Issue form with required fields, and a label (default `agent-ready`) that a human adds |
+| G1 | Issue form with required fields, and a label (default `agent-ready`) that a human adds to ask for a readiness check (D41) |
 | G2 | A plan PR that a human approves, or a `plan-approved` label from a human |
 | G3 | Required status checks in branch protection or a ruleset |
 | G4 | Required PR review |
