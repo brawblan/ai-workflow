@@ -102,6 +102,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D39 | The protected-path hook does not see a file write by a shell command. Its matcher names only the file tools, and a shell tool gives a command, not a path (dossier F15, F17). Cornerstone accepts this gap. It does not parse shell commands for write targets, because a parse is partial and gives false confidence (F16). It does not configure an OS sandbox. Risk: the hook is a guard for the file tools only. K6 in CI is the control for a shell write, but only for an implementer commit that changes a protected path. K6 reads the `Role:` trailer that the committer writes. No check sees a shell write that breaks the path limit of the tester, the planner, the investigator, or the reviewer. For those limits, the reviewer and gate G4 are the control. The `hook.protect-paths` eval (H1 to H5) pins the gap and the K6 control. Review this decision by 2027-04-18. | [lifecycle.md](lifecycle.md#eval-design), the adapter doc, `evals/hook-protect-paths/` |
 | D40 | Cornerstone is its own framework. It does not adopt Spec Kit, BMAD, or Agentic Code. Reason: in the pages we read, no tool joins all of these parts. The parts are a neutral core, harness adapters, gates by profile, and an eval plan with a review date for each component. We borrow ideas, not tools (D18, D21). Review this decision by 2027-04-18, after a read of the tool sources. | [dossier section 5](../docs/research/dossier.md#5-prior-art) |
 | D41 | A `label:` trigger asks for a readiness check. It does not mean "ready". If the first role of the profile is the shaper, the label workflow tells it to report the missing Definition of Ready items. The CI job has no human to interview. Render also rewrites each relative Markdown link in the profile steps to plain text. A relative link does not work in a CI prompt. The role, the tool limits, and the token stay as in D31 and D32. A later start at Build or Plan would need write access, which D31 and D32 do not allow. | [generator/design.md](generator/design.md#trigger-workflows) |
+| D43 | `stone check` fails when a component has no eval plan or no review date (P5). It tests each adapter component list and, if present, `.cornerstone/manifest.yaml`. Each component needs an `eval` key. The value can be empty only for a check, because a check is its own test. Each manifest entry needs a valid `review_by` date. Render sets that date, so a component list does not have it. The rule does not fail on a past `review_by`. That is a review trigger, not a missing field. The rule does not test that the eval folder exists. A planned eval is still a plan. Before this rule, only the golden-file tests tested these fields, and only for the rendered profiles. The rule is a check, so its unit tests are its eval. Review it for false positives by 2027-04-19. | [lifecycle.md](lifecycle.md#manifest), [principles.md](principles.md) |
 
 ## Open questions
 
@@ -191,7 +192,8 @@ Do these items in order. Each item is one PR or more.
      test for each profile.
    - Each generated check (K6, K7, K14, K15, K16) blocks. K16 blocks from the start (D30). The
      others block after their 2-week warning time.
-   - Each new component has an eval plan and a review date in the manifest (P5).
+   - Each new component has an eval plan and a review date in the manifest (P5). `stone check`
+     tests this (D43).
    - Then tag `v1.0.0`.
 
 ## Relation to the plugin in this repo

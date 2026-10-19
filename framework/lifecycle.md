@@ -25,6 +25,9 @@ components:
     hash: <sha256 of the generated content>
 ```
 
+`stone check` tests these fields (D43). It fails if a component has no `eval` key, or an empty
+`eval` and a kind that is not `check`. It also fails if a manifest entry has no valid `review_by`.
+
 ## Review triggers
 
 | Trigger | Action |
