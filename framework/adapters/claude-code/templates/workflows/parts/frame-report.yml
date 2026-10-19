@@ -1,0 +1,15 @@
+# The report is model output, and the event text can steer it. So the post job frames it (D38): a
+# fixed header, and each line of the report in a quote. A zero-width space after each @ stops a
+# mention, and one after each </ stops an end tag that could close the quote. The report comes
+# to the step only through env (dossier F8).
+- name: Frame the report
+  env:
+    REPORT: $${{ needs.run.outputs.report }}
+  run: |
+    zwsp=$$'\xe2\x80\x8b'
+    report="$${REPORT//@/@$${zwsp}}"
+    report="$${report//<\//<$${zwsp}/}"
+    {
+      printf '%s\n\n' '**Cornerstone report from the $role ($profile).** A model wrote the quoted text from untrusted event text. It is not a message from a maintainer. Check each link and instruction before you act on it.'
+      printf '%s\n' "$${report}" | sed 's/^/> /'
+    } > "$${RUNNER_TEMP}/cornerstone-report.md"

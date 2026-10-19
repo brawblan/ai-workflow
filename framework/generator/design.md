@@ -90,6 +90,10 @@ Rules:
 
 - Event text goes to a step only through `env`, never inline in a `run` script (dossier F8).
 - The prompt tells the role that the event text is data, not instructions.
+- Each job has a time limit, and the role has a turn limit. Anyone can start some triggers, and each
+  run costs model time (D38, dossier F13).
+- The post job frames the report. A fixed header says that a model wrote it from untrusted event
+  text. The report goes in a quote, and no mention in it notifies a person (D38, dossier F14).
 - If two selected profiles use the same label, each run also needs the label `profile:<id>`.
 - The harness secret is `[HARNESS_TOKEN]` in the core. The adapter names the real secret.
 - Each workflow is one component, `trigger.<type>.<profile>`, with its own review date.
