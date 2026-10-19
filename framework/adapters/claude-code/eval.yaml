@@ -1,7 +1,9 @@
 # How `stone eval` starts one headless role run in this harness (lifecycle.md, "Eval design").
 # stone fills $role, $model, $budget, and $prompt. An argument that is only $tools becomes the
-# tool list of the role. The two variants differ only in --agent: the role file is also removed
-# from the workspace for "without". The hook and the tools stay the same in both variants.
+# tool list of the role. For a role eval, the two variants differ only in --agent: the role file is
+# also removed from the workspace for "without". The hook and the tools stay the same in both
+# variants. For any other component (a hook), the runner uses `with` for both variants, so both
+# load the same role file, and "without" removes only the component (D44).
 
 run:
   with: [claude, -p, --agent, $role, --model, $model, --output-format, stream-json, --verbose,

@@ -139,6 +139,19 @@ def find_component(framework: Path, harness: str, component_id: str) -> dict[str
     raise EvalError(f"The adapter '{harness}' has no component '{component_id}'.")
 
 
+def registered_in(framework: Path, harness: str, target: str) -> list[str]:
+    """Return each shared JSON file whose merged fragment names `target` (the entry of a hook)."""
+    registry = yaml.safe_load((framework / "adapters" / harness / "components.yaml")
+                              .read_text(encoding="utf-8"))["components"]
+    found = []
+    for entry in registry:
+        if entry.get("merge") == "json" and entry.get("template") and target:
+            fragment = framework / "adapters" / harness / "templates" / entry["template"]
+            if target in fragment.read_text(encoding="utf-8"):
+                found.append(entry["target"])
+    return found
+
+
 def load_run_config(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise EvalError(f"{path}: no file. The harness adapter must give the eval command.")
@@ -174,6 +187,25 @@ def _commit(cwd: Path, message: str) -> None:
     _git(cwd, "commit", "-q", "--allow-empty", "-m", message)
 
 
+def _prune(node: Any, target: str) -> Any:
+    """Remove each list item that names `target`. Remove a container that this makes empty."""
+    if isinstance(node, list):
+        return [_prune(item, target) for item in node if target not in json.dumps(item)]
+    if isinstance(node, dict):
+        for key in list(node):
+            was_empty = node[key] in ({}, [])
+            node[key] = _prune(node[key], target)
+            if node[key] in ({}, []) and not was_empty:
+                del node[key]
+    return node
+
+
+def unregister(path: Path, target: str) -> None:
+    """Remove from the JSON file `path` each entry that names `target`. Other entries stay."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    path.write_text(json.dumps(_prune(data, target), indent=2) + "\n", encoding="utf-8")
+
+
 def prepare(folder: Path, scenario: dict[str, Any], framework: Path, role_file: str,
             variant: str) -> Workspace:
     """Make the workspace: the fixture, the rendered files, and the change of the scenario."""
@@ -187,6 +219,13 @@ def prepare(folder: Path, scenario: dict[str, Any], framework: Path, role_file: 
             render.render(path, framework)
     if variant == "without" and role_file:
         (path / role_file).unlink(missing_ok=True)
+        # A shared settings file can still name the file (a hook entry). A missing hook file makes
+        # every file-tool edit fail, so "without" removes those entries too (D44).
+        if (path / render.CONFIG).exists():
+            harness = render.load_config(path, framework)["harness"]
+            for shared in registered_in(framework, harness, role_file):
+                if (path / shared).is_file():
+                    unregister(path / shared, role_file)
     _commit(path, "chore(cornerstone): render\n\nRole: generator\nActor: agent")
     if scenario.get("change"):
         _git(path, "apply", "--whitespace=nowarn", str((folder / scenario["change"]).resolve()))
@@ -257,16 +296,19 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
     except (EvalError, render.RenderError, OSError) as error:
         run.error = f"the setup failed: {error}"  # the harness does not start
         return run
+    # Only a role eval removes the role. For another component, both variants load the same role
+    # file, so the hook (or other component) is the only difference (D44).
+    launch = variant if opts["kind"] == "role" else "with"
     prompt = "\n\n".join(part for part in (data.get("task"), scenario["prompt"]) if part)
     values = {"role": data["role"], "model": opts["model"], "budget": opts["budget"],
               "prompt": prompt, "tools": (config.get("tools") or {}).get(data["role"], [])}
     env = {**os.environ, **GIT_ENV,
            **{k: Template(str(v)).safe_substitute(values)
-              for k, v in ((config.get("env") or {}).get(variant) or {}).items()}}
+              for k, v in ((config.get("env") or {}).get(launch) or {}).items()}}
     start = time.monotonic()
     stdout = stderr = ""
     try:
-        code, stdout, stderr = _harness(build_command(config, variant, values), workspace.path,
+        code, stdout, stderr = _harness(build_command(config, launch, values), workspace.path,
                                         env, opts["timeout"])
         if code is None:
             run.error = f"the harness ran for more than {opts['timeout']} seconds"
@@ -504,7 +546,7 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     runs_folder = root / RUNS / f"{stamp}-{entry['eval'].strip('/').split('/')[-1]}"
     runs_folder.mkdir(parents=True, exist_ok=True)
-    opts = {"framework": framework.resolve(), "role_file": entry.get("target", ""),
+    opts = {"framework": framework.resolve(), "role_file": entry.get("target", ""), "kind": entry.get("kind", ""),
             "run_config": loaded, "model": model, "budget": budget, "timeout": timeout,
             "runs": runs_folder, "keep": keep}
     runs: list[Run] = []

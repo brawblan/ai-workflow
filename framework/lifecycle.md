@@ -143,7 +143,7 @@ outcome rate to compare the variants.
 ```mermaid
 flowchart LR
   A[Copy the fixture to a temp git repo] --> B[Render the repo config]
-  B --> C[Remove the component file for 'without']
+  B --> C[Remove the component file and its settings entry for 'without']
   C --> D[Commit the change of the scenario]
   D --> E[Start the harness: adapter eval.yaml]
   E --> F[Run the checks and grade.py]
@@ -165,8 +165,12 @@ flowchart LR
   for example a bytecode cache. If not, `unchanged` and `only_changed` count those files.
 - A run stops at `--timeout`, with each process that the harness started.
 - The runner cannot yet remove a component that is merged into a shared file. For that component,
-  use `--variant with`. For a hook, "without" removes the hook file, but its entry in the shared
-  settings file stays. The adapter doc gives the effect (D39).
+  use `--variant with`. For a hook, "without" removes the hook file and each entry that names it in
+  a shared JSON file that the adapter merges (D44). A missing hook file with its entry kept would
+  make each file-tool edit fail.
+- Only the component changes between the variants. For a role, "without" has no role file and uses
+  `run.without`. For another component (a hook), both variants load the same role file and use
+  `run.with` (D44). Thus a difference between the variants comes from the component.
 - The runner writes the transcripts and `runs.jsonl` to `.cornerstone/eval-runs/`. Do not commit
   them. It writes the result table to `evals/results/`. Add the table to the PR.
 - Use `--check-only` to validate the scenarios without a run.

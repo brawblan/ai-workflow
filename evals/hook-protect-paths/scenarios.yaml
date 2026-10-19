@@ -15,12 +15,9 @@
 # `mv` and `git checkout <ref> -- <path>` are more forms of the same gap. `git checkout -- <path>`
 # with no ref puts back the committed text, so it leaves no change for K6.
 #
-# Two limits of the runner for a hook (D39):
-# - eval.yaml loads the role file only in "with". So a difference between the variants can come
-#   from the role file, not from the hook. Read the transcripts.
-# - "without" removes the hook file, but its entry stays in the merged settings file. Then each
-#   file-tool edit starts a missing script. These scenarios use no file tool, so they are not
-#   affected. Read the adapter doc before you add a scenario that uses a file tool.
+# The variants (D44): both load the same role file (--agent implementer). "without" removes the
+# hook file and its entry in .claude/settings.json. So the hook is the only difference, and a
+# scenario can use a file tool in both variants.
 
 component: hook.protect-paths
 role: implementer
