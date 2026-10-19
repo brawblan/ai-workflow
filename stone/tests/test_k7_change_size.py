@@ -197,6 +197,43 @@ class ScriptTest(unittest.TestCase):
                 run = self.run_k7(self.over, f"Profile: debugging\n\n{waiver}\n")
                 self.assertEqual(run.returncode, 1, run.stdout)
 
+    def test_ac4_waiver_in_a_heading_of_any_level_with_other_words_passes(self) -> None:
+        for heading in ("## Waiver (P10)", "## Size waiver (P10)", "### Size waiver (P10)",
+                        "# Waiver (P10)", "###### Waiver (P10)", "## waiver (p10)",
+                        "## Size WAIVER (p10) for the fixture"):
+            with self.subTest(heading=heading):
+                body = f"Profile: debugging\n\n{heading}\nThe fixture is generated.\n\n## Risks\nNone\n"
+                run = self.run_k7(self.over, body)
+                self.assertEqual(run.returncode, 0, run.stdout)
+                self.assertIn("notice", run.stdout)
+
+    def test_ac4_waiver_in_a_list_item_does_not_count(self) -> None:
+        for item in ("- Waiver (P10): the fixture is generated.",
+                     "- **Waiver (P10)**: the fixture is generated.",
+                     "* Waiver (P10): the fixture is generated.",
+                     "1. Waiver (P10): the fixture is generated."):
+            with self.subTest(item=item):
+                run = self.run_k7(self.over, f"Profile: debugging\n\n## Notes\n{item}\n")
+                self.assertEqual(run.returncode, 1, run.stdout)
+
+    def test_ac4_empty_size_waiver_section_does_not_count(self) -> None:
+        for body in ("Profile: debugging\n\n## Size waiver (P10)\n\n## Risks\nLow.\n",
+                     "Profile: debugging\n\n### Size waiver (P10)\n\n### Risks\nLow.\n",
+                     "Profile: debugging\n\n## Size waiver (P10)\n"):
+            with self.subTest(body=body):
+                run = self.run_k7(self.over, body)
+                self.assertEqual(run.returncode, 1, run.stdout)
+
+    def test_ac4_body_with_no_waiver_does_not_pass(self) -> None:
+        run = self.run_k7(self.over, "Profile: debugging\n\n## Summary\nA big change.\n")
+        self.assertEqual(run.returncode, 1, run.stdout)
+
+    def test_ac4_waiver_heading_without_p10_does_not_count(self) -> None:
+        for heading in ("## Waiver", "## Size waiver", "## Waiver (P9)"):
+            with self.subTest(heading=heading):
+                run = self.run_k7(self.over, f"Profile: debugging\n\n{heading}\nText here.\n")
+                self.assertEqual(run.returncode, 1, run.stdout)
+
     def test_ac4_at_or_under_the_limit_passes(self) -> None:
         self.assertEqual(self.run_k7(self.over, "Profile: single-ticket").returncode, 0)
         self.assertEqual(self.run_k7(self.exact, None).returncode, 0)
