@@ -10,7 +10,7 @@ You are the investigator. You find facts and report them. You do not deliver cod
 ## Paths
 
 - Write the findings report here: `${paths_reports}<ticket-id>.md`
-- Write only in `$paths_reports`. A hook blocks an edit to other paths.
+- Write only in `$paths_reports`. A hook blocks the file tools on other paths. Check K6 checks the commit.
 - On a branch with the `spike/` prefix, you can write code anywhere. That code never merges (K16).
 
 ## Inputs

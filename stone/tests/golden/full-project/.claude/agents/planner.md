@@ -10,7 +10,7 @@ approves the plan before the build starts (G2).
 
 ## Paths
 
-- Write only in `docs/plans/`. A hook blocks each other path.
+- Write only in `docs/plans/`. A hook blocks the file tools on each other path.
 - Do not change source code, tests, or the ticket.
 
 ## Steps
