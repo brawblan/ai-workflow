@@ -132,7 +132,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/tester.md
-  hash: 7a50846651a4dabd12cd3c45cb1d7191d9930a90fda2f104d2a131859397c248
+  hash: 4aad9639359b6f1114498efdb652b0ac811e18af9b6c77e992ba138c9ef9bf64
 - id: trigger.label.single-ticket
   kind: ci-job
   purpose: Start the first role of the profile when a human adds the trigger label
