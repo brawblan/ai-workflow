@@ -17,6 +17,10 @@ exclude_docs: |
   /evals/*
   !/evals/README.md
 
+# Reports are built and linkable, but the nav has no section for them.
+not_in_nav: |
+  /docs/reports/*
+
 theme:
   name: material
   palette:
