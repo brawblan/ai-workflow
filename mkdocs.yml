@@ -79,6 +79,7 @@ nav:
       - Triage bug reports: docs/guides/bug-triage.md
       - Audit an area of the code: docs/guides/code-audit.md
       - Run a spike: docs/guides/spike.md
+      - Upgrade a dependency: docs/guides/dependency-upgrade.md
       - Run the roles: docs/guides/run-the-roles.md
   - Framework:
       - framework/README.md
