@@ -157,7 +157,7 @@ components:
     purpose: Start the first role of the profile when a human adds the trigger label to an issue.
     principle: [P6, P9]
     template: workflows/trigger-label.yml
-    parts: {run_role: workflows/parts/run-role.yml}
+    parts: {run_role: workflows/parts/run-role.yml, frame_report: workflows/parts/frame-report.yml}
     target: .github/workflows/cornerstone-$profile-label.yml
     eval: evals/trigger-label/
 
@@ -167,7 +167,7 @@ components:
     purpose: Start the first role of the profile on its schedule. Post its report as an issue.
     principle: [P6, P9]
     template: workflows/trigger-schedule.yml
-    parts: {run_role: workflows/parts/run-role.yml}
+    parts: {run_role: workflows/parts/run-role.yml, frame_report: workflows/parts/frame-report.yml}
     target: .github/workflows/cornerstone-$profile-schedule.yml
     eval: evals/trigger-schedule/
 
@@ -177,7 +177,7 @@ components:
     purpose: Start the first role of the profile on each new issue. Post its report on the issue.
     principle: [P6, P9]
     template: workflows/trigger-issue-opened.yml
-    parts: {run_role: workflows/parts/run-role.yml}
+    parts: {run_role: workflows/parts/run-role.yml, frame_report: workflows/parts/frame-report.yml}
     target: .github/workflows/cornerstone-$profile-issue-opened.yml
     # Anyone can open an issue. The run job has no write token, so the action may start for them.
     values: {allowed_non_write_users: "*"}
@@ -189,7 +189,7 @@ components:
     purpose: Start the first role of the profile when a dependency bot opens a PR. Post its report on the PR.
     principle: [P6, P9]
     template: workflows/trigger-dependency-pr.yml
-    parts: {run_role: workflows/parts/run-role.yml}
+    parts: {run_role: workflows/parts/run-role.yml, frame_report: workflows/parts/frame-report.yml}
     target: .github/workflows/cornerstone-$profile-dependency-pr.yml
     values: {allowed_bots: "dependabot[bot],renovate[bot]"}
     eval: evals/trigger-dependency-pr/

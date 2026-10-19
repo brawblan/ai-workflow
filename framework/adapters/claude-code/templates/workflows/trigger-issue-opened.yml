@@ -15,6 +15,7 @@ concurrency:
 jobs:
   run:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       issues: read
@@ -40,14 +41,16 @@ jobs:
     needs: run
     if: needs.run.outputs.report != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       issues: write
     steps:
+      $frame_report
+
       - name: Post the report on the issue
         env:
           GH_TOKEN: $${{ github.token }}
           ISSUE_NUMBER: $${{ github.event.issue.number }}
-          REPORT: $${{ needs.run.outputs.report }}
         run: |
-          printf '%s\n' "$${REPORT}" \
-            | gh issue comment "$${ISSUE_NUMBER}" --repo "$${GITHUB_REPOSITORY}" --body-file -
+          gh issue comment "$${ISSUE_NUMBER}" --repo "$${GITHUB_REPOSITORY}" \
+            --body-file "$${RUNNER_TEMP}/cornerstone-report.md"
