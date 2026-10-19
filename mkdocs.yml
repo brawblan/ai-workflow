@@ -76,6 +76,8 @@ nav:
       - Make a small change: docs/guides/small-change.md
       - Fix a bug: docs/guides/fix-a-bug.md
       - Build a feature: docs/guides/build-a-feature.md
+      - Triage bug reports: docs/guides/bug-triage.md
+      - Audit an area of the code: docs/guides/code-audit.md
       - Run a spike: docs/guides/spike.md
       - Run the roles: docs/guides/run-the-roles.md
   - Framework:

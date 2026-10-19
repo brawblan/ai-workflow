@@ -24,6 +24,7 @@ Start each role in a new terminal session. Do not reuse a session from an earlie
 | implementer | `STONE_ROLE=implementer claude --agent implementer` | The ticket, and the plan if one exists |
 | tester | `STONE_ROLE=tester claude --agent tester` | The ticket and the branch name. It reads the diff. |
 | reviewer | `STONE_ROLE=reviewer claude --agent reviewer` | The ticket, the branch, the check output, and the decision log |
+| investigator | `STONE_ROLE=investigator claude --agent investigator` | The ticket or the bug report, and the question to answer. It writes a report. |
 
 `STONE_ROLE` tells the protected-path hook which paths the session can change:
 
@@ -33,8 +34,12 @@ Start each role in a new terminal session. Do not reuse a session from an earlie
 | implementer | All paths except tests, checks, CI, `.claude/`, and `.cornerstone/` |
 | tester | The test paths only |
 | reviewer | No path |
+| investigator | The reports path only (`paths.reports`, default `docs/reports/`). On a `spike/` branch, all paths except `.claude/` and `.cornerstone/`. |
 
 If `STONE_ROLE` is not set, the hook uses `implementer`.
+
+The investigator is the only role with a branch rule. Code on a `spike/` branch never merges (K16).
+See [K16 and the spike branch](../../framework/checks.md#k16-and-the-spike-branch).
 
 To run a role with no human at the terminal, add `-p` and the prompt:
 
@@ -54,7 +59,7 @@ git commit -m "fix(auth): renew the token before it expires" \
 
 | Trailer | Values |
 | --- | --- |
-| `Role:` | `implementer`, `tester`, `generator` (output of `stone render`, `stone spec apply`, or `stone spec sync`), or another role from the workflow model |
+| `Role:` | `implementer`, `tester`, `investigator`, `generator` (output of `stone render`, `stone spec apply`, or `stone spec sync`), or another role from the workflow model |
 | `Actor:` | `human` or `agent` |
 
 A commit with no `Role:` trailer counts as an implementer commit. K6 fails if an implementer commit
