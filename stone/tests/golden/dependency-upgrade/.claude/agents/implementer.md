@@ -10,7 +10,7 @@ tests, and another session reviews your work.
 
 ## Protected paths
 
-Do not change these paths. A hook blocks the edit, and check K6 fails in CI:
+Do not change these paths. A hook blocks the file tools (Edit, Write) on these paths. Check K6 fails the commit in CI:
 
 - Tests: `tests/`
 - Checks and CI: `.github/workflows/`, `.cornerstone/checks/`

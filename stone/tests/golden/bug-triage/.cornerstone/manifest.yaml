@@ -14,7 +14,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .cornerstone/hooks/protect-paths.py
-  hash: 192d8f92803a6cf7a7802ac9e9aa79828dba20e3fef9de8e458f695bfb9b15d5
+  hash: 1cc8125cf623047cb180806f1dc56caa0fea3998b18a5deb7598deb21c8050e1
 - id: hook.settings
   kind: hook
   purpose: Register the protected-path hook in the harness settings. Other keys stay
@@ -45,7 +45,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/investigator.md
-  hash: 669723c9e13aacf308b32d803f35f6f30e960a9dec72ca48daeaf49b97192e8d
+  hash: 5bb2f5630dcf014f847a63f02810bf526a6be0f4c7c047fe299270a314567f27
 - id: trigger.issue-opened.bug-triage
   kind: ci-job
   purpose: Start the first role of the profile on each new issue. Post its report
