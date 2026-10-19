@@ -9,7 +9,7 @@ the workflow profiles where it applies, and the framework principle that it supp
 
 ## How to read this dossier
 
-- `[S4]` is a citation. The full list is in [Sources](#5-sources).
+- `[S4]` is a citation. The full list is in [Sources](#6-sources).
 - Profile tags show where a finding applies:
 
 | Tag | Profile | Tag | Profile |
@@ -218,7 +218,36 @@ the workflow profiles where it applies, and the framework principle that it supp
 - Open models that run locally for low-risk roles [S2].
 - A cost budget for each profile run.
 
-## 5. Sources
+## 5. Prior art
+
+Date of the search: 2026-10-18. The search had two web queries and three page reads. It is not a
+full survey. A "none" below means that the pages we read did not show the feature.
+
+| Tool | What it is | What it has that Cornerstone has | What we did not find in it |
+| --- | --- | --- | --- |
+| Spec Kit [S45] | Templates and slash commands for one coding agent | Gated phases: specify, plan, tasks, implement | Roles, eval plans, review dates |
+| OpenSpec [S34] | Spec tool with deltas that merge into living specs | The delta idea (D21) | Gates by profile, roles |
+| BMAD-METHOD [S30] | Multi-agent method with role agents | Roles: analyst, PM, architect, dev, QA | A neutral core, eval plans, review dates |
+| Kiro [S46] | IDE with a spec-driven workflow | Spec-first workflow | A tool-neutral core (one IDE) |
+| Agentic Code [S47] | `AGENTS.md` workflow framework, MIT, `npx` CLI | Stages, a test-first order, a separate-session review, `AGENTS.md` | Roles, a vendor-neutral adapter layer, evals, sunset rules |
+| SEH [S48] | CLI that makes one source of rules and links it to each harness file, MIT | One source, many harness files | Gates, roles, evals, lifecycle |
+| harnessforge [S49] | Local tool that scans a repo and writes `AGENTS.md`, rules, validators | A generator, many harnesses | A stated lifecycle or eval method (the page names validators only) |
+
+What the table shows:
+
+- Many tools do one part of Cornerstone: a gated flow, role agents, or a generator.
+- In the pages we read, no tool joins all of these parts. The parts are a neutral core, harness
+  adapters, gates by profile, and an eval plan with a review date for each component (P5).
+- The gap that remains is the lifecycle: a part leaves when its evidence goes. We found no prior art
+  for it. This is a gap in our search, not a proof. See D40.
+
+Open items:
+
+- Read the source of Spec Kit, Agentic Code, and harnessforge. This search read a README or a
+  summary page only.
+- Check if a tool states a sunset or an eval rule that the page did not show.
+
+## 6. Sources
 
 Internal sources are the talk notes in the claude.ai project "Automation and Workflows". They are not
 in this repo.
@@ -269,3 +298,8 @@ in this repo.
 | S42 | GitHub Docs, [Basic writing and formatting syntax](https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax) (a mention notifies the person or team). Read 2026-10-18. A test with the GitHub Markdown API (`POST /markdown`, `gfm` mode) on 2026-10-18 confirmed the rest. Without the frame, `@user` gave a mention link, and the text after a `</blockquote>` line was outside the quote. With the frame, no mention link was in the output, and all lines stayed in the quote. |
 | S43 | Anthropic, [Claude Code hooks reference](https://code.claude.com/docs/en/hooks). Read 2026-10-18. The `PreToolUse` matcher matches the tool name. The `Bash` input is `command`. The `Edit` and `Write` input is `file_path`. |
 | S44 | This repo, issue #39, and the role.tester result `evals/results/20261018-085807-role.tester-claude-opus-5-5.md` (scenario T3, 2026-10-18). The run transcripts are not committed. |
+| S45 | GitHub, [Spec Kit](https://github.com/github/spec-kit). Described in [Spec-Driven Frameworks Compared](https://developertoolkit.ai/en/ecosystem/frameworks/spec-driven-frameworks/). Read 2026-10-18 (summary only). |
+| S46 | Amazon, Kiro. Described in [Spec Kit vs Kiro](https://codemyspec.com/blog/spec-kit-vs-kiro). Read 2026-10-18 (summary only). |
+| S47 | [Agentic Code](https://cdn.jsdelivr.net/npm/agentic-code@0.7.0/README.md) v0.7.0, MIT. Read 2026-10-18. |
+| S48 | [SEH](https://github.com/manuuuel/seh), MIT. Read 2026-10-18 (summary only). |
+| S49 | [harnessforge](https://hunted.space/product/harnessforge) (Product Hunt listing). Read 2026-10-18 (summary only). |

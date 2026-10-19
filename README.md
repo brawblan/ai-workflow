@@ -1,32 +1,55 @@
 # ai-workflow
 
-The home of **Cornerstone**, a tool-neutral framework for agent-assisted software delivery, and
-its `stone` CLI. The repo also has the `workflow` plugin skills, my personal agent rules, and tips.
+**Cornerstone: a framework for agent-assisted software delivery, where checks decide that work is
+done.**
 
-Read the docs at [brawblan.github.io/ai-workflow](https://brawblan.github.io/ai-workflow/).
+This repo holds Cornerstone, its `stone` CLI, the `workflow` plugin skills, my personal agent
+rules, and tips. Read the docs at [brawblan.github.io/ai-workflow](https://brawblan.github.io/ai-workflow/).
 
-Cornerstone says how a human and an agent deliver software together. It sets who does each stage,
-which gates stop the work, and which checks decide that work is done. The core never names a tool.
-Adapters turn the core into files for one harness. `stone render` writes those files into a target
-repo.
+## What Cornerstone is
 
-## Why Cornerstone exists
+Cornerstone says how a human and an agent deliver software together. It is a set of written rules
+and a CLI that turns the rules into files for your repo.
 
-Models change. A rule, a skill, or a planning step that helps one model can hurt the next model.
-So each part of the workflow has a reason, an eval, and a review date. When the evidence goes, the
-part goes. The evidence is in the [research dossier](docs/research/dossier.md).
+- **Stages and roles.** The work moves through Intake, Shape, Plan, Build, Test, Verify, Review,
+  Deliver, and Learn. A shaper, a planner, an implementer, a tester, a reviewer, and an
+  investigator do the work.
+- **Gates.** A human approves the ticket, the plan, and the change. Only CI passes the checks gate.
+- **Profiles.** Ten profiles set the plan form and the gates for each type of work, from a spike to
+  a full project.
+- **A neutral core.** The core never names a tool. An adapter turns it into files for one harness.
+  `stone render` writes those files into your repo.
 
-Four principles do most of the work:
+## Why use it
 
-- **Checks decide (P1).** CI output, not an agent claim, shows that work is done.
-- **Separate the writer from the judge (P2).** The implementer does not write its tests or approve
-  its own change. Each role runs in a fresh session.
-- **Judgment goes into the inputs (P3).** A human makes the ticket ready. Then the prompt can be
-  simple.
-- **Ceremony scales with risk (P7).** A profile sets the plan form and the gates for each type of
-  work.
+| Problem | What Cornerstone does |
+| --- | --- |
+| An agent stops when the work looks done, and it can claim a check that it did not run. | Check output from CI, outside the agent session, shows that work is done (P1). |
+| An agent that writes the code and its tests proves only that the code agrees with itself. | A different role writes the tests and reviews, each in a fresh session. A hook and a CI check stop the implementer from changing tests (P2). |
+| A vague ticket gives a drifting result, and a long prompt does not fix it. | A human makes the ticket ready first: acceptance criteria, non-goals, a test oracle, and the users it serves (P3). |
+| The same heavy process for a one-line fix and for a new product wastes time. | The profile sets how much plan and how many gates the work needs (P7). |
+| A rule that helps one model can hurt the next model. | Each rule, skill, and role has an eval and a review date. When the evidence goes, the part goes (P5). |
+| A framework tied to one tool breaks when the tool changes. | Only the adapter changes. The core stays the same (P12). |
 
-All 12 principles are in [framework/principles.md](framework/principles.md).
+Each rule cites its evidence in the [research dossier](docs/research/dossier.md).
+
+## Who it is for
+
+- A developer who uses a coding agent on real repos and wants the result checked, not trusted.
+- A team that wants one process for many types of work, with the heavy gates only where the risk is
+  high.
+- A person who already uses Spec Kit, OpenSpec, or BMAD and wants a layer that does not depend on
+  one tool. See [the migration guide](docs/guides/migrate.md).
+
+It is not for you if you want a prompt library or an IDE. It is also not for you if you need a
+harness other than Claude Code today. The only adapter at this time is for Claude Code.
+
+## How it compares
+
+Many tools cover one part of this: a gated flow, role agents, or a file generator. In the sources
+that we read, none joins a neutral core, harness adapters, gates by profile, and an eval and review
+date for each part. The [prior art section](docs/research/dossier.md#5-prior-art) has the table and
+its limits.
 
 ## Status
 

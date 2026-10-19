@@ -8,18 +8,34 @@ hide:
 
 **Agent-assisted software delivery, where checks decide that work is done.**
 
-Cornerstone tells a human and an agent how to deliver software together. It sets who does each
-stage, which gates stop the work, and which checks decide that work is done. The core names no tool.
-Adapters turn it into files for your harness.
+Cornerstone says how a human and an agent deliver software together. It sets who does each stage,
+which gates stop the work, and which checks decide that work is done. The core names no tool.
+Adapters turn it into files for your harness, and the `stone` CLI writes those files into your repo.
 
 [Get started](docs/guides/README.md){ .md-button .md-button--primary }
 [Read the principles](framework/principles.md){ .md-button }
 
-## The problem
+## Why use it
 
-Agents write code fast. But an agent stops when the work looks done. It can write tests that agree
-with its own mistakes, and it can drift from the ticket. Also, models change. A rule that helps one
-model can hurt the next model.
+Agents write code fast. But an agent stops when the work looks done. It can claim a check that it
+did not run. It can write tests that agree with its own mistakes. It can drift from the ticket.
+Also, models change, and a rule that helps one model can hurt the next model.
+
+Cornerstone gives you:
+
+- **Proof, not claims.** CI output shows that work is done.
+- **Independent judges.** A different role, in a fresh session, writes the tests and reviews.
+- **Right-sized process.** A profile sets the plan and the gates for each type of work.
+- **Rules that expire.** Each part has an eval and a review date, and it leaves when the evidence goes.
+- **No lock-in.** When a tool changes, only its adapter changes.
+
+## Who it is for
+
+- A developer who uses a coding agent on real repos and wants the result checked.
+- A team that wants one process for many types of work.
+- A person who uses Spec Kit, OpenSpec, or BMAD and wants a layer that does not depend on one tool.
+
+It is not a prompt library or an IDE. At this time the only adapter is for Claude Code.
 
 ## What Cornerstone does
 
@@ -66,6 +82,12 @@ model can hurt the next model.
     goes.
 
 </div>
+
+## How it compares
+
+Many tools cover one part: a gated flow, role agents, or a file generator. In the sources that we
+read, none joins a neutral core, harness adapters, gates by profile, and an eval and review date for
+each part. See the [prior art](docs/research/dossier.md#5-prior-art).
 
 ## How the work moves
 
