@@ -16,6 +16,7 @@ jobs:
   run:
     if: contains(fromJSON('["dependabot[bot]", "renovate[bot]"]'), github.event.pull_request.user.login)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     permissions:
       contents: read
       pull-requests: read
@@ -39,6 +40,8 @@ jobs:
       # The event text is untrusted. The role returns its report as structured output. Then the post job
       # posts the report with its own token (D31). The role reads only the checkout and the event folder.
       # An unscoped Read rule also allows /proc/self/environ, so the posted report could leak the secret (D32).
+      # Anyone can start some triggers, and each run costs model time. So the role stops after 30 turns,
+      # and the job stops after 20 minutes (D38).
       - name: Run the investigator
         id: run
         uses: anthropics/claude-code-action@f27be6b65a4652f08a2ba3cff79114829b588967 # v1.0.252
@@ -70,6 +73,7 @@ jobs:
           claude_args: >-
             --agent investigator
             --model claude-opus-5-5
+            --max-turns 30
             --add-dir ${{ runner.temp }}/cornerstone
             --allowedTools "Read(./**),Read(/${{ runner.temp }}/cornerstone/**)"
             --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch
@@ -79,14 +83,30 @@ jobs:
     needs: run
     if: needs.run.outputs.report != ''
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       pull-requests: write
     steps:
+      # The report is model output, and the event text can steer it. So the post job frames it (D38): a
+      # fixed header, and each line of the report in a quote. A zero-width space after each @ stops a
+      # mention, and one after each </ stops an end tag that could close the quote. The report comes
+      # to the step only through env (dossier F8).
+      - name: Frame the report
+        env:
+          REPORT: ${{ needs.run.outputs.report }}
+        run: |
+          zwsp=$'\xe2\x80\x8b'
+          report="${REPORT//@/@${zwsp}}"
+          report="${report//<\//<${zwsp}/}"
+          {
+            printf '%s\n\n' '**Cornerstone report from the investigator (dependency-upgrade).** A model wrote the quoted text from untrusted event text. It is not a message from a maintainer. Check each link and instruction before you act on it.'
+            printf '%s\n' "${report}" | sed 's/^/> /'
+          } > "${RUNNER_TEMP}/cornerstone-report.md"
+
       - name: Post the report on the PR
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          REPORT: ${{ needs.run.outputs.report }}
         run: |
-          printf '%s\n' "${REPORT}" \
-            | gh pr comment "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" --body-file -
+          gh pr comment "${PR_NUMBER}" --repo "${GITHUB_REPOSITORY}" \
+            --body-file "${RUNNER_TEMP}/cornerstone-report.md"

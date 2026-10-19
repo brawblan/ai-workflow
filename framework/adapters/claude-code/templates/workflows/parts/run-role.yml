@@ -2,6 +2,8 @@
 # The event text is untrusted. The role returns its report as structured output. Then the post job
 # posts the report with its own token (D31). The role reads only the checkout and the event folder.
 # An unscoped Read rule also allows /proc/self/environ, so the posted report could leak the secret (D32).
+# Anyone can start some triggers, and each run costs model time. So the role stops after 30 turns,
+# and the job stops after 20 minutes (D38).
 - name: Run the $role
   id: run
   uses: anthropics/claude-code-action@f27be6b65a4652f08a2ba3cff79114829b588967 # v1.0.252
@@ -24,6 +26,7 @@
     claude_args: >-
       --agent $role
       --model $model
+      --max-turns 30
       --add-dir $${{ runner.temp }}/cornerstone
       --allowedTools "Read(./**),Read(/$${{ runner.temp }}/cornerstone/**)"
       --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch
