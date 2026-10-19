@@ -150,7 +150,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .github/workflows/cornerstone-dependency-upgrade-dependency-pr.yml
-  hash: 9924e77cd27faca2c1c58d38bba25bde84318c57df0db7f7dda954cd05305a45
+  hash: 300d7763d4646fd095833761687aa92a148d3f1312a161e15dae336d24d9ce83
 - id: trigger.schedule.dependency-upgrade
   kind: ci-job
   purpose: Start the first role of the profile on its schedule. Post its report as
@@ -166,4 +166,4 @@ components:
   review_by: '2027-04-18'
   files:
   - .github/workflows/cornerstone-dependency-upgrade-schedule.yml
-  hash: 691097f355183039952ad3553ed74dc56f1f7d5798fb0bd335eb5fa3c2038ed6
+  hash: 0489d40a4ef8c5825140e14879db2265eab4cd163252bae10f930cc60552ddb9
