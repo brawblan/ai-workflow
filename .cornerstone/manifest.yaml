@@ -59,7 +59,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .cornerstone/hooks/protect-paths.py
-  hash: 5633080f85a35618362bb269fbc7f4502c429f8d038b3b54fb6f425fa46a725f
+  hash: de3ec362f283cf98cb59f0cc3a6d224224838031e4df23ed3aa80831e50f0dda
 - id: hook.settings
   kind: hook
   purpose: Register the protected-path hook in the harness settings. Other keys stay
@@ -89,7 +89,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/implementer.md
-  hash: bd0c13df5278b49906cf32f16c3d8f99187dbc9e32b651857ecdc778f709a3fb
+  hash: d9828b5aea50b681d3123581232c2407f06ff5881b2d84d360c4a065e265c96d
 - id: role.reviewer
   kind: role
   purpose: Find defects and scope drift in a fresh session.
