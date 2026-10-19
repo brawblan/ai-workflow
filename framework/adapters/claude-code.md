@@ -19,9 +19,9 @@ each component that `stone render` writes.
 | Role | `.claude/agents/<role>.md` with `name`, `description`, `tools`, `model` | partial | Tools can be limited. Paths cannot be limited by the role file. See "Protected paths". |
 | Fresh session for each role | A separate `claude -p` run for each role | full | A sub-agent also has a fresh context, but the lead agent starts it. Use separate runs where P2 applies. |
 | Headless run | `claude -p "<prompt>" --output-format json` | full | |
-| Eval run | [claude-code/eval.yaml](claude-code/eval.yaml): the argv for each variant, the env, the tools of each role, and the JSON paths of the result | full | `stone eval` reads it (D26). `[TO CONFIRM]` that `--setting-sources project` keeps the user instruction file out of the run. |
+| Eval run | [claude-code/eval.yaml](claude-code/eval.yaml): the argv for each variant, the env, the tools of each role, and the JSON paths of the result | full | `stone eval` reads it (D26). `[TO CONFIRM]` that `--setting-sources project` keeps the user instruction file out of the run. For a hook eval, "without" removes the hook file but keeps its entry in `.claude/settings.json`. Then `python3` cannot open the file and exits with code 2, so the harness blocks each file-tool edit. |
 | Select the role for a headless run | `claude -p --agent <role>` loads `.claude/agents/<role>.md` | full | Confirmed on 2026-10-18 (Claude Code 2.1): the tester and reviewer runs for `stone eval` followed their role files. `[TO CONFIRM]` if the `model` field of the role file or `--model` wins. |
-| Hook before a file edit | `PreToolUse` hook with matcher `Edit\|Write` in `.claude/settings.json`. Exit code 2 blocks the edit. | full | |
+| Hook before a file edit | `PreToolUse` hook with matcher `Edit\|Write\|MultiEdit\|NotebookEdit` in `.claude/settings.json`. Exit code 2 blocks the edit. | partial | The hook does not start for `Bash`, so it does not see a file write by a shell command (D39). K6 in CI is the control. |
 | Hook before the session ends | `Stop` hook that runs the checks | full | Do not loop forever. The harness caps repeated blocks. |
 | Model for each role | `model` field in the role file, from `defaults.role_models` in the model profile | full | |
 | Permissions | `permissions` allow and deny lists in `.claude/settings.json`, and sandbox mode | full | |
@@ -34,7 +34,8 @@ The implementer must not change tests or checks (P2). This applies to a human im
 two layers:
 
 1. **Local hook.** The run script sets `STONE_ROLE=implementer`. A `PreToolUse` hook reads the role and
-   the target path. It exits with code 2 if the path is protected. In a `pair` session, the hook
+   the target path of a file tool. It exits with code 2 for a protected path. It does not see
+   a `Bash` command. In a `pair` session, the hook
    uses the role of the human (default: implementer). The hook also limits the tester to the test
    paths and the planner to the plans path, and blocks each edit by the reviewer.
 2. **CI check K6.** Each commit has the trailers `Role: <role>` and `Actor: human|agent`. A commit
@@ -54,8 +55,19 @@ outside the project repo is not blocked.
 
 `stone render` writes the hook to `.cornerstone/hooks/protect-paths.py` and K6 to
 `.cornerstone/checks/protected_paths.py`. It merges this entry into `.claude/settings.json` and keeps
-the other keys. The hook catches edits by the file tools only. A shell command can still change a
-file, and K6 catches that change in CI.
+the other keys. The hook catches edits by the file tools only. A `Bash` command such as `sed -i`,
+a `>` redirect, `tee`, `cp`, `mv`, `git checkout <ref> -- <path>`, or a script can still change a
+file. The hook does not parse `Bash` commands, because a parse is partial (D39). The adapter does
+not configure the sandbox for this. These are the limits:
+
+| Shell write | Control |
+| --- | --- |
+| An implementer commit that changes a protected path | K6 fails in CI. |
+| A commit with a false `Role:` trailer | None in CI. K6 reads the trailer. The reviewer and G4 are the control. |
+| A tester, planner, investigator, or reviewer write outside its paths | None in CI. The reviewer and G4 are the control. |
+| A change that is not committed | Nothing to merge. |
+
+The `hook.protect-paths` eval (`evals/hook-protect-paths/`) pins these limits for the implementer.
 
 ```json
 {
@@ -79,7 +91,8 @@ file, and K6 catches that change in CI.
 
 `stone render` writes `.github/workflows/cornerstone-<profile>-<type>.yml` for each trigger of a
 selected profile that is not `command` (D31). The templates are `workflows/trigger-<type>.yml`. The
-shared run step is `workflows/parts/run-role.yml`.
+shared run step is `workflows/parts/run-role.yml`. The shared frame step of the post job is
+`workflows/parts/frame-report.yml`.
 
 Before the first run, add the repository secret `CLAUDE_CODE_OAUTH_TOKEN`. Make each trigger label,
 and `profile:<id>` if two selected profiles use one label. For `ci:dependency-pr`, add the same
@@ -105,10 +118,20 @@ The run job:
 | `claude_code_oauth_token` | `secrets.CLAUDE_CODE_OAUTH_TOKEN` | The harness secret |
 | `github_token` | `github.token` | The job `permissions` limit this token. The action does not get its app token. |
 | `prompt` | The role, the profile, the trigger, the event file path, and the profile steps | The pipeline gives the profile steps at run time (D24). |
-| `claude_args` | `--agent <role> --model <model> --add-dir <event folder> --allowedTools "Read(./**),Read(/<event folder>/**)" --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch --json-schema <report schema>` | The role reads and reports. It cannot change files or run commands. It reads only the checkout and the event folder (D32). Its only output is the report. |
+| `claude_args` | `--agent <role> --model <model> --max-turns 30 --add-dir <event folder> --allowedTools "Read(./**),Read(/<event folder>/**)" --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch --json-schema <report schema>` | The role reads and reports. It cannot change files or run commands. It reads only the checkout and the event folder (D32). Its only output is the report. It stops with an error after 30 turns (D38). |
 
-The action returns the report in `structured_output`. The post job reads it from the job output and
-gives it to `gh` through `env`.
+The action returns the report in `structured_output`. The post job:
+
+1. Reads the report from the job output through `env` (dossier F8).
+2. Frames the report (D38). A fixed header says that a model wrote the text from untrusted event
+   text. Each line of the report goes in a quote. A zero-width space after each `@` stops each
+   mention, so the comment notifies no person or team. A zero-width space after each `</` stops an
+   end tag, so the report cannot close the quote. The text looks the same.
+3. Posts the framed file with `gh`.
+
+Each job has a time limit (D38). The run job stops after 20 minutes, and the post job after 5
+minutes. Without a limit, a job can run for 360 minutes (dossier F13). If the role stops at a limit,
+the run job fails and the post job does not run.
 
 The action checks that the actor has write access for issue events. For `schedule` and
 `workflow_dispatch`, GitHub needs write access to start the run. Two entries in
@@ -131,6 +154,8 @@ limits apply:
 | Read rules only for `./**` and the event folder | Read, Grep, and Glob cannot open a file outside the checkout, such as `/proc/self/environ` with the harness secret. An unscoped `Read` rule allows all paths, and the report is public (D32, dossier F12). |
 | Event text in a file, not in the prompt or a `run` script | The text cannot inject shell commands (dossier F8). |
 | The post job posts the report as text | A report cannot apply labels. The investigator proposes labels, and a human approves them and the severity at G4. |
+| The post job frames the report (D38) | A reader sees which text the model wrote. The report cannot notify a person or a team with a mention, and it cannot leave the quote (dossier F14). |
+| A turn limit on the role and a time limit on each job (D38) | A spam issue or an injected loop cannot run the paid model for hours (dossier F13). |
 | Bug-triage: the post job has only `issues: write` | No write token beyond comments and labels. No contents, PR, or workflow write. |
 | GitHub redacts a job output that contains a secret | A report with the harness secret or the job token is not posted (dossier F9). |
 | `github.token` expires when the job ends | A leaked token is read-only and short-lived. |
@@ -138,6 +163,10 @@ limits apply:
 Limits that stay:
 
 - The report can carry injected text or wrong labels. A human reads each report before acting.
+  The frame marks the text, but a link in the quote still works.
+- Each new issue from any account starts one run for `ci:issue-opened`. The limits cap the cost of
+  one run, not the number of runs. The concurrency group is one issue, so it does not slow a flood
+  of issues. The owner chose no author gate, because any user can report a bug (D38).
 - The run job can read all repo files. Do not keep private data in a repo that runs these workflows.
 - The role has no web tools. A step that reads a web page, for example release notes, uses only the
   event data and the repo. Do that step in a local run (`command`) if the report needs more.
@@ -184,9 +213,9 @@ check on the main branch and on the integration branch (D33).
 | shaper | Read, Grep, Glob, issue read and write | the strongest model |
 | planner | Read, Grep, Glob, Write (plans path only, enforced by hook) | the strongest model |
 | implementer | Read, Grep, Glob, Edit, Write, Bash | repo config |
-| tester | Read, Grep, Glob, Edit, Write (tests path only, enforced by hook), Bash | repo config |
+| tester | Read, Grep, Glob, Edit, Write (tests path only, enforced by hook), Bash (the hook does not see it, D39) | repo config |
 | reviewer | Read, Grep, Glob, Bash (read-only commands) | repo config |
-| investigator | Read, Grep, Glob, Edit, Write (reports path, or a `spike/` branch, enforced by hook), Bash | repo config |
+| investigator | Read, Grep, Glob, Edit, Write (reports path, or a `spike/` branch, enforced by hook), Bash (the hook does not see it, D39) | repo config |
 
 ## Existing plugin skills
 
