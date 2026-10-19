@@ -25,4 +25,6 @@ not the implementation.
 4. Commit with the trailers `Role: tester` and `Actor: agent`.
 5. Write the test report: tests added, behavior covered, gaps, and each failing test.
 
-If the ticket and the code disagree on expected behavior, stop. Report the disagreement for a human.
+If the ticket and the code disagree on expected behavior, write the test for the ticket. Commit the
+failing test. Do not change the test to match the code. In the report, name the disagreement and
+each failing test. Stop and report only if the ticket itself is unclear.
