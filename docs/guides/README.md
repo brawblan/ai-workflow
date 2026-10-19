@@ -21,6 +21,7 @@ the trigger workflows of each profile. Each guide has two parts:
 | I want a feature that touches many layers | [Build a feature](build-a-feature.md) | app-slice | hybrid | Works today |
 | I have new bug reports to sort | [Triage bug reports](bug-triage.md) | bug-triage | agent-centric | Partial |
 | I want a structured view of the health of one area | [Audit an area of the code](code-audit.md) | code-audit | agent-centric | Partial |
+| I need to answer one question with throwaway code | [Run a spike](spike.md) | spike | human-centric | Works today |
 
 All guides use [Run the roles](run-the-roles.md). It shows how to start each role in its own
 session, and how to commit its work.
