@@ -150,4 +150,4 @@ components:
   review_by: '2027-04-18'
   files:
   - .github/workflows/cornerstone-debugging-label.yml
-  hash: c94db1594e9673966238d293268ad878004673639c0702a169a3a540f1da5256
+  hash: 908febfa2225054e7bccfd7f9f42c7cdf673ba57d6723a6a446672dd57900172
