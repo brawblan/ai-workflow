@@ -99,6 +99,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D36 | Eval results stay as committed files in `evals/results/`, one file for each run. The docs site shows them on the Evals page. A build hook reads the files and writes the page, so a new result file needs no page edit. The page shows the latest run of each component and links to the earlier runs and to the eval folder on GitHub. | [lifecycle.md](lifecycle.md#eval-design) |
 | D37 | The first model profile of the first harness adapter is `active`. The role.planner and role.tester evals pass (k = 3), and their idioms name the eval. The other idioms have no eval yet, so they are not proven, and adapter-refresh keeps them as proposed. Render no longer warns for this profile. The shaper, implementer, reviewer, and investigator evals stay on the roadmap. | [adapters/contract.md](adapters/contract.md), [lifecycle.md](lifecycle.md#eval-design) |
 | D38 | Each trigger workflow limits the cost of one run. The run job and the post job have a time limit, and the role has a turn limit. The post job frames the report. A fixed header says that a model wrote it from untrusted event text. The report goes in a quote, no mention in it notifies a person, and it comes to the step only through `env`. `ci:issue-opened` gets no author gate, because any user can report a bug. So the limits cap the cost of one run, not the number of runs (dossier F13, F14). | [generator/design.md](generator/design.md#trigger-workflows), the adapter doc |
+| D39 | The protected-path hook does not see a file write by a shell command. Its matcher names only the file tools, and a shell tool gives a command, not a path (dossier F15, F17). Cornerstone accepts this gap. It does not parse shell commands for write targets, because a parse is partial and gives false confidence (F16). It does not configure an OS sandbox. Risk: the hook is a guard for the file tools only. K6 in CI is the control for a shell write, but only for an implementer commit that changes a protected path. K6 reads the `Role:` trailer that the committer writes. No check sees a shell write that breaks the path limit of the tester, the planner, the investigator, or the reviewer. For those limits, the reviewer and gate G4 are the control. The `hook.protect-paths` eval (H1 to H5) pins the gap and the K6 control. Review this decision by 2027-04-18. | [lifecycle.md](lifecycle.md#eval-design), the adapter doc, `evals/hook-protect-paths/` |
 
 ## Open questions
 
@@ -154,6 +155,10 @@ Do these items in order. Each item is one PR or more.
    - 4f. Done: the first model profile is `active` (D37). The `verify-loop` and
      `plan-only-when-unsure` idioms name their evals. Still to write: the evals for the shaper,
      the implementer, the reviewer, the investigator, and the hooks.
+   - 4g. Done (scenarios only): the `hook.protect-paths` eval (H1 to H5) for a shell write to a
+     protected path (D39). Expected result: each check passes in both variants, so the hook adds
+     no gain for a shell write. No model run yet. Run `stone eval hook.protect-paths --trials 3`
+     and add the result. Review D39 by 2027-04-18.
 5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
    of Q4 2026.
 6. Version 1: support all 10 profiles (D24). Items 6b to 6h can run in parallel after 6a.

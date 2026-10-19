@@ -19,9 +19,9 @@ each component that `stone render` writes.
 | Role | `.claude/agents/<role>.md` with `name`, `description`, `tools`, `model` | partial | Tools can be limited. Paths cannot be limited by the role file. See "Protected paths". |
 | Fresh session for each role | A separate `claude -p` run for each role | full | A sub-agent also has a fresh context, but the lead agent starts it. Use separate runs where P2 applies. |
 | Headless run | `claude -p "<prompt>" --output-format json` | full | |
-| Eval run | [claude-code/eval.yaml](claude-code/eval.yaml): the argv for each variant, the env, the tools of each role, and the JSON paths of the result | full | `stone eval` reads it (D26). `[TO CONFIRM]` that `--setting-sources project` keeps the user instruction file out of the run. |
+| Eval run | [claude-code/eval.yaml](claude-code/eval.yaml): the argv for each variant, the env, the tools of each role, and the JSON paths of the result | full | `stone eval` reads it (D26). `[TO CONFIRM]` that `--setting-sources project` keeps the user instruction file out of the run. For a hook eval, "without" removes the hook file but keeps its entry in `.claude/settings.json`. Then `python3` cannot open the file and exits with code 2, so the harness blocks each file-tool edit. |
 | Select the role for a headless run | `claude -p --agent <role>` loads `.claude/agents/<role>.md` | full | Confirmed on 2026-10-18 (Claude Code 2.1): the tester and reviewer runs for `stone eval` followed their role files. `[TO CONFIRM]` if the `model` field of the role file or `--model` wins. |
-| Hook before a file edit | `PreToolUse` hook with matcher `Edit\|Write` in `.claude/settings.json`. Exit code 2 blocks the edit. | full | |
+| Hook before a file edit | `PreToolUse` hook with matcher `Edit\|Write\|MultiEdit\|NotebookEdit` in `.claude/settings.json`. Exit code 2 blocks the edit. | partial | The hook does not start for `Bash`, so it does not see a file write by a shell command (D39). K6 in CI is the control. |
 | Hook before the session ends | `Stop` hook that runs the checks | full | Do not loop forever. The harness caps repeated blocks. |
 | Model for each role | `model` field in the role file, from `defaults.role_models` in the model profile | full | |
 | Permissions | `permissions` allow and deny lists in `.claude/settings.json`, and sandbox mode | full | |
@@ -34,7 +34,8 @@ The implementer must not change tests or checks (P2). This applies to a human im
 two layers:
 
 1. **Local hook.** The run script sets `STONE_ROLE=implementer`. A `PreToolUse` hook reads the role and
-   the target path. It exits with code 2 if the path is protected. In a `pair` session, the hook
+   the target path of a file tool. It exits with code 2 for a protected path. It does not see
+   a `Bash` command. In a `pair` session, the hook
    uses the role of the human (default: implementer). The hook also limits the tester to the test
    paths and the planner to the plans path, and blocks each edit by the reviewer.
 2. **CI check K6.** Each commit has the trailers `Role: <role>` and `Actor: human|agent`. A commit
@@ -54,8 +55,19 @@ outside the project repo is not blocked.
 
 `stone render` writes the hook to `.cornerstone/hooks/protect-paths.py` and K6 to
 `.cornerstone/checks/protected_paths.py`. It merges this entry into `.claude/settings.json` and keeps
-the other keys. The hook catches edits by the file tools only. A shell command can still change a
-file, and K6 catches that change in CI.
+the other keys. The hook catches edits by the file tools only. A `Bash` command such as `sed -i`,
+a `>` redirect, `tee`, `cp`, `mv`, `git checkout <ref> -- <path>`, or a script can still change a
+file. The hook does not parse `Bash` commands, because a parse is partial (D39). The adapter does
+not configure the sandbox for this. These are the limits:
+
+| Shell write | Control |
+| --- | --- |
+| An implementer commit that changes a protected path | K6 fails in CI. |
+| A commit with a false `Role:` trailer | None in CI. K6 reads the trailer. The reviewer and G4 are the control. |
+| A tester, planner, investigator, or reviewer write outside its paths | None in CI. The reviewer and G4 are the control. |
+| A change that is not committed | Nothing to merge. |
+
+The `hook.protect-paths` eval (`evals/hook-protect-paths/`) pins these limits for the implementer.
 
 ```json
 {
@@ -201,9 +213,9 @@ check on the main branch and on the integration branch (D33).
 | shaper | Read, Grep, Glob, issue read and write | the strongest model |
 | planner | Read, Grep, Glob, Write (plans path only, enforced by hook) | the strongest model |
 | implementer | Read, Grep, Glob, Edit, Write, Bash | repo config |
-| tester | Read, Grep, Glob, Edit, Write (tests path only, enforced by hook), Bash | repo config |
+| tester | Read, Grep, Glob, Edit, Write (tests path only, enforced by hook), Bash (the hook does not see it, D39) | repo config |
 | reviewer | Read, Grep, Glob, Bash (read-only commands) | repo config |
-| investigator | Read, Grep, Glob, Edit, Write (reports path, or a `spike/` branch, enforced by hook), Bash | repo config |
+| investigator | Read, Grep, Glob, Edit, Write (reports path, or a `spike/` branch, enforced by hook), Bash (the hook does not see it, D39) | repo config |
 
 ## Existing plugin skills
 
