@@ -45,6 +45,10 @@ def flow(name: str) -> str:
     return text.split("\n## Flow\n", 1)[1].split("\n## ", 1)[0].strip()
 
 
+def strip_links(text: str) -> str:
+    return re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+
+
 class TriggerBase(RenderBase):
     def workflows(self) -> dict[str, dict]:
         return {p: yaml.safe_load(self.read(p)) for p in self.written_files() if TRIGGER.match(p)}
@@ -150,7 +154,8 @@ class TriggerContentTest(TriggerBase):
                 step = next(s for s in data["jobs"]["run"]["steps"] if s.get("id") == "run")
                 self.assertRegex(step["uses"], r"^[^@\s]+@[0-9a-f]{40}$")
                 self.assertIn(f"You are the {role}.", step["with"]["prompt"])
-                self.assertIn(flow(name), step["with"]["prompt"])
+                if role != "shaper" or parts(path)[1] != "label":  # D41
+                    self.assertIn(strip_links(flow(name)), step["with"]["prompt"])
                 args = shlex.split(step["with"]["claude_args"])
                 self.assertEqual(args[args.index("--agent") + 1], role)
                 # D32: each allow rule has a path. A rule with no path allows reads anywhere.
@@ -158,6 +163,38 @@ class TriggerContentTest(TriggerBase):
                 self.assertEqual(allowed, ["Read(./**)", "Read(/${{ runner.temp }}/cornerstone/**)"])
                 denied = args[args.index("--disallowedTools") + 1].split(",")
                 self.assertLessEqual({"Bash", "Edit", "Write"}, set(denied))
+
+    def test_d41_prompt_has_no_relative_link(self) -> None:
+        for path, data in self.workflows().items():
+            prompt = next(s for s in data["jobs"]["run"]["steps"]
+                          if s.get("id") == "run")["with"]["prompt"]
+            with self.subTest(path=path):
+                self.assertNotRegex(prompt, r"\]\((?!https?:)[^)]*\)")
+                self.assertNotIn("../", prompt)
+
+    def test_d41_label_run_of_the_shaper_reports_and_does_not_interview(self) -> None:
+        found = 0
+        for path, data in self.workflows().items():
+            name, kind = parts(path)
+            if kind != "label" or profile_data(name)["roles"][0] != "shaper":
+                continue
+            found += 1
+            prompt = next(s for s in data["jobs"]["run"]["steps"]
+                          if s.get("id") == "run")["with"]["prompt"]
+            with self.subTest(path=path):
+                self.assertIn("readiness check", prompt)
+                self.assertIn("In the `report`, list each missing field", prompt)
+                self.assertIn("Do not interview anyone", prompt)
+                self.assertNotIn("with the human", prompt)
+                self.assertNotIn("with the ticket author", prompt)
+                self.assertNotIn("Run the shaper", prompt)
+        self.assertGreater(found, 0)
+
+    def test_d41_flow_steps_rewrites_a_relative_link_to_text(self) -> None:
+        from stone import triggers
+        text = triggers.flow_steps(FRAMEWORK, "app-slice")
+        self.assertNotIn("../workflow-model.md", text)
+        self.assertIn("(see Specs)", text)
 
     def test_ac8_manifest_has_one_entry_for_each_workflow(self) -> None:
         entries = {c["id"]: c for c in yaml.safe_load(self.read(MANIFEST))["components"]}

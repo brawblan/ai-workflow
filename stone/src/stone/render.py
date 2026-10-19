@@ -274,7 +274,7 @@ def trigger_components(framework: Path, harness: Path, registry: list[dict[str, 
         for name, part in (entry.get("parts") or {}).items():
             text = triggers.insert_block(
                 text, name, (harness / "templates" / part).read_text(encoding="utf-8"))
-        steps = triggers.flow_steps(framework, trigger.profile["id"]).replace("$", "$$")
+        steps = triggers.prompt_steps(framework, trigger).replace("$", "$$")
         text = triggers.insert_block(text, "profile_steps", steps)
         component_id = f"{entry['id']}.{trigger.profile['id']}"
         target = fill(entry["target"], entry["template"], values, config)

@@ -50,12 +50,14 @@ Personas: farmer
 Write `Personas: none` if the change does not affect users. If a field is missing, start the shaper
 (`claude --agent shaper`) with the issue number. It asks you for the missing fields.
 
-Add the label `agent-ready` when the ticket is ready. That label is G1.
+Add the label `agent-ready` to ask for a readiness check. The G1 check passes when no field is
+missing.
 
 `stone render` also writes
-the workflow `cornerstone-single-ticket-label.yml`. The label then starts the shaper in CI. The
-shaper has read-only tools. It checks the ticket against the Definition of Ready and posts a report
-on the issue. It does not start another role.
+the workflow `cornerstone-single-ticket-label.yml`. The label starts the shaper in CI. No human is
+in that job, so the shaper does not interview anyone (D41). It has read-only tools. It checks the
+ticket against the Definition of Ready and posts the missing fields on the issue. It does not
+start another role.
 
 Before the first run, add the repository secret
 `CLAUDE_CODE_OAUTH_TOKEN` and the label. See the

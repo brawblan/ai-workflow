@@ -29,12 +29,13 @@ Start the shaper with the issue: `claude --agent shaper`. It interviews you unti
 the [Definition of Ready](../../framework/workflow-model.md#definition-of-ready-default) fields. A
 feature ticket must name its personas, for example `Personas: farmer, worker`.
 
-Add the `agent-ready` label when the ticket is ready. That label is G1.
+Add the `agent-ready` label to ask for a readiness check. G1 is met when a human accepts the ticket.
 
 `stone render` also writes
-the workflow `cornerstone-app-slice-label.yml`. The label then starts the shaper in CI. The shaper
-has read-only tools. It checks the ticket against the Definition of Ready and posts a report on the
-issue. It does not start another role.
+the workflow `cornerstone-app-slice-label.yml`. The label starts the shaper in CI. No human is in
+that job, so the shaper does not interview anyone (D41). It has read-only tools. It checks the
+ticket against the Definition of Ready and posts the missing fields on the issue. It does not
+start another role.
 
 Add the secret `CLAUDE_CODE_OAUTH_TOKEN` first. See the
 [adapter](../../framework/adapters/claude-code.md#trigger-workflows).
