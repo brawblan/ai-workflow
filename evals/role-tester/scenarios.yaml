@@ -43,9 +43,10 @@ scenarios:
     expect:
       - {check: unchanged, paths: [src/]}
       - {check: grader, name: passes_with_patch, patch: fixtures/prices-fix.diff}
-      # The report names the discount failure on one line. No commit check: the role says to
-      # stop when the ticket and the code disagree (tester.md).
+      # The report names the discount failure on one line. The role commits the failing test
+      # and reports the disagreement (D42).
       - {check: matches, path: "@report", pattern: "discount[^\\n]*\\bfail|\\bfail[^\\n]*discount"}
+      - {check: commit_trailer, trailer: "Role: tester", kind: contract}
 
   - id: T3
     title: The ticket implies edge cases
