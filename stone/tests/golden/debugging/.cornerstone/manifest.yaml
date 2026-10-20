@@ -29,7 +29,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .cornerstone/checks/change_size.py
-  hash: e575b42cc06fffe3bac3798d3627801a85f2986e552434c8d5ef9981e19876b3
+  hash: e7a5393ddd6cc1b2be97655a578d0066df800d3327d539aa540f0ee80b01a4d5
 - id: ci-job.checks
   kind: ci-job
   purpose: G3. Run K6, K7, K14, and the repo checks on each pull request.
