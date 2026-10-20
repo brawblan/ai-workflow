@@ -3,7 +3,8 @@
 
 Check K7: fail if the diff since the base is over the size limit and the PR has no waiver (P10).
 The PR body names the profile on a "Profile: <id>" line. With no such line, the smallest limit
-applies. A "Waiver (P10)" section with text passes, with a notice.
+applies. A waiver is a Markdown heading of any level with "waiver (P10)" in its text, in any
+case, with text under it. A list item is not a waiver. A waiver passes, with a notice.
 Usage: change_size.py <base> [--body FILE|-] [--mode warn|block] [--format text|github]
 """
 
@@ -40,11 +41,15 @@ def headings(lines: list[str]) -> list[tuple[int, str]]:
 
 
 def waiver(body: str) -> str:
-    """Return the text of the first "Waiver (P10)" section that is not empty, or ''."""
+    """Return the text of the first waiver section that is not empty, or ''.
+
+    A waiver section is a heading with "waiver (p10)" in its text. The heading can have any level.
+    The text ends at the next heading. A list item is not a heading, so it is not a waiver.
+    """
     lines = body.splitlines()
     found = headings(lines)
     for number, (index, name) in enumerate(found):
-        if not name.startswith("waiver (p10)"):
+        if "waiver (p10)" not in name:
             continue
         end = found[number + 1][0] if number + 1 < len(found) else len(lines)
         text = " ".join(line.strip() for line in lines[index + 1:end]).strip()

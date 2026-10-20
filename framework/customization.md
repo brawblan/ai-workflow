@@ -73,8 +73,10 @@ waivers: []
 ```
 
 Check K7 uses `limits.pr_changed_lines` only if it is smaller than the profile limit. To loosen a
-limit for one PR, add a `Waiver (P10)` section to the PR body. Name the profile of the PR on a
-`Profile: <id>` line in the PR body. Without it, K7 uses the smallest limit.
+limit for one PR, add a waiver to the PR body. A waiver is a Markdown heading of any level with
+`waiver (P10)` in its text, in any case, and text under it. Examples: `## Waiver (P10)` and
+`### Size waiver (P10)`. A list item is not a waiver. An empty section does not count. Name the
+profile of the PR on a `Profile: <id>` line in the PR body. Without it, K7 uses the smallest limit.
 
 Write each `branches.*` value as a quoted YAML string if it could parse as a number or a boolean
 (`"1.10"`, `"yes"`). YAML reads `1.10` as `1.1` and `yes` as `True`, and K16 then compares the wrong
