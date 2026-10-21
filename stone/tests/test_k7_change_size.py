@@ -121,7 +121,7 @@ class RenderK7Test(unittest.TestCase):
                     render_into(root, ["single-ticket"], f"limits: {{pr_changed_lines: {value}}}\n")
                 self.assertEqual([p.name for p in root.rglob("*") if p.is_file()], ["config.yaml"])
 
-    def test_ac3_workflow_has_k7_after_k6_with_env_only_and_warn_mode(self) -> None:
+    def test_ac3_workflow_has_k7_after_k6_with_env_only_and_block_mode(self) -> None:
         render_into(self.root, ["single-ticket"])
         workflow = (self.root / ".github/workflows/cornerstone-checks.yml").read_text("utf-8")
         steps = yaml.safe_load(workflow)["jobs"]["checks"]["steps"]
@@ -131,7 +131,7 @@ class RenderK7Test(unittest.TestCase):
         self.assertNotIn("${{", k7["run"])
         self.assertIn("github.event.pull_request.body", k7["env"]["PR_BODY"])
         self.assertIn("github.base_ref", k7["env"]["BASE_REF"])
-        for flag in ("--mode warn", "--format github", "--body -"):
+        for flag in ("--mode block", "--format github", "--body -"):
             self.assertIn(flag, k7["run"])
 
 

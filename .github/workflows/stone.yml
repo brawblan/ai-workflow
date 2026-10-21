@@ -30,13 +30,12 @@ jobs:
       - name: stone check
         run: stone check --format github
 
-      # K17 warns for 2 weeks after this workflow merges, then blocks (framework/writing.md).
-      # To block, change --mode warn to --mode block in both K17 steps.
+      # K17 blocks (D45, framework/writing.md).
       - name: K17 on changed lines
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: stone check-writing --diff "origin/${BASE_REF}" --mode warn --format github
+        run: stone check-writing --diff "origin/${BASE_REF}" --mode block --format github
 
       - name: K17 on the PR body
         if: github.event_name == 'pull_request'
@@ -44,4 +43,4 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: |
           printf '%s\n' "$PR_BODY" > "$RUNNER_TEMP/pr-body.md"
-          stone check-writing "$RUNNER_TEMP/pr-body.md" --mode warn --format github
+          stone check-writing "$RUNNER_TEMP/pr-body.md" --mode block --format github

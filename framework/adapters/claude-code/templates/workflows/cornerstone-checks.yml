@@ -21,15 +21,15 @@ jobs:
           BASE_REF: $${{ github.base_ref }}
         run: python3 .cornerstone/checks/protected_paths.py "origin/$${BASE_REF}"
 
-      # K7 warns for 2 weeks after this step is first rendered. Then the framework changes it to block.
-      # The limit comes from the "Profile: <id>" line in the PR body. A "Waiver (P10)" section passes.
+      # K7 blocks (D45). A "Waiver (P10)" section in the PR body passes.
+      # The limit comes from the "Profile: <id>" line in the PR body.
       - name: K7 change size
         env:
           BASE_REF: $${{ github.base_ref }}
           PR_BODY: $${{ github.event.pull_request.body }}
         run: |
           printf '%s\n' "$${PR_BODY}" | python3 .cornerstone/checks/change_size.py \
-            "origin/$${BASE_REF}" --body - --mode warn --format github
+            "origin/$${BASE_REF}" --body - --mode block --format github
 
       # stone comes from the framework tag in framework_version. A venv keeps it apart from the repo.
       - name: Install stone
