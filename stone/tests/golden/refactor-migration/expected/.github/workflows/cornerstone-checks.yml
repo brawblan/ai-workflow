@@ -55,22 +55,19 @@ jobs:
         run: make check
 
       # K8 architecture fitness: a repo command from .cornerstone/config.yaml. Its exit code passes or fails the step.
-      # The step warns for 2 weeks after the framework adds it. Then the framework makes it block.
+      # A failing command fails the job, and G3 blocks (D52).
       - name: K8 architecture fitness
-        continue-on-error: true
         run: lint-imports
 
       # K12 differential tests: a repo command from .cornerstone/config.yaml. Its exit code passes or fails the step.
-      # The step warns for 2 weeks after the framework adds it. Then the framework makes it block.
+      # A failing command fails the job, and G3 blocks (D52).
       - name: K12 differential tests
-        continue-on-error: true
         run: pytest tests/differential
 
       # K10: the repo command tests the mutants in the code changed since BASE_REF. It fails if the
       # mutation score is under MUTATION_SCORE_MIN (limits.mutation_score_changed_code).
-      # The step warns for 2 weeks after the framework adds it. Then the framework makes it block.
+      # A failing command fails the job, and G3 blocks (D52).
       - name: K10 mutation score
-        continue-on-error: true
         env:
           BASE_REF: origin/${{ github.base_ref }}
           MUTATION_SCORE_MIN: 0.6
