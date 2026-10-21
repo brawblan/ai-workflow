@@ -96,7 +96,7 @@ Add `--format github` to show the findings as annotations in a GitHub Actions ru
 
    K7 reads the `Profile: <id>` line in the PR body to find the limit. With no body or no line, it
    uses the smallest limit. A `Waiver (P10)` section with text passes. Add `--mode warn` to only
-   warn. The G3 workflow uses `--mode warn` for the first 2 weeks.
+   warn. The G3 workflow uses `--mode block` (D45).
 
 8. Commit the render output alone, with the trailers `Role: generator` and `Actor: human`. K6 counts
    a commit with no `Role:` trailer as an implementer commit, and the output is in protected paths.

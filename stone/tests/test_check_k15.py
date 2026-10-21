@@ -44,7 +44,7 @@ K15 = ".cornerstone/checks/instruction_size.py"
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
 MANIFEST = ".cornerstone/manifest.yaml"
 K15_STEP = "K15 instruction size"
-K15_RUN = "python3 .cornerstone/checks/instruction_size.py --mode warn --format github"
+K15_RUN = "python3 .cornerstone/checks/instruction_size.py --mode block --format github"
 
 
 def profile_names(framework: Path = FRAMEWORK) -> list[str]:
@@ -370,14 +370,14 @@ class K15ScriptTest(K15Base):
         self.assertEqual(run.returncode, 0, run.stdout)
         self.assertNotIn("::", run.stdout)
 
-    def test_ac3_ci_step_command_warns_and_does_not_fail_the_job(self) -> None:
+    def test_ac3_ci_step_command_blocks_and_fails_the_job(self) -> None:
         self.write("AGENTS.md", self.limit + 1)
         steps = yaml.safe_load(self.read(WORKFLOW))["jobs"]["checks"]["steps"]
         command = next(step["run"] for step in steps if step.get("name") == K15_STEP).split()
         self.assertEqual(command[:2], ["python3", K15])
         run = self.run_check(*command[2:])
-        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
-        self.assertIn("::warning file=AGENTS.md::", run.stdout)
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn("::error file=AGENTS.md::", run.stdout)
 
     def test_ac3_only_agents_md_counts(self) -> None:
         self.write("AGENTS.md", 1)

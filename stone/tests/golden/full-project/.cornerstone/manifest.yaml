@@ -59,7 +59,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .github/workflows/cornerstone-checks.yml
-  hash: 186dd4f8a6c410d017185656185a30878dd0226ef5bac31c6b88eb3bbfc169c3
+  hash: 9d7f14612fd5eb9dc09732873832d6e824e740254f98f880c58e98651187c692
 - id: hook.protect-paths
   kind: hook
   purpose: Block an edit to a path that the current role must not change.

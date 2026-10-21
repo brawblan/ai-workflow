@@ -501,10 +501,10 @@ class AllStepsTest(FrameworkCopy):
         after = names[names.index("All checks") + 1:]
         self.assertEqual(after, registry_step_names())
 
-    def test_ac7_each_optional_step_has_continue_on_error(self) -> None:
+    def test_ac7_no_optional_step_has_continue_on_error(self) -> None:
         for name in self.optional_steps():
             with self.subTest(step=name):
-                self.assertIs(self.step(name).get("continue-on-error"), True)
+                self.assertNotIn("continue-on-error", self.step(name))
 
     def test_ac7_each_optional_step_runs_its_command(self) -> None:
         for name, key in STEPS.values():
@@ -544,7 +544,7 @@ class EachProfileYamlTest(StepsBase):
                                       if n in self.optional_steps()]
                     self.assertEqual(self.optional_steps(), names_in_order)
                     for step in self.optional_steps():
-                        self.assertIs(self.step(step).get("continue-on-error"), True)
+                        self.assertNotIn("continue-on-error", self.step(step))
 
 
 # AC8: the K10 step needs limits.mutation_score_changed_code.

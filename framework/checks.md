@@ -21,7 +21,7 @@ checks for the profile in CI. Each check SHOULD also run on the developer's mach
 | K12 | Differential tests | Two independent implementations give different outputs. | by profile | custom harness, `git bisect run` |
 | K13 | Secret scan | A secret or token is in the diff. | yes | gitleaks, platform secret scanning |
 | K14 | PR evidence | A required PR section (evidence, decision log, review findings, confidence) is missing or empty. | yes | `stone check-evidence`. Blocks in the G3 workflow (D49). |
-| K15 | Instruction size | The instruction file is over the line limit (`instruction_file_max_lines` in the model profile). The adapter names the instruction file. | yes | script in the generator output |
+| K15 | Instruction size | The instruction file is over the line limit (`instruction_file_max_lines` in the model profile). The adapter names the instruction file. | yes | script in the generator output. Blocks in the G3 workflow (D52). |
 | K16 | No merge to main | A spike branch targets the main or the integration branch. | spike profile | branch protection, script |
 | K17 | Writing standard | New or changed human-facing text breaks a measurable rule. See [writing.md](writing.md#what-k17-tests). | yes, also for profiles that only write reports | script in the generator output |
 | K18 | Persona references | The personas file breaks the format in [workflow-model.md](workflow-model.md#personas), or a plan names a persona or a job story that the file does not have. | by profile | `stone check`. An error since 2026-10-21 (D53). |
@@ -69,8 +69,8 @@ Source: dossier B14, C3.
    roles, the file hook limits the file tools. The reviewer and gate G4 are the control (D39, D51).
 2. A check failure message SHOULD say how to fix the failure. Agents act on the message (dossier C7).
 3. A new check starts as a warning for 2 weeks. Then it becomes blocking. The repo config can
-   change this period. Exception: K16 blocks from the start, because a role permission depends on
-   it (D30).
+   change this period. A check may block early if a replay shows no false positive (D45).
+   Exception: K16 blocks from the start, because a role permission depends on it (D30).
 4. When an agent makes the same mistake twice, add a check if the rule can be stated. Add an
    instruction only if it cannot (P6).
 5. Limits (size, complexity, mutation score) are in the repo config, not in the check code.

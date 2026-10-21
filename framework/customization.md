@@ -111,7 +111,8 @@ mutation tools do not read them, so wrap the tool in a repo script:
 
 The K10 step needs `limits.mutation_score_changed_code`. If it has no value, render stops.
 
-A new step warns for 2 weeks (`continue-on-error`). Then the framework makes it block.
+A failing command fails the job, and G3 blocks the merge (D52). The steps have no `continue-on-error`.
+Make sure that each command passes before you add it to `commands`.
 
 CI does not know the profile of a PR. So each step runs on each PR in the repo. For example, a repo
 with single-ticket and refactor-migration runs K10 on each single-ticket PR too.
