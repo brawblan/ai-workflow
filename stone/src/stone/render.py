@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from stone import framework_check, triggers
+from stone import framework_check, results, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -413,16 +413,16 @@ def _merge_json(root: Path, path: str, fragment_text: str) -> tuple[bool, str]:
 
 
 def _manifest_entry(component: Component, old: dict[str, Any] | None, config: dict[str, Any],
-                    today: dt.date) -> dict[str, Any]:
+                    today: dt.date, tested: dict[str, list[str]]) -> dict[str, Any]:
     return {
         "id": component.id,
         "kind": component.kind,
         "purpose": component.purpose,
         "principle": component.principle,
         "source": "framework",
-        "owner": old["owner"] if old else config["owners"]["default"],
+        "owner": (old or {}).get("owner") or config["owners"]["default"],
         "eval": component.eval,
-        "models_tested": old.get("models_tested", []) if old else [],
+        "models_tested": tested.get(component.id, []),  # from evals/results/ (D50)
         "added": str(old["added"]) if old else today.isoformat(),
         "review_by": str(old["review_by"]) if old else add_months(today, REVIEW_MONTHS).isoformat(),
         "files": sorted(component.files),
@@ -441,6 +441,7 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
     manifest = load_manifest(root)
     old_entries = {entry["id"]: entry for entry in manifest.get("components", [])}
 
+    tested = results.result_models(root)
     result = Result()
     entries = [entry for entry in manifest.get("components", []) if entry.get("source") == "repo"]
     to_write: dict[str, str] = {}
@@ -463,7 +464,7 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
             if old:
                 entries.append(old)
             continue
-        entries.append(_manifest_entry(component, old, config, today))
+        entries.append(_manifest_entry(component, old, config, today, tested))
     rendered_ids = {component.id for component in components}
     for entry_id, entry in old_entries.items():
         if entry.get("source") != "repo" and entry_id not in rendered_ids:
