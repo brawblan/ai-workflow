@@ -40,13 +40,13 @@ jobs:
           "$${RUNNER_TEMP}/stone/bin/pip" install --quiet \
             "cornerstone-stone @ git+https://github.com/brawblan/ai-workflow@$${STONE_TAG}#subdirectory=stone"
 
-      # K14 warns for 2 weeks after this step is first rendered. Then the framework changes it to block.
+      # K14 blocks (D45, D49). The PR body needs the Evidence, Decision log, Review findings, and Confidence sections.
       - name: K14 PR evidence
         env:
           PR_BODY: $${{ github.event.pull_request.body }}
         run: |
           printf '%s\n' "$${PR_BODY}" \
-            | "$${RUNNER_TEMP}/stone/bin/stone" check-evidence - --mode warn --format github
+            | "$${RUNNER_TEMP}/stone/bin/stone" check-evidence - --mode block --format github
 
 $ci_step_check_k15
       - name: Install

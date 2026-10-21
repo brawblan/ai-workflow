@@ -65,7 +65,7 @@ Add `--format github` to show the findings as annotations in a GitHub Actions ru
    gh pr view <number> --json body --jq .body | stone check-evidence -
    ```
 
-   K14 warns by default. Add `--mode block` to fail on findings after the 2-week warning period.
+   K14 warns by default. Add `--mode block` to fail on findings. The G3 workflow uses `--mode block` (D49).
    Add `--section <name>` for each section that your repo requires. It replaces the default list.
 
 6. Render the generated files into a target repo. Write `.cornerstone/config.yaml` first (see
