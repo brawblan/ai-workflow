@@ -98,7 +98,7 @@ class FrameworkCheckTest(unittest.TestCase):
         self.assertTrue(any("names 'Codex'" in m for m in self.messages()))
 
     def test_broken_link(self) -> None:
-        (self.root / "README.md").write_text("See [x](missing.md).\n", encoding="utf-8")
+        (self.root / "AGENTS.md").write_text("See [x](missing.md).\n", encoding="utf-8")
         self.assertTrue(any("'missing.md' points to no file" in m for m in self.messages()))
 
     def test_config_waiver_cannot_remove_g3(self) -> None:
