@@ -63,7 +63,10 @@ Source: dossier B14, C3.
 
 ## Rules for checks
 
-1. A check MUST be read-only for the implementer and the tester. Only a human changes a check (K6).
+1. A check MUST be read-only for the implementer. Only a human changes a check. K6 enforces this for
+   the implementer only: it fails an implementer commit that changes a protected path. No check
+   sees the same change by the tester, the planner, the investigator, or the reviewer. For those
+   roles, the file hook limits the file tools. The reviewer and gate G4 are the control (D39, D51).
 2. A check failure message SHOULD say how to fix the failure. Agents act on the message (dossier C7).
 3. A new check starts as a warning for 2 weeks. Then it becomes blocking. The repo config can
    change this period. Exception: K16 blocks from the start, because a role permission depends on

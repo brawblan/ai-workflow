@@ -10,7 +10,7 @@ defines where specificity goes and which layer wins.
 | 1 | Framework core | `framework/` in this repo | Principles, gates, profiles |
 | 2 | Adapter and model profile | `framework/adapters/<name>.md`, its templates, and `framework/adapters/<name>/models/` | File paths for one harness. Idioms and role models for one model family. |
 | 3 | Repo config | `.cornerstone/config.yaml` in the target repo | Commands, paths, limits, owners |
-| 4 | Profile override | `.cornerstone/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
+| 4 | Profile override (not built yet, D51) | `.cornerstone/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
 | 5 | Task | The ticket fields | Acceptance criteria, non-goals, a mode, a waiver |
 
 A later layer wins over an earlier layer, with these limits:
@@ -117,6 +117,11 @@ CI does not know the profile of a PR. So each step runs on each PR in the repo. 
 with single-ticket and refactor-migration runs K10 on each single-ticket PR too.
 
 ## Profile override (`.cornerstone/profiles/<profile>.yaml`)
+
+> Not built yet (D51, issue #78). `stone render` and `stone check` do not read these files. The
+> file below shows the planned form only. Today, a waiver is a record in the PR body (see the PR
+> size waiver above), and the human decides at G4. `stone check` rejects only a profile that
+> removes G3 or G5.
 
 ```yaml
 extends: single-ticket

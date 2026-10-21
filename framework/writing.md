@@ -62,7 +62,9 @@ blocks since D45, after a replay on the merged PRs found no false positive.
 
 ## Evidence (P5)
 
-The manifest entry is `rule.writing-standard`. It is reviewed every 6 months, like each component.
+The manifest has no entry for the writing standard (D51). `stone render` writes a manifest entry
+only for a rendered component, and K17 and the `ste-writing` skill are not rendered components. A
+human reviews the standard every 6 months. The human records the result in the PR that changes it.
 
 | Measure | How | Keep STE when |
 | --- | --- | --- |
@@ -71,7 +73,7 @@ The manifest entry is `rule.writing-standard`. It is reviewed every 6 months, li
 | Blind A/B | Each quarter, a human rates 10 pairs of the same artifact, one in STE and one not. The human does not know which is which. Question: "Which one is faster to understand and act on?" | STE wins 6 or more of 10 pairs |
 
 If STE loses on a type of text (for example commit messages), remove that type from the scope. Record
-the result in the manifest.
+the result in that PR.
 
 For agent-facing text, the [adapter-refresh](profiles/adapter-refresh.md) evals decide. Run each
 affected eval with the STE version and with the vendor-style version. Keep the version that wins.

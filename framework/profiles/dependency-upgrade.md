@@ -66,7 +66,9 @@ conditions are true:
 3. No security notice applies to the new version.
 4. The investigator found no breaking change.
 
-Minor and major versions always need G4. Example waiver in the profile override:
+Minor and major versions always need G4. The profile override is not built yet (D51, issue #78).
+Today, the waiver is a record in the PR body, and the human decides at G4. Planned form of the
+waiver in the profile override:
 
 ```yaml
 waivers:

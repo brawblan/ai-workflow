@@ -61,7 +61,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .github/workflows/cornerstone-bug-triage-issue-opened.yml
-  hash: 1ac6c3fb0d1a6a941793ca84c4c0d8463956f1483a5b5acff158882866040bc1
+  hash: a491a3ed381d480842145561e5354fa44bf3b4cbb296609119550bb5d508df53
 - id: trigger.schedule.bug-triage
   kind: ci-job
   purpose: Start the first role of the profile on its schedule. Post its report as
@@ -77,4 +77,4 @@ components:
   review_by: '2027-04-18'
   files:
   - .github/workflows/cornerstone-bug-triage-schedule.yml
-  hash: 901ae66a994ee40cecb26f7ba67ab9ce8974e2b292a4603e8d0aa1c12ea0f22e
+  hash: b587f914df32667143deb30a039376d92622595d20849e55bdb9f0a1947aeee1
