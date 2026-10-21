@@ -39,7 +39,9 @@ The rule: structure changes and behavior changes never go in the same commit.
 2. Start the tester in a fresh session. It writes characterization tests for the current behavior.
    The tests MUST pass on the current code.
 3. Start the planner in a fresh session. It writes the plan artifact and the progress file. Each task
-   is one small structural step. It writes the new fitness rules (K8) for the target structure.
+   is one small structural step. It writes the new fitness rules (K8) for the target structure as
+   text in the plan. The planner changes only `paths.plans`, so it cannot write the K8 config. A
+   human adds the rules to the K8 config (D51).
 4. A human approves the plan (G2).
 5. For each task, start the implementer in a fresh session. It makes one structural step. All
    characterization tests MUST pass after each step.

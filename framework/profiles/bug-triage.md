@@ -21,7 +21,8 @@ outputs: [labels, report]
 
 # Bug triage
 
-This profile does not change code. It changes issue fields and writes a short report on each issue.
+This profile does not change code. It writes a short report on each issue as a comment, or as a
+new issue for the scheduled run. A human changes the issue fields.
 
 ## Use when
 
@@ -42,8 +43,10 @@ This profile does not change code. It changes issue fields and writes a short re
    - Suspected area of the code (file paths), with a confidence level
    - Suggested severity and labels, each with a one-sentence reason
    - Duplicate of: issue number, or none
-5. A human approves the labels and the severity (G4). The investigator applies only approved labels.
-6. If the bug is confirmed, mark the issue ready for the [debugging](debugging.md) profile.
+5. A human approves the labels and the severity (G4). The investigator posts the comment only. A
+   human applies the labels. Label application by a role is not built yet (D51, issue #79).
+6. If the bug is real, a human marks the issue ready for the [debugging](debugging.md)
+   profile. This step is not built yet (D51, issue #79).
 
 > WARNING: The investigator reads untrusted text from bug reports. Do not give it production data or
 > an outbound channel other than issue comments (P9, lethal trifecta).
@@ -57,7 +60,7 @@ This profile does not change code. It changes issue fields and writes a short re
 
 | Failure | Action |
 | --- | --- |
-| The bug cannot be reproduced | Label it "needs info". Ask the reporter for the missing facts. |
+| The bug cannot be reproduced | A human labels it "needs info". Ask the reporter for the missing facts. |
 | The report has a secret or private data | Do not copy it into the comment. Tell the repo owner. |
 
 ## Evidence
