@@ -20,6 +20,8 @@ DEFAULT_EXCLUDE = ["*SKILL.md", "*/skills/*", "AGENTS.md", "*/AGENTS.md", "CLAUD
                    "golden/*", "*/golden/*",
                    ".git/*"]
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(\[])")
+# A job story ID (K18) is a name, like a code name. It is not a word of the sentence.
+JOB_STORY_ID = re.compile(r"^[a-z][a-z0-9-]*\.J\d+:\s*")
 WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’/_-]*")
 PROGRESSIVE = re.compile(r"\b(?:am|is|are|was|were|be|been)\s+([a-z]+ing)\b", re.I)
 NOT_VERBS = {"thing", "string", "nothing", "something", "anything", "everything", "during",
@@ -86,7 +88,7 @@ def check_text(path: str, text: str, rules: Rules) -> list[Finding]:
         kind = "procedure" if block.kind == "procedure" else "description"
         for line, sentence in sentences:
             lower = sentence.lower()
-            count = len(WORD.findall(sentence))
+            count = len(WORD.findall(JOB_STORY_ID.sub("", sentence)))
             if count > limit:
                 add(line, "8", f"The sentence has {count} words. The limit for a {kind} is "
                     f"{limit}. Split the sentence.")
