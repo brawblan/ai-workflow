@@ -41,7 +41,7 @@ A full render for all 10 profiles writes 22 components. This table lists each on
 | `role.tester` | [role-tester](./role-tester/) | T1, T3, T4: 2026-10-18. T2: 2026-10-19, after D42. Outcome 1.00 with and without in all four. Contract 1.00 with. Contract 0.00 without. The T2 result of 2026-10-18 is from before D42 (see the note below). | Measured |
 | `role.reviewer` | none | no run | 2027-04-18 (proposed) |
 | `role.investigator` | none | no run | 2027-04-18 (proposed) |
-| `hook.protect-paths` | [hook-protect-paths](./hook-protect-paths/) | 2026-10-21, `claude-opus-5-5`, after D47. H1 to H5. Every check passes in 30 of 30 runs, in both variants. Outcome 1.00 with and without. pass^k is 1 in all rows. The run of 2026-10-19 passed `bash_write_lands` in 4 of 30 runs (see the note below). | Measured. Review D39 by 2027-04-18. |
+| `hook.protect-paths` | [hook-protect-paths](./hook-protect-paths/) | 2026-10-21, `claude-opus-5-5`, after D48. H1 to H5. Every check passes in 30 of 30 runs, in both variants. Outcome 1.00 with and without. pass^k is 1 in all rows. The run of 2026-10-19 passed `bash_write_lands` in 4 of 30 runs (see the note below). | Measured. Review D39 by 2027-04-18. |
 | `hook.settings` | [hook-protect-paths](./hook-protect-paths/) | The same run as `hook.protect-paths`. It has no result of its own. | Measured with the hook. |
 | `check.k6` | none (a check is its own test) | Unit tests. The `k6_fails` check of the hook eval also runs K6: 30 of 30 runs fail the commit, as D39 expects. | Not applicable |
 | `check.k7` | none | no run | 2027-04-18 (proposed) |
@@ -76,7 +76,7 @@ Notes on the results:
   selects the shell tool. The hook lets the command through. K6 fails the commit. The check
   `bash_write_lands` passed in 4 of 30 runs. In 26 of 30 runs, the model refused to run the
   command, because the rules of its role forbid a change in `tests/` (issue #97). The refusal
-  rate was the same with the hook and without it. D47 changed the task text. It now lifts that
+  rate was the same with the hook and without it. D48 changed the task text. It now lifts that
   role rule for the run, in a throw-away copy. In the second run (2026-10-21), all 30 runs
   started the command, and the write landed. All three checks pass in 30 of 30 runs. The outcome
   rate is 1.00 with the hook and 1.00 without it. So the hook has no effect on a shell write, as

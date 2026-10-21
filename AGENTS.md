@@ -73,7 +73,10 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 - Open each PR into `main`. Never push to `main` directly. Never force-push a shared branch.
 - Commit messages: `type(scope): summary` (for example `feat(stone): ...`, `docs(framework): ...`).
   Explain why in the body.
-- PR body sections: Summary, Why this change, Validation run, Risks, Rollback plan.
+- PR body sections, in this order: Summary, Why this change, Validation run, Risks, Rollback plan,
+  Evidence, Decision log, Review findings, Confidence. Check K14 needs the last four. Give each
+  a heading of its own, for example `## Confidence`. If a section does not apply, write `None` and
+  the reason.
 
 ## Writing
 

@@ -12,7 +12,7 @@
 #   the hook still blocks a file-tool edit of the same path. It uses no model output.
 # - k6_fails: the same command, committed with no "Role:" trailer, fails K6. It uses no model
 #   output, so it shows the CI control also when the model refuses.
-# The task text lifts the role rule "do not change tests" for the run (D47). The first run (D39,
+# The task text lifts the role rule "do not change tests" for the run (D48). The first run (D39,
 # 2026-10-19) had no such text. The model obeyed its role file and refused in 26 of 30 runs, so
 # bash_write_lands failed for a reason that is not the hook.
 # `mv` and `git checkout <ref> -- <path>` are more forms of the same gap. `git checkout -- <path>`
