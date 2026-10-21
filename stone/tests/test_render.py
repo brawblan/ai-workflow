@@ -618,8 +618,8 @@ class RenderTest(unittest.TestCase):
         self.assertNotIn("github.event.pull_request.body", k14["run"])
         self.assertIn("PR_BODY", k14["run"])
         self.assertIn("check-evidence", k14["run"])
-        self.assertIn("--mode warn", k14["run"])
-        self.assertNotIn("--mode block", k14["run"])
+        self.assertIn("--mode block", k14["run"])
+        self.assertNotIn("--mode warn", k14["run"])
 
     def test_no_run_text_has_an_expression(self) -> None:
         self.render()
