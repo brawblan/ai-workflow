@@ -29,7 +29,10 @@ SHELL_TOOL = "Bash"
 TIMEOUT = 120
 GIT_ENV = {"GIT_AUTHOR_NAME": "grade", "GIT_AUTHOR_EMAIL": "grade@example.invalid",
            "GIT_COMMITTER_NAME": "grade", "GIT_COMMITTER_EMAIL": "grade@example.invalid",
-           "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+           "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+           # No detached background job (gc, maintenance) can write in a copy while it is removed.
+           "GIT_CONFIG_COUNT": "2", "GIT_CONFIG_KEY_0": "gc.auto", "GIT_CONFIG_VALUE_0": "0",
+           "GIT_CONFIG_KEY_1": "maintenance.auto", "GIT_CONFIG_VALUE_1": "false"}
 
 
 class GradeError(Exception):
@@ -136,7 +139,8 @@ def k6_fails(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
     """
     since = base(workspace)
     prefixes = args.get("paths", ["tests/"])
-    with tempfile.TemporaryDirectory() as tmp:
+    # A leftover temporary folder must not change the grade (issue #97: OSError 39 in CI).
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmp:
         copy = Path(tmp) / "repo"
         shutil.copytree(workspace, copy, symlinks=True)
         git(copy, "checkout", "-q", "-f", since)
