@@ -634,11 +634,11 @@ class SpecApplyTest(unittest.TestCase):
     def k19_paths(self) -> list[str]:
         return sorted(finding.path for finding in self.k19())
 
-    def assert_all_warnings(self, findings: list) -> None:
+    def assert_all_errors(self, findings: list) -> None:
         self.assertTrue(findings, "K19 found nothing")
         for finding in findings:
             self.assertEqual(finding.check, "K19")
-            self.assertEqual(finding.severity, "warning")
+            self.assertEqual(finding.severity, "error")
 
     def line_of(self, path: Path, start: str) -> int:
         lines = path.read_text(encoding="utf-8").splitlines()
@@ -852,12 +852,12 @@ class SpecApplyTest(unittest.TestCase):
         self.delta("draft", added("export.R2"))
         self.assertEqual(self.k19(), [])
 
-    def test_p2_ac3_format_error_is_a_warning_with_its_line(self) -> None:
+    def test_p2_ac3_format_error_is_an_error_with_its_line(self) -> None:
         path = self.delta("p1", added("export.R1"),
                           "## CHANGED export.R2: Bad op\n\n### Scenario: s\n- WHEN a\n- THEN b\n",
                           front="plan: p1")
         findings = self.k19()
-        self.assert_all_warnings(findings)
+        self.assert_all_errors(findings)
         self.assertEqual([(f.path, f.line) for f in findings],
                          [(f"{PLANS}/p1.spec.md", self.line_of(path, "## CHANGED"))])
 
@@ -866,19 +866,19 @@ class SpecApplyTest(unittest.TestCase):
                           "## ADDED bad id: Title\n\n### Scenario: s\n- WHEN a\n- THEN b\n")
         self.delta("p2", added("login.R1"), front="apply_order: 0")
         findings = self.k19()
-        self.assert_all_warnings(findings)
+        self.assert_all_errors(findings)
         self.assertEqual(sorted((f.path, f.line) for f in findings),
                          [(f"{PLANS}/p1.spec.md", self.line_of(path, "## ADDED export.R1")),
                           (f"{PLANS}/p1.spec.md", self.line_of(path, "## ADDED bad id")),
                           (f"{PLANS}/p2.spec.md", 1)])
 
-    def test_p2_ac3_bad_yaml_in_a_delta_is_a_warning(self) -> None:
+    def test_p2_ac3_bad_yaml_in_a_delta_is_an_error(self) -> None:
         self.delta("p1", added("export.R1"), front="apply_order: [1")
         findings = self.k19()
-        self.assert_all_warnings(findings)
+        self.assert_all_errors(findings)
         self.assertEqual([f.path for f in findings], [f"{PLANS}/p1.spec.md"])
 
-    def test_p2_ac3_each_delta_in_a_tie_is_a_warning(self) -> None:
+    def test_p2_ac3_each_delta_in_a_tie_is_an_error(self) -> None:
         self.delta("base", added("export.R1"), front="apply_order: 1")
         self.delta("left", added("export.R2"), front="apply_order: 2")
         self.delta("right", added("login.R1"), front="apply_order: 2")
@@ -886,82 +886,82 @@ class SpecApplyTest(unittest.TestCase):
                 specs.replay(specs.applied(specs.load_deltas(self.root)))).items():
             self.write(f"{SPECS}/{name}", text)
         findings = self.k19()
-        self.assert_all_warnings(findings)
+        self.assert_all_errors(findings)
         self.assertEqual(self.k19_paths(), [f"{PLANS}/left.spec.md", f"{PLANS}/right.spec.md"])
         for finding in findings:
             self.assertIn("stone spec sync", finding.message)
 
-    def test_p2_ac3_tie_of_three_deltas_gives_three_warnings(self) -> None:
+    def test_p2_ac3_tie_of_three_deltas_gives_three_errors(self) -> None:
         for plan, req in (("a", "export.R1"), ("b", "login.R1"), ("c", "admin.R1")):
             self.delta(plan, added(req), front="apply_order: 1")
         for name, text in specs.render_specs(
                 specs.replay(specs.applied(specs.load_deltas(self.root)))).items():
             self.write(f"{SPECS}/{name}", text)
-        self.assert_all_warnings(self.k19())
+        self.assert_all_errors(self.k19())
         self.assertEqual(self.k19_paths(),
                          [f"{PLANS}/a.spec.md", f"{PLANS}/b.spec.md", f"{PLANS}/c.spec.md"])
 
-    def test_p2_ac3_replay_conflict_is_a_warning(self) -> None:
+    def test_p2_ac3_replay_conflict_is_an_error(self) -> None:
         self.delta("base", added("export.R1"), front="apply_order: 1")
         self.delta("left", added("export.R2", "Left"), front="apply_order: 2")
         self.delta("right", added("export.R2", "Right"), front="apply_order: 2")
         findings = self.k19()
-        self.assert_all_warnings(findings)
+        self.assert_all_errors(findings)
         self.assertTrue(any("export.R2" in f.message for f in findings), findings)
 
-    def test_p2_ac3_conflict_without_a_tie_is_a_warning(self) -> None:
+    def test_p2_ac3_conflict_without_a_tie_is_an_error(self) -> None:
         self.delta("p1", modified("export.R1"), front="apply_order: 1")
         findings = self.k19()
-        self.assert_all_warnings(findings)
+        self.assert_all_errors(findings)
         self.assertTrue(any("export.R1" in f.message for f in findings), findings)
 
-    def test_p2_ac3_hand_edit_is_a_warning(self) -> None:
+    def test_p2_ac3_hand_edit_is_an_error(self) -> None:
         self.delta("p1", added("export.R1"), added("login.R1"))
         self.apply("p1")
         self.write(f"{SPECS}/export.md", self.read(f"{SPECS}/export.md") + "\nA hand edit.\n")
-        self.assert_all_warnings(self.k19())
+        self.assert_all_errors(self.k19())
         self.assertEqual(self.k19_paths(), [f"{SPECS}/export.md"])
 
-    def test_p2_ac3_extra_spec_file_is_a_warning(self) -> None:
+    def test_p2_ac3_extra_spec_file_is_an_error(self) -> None:
         self.delta("p1", added("export.R1"))
         self.apply("p1")
         self.write(f"{SPECS}/extra.md", "# extra\n")
-        self.assert_all_warnings(self.k19())
+        self.assert_all_errors(self.k19())
         self.assertEqual(self.k19_paths(), [f"{SPECS}/extra.md"])
 
-    def test_p2_ac3_spec_file_with_no_delta_is_a_warning(self) -> None:
+    def test_p2_ac3_spec_file_with_no_delta_is_an_error(self) -> None:
         self.write(f"{SPECS}/manual.md", "# manual\n")
-        self.assert_all_warnings(self.k19())
+        self.assert_all_errors(self.k19())
         self.assertEqual(self.k19_paths(), [f"{SPECS}/manual.md"])
 
-    def test_p2_ac3_missing_spec_file_is_a_warning(self) -> None:
+    def test_p2_ac3_missing_spec_file_is_an_error(self) -> None:
         self.delta("p1", added("export.R1"), added("login.R1"))
         self.apply("p1")
         (self.root / SPECS / "login.md").unlink()
-        self.assert_all_warnings(self.k19())
+        self.assert_all_errors(self.k19())
         self.assertEqual(self.k19_paths(), [f"{SPECS}/login.md"])
 
-    def test_p2_ac3_applied_delta_with_no_specs_folder_is_a_warning(self) -> None:
+    def test_p2_ac3_applied_delta_with_no_specs_folder_is_an_error(self) -> None:
         self.delta("p1", added("export.R1"), front="apply_order: 1")
-        self.assert_all_warnings(self.k19())
+        self.assert_all_errors(self.k19())
         self.assertEqual(self.k19_paths(), [f"{SPECS}/export.md"])
 
-    def test_p2_ac3_deleted_applied_delta_is_a_warning(self) -> None:
+    def test_p2_ac3_deleted_applied_delta_is_an_error(self) -> None:
         self.delta("p1", added("export.R1"))
         self.apply("p1")
         self.delta("p2", added("login.R1"))
         self.apply("p2")
         (self.root / PLANS / "p1.spec.md").unlink()
-        self.assert_all_warnings(self.k19())
+        self.assert_all_errors(self.k19())
         self.assertEqual(self.k19_paths(), [f"{SPECS}/export.md"])
 
-    def test_p2_ac3_config_path_outside_the_repo_is_a_warning(self) -> None:
+    def test_p2_ac3_config_path_outside_the_repo_is_an_error(self) -> None:
         self.nested_repo()
         for key in ("specs", "plans"):
             with self.subTest(key=key):
                 self.write(".cornerstone/config.yaml", f"paths:\n  {key}: ../outside/\n")
                 findings = self.k19()
-                self.assert_all_warnings(findings)
+                self.assert_all_errors(findings)
                 self.assertTrue(any(f"paths.{key}" in f.message for f in findings), findings)
 
     def test_p2_ac3_after_sync_k19_has_no_finding(self) -> None:
@@ -988,15 +988,16 @@ class SpecApplyTest(unittest.TestCase):
             code = cli.main(["check", "--root", str(self.root), "--framework", str(framework)])
         return code, out.getvalue()
 
-    def test_p2_ac3_stone_check_runs_k19_as_a_warning(self) -> None:
+    def test_p2_ac3_stone_check_runs_k19_as_an_error(self) -> None:
         self.delta("p1", added("export.R1"))
         self.apply("p1")
         clean_code, clean_output = self.run_stone_check()
         self.assertNotIn("K19", clean_output)
         self.write(f"{SPECS}/export.md", "A hand edit.\n")
         code, output = self.run_stone_check()
-        self.assertIn(f"{SPECS}/export.md:1: warning: K19:", output)
-        self.assertEqual(code, clean_code, "a K19 warning changed the exit code")
+        self.assertIn(f"{SPECS}/export.md:1: error: K19:", output)
+        self.assertEqual(clean_code, 0)
+        self.assertEqual(code, 1, "a K19 error must make the exit code 1")
 
     def test_p2_ac3_stone_check_has_no_k19_finding_after_sync(self) -> None:
         self.tie_after_merge()
@@ -1067,7 +1068,7 @@ class SpecApplyTest(unittest.TestCase):
         self.write("product/specs/export.md", "A hand edit.\n")
         self.assertEqual(self.k19_paths(), ["product/specs/export.md"])
         _, output = self.run_stone_check()
-        self.assertIn("product/specs/export.md:1: warning: K19:", output)
+        self.assertIn("product/specs/export.md:1: error: K19:", output)
 
     def test_paths_bad_form_stops_apply_and_sync_and_writes_nothing(self) -> None:
         for key in ("specs", "plans"):
@@ -1080,16 +1081,16 @@ class SpecApplyTest(unittest.TestCase):
                     self.assert_sync_refused(f"paths.{key}")
                     self.assertFalse((self.root / SPECS).exists())
 
-    def test_paths_bad_form_is_a_k19_warning_with_no_traceback(self) -> None:
+    def test_paths_bad_form_is_a_k19_error_with_no_traceback(self) -> None:
         for key in ("specs", "plans"):
             for value in self.BAD_PATHS:
                 with self.subTest(key=key, value=value):
                     self.write(".cornerstone/config.yaml", f"paths:\n  {key}: {value}\n")
                     findings = self.k19()
-                    self.assert_all_warnings(findings)
+                    self.assert_all_errors(findings)
                     self.assertTrue(any(f"paths.{key}" in f.message for f in findings), findings)
                     _, output = self.run_stone_check()
-                    self.assertIn("warning: K19:", output)
+                    self.assertIn("error: K19:", output)
                     self.assertIn(f"paths.{key}", output)
 
 
