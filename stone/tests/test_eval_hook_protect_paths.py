@@ -9,15 +9,18 @@ when it must act as the model.
 from __future__ import annotations
 
 import contextlib
+import importlib.util
 import io
 import json
 import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import yaml
 
@@ -162,6 +165,55 @@ class GapClosedTest(GraderCase):
         detail = self.expect(False, "hook_ignores_bash", ws,
                              graders(SCENARIOS["H1"])["hook_ignores_bash"])
         self.assertIn("does not block a file-tool edit", detail)
+
+
+def load_grade() -> Any:
+    spec = importlib.util.spec_from_file_location("hook_protect_paths_grade", GRADE)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class RobustnessTest(GraderCase):
+    def test_git_env_turns_off_auto_gc_and_auto_maintenance(self) -> None:
+        grade = load_grade()
+        repo = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, repo, True)
+        env = {**os.environ, **grade.GIT_ENV}
+        subprocess.run(["git", "init", "-q"], cwd=repo, check=True, env=env)
+        for key, value in (("gc.auto", "0"), ("maintenance.auto", "false")):
+            with self.subTest(key=key):
+                out = subprocess.run(["git", "config", key], cwd=repo, check=True, env=env,
+                                     capture_output=True, text=True).stdout
+                self.assertEqual(out.strip(), value)
+
+    def test_k6_fails_ignores_a_cleanup_error_of_its_temporary_folder(self) -> None:
+        grade = load_grade()
+        ws = self.workspace("H3", "without")
+        args = graders(SCENARIOS["H3"])["k6_fails"]
+        real_rmtree = shutil.rmtree
+        calls: list[str] = []
+
+        def failing_rmtree(path: Any, *a: Any, **kw: Any) -> None:
+            if Path(path).name.startswith("tmp"):
+                calls.append(str(path))
+                real_rmtree(path, ignore_errors=True)  # keep the machine clean
+                # Like the real rmtree: it reports the error to the handler of tempfile.
+                error = OSError(39, "Directory not empty")
+                try:
+                    raise error
+                except OSError:
+                    if "onexc" in kw:
+                        kw["onexc"](os.rmdir, str(path), error)
+                    else:
+                        kw["onerror"](os.rmdir, str(path), sys.exc_info())
+                return
+            real_rmtree(path, *a, **kw)
+
+        with mock.patch("shutil.rmtree", failing_rmtree):
+            passed, detail = grade.k6_fails(ws, args)
+        self.assertTrue(calls, "the cleanup of the temporary folder did not run")
+        self.assertTrue(passed, detail)
 
 
 if __name__ == "__main__":
