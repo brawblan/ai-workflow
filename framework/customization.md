@@ -85,8 +85,9 @@ Write each `branches.*` value as a quoted YAML string if it could parse as a num
 (`"1.10"`, `"yes"`). YAML reads `1.10` as `1.1` and `yes` as `True`, and K16 then compares the wrong
 name. `stone render` and `stone check` fail on a `branches.*` value that is not a string (D34).
 
-`stone check` tests the relative links in the files that Cornerstone owns: `AGENTS.md`, `CLAUDE.md`,
-`constitution/`, `.cornerstone/`, the plans and specs folders, and the framework folder (D54). To
+`stone check` tests the relative links in the files that Cornerstone owns (D54). These are
+`AGENTS.md`, the file that imports it, and these folders: `constitution/`, `.cornerstone/`, plans,
+specs, and the framework folder. To
 test more files, list them in `checks.links.paths`, or run `stone check --links all`. The check
 decodes percent-encoding, resolves a link that starts with `/` from the repo root, and tests links
 in the `<...>` form.
