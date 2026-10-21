@@ -6,10 +6,12 @@ import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import unquote
 
 import yaml
 
-LINK = re.compile(r"\]\(([^)\s]+)\)")
+# A link target is plain (no space) or in the CommonMark form <...>, which can hold spaces.
+LINK = re.compile(r"\]\((?:<([^<>]+)>|([^)\s]+))\)")
 TABLE_SEPARATOR = re.compile(r"^\s*\|?\s*:?-{3,}")
 
 
@@ -33,8 +35,16 @@ def table_rows(text: str) -> list[list[str]]:
     return rows
 
 
+def link_file(target: str) -> str:
+    """Return the file part of a link target: no fragment, and no percent-encoding."""
+    return unquote(target.split("#", 1)[0])
+
+
 def relative_links(path: Path) -> list[tuple[int, str]]:
-    """Return (line, target) for each relative link outside code blocks."""
+    """Return (line, target) for each relative link outside code blocks.
+
+    The target is as written, without the <...> of the CommonMark form.
+    """
     links: list[tuple[int, str]] = []
     in_code = False
     for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
@@ -44,8 +54,8 @@ def relative_links(path: Path) -> list[tuple[int, str]]:
         if in_code:
             continue
         for match in LINK.finditer(line):
-            target = match.group(1)
-            if target.startswith(("http://", "https://", "#", "mailto:")) or "<" in target:
+            target = match.group(1) or match.group(2)
+            if target.startswith(("http://", "https://", "//", "#", "mailto:")) or "<" in target:
                 continue
             links.append((number, target))
     return links

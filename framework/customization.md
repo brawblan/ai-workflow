@@ -69,6 +69,9 @@ writing:
   dictionary: docs/style/ste.md    # optional project dictionary
   max_words_procedure: 20
   max_words_description: 25
+checks:
+  links:
+    paths: [README.md, docs/]    # optional: more paths for the link check of stone check
 waivers: []
 ```
 
@@ -81,6 +84,12 @@ profile of the PR on a `Profile: <id>` line in the PR body. Without it, K7 uses 
 Write each `branches.*` value as a quoted YAML string if it could parse as a number or a boolean
 (`"1.10"`, `"yes"`). YAML reads `1.10` as `1.1` and `yes` as `True`, and K16 then compares the wrong
 name. `stone render` and `stone check` fail on a `branches.*` value that is not a string (D34).
+
+`stone check` tests the relative links in the files that Cornerstone owns: `AGENTS.md`, `CLAUDE.md`,
+`constitution/`, `.cornerstone/`, the plans and specs folders, and the framework folder (D54). To
+test more files, list them in `checks.links.paths`, or run `stone check --links all`. The check
+decodes percent-encoding, resolves a link that starts with `/` from the repo root, and tests links
+in the `<...>` form.
 
 The generator fills the facts that it can find. It asks a human for the rest. It writes
 `TODO(<owner>)` for an unknown value. It does not guess.
