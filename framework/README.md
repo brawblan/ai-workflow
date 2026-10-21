@@ -2,7 +2,7 @@
 
 The principles are the cornerstone. Each profile, adapter, and generated file aligns to them.
 
-Status: draft v0 (2026-10-17). Evidence: [docs/research/dossier.md](../docs/research/dossier.md).
+Status: version 1.0.0 (2026-10-21). Evidence: [docs/research/dossier.md](../docs/research/dossier.md).
 
 This framework describes how an agent and a human deliver software together. The core is
 tool-neutral. Adapters turn the core into files for one harness (see [adapters/](adapters/contract.md)). A
@@ -188,7 +188,7 @@ Do these items in order. Each item is one PR or more.
      path with no such text. Result: `evals/results/`.
 5. Do the first blind A/B rating of STE text (see [writing.md](writing.md#evidence-p5)) at the end
    of Q4 2026.
-6. Version 1: support all 10 profiles (D24). Items 6b to 6h can run in parallel after 6a.
+6. Done on 2026-10-21: version 1.0.0 supports all 10 profiles (D24). Items 6b to 6h ran in parallel after 6a.
    - 6a. Done in stone 0.8: profile support from the adapter role files, the `when` filter, and the
      investigator role with its hook rule (D24, D25).
    - 6b. Done: K7 (change size) as a generated check in the G3 workflow (D27). K7 blocks since D45.
@@ -217,7 +217,8 @@ Do these items in order. Each item is one PR or more.
      K14, and K15 block early under the rule of D45 (D45, D49, D52).
    - Each new component has an eval plan and a review date in the manifest (P5). `stone check`
      tests this (D43).
-   - Then tag `v1.0.0`.
+   - Done on 2026-10-21: all criteria are met, and the tag is `v1.0.0`. The known limits are in
+     [the principles audit](../docs/reports/v1-principles-audit.md) and in the open issues.
 
 ## Relation to the plugin in this repo
 

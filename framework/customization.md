@@ -26,7 +26,7 @@ A later layer wins over an earlier layer, with these limits:
 ## Repo config (`.cornerstone/config.yaml`)
 
 ```yaml
-framework_version: 0.5.0           # tag of brawblan/ai-workflow. G3 installs stone from it.
+framework_version: 1.0.0           # tag of brawblan/ai-workflow. G3 installs stone from it.
 harness: <harness-adapter-name>    # a file name in framework/adapters/
 model_profile: <model-family>      # a file in framework/adapters/<harness>/models/
 spec_tool: plain                   # plain, or a spec-tool adapter name
