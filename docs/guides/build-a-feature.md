@@ -74,8 +74,8 @@ The G3 workflow also runs a step for each check of this profile that has a comma
 | K10 mutation score on the changed code | `mutation`, and `limits.mutation_score_changed_code` |
 
 The K10 command gets the variables `BASE_REF` and `MUTATION_SCORE_MIN`. See
-[customization](../../framework/customization.md#commands-for-the-by-profile-checks). These steps
-warn for 2 weeks after render adds them (`continue-on-error`). Then they block.
+[customization](../../framework/customization.md#commands-for-the-by-profile-checks). A failing
+command fails the job, and G3 blocks (D52).
 
 ### 4. Review and deliver
 
