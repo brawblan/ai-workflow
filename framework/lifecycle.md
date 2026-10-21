@@ -25,8 +25,20 @@ components:
     hash: <sha256 of the generated content>
 ```
 
-`stone check` tests these fields (D43). It fails if a component has no `eval` key, or an empty
-`eval` and a kind that is not `check`. It also fails if a manifest entry has no valid `review_by`.
+`stone check` tests these fields (D43, D50). It fails in these cases:
+
+- A component has no `eval` key, or an empty `eval` and a kind that is not `check`.
+- A manifest entry has no valid `review_by`.
+- A manifest entry has an empty `owner`.
+- A result file in `evals/results/` names a model that `models_tested` of its component does not
+  list.
+
+`stone render` keeps the `owner` of an entry. If the owner is empty or the entry is new, it sets
+`owner` from `owners.default` in the repo config. It sets `models_tested` from the result files:
+for each component, the models of all its result files, sorted. It reads the component and the
+model from the first lines of the result file (`# Eval results: <component>` and
+``Model: `<model>` ``). After a `stone eval` run, run `stone render` and commit the manifest. A
+component with no result file has `models_tested: []`.
 
 ## Review triggers
 
