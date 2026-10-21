@@ -351,12 +351,12 @@ def check(root: Path) -> list[Finding]:
     try:
         plans, folder = config_path(root, "plans"), config_path(root, "specs")
     except SpecError as error:
-        return [Finding(CONFIG.as_posix(), 1, CHECK, str(error), "warning")]
+        return [Finding(CONFIG.as_posix(), 1, CHECK, str(error))]
     deltas = load_deltas(root)
     if not deltas and not folder.is_dir():
         return []
     base = root.resolve()
-    findings = [Finding(delta.path.relative_to(base).as_posix(), line, CHECK, message, "warning")
+    findings = [Finding(delta.path.relative_to(base).as_posix(), line, CHECK, message)
                 for delta in deltas.values() for line, message in delta.errors]
     if findings:
         return findings
@@ -365,15 +365,14 @@ def check(root: Path) -> list[Finding]:
         for delta in group:
             findings.append(Finding(delta.path.relative_to(base).as_posix(), 1, CHECK,
                                     f"Another delta has apply_order {delta.order}. Run "
-                                    "'stone spec sync'.", "warning"))
+                                    "'stone spec sync'."))
     try:
         expected = render_specs(replay(history))
     except SpecError as error:
-        return findings + [Finding(plans.relative_to(base).as_posix(), 1, CHECK, str(error),
-                                   "warning")]
+        return findings + [Finding(plans.relative_to(base).as_posix(), 1, CHECK, str(error))]
     for name in drift(folder, expected):
         findings.append(Finding((folder / name).relative_to(base).as_posix(), 1, CHECK,
                                 "The spec is not the same as a replay of the applied deltas. "
                                 "Undo the edit, restore a deleted delta, or run 'stone spec sync' "
-                                "after a merge.", "warning"))
+                                "after a merge."))
     return findings

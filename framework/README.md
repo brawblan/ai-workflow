@@ -111,6 +111,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | D48 | The task text of the `hook.protect-paths` eval lifts the role rule "do not change tests" for the run. The repo owner approves the test, and the workspace is a throw-away copy. Reason: issue #97. In the first run (D39), the model obeyed its role file. It refused to run the command in 26 of 30 runs, so `bash_write_lands` failed for a reason that is not the hook. Evidence: the transcripts of that run (4 of 30 runs started the command). In the run of 2026-10-21, with the task text, 30 of 30 runs started it. D39 is unchanged. Risk: the eval now tests a model that follows the task text over its role file. It does not show how often a model writes a protected path with no such text. A refusal is a model-dependent control against a shell write. K6 stays the control (D39). Review it by 2027-04-18, with D39. | [lifecycle.md](lifecycle.md#eval-design), `evals/hook-protect-paths/` |
 | D49 | K14 blocks early, under the rule of D45. Replay on 2026-10-21 with `stone check-evidence --mode block` on the 10 PRs merged from #84 on. The 7 PRs with the form of D47 (#86, #87, #88, #89, #90, #99, #100) pass. The 3 PRs with the old form (#84, #91, #92) fail on all 4 sections, and these are true positives. So the replay shows no false positive. The G3 template uses `--mode block` for K14. K15 and `continue-on-error` in the step templates keep their date of 2026-11-01 (issue #63). Risk: a PR that has no D47 body fails K14 and cannot merge until the author adds the sections. The error text names the missing section. Review it with D45 by 2027-04-19. | [checks.md](checks.md#rules-for-checks), [customization.md](customization.md) |
 | D51 | Until a feature is built, the docs describe only what `stone render`, `stone check`, and the hooks do. A promise that is not built is marked "not built yet". Reason: the issues #98, #77, #78, and #79 each found a doc that promised more than the code does. The owner chose to change the docs. Effect: K6 limits only the implementer (#98). The planner puts the new K8 rules as text in the plan, and a human adds them to the K8 config (#77). Render and check do not read profile overrides or the waiver of D2. Today a waiver is a record in the PR body, and a human decides at G4 (#78). The bug-triage investigator posts a comment, and a human applies the labels (#79). Risk: a reader who needs a feature that is not built must do it by hand. The issues #78 and #79 stay open as build work after v1. Review it with D39 by 2027-04-18. | [checks.md](checks.md#rules-for-checks), [customization.md](customization.md#profile-override-cornerstoneprofilesprofileyaml), [profiles/bug-triage.md](profiles/bug-triage.md) |
+| D53 | K18 and K19 are errors, under the rule of D45. Replay on 2026-10-21 of `stone check` on the 70 first-parent commits of `main` since 2026-10-17, and on the 5 fixtures in `evals/` (the shop and cart fixtures have personas, plans, and specs). The replay found 0 K18 findings and 0 K19 findings, so it shows no false positive. The unit tests cover the true positives of both checks. Reason: the owner wants v1 this week, and the replay found no false positive. Risk: this repo has no personas file and no spec at any commit, so the repo history does not test the checks. Only the fixtures and the unit tests do. A repo with a real personas file can find a case that is not covered. The error text names the line and the fix, and `stone spec sync` fixes a tie or a drift after a merge. Review it with D45 by 2027-04-19. | [checks.md](checks.md), [workflow-model.md](workflow-model.md#personas) |
 
 ## Open questions
 
@@ -127,14 +128,14 @@ Do these items in order. Each item is one PR or more.
 3. Update the plugin skills from the
    [gap analysis](../docs/research/dossier.md#3-gap-analysis-of-this-repo-brawblanai-workflow-v021).
    `stone render` writes the role files, so the plugin has no tester or reviewer skill (D14).
-   - 3a0. Done in plugin 0.4.1 and stone 0.3: user personas and job stories (D15 to D17). Two weeks
-     after the merge, change K18 in `stone check` from a warning to an error.
+   - 3a0. Done in plugin 0.4.1 and stone 0.3: user personas and job stories (D15 to D17). K18 is an
+     error since 2026-10-21 (D53).
    - 3a1. Done in plugin 0.5.0 and stone 0.4. The plugin has no spec-tool support (D18). The
      app-slice profile has the planner role (D19).
    - 3a2. Done in stone 0.5: the spec format and `stone spec apply` (D21).
    - 3a3. Done in plugin 0.6.0 and stone 0.6: check K19 and `stone spec sync` (D22). The planner,
-     the tester, the reviewer, the hook, and the guides use the specs. Two weeks after the merge,
-     change K19 from a warning to an error.
+     the tester, the reviewer, the hook, and the guides use the specs. K19 is an error since
+     2026-10-21 (D53).
    - 3a. Done in plugin 0.3.0: the `cornerstone-setup` entry skill, the repo config of this repo,
      and a `stone render` run in this repo.
    - 3b. Done in plugin 0.4.0. `ticket-delivery` does not self-verify. `dev-pr` has the evidence
