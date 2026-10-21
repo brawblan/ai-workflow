@@ -72,7 +72,7 @@ The G3 workflow adds a step for K8, K12, and K10 only if the command has a value
 render skips the step and warns. K10 also needs `limits.mutation_score_changed_code`. Without it,
 render stops.
 
-Each step warns for 2 weeks after render adds it (`continue-on-error`). Then it blocks.
+A failing command fails the job, and G3 blocks (D52).
 CI does not know the profile of a PR, so each step runs on each PR of the repo.
 
 K9 (complexity) and K13 (secret scan) have no step of their own. Put them in `commands.all_checks`.

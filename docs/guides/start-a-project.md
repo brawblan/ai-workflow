@@ -129,4 +129,4 @@ Start each backlog item with [Build a feature](build-a-feature.md) or
 
 - The foundation still comes from `/workflow:project-setup`. The shaper role shapes tickets, not the
   constitution files.
-- K15 and the K4, K5, and K8 steps warn for 2 weeks after render adds them. Then they block.
+- K15 and the K4, K5, and K8 steps block (D52).
