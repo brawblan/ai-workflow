@@ -62,7 +62,7 @@ def check_file(path: Path, label: str) -> tuple[list[Finding], set[str], set[str
     job_ids: set[str] = set()
 
     def add(line: int, message: str) -> None:
-        findings.append(Finding(label, line, CHECK, message, "warning"))
+        findings.append(Finding(label, line, CHECK, message))
 
     personas = parse(path.read_text(encoding="utf-8"))
     if not personas:
@@ -102,7 +102,7 @@ def _check_jobs(persona: Persona, pid: str, job_ids: set[str], label: str) -> li
     if not JOBS_MIN <= len(jobs) <= JOBS_MAX:
         findings.append(Finding(label, persona.line, CHECK,
                                 f"The persona has {len(jobs)} job stories. Write {JOBS_MIN} to "
-                                f"{JOBS_MAX}.", "warning"))
+                                f"{JOBS_MAX}."))
     for line, job in jobs:
         match = JOB.match(job)
         if not match:
@@ -115,7 +115,7 @@ def _check_jobs(persona: Persona, pid: str, job_ids: set[str], label: str) -> li
         else:
             job_ids.add(match.group("id"))
             continue
-        findings.append(Finding(label, line, CHECK, message, "warning"))
+        findings.append(Finding(label, line, CHECK, message))
     return findings
 
 
@@ -152,7 +152,7 @@ def check_plans(root: Path, persona_ids: set[str] | None, job_ids: set[str]) -> 
                 else:
                     message = (f"The {kind} '{name}' is not in {PERSONAS_FILE}. Fix the ID, or "
                                "add it to the personas file.")
-                findings.append(Finding(label, number, CHECK, message, "warning"))
+                findings.append(Finding(label, number, CHECK, message))
     return findings
 
 
@@ -168,7 +168,7 @@ def _references(line: str) -> list[tuple[str, str]]:
 
 
 def run(root: Path) -> list[Finding]:
-    """K18. Findings are warnings for the first 2 weeks (checks.md, rule 3)."""
+    """K18. Each finding is an error. The warning period ended early (D53)."""
     path = root / PERSONAS_FILE
     if not path.exists():
         return check_plans(root, None, set())
