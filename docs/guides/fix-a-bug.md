@@ -124,4 +124,3 @@ If the repo selects more than one profile with the label `agent-ready`, add the 
 
 - Automatic bisect. Check K12 adds a step that runs `commands.differential` from the repo config, if
   the command has a value. It does not run `git bisect`. The bisect stays in the prompt of step 3.
-- K18 gives a warning, not an error, for an unknown persona ID in a plan.

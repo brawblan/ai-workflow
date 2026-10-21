@@ -109,4 +109,3 @@ warn for 2 weeks after render adds them (`continue-on-error`). Then they block.
 - A pipeline that sets `passes` in the progress file. The planner writes `"passes": false`. You
   change it by hand.
 - A run script that starts each role in order. The label workflow starts the shaper only.
-- K18 and K19 give warnings, not errors.
