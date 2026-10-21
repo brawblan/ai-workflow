@@ -1,5 +1,4 @@
       # $step_name: a repo command from .cornerstone/config.yaml. Its exit code passes or fails the step.
-      # The step warns for 2 weeks after the framework adds it. Then the framework makes it block.
+      # A failing command fails the job, and G3 blocks (D52).
       - name: $step_name
-        continue-on-error: true
         run: $step_command
