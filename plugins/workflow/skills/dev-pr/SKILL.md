@@ -90,11 +90,14 @@ silently.
   you open the PR: `python <script> origin/<base> --body <file with the PR body>`.
 - If the diff is over the limit, tell the user. Split the PR, or add a `Waiver (P10)` section
   with the reason, the owner, and the end date. Write the waiver only if the user approves it.
-- If the repo has a PR template, use all of its sections. Otherwise use: **Summary**, **Why this
-  change**, **Validation run**, **Risks**, **Rollback plan**, **Environment/config changes**,
-  **Follow-up issues**. Keep scope focused to one concern; call out any deliberately-deferred
-  follow-up work as an issue rather than folding it into this PR.
-- Add the evidence sections (check K14), also when the repo template does not have them:
+- If the repo has a PR template, use all of its sections. Otherwise use these sections, in this
+  order: **Summary**, **Why this change**, **Validation run**, **Risks**, **Rollback plan**,
+  then the four evidence sections below. Add **Environment/config changes** or **Follow-up
+  issues** after **Confidence** only if they apply. Keep scope focused to one concern; call out
+  any deliberately-deferred follow-up work as an issue rather than folding it into this PR.
+- Add the evidence sections (check K14), also when the repo template does not have them. Put
+  them after **Rollback plan**, in this order. Use the exact heading names, for example
+  `## Confidence`:
 
   | Section | Content |
   | --- | --- |
