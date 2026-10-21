@@ -9,6 +9,7 @@ when it must act as the model.
 from __future__ import annotations
 
 import contextlib
+import errno
 import importlib.util
 import io
 import json
@@ -191,28 +192,25 @@ class RobustnessTest(GraderCase):
         grade = load_grade()
         ws = self.workspace("H3", "without")
         args = graders(SCENARIOS["H3"])["k6_fails"]
-        real_rmtree = shutil.rmtree
         calls: list[str] = []
+        tmp_root = Path(tempfile.gettempdir())
 
-        def failing_rmtree(path: Any, *a: Any, **kw: Any) -> None:
-            if Path(path).name.startswith("tmp"):
-                calls.append(str(path))
-                real_rmtree(path, ignore_errors=True)  # keep the machine clean
-                # Like the real rmtree: it reports the error to the handler of tempfile.
-                error = OSError(39, "Directory not empty")
-                try:
-                    raise error
-                except OSError:
-                    if "onexc" in kw:
-                        kw["onexc"](os.rmdir, str(path), error)
-                    else:
-                        kw["onerror"](os.rmdir, str(path), sys.exc_info())
-                return
-            real_rmtree(path, *a, **kw)
+        def remove_left_folders() -> None:
+            # The fake rmdir leaves folders on disk. Remove the top-level ones.
+            for call in calls:
+                for parent in (Path(call), *Path(call).parents):
+                    if parent.parent == tmp_root and parent.name.startswith("tmp"):
+                        shutil.rmtree(parent, ignore_errors=True)
 
-        with mock.patch("shutil.rmtree", failing_rmtree):
+        self.addCleanup(remove_left_folders)
+
+        def failing_rmdir(path: Any, *a: Any, **kw: Any) -> None:
+            calls.append(str(path))
+            raise OSError(errno.ENOTEMPTY, "Directory not empty")
+
+        with mock.patch("os.rmdir", failing_rmdir):
             passed, detail = grade.k6_fails(ws, args)
-        self.assertTrue(calls, "the cleanup of the temporary folder did not run")
+        self.assertTrue(calls, "the removal of a folder did not run")
         self.assertTrue(passed, detail)
 
 
