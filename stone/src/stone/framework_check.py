@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from stone import personas_check, specs
+from stone import personas_check, results, specs
 from stone.findings import Finding
 from stone.markdown import relative_links, split_frontmatter, table_rows
 
@@ -194,38 +194,59 @@ def _is_date(value: Any) -> bool:
     return True
 
 
-def component_problems(entry: dict[str, Any], needs_review_by: bool) -> list[str]:
-    """P5 (D43): name each missing eval plan or review date of one component entry."""
+def component_problems(entry: dict[str, Any], is_manifest: bool,
+                       tested: dict[str, list[str]] | None = None) -> list[str]:
+    """P5 (D43, D50): name each missing item of one component entry.
+
+    An adapter component list needs only the eval plan. A manifest entry also needs a review date,
+    an owner, and (if it has a result file) the model of each result in `models_tested`.
+    `tested` maps a component id to the models in `evals/results/`.
+    """
     problems = []
     if "eval" not in entry:
         problems.append("has no 'eval' key (P5). Add the eval folder, or \"\" for a check.")
     elif not str(entry["eval"] or "").strip() and entry.get("kind") not in EVAL_OPTIONAL_KINDS:
         problems.append("has no eval plan (P5). Set 'eval' to its eval folder, for example "
                         f"evals/{str(entry.get('id', '')).replace('.', '-')}/.")
-    if needs_review_by and not _is_date(entry.get("review_by")):
+    if not is_manifest:
+        return problems
+    if not _is_date(entry.get("review_by")):
         problems.append("has no valid 'review_by' date (P5). Set it to YYYY-MM-DD.")
+    if not str(entry.get("owner") or "").strip():
+        problems.append("has no owner (P5). Set 'owners.default' in .cornerstone/config.yaml, "
+                        "then run stone render.")
+    listed = entry.get("models_tested")
+    listed = listed if isinstance(listed, list) else []
+    missing = [model for model in (tested or {}).get(str(entry.get("id")), [])
+               if model not in listed]
+    if missing:
+        problems.append(f"has a result file for the model {', '.join(missing)} in "
+                        "evals/results/, but 'models_tested' does not list it (P5). "
+                        "Run stone render.")
     return problems
 
 
 def check_components(root: Path, framework: Path) -> list[Finding]:
-    """P5 (D43): test the adapter component lists and, if present, the repo manifest.
+    """P5 (D43, D50): test the adapter component lists and, if present, the repo manifest.
 
     Each component needs an eval plan (empty only for a check). Each manifest entry also needs a
-    review date. Render sets `review_by`, so the component lists do not have it.
+    review date, an owner, and the models of its result files in `models_tested`. Render sets
+    these three items, so the component lists do not have them.
     """
     paths = [(path, False) for path in sorted((framework / "adapters").glob("*/components.yaml"))]
     manifest = root / ".cornerstone" / "manifest.yaml"
     if manifest.exists():
         paths.append((manifest, True))
+    tested = results.result_models(root)
     findings: list[Finding] = []
-    for path, needs_review_by in paths:
+    for path, is_manifest in paths:
         text = path.read_text(encoding="utf-8")
         name = str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
         for entry in (yaml.safe_load(text) or {}).get("components") or []:
             component_id = entry.get("id", "?")
             match = re.search(rf"^\s*- id: {re.escape(str(component_id))}\s*$", text, re.M)
             line = text.count("\n", 0, match.start()) + 1 if match else 1
-            for problem in component_problems(entry, needs_review_by):
+            for problem in component_problems(entry, is_manifest, tested):
                 findings.append(Finding(name, line, CHECK,
                                         f"The component '{component_id}' {problem}"))
     return findings

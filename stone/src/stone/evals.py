@@ -27,14 +27,14 @@ from typing import Any
 
 import yaml
 
-from stone import render, specs
+from stone import render, results, specs
 
 VARIANTS = ("with", "without")
 KINDS = {"outcome", "contract"}
 REPORT = "@report"  # a check path that means the final text of the run
 REPORT_ENV = "STONE_EVAL_REPORT"  # grade.py reads the final text of the run here
 RUNS = Path(".cornerstone/eval-runs")
-RESULTS = Path("evals/results")
+RESULTS = results.RESULTS
 WORK_BRANCH = "feature/eval-work"
 GIT_ENV = {"GIT_AUTHOR_NAME": "stone eval", "GIT_AUTHOR_EMAIL": "eval@example.invalid",
            "GIT_COMMITTER_NAME": "stone eval", "GIT_COMMITTER_EMAIL": "eval@example.invalid",
