@@ -247,7 +247,7 @@ class K15WorkflowStepTest(K15Base):
         self.render()
         text = self.read(WORKFLOW)
         self.assertNotIn("\n\n\n", text)
-        self.assertIn("--mode warn --format github\n\n      - name: Install\n", text)
+        self.assertIn("--mode block --format github\n\n      - name: Install\n", text)
         lines = text.splitlines()
         steps_at = lines.index("    steps:")
         for number, line in enumerate(lines):
