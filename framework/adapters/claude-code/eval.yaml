@@ -23,9 +23,9 @@ tools:   # the same lists as the role files, plus the commands that the role run
            "Bash(git log*)", "Bash(git show*)", "Bash(git add*)", "Bash(git commit*)",
            "Bash(git status*)"]
   # The hook.protect-paths eval (D39): the shell write forms of its scenarios. Confirmed on
-  # 2026-10-19: sed -i, a redirect, and python3 -c ran under acceptEdits. A command with a second
-  # part (`; echo ...`) needed approval, so the model ran it again alone. [TO CONFIRM] tee and cp:
-  # in that run, the model started neither (it refused in 26 of 30 runs).
+  # 2026-10-19 and 2026-10-21: sed -i, a redirect, tee, cp, and python3 -c ran under acceptEdits
+  # (30 of 30 runs on 2026-10-21, with no file tool). A command with a second part (`; echo ...`)
+  # needed approval and was denied, so the model ran it again alone (6 of 30 runs).
   implementer: [Read, Grep, Glob, Edit, Write, "Bash(sed -i*)", "Bash(printf*)", "Bash(tee*)",
                 "Bash(cp*)", "Bash(python3 -c*)", "Bash(git diff*)", "Bash(git status*)"]
 
