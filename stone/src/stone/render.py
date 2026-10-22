@@ -357,8 +357,7 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
             values.setdefault(block, "")
         if entry.get("steps"):
             values["check_steps"] = render_steps(harness, entry["steps"], profiles, values, config)
-        content = substitute(harness, entry["template"], values, steps, config,
-                             entry.get("parts"))
+        content = substitute(harness, entry["template"], values, steps, config)
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
@@ -440,14 +439,9 @@ def step_name(component_id: str) -> str:
 
 
 def substitute(harness: Path, template_name: str, values: dict[str, str],
-               steps: dict[str, str | None], config: dict[str, Any],
-               parts: dict[str, str] | None = None) -> str:
-    """Fill one template. Remove the line of each step that is not rendered, or empty block.
-    Insert each part file at the line of its name first."""
+               steps: dict[str, str | None], config: dict[str, Any]) -> str:
+    """Fill one template. Remove the line of each step that is not rendered, or empty block."""
     template = (harness / "templates" / template_name).read_text(encoding="utf-8")
-    for name, part in (parts or {}).items():
-        template = triggers.insert_block(
-            template, name, (harness / "templates" / part).read_text(encoding="utf-8"))
     for name, step in steps.items():
         if step is None:
             template = template.replace(f"${name}\n", "").replace(f"${{{name}}}\n", "")

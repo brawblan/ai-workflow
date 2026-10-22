@@ -6,9 +6,13 @@ A commit with no "Role:" trailer counts as an implementer commit. Human and agen
 the same rule. Usage: protected_paths.py <base>
 """
 
-import re
 import subprocess
 import sys
+from pathlib import Path
+
+sys.dont_write_bytecode = True  # no __pycache__ folder in .cornerstone/lib
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+from path_match import covers  # noqa: E402  the same match as the hook (D62)
 
 PROTECTED = $protected_json
 TRAILERS = $trailers_json  # "commit": the Role trailer. "notes": also the git note (#121).
@@ -33,8 +37,6 @@ def role_of(sha: str) -> str:
             return "human"
     return roles[-1].lower() if roles else "implementer"
 
-
-$path_match
 
 
 def main(base: str) -> int:

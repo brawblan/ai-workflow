@@ -28,8 +28,13 @@ TICKET = $tickets_json  # the ticket file of the shaper (tickets.path). "" if th
 SPIKE_PREFIX = "spike/"
 ROLES = ("implementer", "tester", "planner", "investigator", "reviewer", "shaper")
 
-
-$path_match
+sys.dont_write_bytecode = True  # no __pycache__ folder in .cornerstone/lib
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+try:
+    from path_match import covers  # the same match as K6 (D62)
+except ImportError:
+    print("Blocked: .cornerstone/lib/path_match.py is missing. Run stone render.", file=sys.stderr)
+    sys.exit(2)
 
 
 def is_ticket(path: str) -> bool:

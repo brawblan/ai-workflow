@@ -66,12 +66,20 @@ components:
     target: .claude/agents/investigator.md
     eval: evals/role-investigator/
 
+  - id: hook.path-match
+    kind: hook
+    purpose: Match a path against paths.tests and paths.checks. The hook and K6 import it.
+    principle: [P2, P6]
+    provides: path_match                     # stone check tests each glob with this module
+    template: lib/path_match.py
+    target: .cornerstone/lib/path_match.py
+    eval: evals/hook-protect-paths/
+
   - id: hook.protect-paths
     kind: hook
     purpose: Block an edit to a path that the current role must not change.
     principle: [P2, P6]
     template: hooks/protect-paths.py
-    parts: {path_match: parts/path_match.py}
     target: .cornerstone/hooks/protect-paths.py
     eval: evals/hook-protect-paths/
 
@@ -92,7 +100,6 @@ components:
     needs_trailers: true                     # not rendered if commits.trailers is none
     ci_step: workflows/steps/k6.yml
     template: checks/protected_paths.py
-    parts: {path_match: parts/path_match.py}
     target: .cornerstone/checks/protected_paths.py
     eval: ""
 

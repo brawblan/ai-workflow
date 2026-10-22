@@ -224,19 +224,19 @@ def branch_name_problems(config: dict[str, Any]) -> list[str]:
 
 
 def path_compiler(harness: Path) -> Any:
-    """Return compile_path from the `path_match` part of the adapter, or None if it has none.
+    """Return compile_path from the component with `provides: path_match`, or None if none.
 
-    The hook and K6 get the text of the same part (D62), so this check and the rendered files use
-    one match rule. The part is a file of the framework, like the templates that render fills.
+    The hook and K6 import the module that render writes from the same template (D62), so this
+    check and the rendered files use one match rule. The template is a file of the framework,
+    like the other templates that render fills.
     """
     registry = harness / "components.yaml"
     if not registry.is_file():
         return None
     for entry in (yaml.safe_load(registry.read_text(encoding="utf-8")) or {}).get("components", []):
-        part = (entry.get("parts") or {}).get("path_match")
-        if part:
-            namespace: dict[str, Any] = {"re": re}
-            exec((harness / "templates" / part).read_text(encoding="utf-8"), namespace)
+        if entry.get("provides") == "path_match":
+            namespace: dict[str, Any] = {}
+            exec((harness / "templates" / entry["template"]).read_text(encoding="utf-8"), namespace)
             return namespace["compile_path"]
     return None
 
