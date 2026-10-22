@@ -254,7 +254,7 @@ class RenderTest(unittest.TestCase):
 
     def test_hook_agent_type_that_is_not_a_hook_role_uses_stone_role(self) -> None:
         self.render()
-        for agent in ("Explore", "general-purpose", "shaper", "", None):
+        for agent in ("Explore", "general-purpose", "statusline-setup", "", None):
             for role in self.HOOK_ROLES:
                 with self.subTest(agent_type=agent, stone_role=role):
                     self.assertEqual(self.role_seen(stone_role=role, agent_type=agent), role)
@@ -266,7 +266,7 @@ class RenderTest(unittest.TestCase):
         for stone_role in (self.UNSET, ""):
             with self.subTest(stone_role="unset" if stone_role is self.UNSET else "empty"):
                 self.assertEqual(self.role_seen(stone_role=stone_role), "implementer")
-                for agent in ("Explore", "general-purpose", "shaper", "", None):
+                for agent in ("Explore", "general-purpose", "statusline-setup", "", None):
                     with self.subTest(agent_type=agent):
                         self.assertEqual(self.role_seen(stone_role=stone_role, agent_type=agent),
                                          "implementer")
