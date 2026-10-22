@@ -29,4 +29,7 @@ writing:
   standard: ste
   max_words_procedure: 20
   max_words_description: 25
+checks:
+  links:
+    paths: [.]                     # check the links of all Markdown files in this repo (#124)
 waivers: []

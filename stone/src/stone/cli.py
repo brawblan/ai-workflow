@@ -18,6 +18,9 @@ def _parser() -> argparse.ArgumentParser:
     check = commands.add_parser("check", help="Validate the framework and the repo config.")
     check.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
     check.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
+    check.add_argument("--links", choices=framework_check.LINK_MODES, default="default",
+                       help="Link check scope. default: the Cornerstone files and "
+                            "checks.links.paths. all: each Markdown file.")
     check.add_argument("--format", choices=["text", "github"], default="text")
 
     build = commands.add_parser("render", help="Write the generated files and the manifest.")
@@ -81,7 +84,7 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "check":
-        findings = framework_check.run(args.root, args.framework)
+        findings = framework_check.run(args.root, args.framework, args.links)
         blocking = report(findings, args.format)
         print(f"stone check: {len(findings)} finding(s).")
         return 1 if blocking else 0
