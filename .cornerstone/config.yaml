@@ -1,5 +1,5 @@
 # Cornerstone repo config for this repo. Fields: framework/customization.md.
-framework_version: 0.5.0           # this repo renders from its own framework/ folder
+framework_version: 1.0.0           # this repo renders from its own framework/ folder
 harness: claude-code
 model_profile: claude-5
 spec_tool: plain
