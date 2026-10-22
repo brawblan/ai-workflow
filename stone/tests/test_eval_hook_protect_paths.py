@@ -37,6 +37,17 @@ SCENARIOS = {s["id"]: s for s in
 # H1 to H5 pin the shell-write gap (D39). H6 to H8 test how the hook finds the role (D55, #126).
 SHELL_WRITE = ("H1", "H2", "H3", "H4", "H5")
 ROLE_LOOKUP = ("H6", "H7", "H8")
+# H9 tests a glob in paths.tests: a test file next to its source file (D56, #119).
+# It uses role_from_input and k6_fails, so it is not in ROLE_LOOKUP.
+GLOB_MATCH = ("H9",)
+GROUPS = (SHELL_WRITE, ROLE_LOOKUP, GLOB_MATCH)
+COLOCATED_TEST = "src/widget/widget.test.js"
+COLOCATED_SOURCE = "src/widget/widget.js"
+# The match rule before D56. A hook or K6 with this rule cannot protect a colocated test file.
+PREFIX_ONLY_COVERS = ('def covers(patterns, path):\n'
+                      '    return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/")'
+                      ' for p in patterns)\n\n\n')
+MAIN_GUARD = 'if __name__ == "__main__":'
 HOOK_ROLES = ("implementer", "tester", "planner", "investigator", "reviewer")
 ROLE_CALL = "role = find_role(event)"
 
@@ -94,7 +105,8 @@ class ScenarioFileTest(unittest.TestCase):
         self.assertEqual(code, 0, out.getvalue())
 
     def test_each_scenario_is_in_one_group(self) -> None:
-        self.assertEqual(sorted(SCENARIOS), sorted(SHELL_WRITE + ROLE_LOOKUP))
+        self.assertEqual(sorted(SCENARIOS), sorted(sum(GROUPS, ())))
+        self.assertEqual(len(sum(GROUPS, ())), len(set(sum(GROUPS, ()))))
         self.assertFalse(set(SHELL_WRITE) & set(ROLE_LOOKUP))
 
     def test_the_prompt_and_each_grader_have_the_same_command(self) -> None:
@@ -290,6 +302,104 @@ class RoleFromInputTest(GraderCase):
 
     def test_the_role_prompt_changes_no_file(self) -> None:
         for sid in ROLE_LOOKUP:
+            with self.subTest(scenario=sid):
+                ws = self.workspace(sid)
+                self.run_command(ws, SCENARIOS[sid]["prompt"])
+                status = subprocess.run(["git", "status", "--porcelain"], cwd=ws, check=True,
+                                        capture_output=True, text=True).stdout
+                self.assertEqual(status, "")
+
+
+class GlobMatchTest(GraderCase):
+    """H9: a glob in paths.tests protects a test file next to its source file (D56, #119)."""
+
+    def fixture_config(self, sid: str) -> dict[str, Any]:
+        path = EVAL / SCENARIOS[sid]["fixture"] / ".cornerstone" / "config.yaml"
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+    def use_prefix_only_covers(self, ws: Path, file: str) -> None:
+        """Make the rendered file use the match rule from before D56."""
+        target = ws / file
+        text = target.read_text(encoding="utf-8")
+        self.assertEqual(text.count(MAIN_GUARD), 1, f"{file} has no single main guard")
+        target.write_text(text.replace(MAIN_GUARD, PREFIX_ONLY_COVERS + MAIN_GUARD),
+                          encoding="utf-8")
+
+    def test_each_glob_scenario_uses_role_from_input_and_k6_fails(self) -> None:
+        for sid in GLOB_MATCH:
+            with self.subTest(scenario=sid):
+                items = SCENARIOS[sid]["expect"]
+                self.assertEqual({item["check"] for item in items}, {"grader"})
+                self.assertEqual({item["name"] for item in items},
+                                 {"role_from_input", "k6_fails"})
+                for args in role_checks(SCENARIOS[sid]):
+                    self.assertTrue(args.get("allowed"), args)
+                    self.assertTrue(args.get("blocked"), args)
+                for item in items:
+                    if item["name"] == "role_from_input":
+                        self.assertEqual(item.get("kind"), "contract", item)
+
+    def test_the_fixture_has_a_glob_and_no_prefix_for_the_colocated_test(self) -> None:
+        tests = self.fixture_config("H9")["paths"]["tests"]
+        self.assertTrue(any(char in value for value in tests for char in "*?["), tests)
+        prefixes = [value for value in tests if not any(char in value for char in "*?[")]
+        self.assertFalse(any(COLOCATED_TEST == p.rstrip("/") or
+                             COLOCATED_TEST.startswith(p.rstrip("/") + "/") for p in prefixes))
+        self.assertTrue((EVAL / SCENARIOS["H9"]["fixture"] / COLOCATED_TEST).is_file())
+        self.assertTrue((EVAL / SCENARIOS["H9"]["fixture"] / COLOCATED_SOURCE).is_file())
+
+    def test_h9_checks_the_three_colocated_decisions(self) -> None:
+        # Implementer blocked on the test file and allowed on the source file. Tester allowed on
+        # the test file.
+        by_role = {args["input"]["agent_type"]: args for args in role_checks(SCENARIOS["H9"])}
+        self.assertIn(COLOCATED_TEST, by_role["implementer"]["blocked"])
+        self.assertIn(COLOCATED_SOURCE, by_role["implementer"]["allowed"])
+        self.assertIn(COLOCATED_TEST, by_role["tester"]["allowed"])
+        self.assertEqual(graders(SCENARIOS["H9"])["k6_fails"]["paths"], [COLOCATED_TEST])
+
+    def test_each_role_check_passes_with_the_rendered_hook(self) -> None:
+        for sid in GLOB_MATCH:
+            ws = self.workspace(sid)
+            self.run_command(ws, SCENARIOS[sid]["prompt"])
+            for index, args in enumerate(role_checks(SCENARIOS[sid])):
+                with self.subTest(scenario=sid, check=index):
+                    self.expect(True, "role_from_input", ws, args)
+
+    def test_each_role_check_fails_in_the_without_variant(self) -> None:
+        for sid in GLOB_MATCH:
+            ws = self.workspace(sid, "without")
+            self.assertFalse((ws / HOOK_FILE).exists())
+            for index, args in enumerate(role_checks(SCENARIOS[sid])):
+                with self.subTest(scenario=sid, check=index):
+                    self.assertIn("no hook file", self.expect(False, "role_from_input", ws, args))
+
+    def test_k6_fails_passes_with_no_model_output(self) -> None:
+        for sid in GLOB_MATCH:
+            with self.subTest(scenario=sid):
+                ws = self.workspace(sid)
+                detail = self.expect(True, "k6_fails", ws, graders(SCENARIOS[sid])["k6_fails"])
+                self.assertIn(COLOCATED_TEST, detail)
+
+    def test_a_hook_with_the_prefix_rule_fails_each_role_check_of_h9(self) -> None:
+        ws = self.workspace("H9")
+        self.use_prefix_only_covers(ws, HOOK_FILE)
+        for index, args in enumerate(role_checks(SCENARIOS["H9"])):
+            with self.subTest(check=index):
+                detail = self.expect(False, "role_from_input", ws, args)
+                self.assertIn(COLOCATED_TEST, detail)
+
+    def test_a_k6_with_the_prefix_rule_fails_k6_fails_of_h9(self) -> None:
+        ws = self.workspace("H9")
+        k6 = ".cornerstone/checks/protected_paths.py"
+        self.use_prefix_only_covers(ws, k6)
+        # k6_fails starts at the newest render commit, so commit the change as a render.
+        subprocess.run(["git", "commit", "-qam", "chore: render\n\nRole: generator"], cwd=ws,
+                       check=True, capture_output=True, env={**os.environ, **evals.GIT_ENV})
+        detail = self.expect(False, "k6_fails", ws, graders(SCENARIOS["H9"])["k6_fails"])
+        self.assertIn("no finding", detail)
+
+    def test_the_glob_prompt_changes_no_file(self) -> None:
+        for sid in GLOB_MATCH:
             with self.subTest(scenario=sid):
                 ws = self.workspace(sid)
                 self.run_command(ws, SCENARIOS[sid]["prompt"])
