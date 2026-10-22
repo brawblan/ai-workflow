@@ -22,7 +22,7 @@ each component that `stone render` writes.
 | Eval run | [claude-code/eval.yaml](claude-code/eval.yaml): the argv for each variant, the env, the tools of each role, and the JSON paths of the result | full | `stone eval` reads it (D26). `[TO CONFIRM]` that `--setting-sources project` keeps the user instruction file out of the run. For a hook eval, "without" removes the hook file and its entry in `.claude/settings.json`. If the entry stayed, `python3` could not open the file and would exit with code 2, so the harness would block each file-tool edit (D44). For a component that is not a role, both variants use `run.with`, so both load the same role file. |
 | Select the role for a headless run | `claude -p --agent <role>` loads `.claude/agents/<role>.md` | full | Confirmed on 2026-10-18 (Claude Code 2.1): the tester and reviewer runs for `stone eval` followed their role files. `[TO CONFIRM]` if the `model` field of the role file or `--model` wins. |
 | Hook before a file edit | `PreToolUse` hook with matcher `Edit\|Write\|MultiEdit\|NotebookEdit` in `.claude/settings.json`. Exit code 2 blocks the edit. | partial | The hook does not start for `Bash`, so it does not see a file write by a shell command (D39). K6 in CI is the control. |
-| Role in the hook input | The hook input field `agent_type` | full | Confirmed on 2026-10-21 (Claude Code 2.1.292) with a hook that logged its input. `--agent tester` sent `agent_type: tester`, the `name` of the role file. A tester subagent sent `agent_type: tester` and an `agent_id`, also under a `--agent implementer` lead. A session with no role sent no `agent_type` (D54). |
+| Role in the hook input | The hook input field `agent_type` | full | Confirmed on 2026-10-21 (Claude Code 2.1.292) with a hook that logged its input. `--agent tester` sent `agent_type: tester`, the `name` of the role file. A tester subagent sent `agent_type: tester` and an `agent_id`, also under a `--agent implementer` lead. A session with no role sent no `agent_type` (D55). |
 | Hook before the session ends | `Stop` hook that runs the checks | full | Do not loop forever. The harness caps repeated blocks. |
 | Model for each role | `model` field in the role file, from `defaults.role_models` in the model profile | full | |
 | Permissions | `permissions` allow and deny lists in `.claude/settings.json`, and sandbox mode | full | |
@@ -36,7 +36,7 @@ two layers:
 
 1. **Local hook.** A `PreToolUse` hook reads the role and the target path of a file tool. It exits
    with code 2 for a protected path. It does not see a `Bash` command. The hook finds the role in
-   this order (D54):
+   this order (D55):
    1. `agent_type` in the hook input, if it names a hook role. The harness sets it for a `--agent`
       session and in a subagent. In a subagent, it is the type of the subagent, not of the lead.
    2. The environment variable `STONE_ROLE`.
@@ -71,7 +71,7 @@ not configure the sandbox for this. These are the limits:
 | An implementer commit that changes a protected path | K6 fails in CI. |
 | A commit with a false `Role:` trailer | None in CI. K6 reads the trailer. The reviewer and G4 are the control. |
 | A tester, planner, investigator, or reviewer write outside its paths | None in CI. The reviewer and G4 are the control. |
-| A role session that starts a subagent of a different role, for example an implementer that starts a tester | None in CI. The hook uses the role of the subagent (D54). The reviewer and G4 are the control. |
+| A role session that starts a subagent of a different role, for example an implementer that starts a tester | None in CI. The hook uses the role of the subagent (D55). The reviewer and G4 are the control. |
 | A change that is not committed | Nothing to merge. |
 
 The `hook.protect-paths` eval (`evals/hook-protect-paths/`) pins these limits for the implementer.

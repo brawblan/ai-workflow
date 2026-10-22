@@ -18,7 +18,7 @@
 # `mv` and `git checkout <ref> -- <path>` are more forms of the same gap. `git checkout -- <path>`
 # with no ref puts back the committed text, so it leaves no change for K6.
 #
-# H6 to H8 test how the hook finds the role (D54). The graders send the hook input of a probe of
+# H6 to H8 test how the hook finds the role (D55). The graders send the hook input of a probe of
 # 2026-10-21 (a --agent session, a subagent, no role), with no model output. The prompt changes no
 # file. The checks are `contract`: with no hook, no role limit applies.
 #

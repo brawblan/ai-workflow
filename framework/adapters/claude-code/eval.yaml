@@ -13,7 +13,7 @@ run:
             --permission-mode, acceptEdits, --setting-sources, project, --max-budget-usd, $budget,
             --allowedTools, $tools, --, $prompt]
 
-env:   # the hook reads the role from agent_type (set by --agent), and STONE_ROLE is the fallback (D54)
+env:   # the hook reads the role from agent_type (set by --agent), and STONE_ROLE is the fallback (D55)
   with: {STONE_ROLE: $role}
   without: {STONE_ROLE: $role}
 
