@@ -10,7 +10,7 @@ import re
 import subprocess
 import sys
 
-PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "tests/"]
+PROTECTED = ["**/*.test.js", ".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "tests/"]
 
 
 def git(*args: str) -> str:

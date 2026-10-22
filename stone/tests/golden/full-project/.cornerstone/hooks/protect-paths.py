@@ -18,8 +18,8 @@ from pathlib import Path
 # The implementer must not change PROTECTED. The tester changes only TESTS. The planner only PLANS.
 # The investigator changes only REPORTS, except on a SPIKE_PREFIX branch, which never merges (K16).
 # No branch lets the investigator change HARNESS: the hook, the checks, and the harness settings.
-PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "tests/"]
-TESTS = ["tests/"]
+PROTECTED = ["**/*.test.js", ".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "tests/"]
+TESTS = ["tests/", "**/*.test.js"]
 PLANS = ["docs/plans/"]
 REPORTS = ["docs/reports/"]
 HARNESS = [".claude/", ".cornerstone/"]

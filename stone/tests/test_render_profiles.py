@@ -36,7 +36,7 @@ commands:
   test_unit: python -m unittest
   all_checks: make check
 paths:
-  tests: [tests/]
+  tests: [tests/, "**/*.test.js"]
   checks: [.github/workflows/, .cornerstone/checks/]
   plans: docs/plans/
 owners: {default: octocat}
