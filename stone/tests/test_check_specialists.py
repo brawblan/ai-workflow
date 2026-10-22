@@ -14,6 +14,7 @@ import yaml
 
 from stone import cli, gate, render, specialists
 from test_render import CONFIG, FRAMEWORK
+from test_specialists import put_module
 
 SPECS = """specialists:
   - id: security
@@ -37,6 +38,7 @@ class K20Base(unittest.TestCase):
         self.root = Path(self.folder.name)
         (self.root / ".cornerstone").mkdir()
         self.write_config(CONFIG + SPECS)
+        put_module(self.root)
         self.git("init", "-q", "-b", "main")
         self.git("config", "user.email", "a@example.com")
         self.git("config", "user.name", "a")
@@ -99,6 +101,12 @@ class CheckTest(K20Base):
         self.assertEqual([f.severity for f in found], ["error"])
         self.assertIn("security", found[0].message)
         self.assertIn("Ticket: <id>", found[0].message)
+
+    def test_missing_match_module_is_one_error_and_does_not_raise(self) -> None:
+        (self.root / specialists.MATCH_MODULE).unlink()
+        found = self.check("Ticket: 139\n")
+        self.assertEqual([f.severity for f in found], ["error"])
+        self.assertIn(".cornerstone/lib/path_match.py", found[0].message)
 
     def test_missing_report_of_blocking_specialist_is_error(self) -> None:
         found = self.check("Ticket: 139\n")
