@@ -23,6 +23,7 @@ waiver with a reason.
 4. A gate decision is recorded where the work is: a label, a PR review, or a CI status.
 5. Before a human passes G2 or G4, the agent states its confidence and the open risks (P11).
 6. The [mode](modes.md) does not change the gates. Only the profile and recorded waivers change them.
+7. A specialist review with `blocks: true` and a high finding stops G4 until a human decides (D59).
 
 ## Gate selection by profile
 
