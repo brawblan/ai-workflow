@@ -242,19 +242,28 @@ def path_compiler(harness: Path) -> Any:
 
 
 def path_pattern_problems(config: dict[str, Any], harness: Path) -> list[str]:
-    """Name each glob in `paths.tests` and `paths.checks` that is not valid."""
+    """Name each glob in `paths.tests`, `paths.checks`, and `when.paths` that is not valid."""
+    values: list[tuple[str, Any]] = []
     paths = config.get("paths")
-    compile_path = path_compiler(harness) if isinstance(paths, dict) else None
+    if isinstance(paths, dict):
+        for key in ("tests", "checks"):
+            value = paths.get(key) or []
+            values += [(f"'paths.{key}'", item) for item in (value if isinstance(value, list)
+                                                              else [value])]
+    for spec in specialists.listed(config):  # the same match as paths.tests (D65)
+        when = spec.get("when")
+        value = when.get("paths") if isinstance(when, dict) else None
+        values += [(f"'when.paths' of the specialist '{spec.get('id')}'", item)
+                   for item in (value if isinstance(value, list) else [])]
+    compile_path = path_compiler(harness) if values else None
     if compile_path is None:
         return []
     problems = []
-    for key in ("tests", "checks"):
-        value = paths.get(key) or []
-        for pattern in value if isinstance(value, list) else [value]:
-            try:
-                compile_path(str(pattern))
-            except ValueError as error:
-                problems.append(f"'paths.{key}': {error}")
+    for label, pattern in values:
+        try:
+            compile_path(str(pattern))
+        except ValueError as error:
+            problems.append(f"{label}: {error}")
     return problems
 
 

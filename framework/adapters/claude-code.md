@@ -55,7 +55,7 @@ The protected paths are `paths.tests` and `paths.checks` from the repo config, p
 `.cornerstone/`. These two folders hold the hook, the check, and the harness settings. A value can
 be a glob. The hook and K6 import one match module, `.cornerstone/lib/path_match.py`, from the
 template `claude-code/templates/lib/path_match.py` (D62). If the module is missing or broken, the
-hook blocks each edit.
+hook blocks each edit. `stone specialists` uses the same module for `when.paths` (D65).
 
 The hook makes the target path relative to the git work tree that holds the file. This is
 necessary because `CLAUDE_PROJECT_DIR` is the main checkout, also in a linked worktree under

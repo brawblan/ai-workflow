@@ -221,7 +221,9 @@ A repo can connect its own review agents or skills to the roles ([D59](README.md
   `stone render` warns if a specialist has no `eval` plan.
 - `stone specialists --base BASE --ticket ID [--labels a,b] [--personas x,y]` lists the specialists
   that match the change, in config order. A trigger matches if one `when` condition matches:
-  - `paths`: a glob (`*` does not cross a folder, `**` does) on the files changed since BASE.
+  - `paths`: a folder, a file, or a glob on the files changed since BASE. The rules are those of
+    `paths.tests` (D62, D65). `stone specialists` uses `.cornerstone/lib/path_match.py`, so run
+    `stone render` first.
   - `labels`: a label of the ticket.
   - `personas_with`: a word in the `limits` of a persona that `--personas` names.
 - A specialist writes its findings to `<paths.reports>/<ticket-id>.<id>.md`. Each finding has a line
