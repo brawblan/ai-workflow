@@ -85,6 +85,21 @@ Write each `branches.*` value as a quoted YAML string if it could parse as a num
 (`"1.10"`, `"yes"`). YAML reads `1.10` as `1.1` and `yes` as `True`, and K16 then compares the wrong
 name. `stone render` and `stone check` fail on a `branches.*` value that is not a string (D34).
 
+Each value in `paths.tests` and `paths.checks` is a folder, a file, or a glob (D56). A folder or
+a file protects that path and each path under it. A value with `*`, `?`, or `[` is a glob. It
+starts at the repo root:
+
+| Glob | Matches |
+| --- | --- |
+| `*`, `?`, `[...]` | Characters in one folder level. `[!...]` matches a character that is not in the list. |
+| `**` as one level | Any number of levels, also zero |
+| A glob that ends with `/` | Each path under a folder that the glob matches |
+
+For a test file next to its source, use for example `tests: ["**/*.test.js", "**/*.spec.ts"]`.
+`**/*.test.js` matches `a.test.js` and `src/widget/widget.test.js`. Quote a glob in YAML, because
+`*` has a meaning in YAML. `stone render` and `stone check` fail on a glob that is not valid, for
+example a `[` with no `]`.
+
 `stone check` tests the relative links in the files that Cornerstone owns (D54). These are
 `AGENTS.md`, the file that imports it, and these folders: `constitution/`, `.cornerstone/`, plans,
 specs, and the framework folder. To

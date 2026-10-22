@@ -37,7 +37,7 @@ Fill a fact sheet for each config field. Read before you ask.
 | `profiles` | Default `[single-ticket]`. `stone render` skips a profile with a role that the adapter has no file for. |
 | `branches` | `gh repo view --json defaultBranchRef`, `AGENTS.md`, branch protection |
 | `commands` | `AGENTS.md`, `CONTRIBUTING*`, `Makefile`, `package.json` scripts, `pyproject.toml`, CI steps. Copy each command exactly. |
-| `paths` | The folder layout. `tests` and `checks` become protected paths for the implementer. |
+| `paths` | The folder layout. `tests` and `checks` become protected paths for the implementer. If test files are next to their source files, use a glob, for example `"**/*.test.js"` (see `customization.md`). |
 | `limits` | The defaults in `customization.md`, unless `AGENTS.md` or the profile is stricter |
 | `owners.default` | `CODEOWNERS`, `gh api user --jq .login`, then ask |
 | `owners.solo` | Ask. True only if one person fills all human roles. |

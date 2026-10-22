@@ -10,6 +10,7 @@ A path is relative to the git work tree that holds it, so a linked worktree gets
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -26,8 +27,7 @@ SPIKE_PREFIX = "spike/"
 ROLES = ("implementer", "tester", "planner", "investigator", "reviewer")
 
 
-def covers(prefixes: list[str], path: str) -> bool:
-    return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/") for p in prefixes)
+$path_match
 
 
 def find_role(event: dict) -> str:

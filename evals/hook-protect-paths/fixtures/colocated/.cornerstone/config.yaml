@@ -1,0 +1,15 @@
+framework_version: 0.5.0
+harness: claude-code
+model_profile: claude-5
+profiles: [single-ticket]
+branches: {integration: main, main: main}
+commands:
+  install: "true"
+  test_unit: node --test
+  all_checks: node --test
+paths:
+  source: [src/]
+  tests: ["**/*.test.js"]          # each test file is next to its source file (issue #119)
+  checks: [.github/workflows/, .cornerstone/checks/]
+  plans: docs/plans/
+owners: {default: eval}

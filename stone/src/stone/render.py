@@ -214,6 +214,9 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     if model_profile.get("status") != "active":
         print(f"warning: model profile {model_profile['id']} has status "
               f"'{model_profile.get('status')}', not 'active'", file=sys.stderr)
+    problems = framework_check.path_pattern_problems(config, harness)
+    if problems:
+        raise RenderError(f"{CONFIG}: {problems[0]}")
     adapter_roles = {entry["role"] for entry in registry if entry["kind"] == "role"}
     profiles = load_profiles(framework, config["profiles"], adapter_roles)
     defaults = model_profile["defaults"]
@@ -243,7 +246,8 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
             values.setdefault(block, "")
         if entry.get("steps"):
             values["check_steps"] = render_steps(harness, entry["steps"], profiles, values, config)
-        content = substitute(harness, entry["template"], values, steps, config)
+        content = substitute(harness, entry["template"], values, steps, config,
+                             entry.get("parts"))
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
@@ -321,9 +325,14 @@ def step_name(component_id: str) -> str:
 
 
 def substitute(harness: Path, template_name: str, values: dict[str, str],
-               steps: dict[str, str | None], config: dict[str, Any]) -> str:
-    """Fill one template. Remove the line of each step that is not rendered, or empty block."""
+               steps: dict[str, str | None], config: dict[str, Any],
+               parts: dict[str, str] | None = None) -> str:
+    """Fill one template. Remove the line of each step that is not rendered, or empty block.
+    Insert each part file at the line of its name first."""
     template = (harness / "templates" / template_name).read_text(encoding="utf-8")
+    for name, part in (parts or {}).items():
+        template = triggers.insert_block(
+            template, name, (harness / "templates" / part).read_text(encoding="utf-8"))
     for name, step in steps.items():
         if step is None:
             template = template.replace(f"${name}\n", "").replace(f"${{{name}}}\n", "")

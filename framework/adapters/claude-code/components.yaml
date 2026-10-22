@@ -71,6 +71,7 @@ components:
     purpose: Block an edit to a path that the current role must not change.
     principle: [P2, P6]
     template: hooks/protect-paths.py
+    parts: {path_match: parts/path_match.py}
     target: .cornerstone/hooks/protect-paths.py
     eval: evals/hook-protect-paths/
 
@@ -89,6 +90,7 @@ components:
     principle: [P2, P6]
     when: {check: K6}
     template: checks/protected_paths.py
+    parts: {path_match: parts/path_match.py}
     target: .cornerstone/checks/protected_paths.py
     eval: ""
 

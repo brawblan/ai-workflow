@@ -6,6 +6,7 @@ A commit with no "Role:" trailer counts as an implementer commit. Human and agen
 the same rule. Usage: protected_paths.py <base>
 """
 
+import re
 import subprocess
 import sys
 
@@ -16,8 +17,7 @@ def git(*args: str) -> str:
     return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout
 
 
-def covers(path: str) -> bool:
-    return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/") for p in PROTECTED)
+$path_match
 
 
 def main(base: str) -> int:
@@ -28,7 +28,7 @@ def main(base: str) -> int:
         if role != "implementer":
             continue
         files = git("diff-tree", "--no-commit-id", "--name-only", "-r", sha).split("\n")
-        for path in filter(covers, files):
+        for path in (file for file in files if covers(PROTECTED, file)):
             failures += 1
             print(f"K6: commit {sha[:12]} (Role: {role}) changes {path}, a protected path. "
                   "Revert the change. A test change belongs in a 'Role: tester' commit. A check "
