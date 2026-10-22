@@ -412,11 +412,12 @@ def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict
 
     A step with a `command` needs that key in `commands` of the repo config. If the key has no
     value, render skips the step and warns: the profile lists the check, but the repo cannot run it.
+    A step with `needs: specialists` renders only if the repo config has specialists (D66).
     """
     blocks = []
     for step in steps:
         need = profiles_that_need(step, profiles)
-        if not need:
+        if not need or (step.get("needs") == "specialists" and not specialists.listed(config)):
             continue
         step_values = dict(values, step_name=step.get("name", step["id"]))
         command = step.get("command")

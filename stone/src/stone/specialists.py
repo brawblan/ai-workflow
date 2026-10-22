@@ -11,7 +11,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from stone import personas_check
+from stone import evidence_check, personas_check
+from stone.findings import Finding
 
 ID_PREFIX = "specialist."
 DOC = ".cornerstone/specialists.md"
@@ -21,6 +22,10 @@ WHEN_KEYS = ("paths", "personas_with", "labels")
 SLUG = re.compile(r"^[a-z][a-z0-9-]*$")
 HIGH = re.compile(r"^[\s>*_`-]*(?:\d+[.)]\s*)?[*_`]*severity[*_`]*\s*[:=][*_`\s]*high\b",
                   re.I | re.M)
+CHECK = "K20"
+TICKET_LINE = re.compile(r"^Ticket:[ \t]*#?([A-Za-z0-9][A-Za-z0-9._-]*)[ \t]*$", re.I | re.M)
+PERSONAS_LINE = re.compile(r"^Personas:[ \t]*(.*?)[ \t]*$", re.I | re.M)
+WAIVER = "waiver (k20)"
 
 
 class SpecialistError(Exception):
@@ -130,7 +135,7 @@ def persona_limits(root: Path, ids: list[str]) -> dict[str, list[str]]:
     if not ids:
         return {}
     if not path.exists():
-        raise SpecialistError(f"{personas_check.PERSONAS_FILE}: no file, but --personas names "
+        raise SpecialistError(f"{personas_check.PERSONAS_FILE}: no file, but the ticket names "
                               "personas.")
     by_id = {p.fields.get("id", ""): p for p in personas_check.parse(path.read_text("utf-8"))}
     unknown = [name for name in ids if name not in by_id]
@@ -173,24 +178,29 @@ class Row:
                 f"| {self.status} |")
 
 
+def matched(root: Path, config: dict[str, Any], base: str, labels: list[str],
+            persona_ids: list[str]) -> list[tuple[dict[str, Any], list[str]]]:
+    """Return each specialist that matches the change, with the reasons, in config order."""
+    files = changed_files(root, base)
+    limits = persona_limits(root, persona_ids)
+    return [(spec, why) for spec in listed(config) if (why := reasons(spec, files, labels, limits))]
+
+
+def status(root: Path, config: dict[str, Any], ticket: str, spec: dict[str, Any]) -> str:
+    """Return reviewed, missing, or blocking for the report of one specialist."""
+    path = report_path(root, config, ticket, spec["id"])
+    if not path.is_file():
+        return "missing"
+    if spec.get("blocks") and HIGH.search(path.read_text(encoding="utf-8")):
+        return "blocking"
+    return "reviewed"
+
+
 def run(root: Path, config: dict[str, Any], base: str, labels: list[str], persona_ids: list[str],
         ticket: str) -> tuple[list[Row], str]:
     """Match the specialists to a change and check their findings reports."""
-    files = changed_files(root, base)
-    limits = persona_limits(root, persona_ids)
-    rows = []
-    for spec in listed(config):
-        why = reasons(spec, files, labels, limits)
-        if not why:
-            continue
-        path = report_path(root, config, ticket, spec["id"])
-        if not path.is_file():
-            status = "missing"
-        elif spec.get("blocks") and HIGH.search(path.read_text(encoding="utf-8")):
-            status = "blocking"
-        else:
-            status = "reviewed"
-        rows.append(Row(spec, why, status))
+    rows = [Row(spec, why, status(root, config, ticket, spec))
+            for spec, why in matched(root, config, base, labels, persona_ids)]
     if not rows:
         return rows, "No specialist review matched this change."
     lines = ["Specialist findings (run order):", "",
@@ -204,6 +214,74 @@ def run(root: Path, config: dict[str, Any], base: str, labels: list[str], person
             lines.append(f"\nBlocking: {row.spec['id']} has a finding with severity high. "
                          "G4 cannot pass until a human decides.")
     return rows, "\n".join(lines)
+
+
+def body_fields(body: str) -> tuple[str, list[str]]:
+    """Return the ticket ID and the persona IDs from the `Ticket:` and `Personas:` lines."""
+    ticket = TICKET_LINE.search(body)
+    personas = PERSONAS_LINE.search(body)
+    ids = re.split(r"[\s,]+", personas.group(1)) if personas else []
+    return (ticket.group(1) if ticket else ""), [i for i in ids if i and i.lower() != "none"]
+
+
+def waiver(body: str) -> str:
+    """Return the text of the first heading with "waiver (K20)" that is not empty, or ''."""
+    lines = body.splitlines()
+    found = evidence_check.headings(lines)
+    for heading in found:
+        if WAIVER in heading.name:
+            text = evidence_check.section_body(lines, heading, found, set())
+            if not evidence_check.is_empty(text):
+                return text.strip()
+    return ""
+
+
+def check(root: Path, config: dict[str, Any], base: str, body: str, labels: list[str],
+          path: str = "<body>") -> list[Finding]:
+    """K20 (D66): return the findings of the specialists that match the PR.
+
+    A blocking finding, or a missing report of a `blocks: true` specialist, is an error. A
+    missing report of another specialist is a warning. A waiver makes each error a warning.
+    """
+    body = body.replace("\r\n", "\n")  # a PR body from the web form has CRLF line ends
+    ticket, persona_ids = body_fields(body)
+    try:
+        found = matched(root, config, base, labels, persona_ids)
+    except SpecialistError as error:
+        return [Finding(path, 1, CHECK, str(error))]
+    if found and not ticket:
+        names = ", ".join(spec["id"] for spec, _ in found)
+        return _waived(body, [Finding(path, 1, CHECK, (
+            f"The specialists {names} match this PR, but the PR body has no 'Ticket: <id>' "
+            "line. Add the line, so K20 can find the reports."))])
+    findings = []
+    for spec, why in found:
+        report = report_path(root, config, ticket, spec["id"])
+        name = report.relative_to(root).as_posix()
+        state = status(root, config, ticket, spec)
+        if state == "blocking":
+            text = report.read_text(encoding="utf-8")
+            match = HIGH.search(text)
+            line = text[:match.end()].count("\n") + 1 if match else 1
+            findings.append(Finding(name, line, CHECK, (
+                f"The specialist {spec['id']} has a finding with severity high, and it blocks. "
+                "Fix the finding and run the specialist again. Or add a 'Waiver (K20)' section "
+                "with the decision of the human at G4.")))
+        elif state == "missing":
+            blocks = bool(spec.get("blocks"))
+            findings.append(Finding(name, 1, CHECK, (
+                f"The specialist {spec['id']} matches ({'; '.join(why)}), but it has no report. "
+                f"Start `{spec['run']}` in a new session, and commit its report."),
+                "error" if blocks else "warning"))
+    return _waived(body, findings)
+
+
+def _waived(body: str, findings: list[Finding]) -> list[Finding]:
+    """With a waiver, return each error as a warning that names the waiver."""
+    if not waiver(body) or not any(f.severity == "error" for f in findings):
+        return findings
+    return [Finding(f.path, f.line, f.check, f"Waived (K20): {f.message} The human at G4 checks "
+                    "the waiver.", "warning") if f.severity == "error" else f for f in findings]
 
 
 def document(config: dict[str, Any]) -> str:
