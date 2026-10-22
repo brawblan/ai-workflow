@@ -9,7 +9,9 @@ does not change.
 
 from __future__ import annotations
 
+import atexit
 import contextlib
+import functools
 import hashlib
 import io
 import json
@@ -82,6 +84,19 @@ def git(cwd: Path, *args: str) -> str:
     return result.stdout
 
 
+@functools.cache
+def base_repo() -> Path:
+    """The shop fixture as a git repo with one commit. Made once; each workspace copies it."""
+    base = Path(tempfile.mkdtemp(prefix="planner-base-"))
+    atexit.register(shutil.rmtree, base, ignore_errors=True)
+    repo = base / "shop"
+    shutil.copytree(FIXTURE, repo)
+    git(repo, "init", "-q", "-b", "main")
+    git(repo, "add", "-A")
+    git(repo, "commit", "-q", "-m", "chore: fixture base")
+    return repo
+
+
 def snapshot(ws: Path) -> dict[str, str]:
     """The hash of each file of the workspace, out of .git."""
     return {p.relative_to(ws).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
@@ -107,10 +122,7 @@ class GraderCase(unittest.TestCase):
         """The shop fixture as a git repo, then `files` (path: text), as the planner output."""
         self.count += 1
         ws = self.tmp / f"ws{self.count}"
-        shutil.copytree(FIXTURE, ws)
-        git(ws, "init", "-q", "-b", "main")
-        git(ws, "add", "-A")
-        git(ws, "commit", "-q", "-m", "chore: fixture base")
+        shutil.copytree(base_repo(), ws, symlinks=True)
         for rel, text in (files or {}).items():
             (ws / rel).parent.mkdir(parents=True, exist_ok=True)
             (ws / rel).write_text(text, encoding="utf-8")
