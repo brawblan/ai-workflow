@@ -20,13 +20,22 @@ Start each role in a new terminal session. Do not reuse a session from an earlie
 | Role | Command | Give it |
 | --- | --- | --- |
 | shaper | `claude --agent shaper` | The ticket. Answer its questions until the ticket is ready. |
-| planner | `STONE_ROLE=planner claude --agent planner` | The ready ticket. Answer its open questions. App-slice only. |
-| implementer | `STONE_ROLE=implementer claude --agent implementer` | The ticket, and the plan if one exists |
-| tester | `STONE_ROLE=tester claude --agent tester` | The ticket and the branch name. It reads the diff. |
-| reviewer | `STONE_ROLE=reviewer claude --agent reviewer` | The ticket, the branch, the check output, and the decision log |
-| investigator | `STONE_ROLE=investigator claude --agent investigator` | The ticket or the bug report, and the question to answer. It writes a report. |
+| planner | `claude --agent planner` | The ready ticket. Answer its open questions. App-slice only. |
+| implementer | `claude --agent implementer` | The ticket, and the plan if one exists |
+| tester | `claude --agent tester` | The ticket and the branch name. It reads the diff. |
+| reviewer | `claude --agent reviewer` | The ticket, the branch, the check output, and the decision log |
+| investigator | `claude --agent investigator` | The ticket or the bug report, and the question to answer. It writes a report. |
 
-`STONE_ROLE` tells the protected-path hook which paths the session can change:
+The protected-path hook finds the role of the session in this order:
+
+1. The role file that the harness loaded. With `--agent`, or in a subagent, the hook input names it.
+2. The environment variable `STONE_ROLE`, for example `STONE_ROLE=tester claude`.
+3. `implementer`, if neither names a role.
+
+If the hook blocks a tester or a planner edit with an implementer message, your harness version
+does not send the role. Then start the role with `STONE_ROLE=<role> claude --agent <role>`.
+
+The role sets which paths the session can change:
 
 | Role | Can change |
 | --- | --- |
@@ -36,7 +45,8 @@ Start each role in a new terminal session. Do not reuse a session from an earlie
 | reviewer | No path |
 | investigator | The reports path only (`paths.reports`, default `docs/reports/`). On a `spike/` branch, all paths except `.claude/` and `.cornerstone/`. |
 
-If `STONE_ROLE` is not set, the hook uses `implementer`.
+A session with no role is an implementer for the hook. It cannot change `.claude/` or
+`.cornerstone/`. Change those files with `stone render`.
 
 The investigator is the only role with a branch rule. Code on a `spike/` branch never merges (K16).
 See [K16 and the spike branch](../../framework/checks.md#k16-and-the-spike-branch).
@@ -44,8 +54,28 @@ See [K16 and the spike branch](../../framework/checks.md#k16-and-the-spike-branc
 To run a role with no human at the terminal, add `-p` and the prompt:
 
 ```bash
-STONE_ROLE=tester claude --agent tester -p "Write the tests for issue #42 on branch fix/login-timeout."
+claude --agent tester -p "Write the tests for issue #42 on branch fix/login-timeout."
 ```
+
+## Start a role as a subagent
+
+Use this path if you cannot start a session with `--agent`, for example in the desktop app.
+
+1. Start a session with no role.
+2. Ask it to start the role as a subagent. For example: "Use the tester subagent. Write the tests for
+   issue #42 on branch fix/login-timeout."
+3. Start a new session for the next role.
+
+The subagent has a fresh context, and the hook uses the role of the subagent. This path is weaker
+for P2, because the lead session starts the subagent and gives it its prompt. These are the limits:
+
+- Start a role subagent only from a session with no role. If an implementer session starts a tester
+  subagent, the hook lets the subagent change the tests. No check finds this. The reviewer and G4
+  are the control.
+- The lead can change the prompt of the subagent. Give the lead the same ticket text that you give
+  a role session.
+- The subagent commits with its own `Role:` trailer. If the lead commits the files of the subagent,
+  use the trailer of the subagent role.
 
 ## Commit with trailers
 

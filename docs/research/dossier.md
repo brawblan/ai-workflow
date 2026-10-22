@@ -138,6 +138,7 @@ the workflow profiles where it applies, and the framework principle that it supp
 | F15 | A hook before a tool call runs only for the tools that its matcher names. The input of the shell tool is a command, not a file path. Exit code 2 blocks the call. Thus a hook for the file tools does not see a file write by a shell command. | [S43] | ALL | P2, P6 |
 | F16 | The harness applies its edit rules to the file tools, to some file commands in a shell (`sed`, `tee`), and to redirect targets. They do not apply to a script that opens a file itself. Rules that match command arguments are fragile. Only an OS sandbox blocks a path for each process. Thus a parse of shell commands for write targets is partial. | [S39] | ALL | P6, P9 |
 | F17 | In the role.tester eval of this repo, one run without the role changed a source file with `sed -i`. Then it put the file back. The protected-path hook did not see the change. | [S44] | ALL | P2, P6 |
+| F18 | The hook input names the agent in `agent_type` for a session that loads a role file and inside a subagent. In a subagent, the type of the subagent takes precedence over the role of the lead. A session with no role file sends no `agent_type`. A local test confirmed that the value is the `name` of the role file. | [S50] | ALL | P2, P6 |
 
 ### G. Measurement and component lifecycle
 
@@ -303,3 +304,4 @@ in this repo.
 | S47 | [Agentic Code](https://cdn.jsdelivr.net/npm/agentic-code@0.7.0/README.md) v0.7.0, MIT. Read 2026-10-18. |
 | S48 | [SEH](https://github.com/manuuuel/seh), MIT. Read 2026-10-18 (summary only). |
 | S49 | [harnessforge](https://hunted.space/product/harnessforge) (Product Hunt listing). Read 2026-10-18 (summary only). |
+| S50 | Anthropic, [Claude Code hooks reference](https://code.claude.com/docs/en/hooks) (common input fields) and [Subagents](https://code.claude.com/docs/en/sub-agents). Read 2026-10-21. A local test with Claude Code 2.1.292 on 2026-10-21 confirmed it. A hook logged its input for `--agent tester`, for a tester subagent under no role and under `--agent implementer`, and for a session with no role. |

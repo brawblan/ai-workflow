@@ -97,8 +97,12 @@ def _selects(matcher: str, tool: str) -> bool:
         return matcher == tool
 
 
-def _run_hook(workspace: Path, event: dict[str, Any]) -> int:
-    env = {**os.environ, "STONE_ROLE": "implementer", "CLAUDE_PROJECT_DIR": str(workspace)}
+def _run_hook(workspace: Path, event: dict[str, Any], role: str | None = "implementer") -> int:
+    """Run the hook with the event on stdin. STONE_ROLE is `role`, or not set if role is None."""
+    env = {k: v for k, v in os.environ.items() if k != "STONE_ROLE"}
+    env["CLAUDE_PROJECT_DIR"] = str(workspace)
+    if role is not None:
+        env["STONE_ROLE"] = role
     result = subprocess.run([sys.executable, "-B", str(workspace / HOOK)], cwd=workspace,
                             input=json.dumps(event), capture_output=True, text=True,
                             timeout=TIMEOUT, env=env)
@@ -129,6 +133,28 @@ def hook_ignores_bash(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]
     if shell != 0:
         return False, f"the hook blocks the shell command (exit code {shell}). Review D39"
     return True, "the hook blocks the file-tool edit and lets the shell command through"
+
+
+def role_from_input(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
+    """The hook finds the role from the hook input (issue #126). For a file-tool edit of each path
+    in `allowed` and `blocked`, send `input` (agent_type, agent_id) with STONE_ROLE set to
+    `stone_role`, or not set. The hook must allow each path in `allowed` and block each in
+    `blocked`. The input fields are the ones that the harness sent in the probe of 2026-10-21.
+    """
+    if not (workspace / HOOK).is_file():
+        return False, "no hook file (the 'without' variant). No role limit applies"
+    fields = args.get("input") or {}
+    wrong = []
+    for path, want in [(p, 0) for p in args.get("allowed", [])] + \
+                      [(p, 2) for p in args.get("blocked", [])]:
+        event = {"hook_event_name": "PreToolUse", "tool_name": "Write", "cwd": str(workspace),
+                 "tool_input": {"file_path": str(workspace / path)}, **fields}
+        code = _run_hook(workspace, event, args.get("stone_role"))
+        if code != want:
+            wrong.append(f"{path}: exit code {code}, expected {want}")
+    if wrong:
+        return False, "; ".join(wrong)
+    return True, f"the hook uses the role of {fields or 'no input field'} as expected"
 
 
 def k6_fails(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
@@ -164,7 +190,7 @@ def k6_fails(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
 
 
 GRADERS = {"bash_write_lands": bash_write_lands, "hook_ignores_bash": hook_ignores_bash,
-           "k6_fails": k6_fails}
+           "k6_fails": k6_fails, "role_from_input": role_from_input}
 
 
 def main() -> int:
