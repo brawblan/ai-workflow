@@ -9,8 +9,8 @@ branches:
   main: main
 commands:                          # from AGENTS.md. No lint, type check, or acceptance command yet.
   install: pip install ./stone
-  test_unit: python -m unittest discover -s stone/tests
-  all_checks: python -m unittest discover -s stone/tests && stone check && stone check-writing --diff origin/main
+  test_unit: python stone/tests/run_parallel.py -q
+  all_checks: python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/main
 paths:
   source: [stone/src/]
   tests: [stone/tests/]            # protected for the implementer
