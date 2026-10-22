@@ -42,7 +42,8 @@ STEPS = {"K4": ("K4 integration tests", "test_integration"),
          "K10": ("K10 mutation score", "mutation"),
          "K11": ("K11 property and fuzz tests", "property"),
          "K12": ("K12 differential tests", "differential")}
-STEP_NAMES = {name for name, _ in STEPS.values()}
+K20_STEP = "K20 specialist findings"  # no command key: it renders only with a specialists section (D66)
+STEP_NAMES = {name for name, _ in STEPS.values()} | {K20_STEP}
 LIMIT = "limits.mutation_score_changed_code"
 CHECK_WARNING = re.compile(r"\bK(4|5|8|10|11|12)\b|commands\.")
 
@@ -476,8 +477,11 @@ class NoStepOutputTest(FrameworkCopy):
 class AllStepsTest(FrameworkCopy):
     def setUp(self) -> None:
         super().setUp()
-        self.add_profile("every-check", ["K4", "K5", "K6", "K8", "K10", "K11", "K12", "K14"])
+        self.add_profile("every-check",
+                         ["K4", "K5", "K6", "K8", "K10", "K11", "K12", "K14", "K20"])
         self.configure(["every-check"], CHECK_COMMANDS, {"mutation_score_changed_code": 0.6})
+        with (self.root / ".cornerstone" / "config.yaml").open("a", encoding="utf-8") as config:
+            config.write("specialists:\n  - id: security\n    run: /security-review\n")
         self.result, self.log = self.render()
 
     def test_ac7_render_exits_0_with_no_warning(self) -> None:
@@ -492,6 +496,10 @@ class AllStepsTest(FrameworkCopy):
 
     def test_ac7_steps_have_the_order_of_components_yaml(self) -> None:
         self.assertEqual(self.optional_steps(), registry_step_names())
+
+    def test_ac7_k20_is_the_first_optional_step(self) -> None:
+        names = self.step_names()
+        self.assertEqual(names[names.index("All checks") + 1], K20_STEP)
 
     def test_ac7_k10_is_the_last_step(self) -> None:
         self.assertEqual(self.step_names()[-1], "K10 mutation score")
