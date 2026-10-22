@@ -84,16 +84,27 @@ def git(cwd: Path, *args: str) -> str:
     return result.stdout
 
 
+# Stop git background maintenance (auto gc). It creates and removes .git/objects/maintenance.lock,
+# and a copytree that runs at the same time fails on the missing file.
+NO_MAINTENANCE = ("-c", "gc.auto=0", "-c", "maintenance.auto=false")
+COPY_IGNORE = shutil.ignore_patterns("*.lock")
+
+
 @functools.cache
 def base_repo() -> Path:
-    """The shop fixture as a git repo with one commit. Made once; each workspace copies it."""
+    """The shop fixture as a git repo with one commit. Made once; each workspace copies it.
+
+    The repo config turns off auto gc and auto maintenance, so the copies inherit it.
+    """
     base = Path(tempfile.mkdtemp(prefix="planner-base-"))
     atexit.register(shutil.rmtree, base, ignore_errors=True)
     repo = base / "shop"
     shutil.copytree(FIXTURE, repo)
     git(repo, "init", "-q", "-b", "main")
+    git(repo, "config", "gc.auto", "0")
+    git(repo, "config", "maintenance.auto", "false")
     git(repo, "add", "-A")
-    git(repo, "commit", "-q", "-m", "chore: fixture base")
+    git(repo, *NO_MAINTENANCE, "commit", "-q", "-m", "chore: fixture base")
     return repo
 
 
@@ -122,13 +133,13 @@ class GraderCase(unittest.TestCase):
         """The shop fixture as a git repo, then `files` (path: text), as the planner output."""
         self.count += 1
         ws = self.tmp / f"ws{self.count}"
-        shutil.copytree(base_repo(), ws, symlinks=True)
+        shutil.copytree(base_repo(), ws, symlinks=True, ignore=COPY_IGNORE)
         for rel, text in (files or {}).items():
             (ws / rel).parent.mkdir(parents=True, exist_ok=True)
             (ws / rel).write_text(text, encoding="utf-8")
         if files and committed:
             git(ws, "add", "-A")
-            git(ws, "commit", "-q", "-m", "docs: plan")
+            git(ws, *NO_MAINTENANCE, "commit", "-q", "-m", "docs: plan")
         return ws
 
     def grade(self, name: str, ws: Path, args: dict[str, Any] | str,
@@ -163,6 +174,29 @@ class GraderCase(unittest.TestCase):
 
 
 # Criterion 2: job_story_ids ----------------------------------------------------------------------
+
+
+class BaseRepoCacheTest(GraderCase):
+    """Regression: background git maintenance must not break the workspace copy."""
+
+    def test_base_repo_config_turns_off_auto_gc_and_maintenance(self) -> None:
+        repo = base_repo()
+        self.assertEqual(git(repo, "config", "--local", "gc.auto").strip(), "0")
+        self.assertEqual(git(repo, "config", "--local", "maintenance.auto").strip(), "false")
+
+    def test_workspace_inherits_the_config(self) -> None:
+        ws = self.workspace()
+        self.assertEqual(git(ws, "config", "--local", "gc.auto").strip(), "0")
+        self.assertEqual(git(ws, "config", "--local", "maintenance.auto").strip(), "false")
+
+    def test_workspace_copy_skips_a_lock_file_of_the_base_repo(self) -> None:
+        lock = base_repo() / ".git" / "objects" / "maintenance.lock"
+        lock.write_text("", encoding="utf-8")
+        self.addCleanup(lock.unlink, missing_ok=True)
+        ws = self.workspace({PLAN: "x\n"}, committed=True)
+        self.assertFalse((ws / ".git" / "objects" / "maintenance.lock").exists())
+        self.assertEqual(list(ws.rglob("*.lock")), [])
+        self.assertEqual(git(ws, "status", "--porcelain"), "")
 
 
 class JobStoryIdsTest(GraderCase):
