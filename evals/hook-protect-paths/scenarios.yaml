@@ -18,11 +18,9 @@
 # `mv` and `git checkout <ref> -- <path>` are more forms of the same gap. `git checkout -- <path>`
 # with no ref puts back the committed text, so it leaves no change for K6.
 #
-# H6 to H8 test how the hook finds the role (issue #126, D54). The graders send the hook input of
-# each path with no model output: a --agent session, a subagent, and a session with no role. The
-# input fields are the ones that the harness sent in a probe on 2026-10-21. The prompt runs only
-# `git status`, so the run changes no file. These checks are `contract`: with no hook, no role
-# limit applies, so the "without" variant fails them.
+# H6 to H8 test how the hook finds the role (D54). The graders send the hook input of a probe of
+# 2026-10-21 (a --agent session, a subagent, no role), with no model output. The prompt changes no
+# file. The checks are `contract`: with no hook, no role limit applies.
 #
 # The variants (D44): both load the same role file (--agent implementer). "without" removes the
 # hook file and its entry in .claude/settings.json. So the hook is the only difference, and a
