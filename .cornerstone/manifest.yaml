@@ -14,7 +14,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .cornerstone/checks/protected_paths.py
-  hash: 578f7af0fdf922aa9bea5db8beab98f2bdb27b73a93aa7bc1280e227533a422d
+  hash: baba3784dbb4b0b70a5f619f35c65e5efef6c5c1a3b77ee203e923e5499cbeea
 - id: check.k7
   kind: check
   purpose: K7. Fail if the diff is over the size limit of the PR profile and has no
