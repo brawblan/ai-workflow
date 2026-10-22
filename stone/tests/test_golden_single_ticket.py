@@ -1,13 +1,8 @@
 """Golden-file test for `stone render` with the single-ticket profile alone (roadmap item 6).
 
 The test renders the profile into a temporary repo and compares each written file, byte for byte,
-with the fixture in `golden/single-ticket/`. To write the fixtures again after an intended change,
-run:
-
-    STONE_UPDATE_GOLDEN=1 python -m unittest discover -s stone/tests -p "test_golden_*.py"
-
-Then read the fixture diff before you commit it. This file is self-contained on purpose: each
-profile has its own golden test file.
+with its fixture. The compare and the update are in `golden_helpers.py`. A fixture is in
+`golden/single-ticket/` or, if other profiles render the same bytes, in `golden/_shared/` (D64).
 """
 
 from __future__ import annotations
@@ -16,7 +11,6 @@ import contextlib
 import datetime as dt
 import io
 import os
-import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -24,13 +18,13 @@ from unittest import mock
 
 import yaml
 
+from golden_helpers import (TODAY, UPDATE_ENV, golden_differences, tree_files, update_golden,
+                            updating, write_tree)
 from stone import render
 
 PROFILE = "single-ticket"
 FRAMEWORK = Path(__file__).resolve().parents[2] / "framework"
 GOLDEN = Path(__file__).resolve().parent / "golden" / PROFILE
-UPDATE_ENV = "STONE_UPDATE_GOLDEN"
-TODAY = dt.date(2026, 10, 18)
 REVIEW_BY = "2027-04-18"  # TODAY plus 6 months (P5)
 CONFIG = f"""framework_version: 0.8.0
 harness: claude-code
@@ -51,7 +45,6 @@ CONFIG_PATH = ".cornerstone/config.yaml"
 MANIFEST = ".cornerstone/manifest.yaml"
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
 LABEL_WORKFLOW = f".github/workflows/cornerstone-{PROFILE}-label.yml"
-HINT = f"If the change is intended, run with {UPDATE_ENV}=1 to write the fixtures again."
 
 # Pins from framework/profiles/single-ticket.md: roles [shaper, implementer, tester, reviewer],
 # trigger label:agent-ready, G3 required, K6 and K7 in checks, no K15 and no K16.
@@ -65,37 +58,6 @@ NOT_WRITTEN = [".claude/agents/planner.md", ".claude/agents/investigator.md",
 COMPONENTS = ["check.k6", "check.k7", "ci-job.checks", "hook.path-match", "hook.protect-paths",
               "hook.settings", "role.implementer", "role.reviewer", "role.shaper", "role.tester",
               f"trigger.label.{PROFILE}"]
-
-
-def tree_files(folder: Path, skip: frozenset[str] = frozenset()) -> dict[str, bytes]:
-    """Return each file under `folder` (relative POSIX path) and its bytes."""
-    if not folder.is_dir():
-        return {}
-    return {path.relative_to(folder).as_posix(): path.read_bytes()
-            for path in sorted(folder.rglob("*"))
-            if path.is_file() and path.relative_to(folder).as_posix() not in skip}
-
-
-def golden_differences(golden: Path, files: dict[str, bytes]) -> list[str]:
-    """Return one message for each fixture file that is missing, extra, or not equal."""
-    fixtures = tree_files(golden)
-    messages = [f"missing file {path}: the fixture has it, but render did not write it. " + HINT
-                for path in sorted(set(fixtures) - set(files))]
-    messages += [f"extra file {path}: render wrote it, but there is no fixture. " + HINT
-                 for path in sorted(set(files) - set(fixtures))]
-    messages += [f"changed file {path}: the render output is not equal to {golden / path}. "
-                 + HINT for path in sorted(set(files) & set(fixtures))
-                 if files[path] != fixtures[path]]
-    return messages
-
-
-def update_golden(golden: Path, files: dict[str, bytes]) -> None:
-    """Make the fixture folder equal to `files`. Delete the stale fixture files."""
-    if golden.exists():
-        shutil.rmtree(golden)
-    for path, content in files.items():
-        (golden / path).parent.mkdir(parents=True, exist_ok=True)
-        (golden / path).write_bytes(content)
 
 
 def render_profile(root: Path, today: dt.date = TODAY) -> tuple[render.Result, str]:
@@ -124,7 +86,7 @@ class GoldenSingleTicketTest(unittest.TestCase):
     # AC1: the render output is equal to the fixtures.
 
     def test_golden_single_ticket_files_match(self) -> None:
-        if os.environ.get(UPDATE_ENV) == "1":
+        if updating():
             update_golden(self.golden, self.files)
         differences = golden_differences(self.golden, self.files)
         self.assertEqual(differences, [], "\n".join(differences))
@@ -164,7 +126,7 @@ class GoldenSingleTicketTest(unittest.TestCase):
                             in run for name, run in runs.items()), list(runs))
 
     def test_golden_single_ticket_fixtures_hold_the_manifest(self) -> None:
-        if os.environ.get(UPDATE_ENV) == "1":
+        if updating():
             self.skipTest("the fixtures are being rewritten")
         self.assertIn(MANIFEST, tree_files(GOLDEN))
         self.assertNotIn(CONFIG_PATH, tree_files(GOLDEN))
@@ -182,7 +144,7 @@ class GoldenSingleTicketTest(unittest.TestCase):
         for path in sorted(self.files):
             with self.subTest(path=path):
                 golden = Path(self.folder.name) / "golden" / path.replace("/", "_")
-                update_golden(golden, self.files)
+                write_tree(golden, self.files)
                 (golden / path).write_bytes(self.files[path] + b" ")
                 messages = golden_differences(golden, self.files)
                 self.assertEqual(len(messages), 1, messages)
@@ -193,7 +155,7 @@ class GoldenSingleTicketTest(unittest.TestCase):
 
     def test_golden_single_ticket_difference_names_the_file(self) -> None:
         golden = Path(self.folder.name) / "golden"
-        update_golden(golden, self.files)
+        write_tree(golden, self.files)
         self.assertEqual(golden_differences(golden, self.files), [])
         (golden / "only-in-fixture.txt").write_bytes(b"x\n")
         (golden / MANIFEST).unlink()

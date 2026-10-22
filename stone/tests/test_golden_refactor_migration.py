@@ -2,12 +2,12 @@
 
 Convention for all profiles:
 
-- Fixtures are in `stone/tests/golden/<profile>/`: the input `config.yaml`, and the expected
-  output tree under `expected/`.
+- The input `config.yaml` is in `stone/tests/golden/<profile>/`. The expected output tree is under
+  `expected/`. A file that other profiles render with the same bytes is in `golden/_shared/` (D64).
 - One test file for each profile: `stone/tests/test_golden_<profile>.py`.
-- With `STONE_UPDATE_GOLDEN=1`, the test writes the expected files again and does not compare.
-  Read the diff of `expected/` before you commit it. Command:
-  `STONE_UPDATE_GOLDEN=1 python -m unittest discover -s stone/tests -p 'test_golden_*.py'`
+- The compare and the update are in `golden_helpers.py`. With `STONE_UPDATE_GOLDEN=1`, the test
+  writes the expected files again before it compares. Read the diff before you commit it.
+  Command: `STONE_UPDATE_GOLDEN=1 python -m unittest discover -s stone/tests -p 'test_golden_*.py'`
 - Render uses a fixed date, so the manifest is stable.
 """
 
@@ -16,62 +16,43 @@ from __future__ import annotations
 import contextlib
 import datetime as dt
 import io
-import os
-import shutil
 import tempfile
 import unittest
-from collections.abc import Collection
 from pathlib import Path
 
 import yaml
 
+from golden_helpers import (TODAY, golden_differences, tree_files, update_golden, updating,
+                            write_tree)
 from stone import render
 
 TESTS = Path(__file__).resolve().parent
 FRAMEWORK = TESTS.parents[1] / "framework"
-TODAY = dt.date(2026, 10, 18)
-CONFIG = ".cornerstone/config.yaml"
+GOLDEN = TESTS / "golden" / "refactor-migration" / "expected"
+CONFIG = (GOLDEN.parent / "config.yaml").read_text(encoding="utf-8")
+CONFIG_PATH = ".cornerstone/config.yaml"
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
-
-
-def update_golden() -> bool:
-    return os.environ.get("STONE_UPDATE_GOLDEN") == "1"
-
-
-def tree(folder: Path, skip: Collection[str] = ()) -> dict[str, str]:
-    """Return {relative path: text} for each file under the folder."""
-    return {p.relative_to(folder).as_posix(): p.read_text(encoding="utf-8")
-            for p in sorted(folder.rglob("*"))
-            if p.is_file() and p.relative_to(folder).as_posix() not in skip}
 
 
 class GoldenMixin:
     """Render the fixture config of one profile and compare the output with `expected/`.
 
-    Use it as `class <Profile>GoldenTest(GoldenMixin, unittest.TestCase)` with `profile` set.
-    The mixin is not a TestCase, so discovery does not run it alone.
+    Use it as `class <Profile>GoldenTest(GoldenMixin, unittest.TestCase)`. The mixin is not a
+    TestCase, so discovery does not run it alone.
     """
-
-    profile: str
 
     @classmethod
     def setUpClass(cls) -> None:
-        cls.fixture = TESTS / "golden" / cls.profile
-        cls.expected = cls.fixture / "expected"
         cls.folder = tempfile.TemporaryDirectory()
         cls.root = Path(cls.folder.name) / "repo"
         (cls.root / ".cornerstone").mkdir(parents=True)
-        shutil.copyfile(cls.fixture / "config.yaml", cls.root / CONFIG)
+        (cls.root / CONFIG_PATH).write_text(CONFIG, encoding="utf-8")
         cls.log = io.StringIO()
         with contextlib.redirect_stderr(cls.log):
             cls.result = render.render(cls.root, FRAMEWORK, today=TODAY)
-        cls.actual = tree(cls.root, skip={CONFIG})
-        if update_golden():
-            shutil.rmtree(cls.expected, ignore_errors=True)
-            for path, text in cls.actual.items():
-                target = cls.expected / path
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_text(text, encoding="utf-8")
+        cls.actual = tree_files(cls.root, frozenset({CONFIG_PATH}))
+        if updating():
+            update_golden(GOLDEN, cls.actual)
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -82,29 +63,27 @@ class GoldenMixin:
         self.assertEqual(self.result.drift, [])
 
     def test_expected_folder_exists(self) -> None:
-        self.assertTrue(self.expected.is_dir(),
-                        f"No {self.expected}. Run the test with STONE_UPDATE_GOLDEN=1.")
+        self.assertTrue(GOLDEN.is_dir(),
+                        f"No {GOLDEN}. Run the test with STONE_UPDATE_GOLDEN=1.")
 
     def test_render_writes_the_same_set_of_files(self) -> None:
-        self.assertEqual(sorted(self.actual), sorted(tree(self.expected)))
+        differences = golden_differences(GOLDEN, self.actual)
+        self.assertEqual([m for m in differences if not m.startswith("changed")], [],
+                         "\n".join(differences))
 
     def test_render_reports_each_file_that_it_writes(self) -> None:
-        self.assertEqual(sorted(self.result.wrote), sorted(tree(self.expected)))
+        self.assertEqual(sorted(self.result.wrote), sorted(self.actual))
 
     def test_each_file_is_byte_identical(self) -> None:
-        expected = tree(self.expected)
-        for path in sorted(expected):
-            with self.subTest(path=path):
-                self.assertIn(path, self.actual)
-                self.assertEqual(self.actual[path], expected[path])
+        differences = golden_differences(GOLDEN, self.actual)
+        self.assertEqual([m for m in differences if m.startswith("changed")], [],
+                         "\n".join(differences))
 
     def test_manifest_is_compared(self) -> None:
-        self.assertIn(".cornerstone/manifest.yaml", tree(self.expected))
+        self.assertIn(".cornerstone/manifest.yaml", tree_files(GOLDEN))
 
 
 class RefactorMigrationGoldenTest(GoldenMixin, unittest.TestCase):
-    profile = "refactor-migration"
-
     def steps(self) -> list[dict]:
         return yaml.safe_load(self.actual[WORKFLOW])["jobs"]["checks"]["steps"]
 
@@ -133,17 +112,16 @@ class RefactorMigrationGoldenTest(GoldenMixin, unittest.TestCase):
                 self.assertEqual(str(entry["review_by"]), "2027-04-18")
 
     def test_second_render_writes_nothing(self) -> None:
+        # self.actual is equal to the fixtures (test_each_file_is_byte_identical).
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder) / "repo"
-            shutil.copytree(self.expected, root)
-            (root / ".cornerstone").mkdir(parents=True, exist_ok=True)
-            shutil.copyfile(self.fixture / "config.yaml", root / CONFIG)
+            write_tree(root, self.actual)
+            (root / CONFIG_PATH).write_text(CONFIG, encoding="utf-8")
             with contextlib.redirect_stderr(io.StringIO()):
                 result = render.render(root, FRAMEWORK, today=TODAY + dt.timedelta(days=30))
             self.assertEqual(result.wrote, [])
             self.assertEqual(result.drift, [])
-            self.assertEqual(tree(root, skip={CONFIG}), tree(self.expected))
-
+            self.assertEqual(tree_files(root, frozenset({CONFIG_PATH})), self.actual)
 
 
 if __name__ == "__main__":

@@ -36,6 +36,7 @@ from pathlib import Path
 
 import yaml
 
+from golden_helpers import SHARED
 from path_match_helpers import FRAMEWORK, HOOK, K6, PATH_MATCH, REPO, prefix_only_covers
 from stone import cli, framework_check, render
 
@@ -421,6 +422,13 @@ def match_code_files(root: Path, folders: tuple[str, ...] = (".claude", ".corner
             for name in MATCH_NAMES}
 
 
+def golden_repo(root: Path, into: Path) -> Path:
+    """Copy a golden repo into `into` with the files in `golden/_shared/` (D64), and return it."""
+    shutil.copytree(SHARED, into, dirs_exist_ok=True)
+    shutil.copytree(root, into, dirs_exist_ok=True)
+    return into
+
+
 def golden_roots() -> list[Path]:
     """Return each golden repo that has a rendered hook."""
     return sorted(hook.parents[2] for hook in GOLDEN.rglob("protect-paths.py")
@@ -460,21 +468,27 @@ class OneMatchModuleTest(RenderedRepo):
         roots = golden_roots()
         self.assertGreaterEqual(len(roots), 11, roots)
         for root in roots:
-            with self.subTest(golden=root.relative_to(GOLDEN).as_posix()):
-                self.assertEqual(match_code_files(root, (".cornerstone",)),
+            with (self.subTest(golden=root.relative_to(GOLDEN).as_posix()),
+                  tempfile.TemporaryDirectory() as folder):
+                repo = golden_repo(root, Path(folder))
+                self.assertEqual(match_code_files(repo, (".cornerstone",)),
                                  {name: [PATH_MATCH] for name in MATCH_NAMES})
-                self.assertEqual(path_match_imports(root / HOOK), [["covers"]])
-                if (root / K6).exists():
-                    self.assertEqual(path_match_imports(root / K6), [["covers"]])
+                self.assertEqual(path_match_imports(repo / HOOK), [["covers"]])
+                if (repo / K6).exists():
+                    self.assertEqual(path_match_imports(repo / K6), [["covers"]])
 
     def test_the_rendered_module_is_the_template_that_stone_check_uses(self) -> None:
         # stone check tests each glob with the template, so the module must be the same text.
         template = TEMPLATE.read_bytes()
         self.assertEqual((self.root / PATH_MATCH).read_bytes(), template)
         self.assertEqual((REPO / PATH_MATCH).read_bytes(), template)
+        self.assertEqual((SHARED / PATH_MATCH).read_bytes(), template)
         for root in golden_roots():
-            with self.subTest(golden=root.relative_to(GOLDEN).as_posix()):
-                self.assertEqual((root / PATH_MATCH).read_bytes(), template)
+            with (self.subTest(golden=root.relative_to(GOLDEN).as_posix()),
+                  tempfile.TemporaryDirectory() as folder):
+                self.assertFalse((root / PATH_MATCH).exists())
+                repo = golden_repo(root, Path(folder))
+                self.assertEqual((repo / PATH_MATCH).read_bytes(), template)
 
     def test_the_manifest_lists_the_module_as_component_hook_path_match(self) -> None:
         manifest = yaml.safe_load((self.root / ".cornerstone/manifest.yaml")

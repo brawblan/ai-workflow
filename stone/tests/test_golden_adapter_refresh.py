@@ -1,23 +1,17 @@
 """Golden-file test for `stone render` with the adapter-refresh profile (roadmap item 6f).
 
 The test renders the profile into a temporary repo and compares each written file, byte for byte,
-with the fixture in `golden/adapter-refresh/`. To write the fixtures again after an intended change,
-run:
-
-    STONE_UPDATE_GOLDEN=1 python -m unittest discover -s stone/tests
-
-This file is self-contained on purpose: each profile has its own golden test file.
+with its fixture. The compare and the update are in `golden_helpers.py`. A fixture is in
+`golden/adapter-refresh/` or, if other profiles render the same bytes, in `golden/_shared/` (D64).
 """
 
 from __future__ import annotations
 
 import contextlib
-import datetime as dt
 import io
 import json
 import os
 import re
-import shutil
 import tempfile
 import unittest
 from pathlib import Path
@@ -25,14 +19,14 @@ from unittest import mock
 
 import yaml
 
+from golden_helpers import (TODAY, UPDATE_ENV, golden_differences, tree_files, update_golden,
+                            updating, write_tree)
 from stone import render
 from stone.markdown import split_frontmatter
 
 PROFILE = "adapter-refresh"
 FRAMEWORK = Path(__file__).resolve().parents[2] / "framework"
 GOLDEN = Path(__file__).resolve().parent / "golden" / PROFILE
-UPDATE_ENV = "STONE_UPDATE_GOLDEN"
-TODAY = dt.date(2026, 10, 18)
 REVIEW_BY = "2027-04-18"  # TODAY plus 6 months (P5)
 CONFIG = """framework_version: 0.8.0
 harness: claude-code
@@ -65,7 +59,6 @@ COMPONENTS = FRAMEWORK / "adapters" / "claude-code" / "components.yaml"
 PINNED_IDS = {f"role.{role}" for role in ROLES} | {
     "check.k6", "check.k7", "ci-job.checks", "hook.path-match", "hook.protect-paths",
     "hook.settings"}
-HINT = f"If the change is intended, run with {UPDATE_ENV}=1 to write the fixtures again."
 
 
 def profile_frontmatter() -> dict:
@@ -128,43 +121,8 @@ def render_profile(root: Path) -> tuple[render.Result, str]:
     return result, log.getvalue()
 
 
-def tree_files(folder: Path, skip: frozenset[str] = frozenset()) -> dict[str, bytes]:
-    """Return each file under `folder` (relative POSIX path) and its bytes."""
-    if not folder.is_dir():
-        return {}
-    return {path.relative_to(folder).as_posix(): path.read_bytes()
-            for path in sorted(folder.rglob("*"))
-            if path.is_file() and path.relative_to(folder).as_posix() not in skip}
-
-
 def written_files(root: Path) -> dict[str, bytes]:
     return tree_files(root, frozenset({CONFIG_PATH}))
-
-
-def golden_differences(golden: Path, files: dict[str, bytes]) -> list[str]:
-    """Return one message for each fixture file that is missing, extra, or not equal."""
-    fixtures = tree_files(golden)
-    messages = []
-    for path in sorted(set(fixtures) - set(files)):
-        messages.append(f"missing file {path}: the fixture has it, but render did not write it. "
-                        + HINT)
-    for path in sorted(set(files) - set(fixtures)):
-        messages.append(f"extra file {path}: render wrote it, but there is no fixture. " + HINT)
-    for path in sorted(set(files) & set(fixtures)):
-        if files[path] != fixtures[path]:
-            messages.append(f"changed file {path}: the render output is not equal to "
-                            f"{golden / path}. " + HINT)
-    return messages
-
-
-def update_golden(golden: Path, files: dict[str, bytes]) -> None:
-    """Make the fixture folder equal to `files`. Delete the stale fixture files."""
-    if golden.exists():
-        shutil.rmtree(golden)
-    for path, content in files.items():
-        target = golden / path
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(content)
 
 
 class RenderedRepo(unittest.TestCase):
@@ -187,7 +145,7 @@ class GoldenTest(RenderedRepo):
     golden = GOLDEN
 
     def test_golden_files_match(self) -> None:
-        if os.environ.get(UPDATE_ENV) == "1":
+        if updating():
             update_golden(self.golden, self.files)
         differences = golden_differences(self.golden, self.files)
         self.assertEqual(differences, [], "\n".join(differences))
@@ -216,7 +174,7 @@ class GoldenComparisonTest(RenderedRepo):
     def setUp(self) -> None:
         super().setUp()
         self.golden = Path(self.folder.name) / "golden"
-        update_golden(self.golden, self.files)
+        write_tree(self.golden, self.files)
 
     def test_ac2_written_set_leaves_out_only_the_config(self) -> None:
         self.assertNotIn(CONFIG_PATH, self.files)
@@ -290,7 +248,10 @@ class GoldenComparisonTest(RenderedRepo):
         first = self.run_golden_test(golden, {UPDATE_ENV: "1"})
         self.assertTrue(first.wasSuccessful(), first.failures + first.errors)
         self.assertFalse((golden / "stale").exists())
-        self.assertEqual(tree_files(golden), self.files)
+        shared = golden.parent / "_shared"
+        self.assertIn(SETTINGS, tree_files(shared))
+        self.assertNotIn(SETTINGS, tree_files(golden))
+        self.assertEqual(golden_differences(golden, self.files), [])
         second = self.run_golden_test(golden, {})
         self.assertTrue(second.wasSuccessful(), second.failures + second.errors)
 
