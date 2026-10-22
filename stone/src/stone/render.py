@@ -231,10 +231,13 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
             steps[step_name(entry["id"])] = substitute(harness, entry["ci_step"], base_values,
                                                        steps, config)
 
+    local = config.get("delivery", "ci") == "local"
     components = []
     for entry in registry:
         if "trigger" in entry or not needed(entry, profiles):
             continue
+        if local and entry["kind"] == "ci-job":
+            continue  # delivery: local writes no workflow file
         model = defaults["role_models"].get(entry.get("role", ""), "")
         values = {**template_values(config, model), **model_values,
                   "size_limits_json": limits_json,
@@ -248,7 +251,7 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
     try:
-        components.extend(trigger_components(framework, harness, registry, profiles, config,
+        components.extend([] if local else trigger_components(framework, harness, registry, profiles, config,
                                              defaults["role_models"]))
     except triggers.TriggerError as error:
         raise RenderError(str(error)) from None
@@ -486,9 +489,27 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
                          ("drift", result.drift)):
         for path in paths:
             print(f"{label} {path}", file=sys.stderr)
+    if config.get("delivery", "ci") == "local":
+        print("warning: delivery is local. No workflow file was written, so G3 runs on this "
+              "machine only. Run 'stone gate' and paste its output in the PR.", file=sys.stderr)
+        print("Add these lines to .git/info/exclude:", file=sys.stderr)
+        for pattern in ignore_patterns(config, components):
+            print(f"  {pattern}", file=sys.stderr)
     if not dry_run:
         _write(root, to_write)
     return result
+
+
+def ignore_patterns(config: dict[str, Any], components: list[Component]) -> list[str]:
+    """Return the git ignore patterns for the rendered files and the plan and report folders."""
+    patterns = {"AGENTS.md", "constitution/", str(MANIFEST)}  # project-setup writes the first two
+    for component in components:
+        for path in component.files:
+            top = path.split("/")[0]
+            patterns.add(top + "/" if "/" in path else path)
+    for key in ("plans", "specs", "reports"):
+        patterns.add(one_folder(_get(config, f"paths.{key}"), key))
+    return sorted(patterns)
 
 
 def _write(root: Path, files: dict[str, str]) -> None:

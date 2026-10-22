@@ -223,6 +223,47 @@ def branch_name_problems(config: dict[str, Any]) -> list[str]:
             for key, value in branches.items() if value is not None and not isinstance(value, str)]
 
 
+DELIVERY_MODES = ("ci", "local")
+HARNESS_DIRS = (".claude/", ".cornerstone/")  # the hook protects these for every role
+FOLDER_DEFAULTS = {"plans": "docs/plans/", "reports": "docs/reports/"}
+
+
+def _folder_prefix(value: Any) -> str:
+    """Return the folder of a path or glob, with no './' and no trailing '/'."""
+    text = re.split(r"[*?\[]", str(value).strip())[0]  # a glob counts up to its first wildcard
+    if text != str(value).strip():
+        text = text.rpartition("/")[0]
+    return text.removeprefix("./").rstrip("/")
+
+
+def _paths(value: Any) -> list[str]:
+    return [str(item) for item in (value if isinstance(value, list) else [value]) if item]
+
+
+def protected_path_problems(config: dict[str, Any]) -> list[str]:
+    """Return a problem for each plans or reports folder that overlaps a protected path.
+
+    The hook blocks a role that writes to a protected path, so the implementer could not write
+    its decision log, and the investigator could not write a report there.
+    """
+    paths = config.get("paths") if isinstance(config.get("paths"), dict) else {}
+    protected = [(item, _folder_prefix(item)) for item in
+                 [*HARNESS_DIRS, *_paths(paths.get("tests")), *_paths(paths.get("checks"))]]
+    problems = []
+    for key, default in FOLDER_DEFAULTS.items():
+        for folder in _paths(paths.get(key)) or [default]:
+            mine = _folder_prefix(folder)
+            for item, theirs in protected:
+                if not theirs:
+                    continue  # a glob with no folder part: it cannot be compared
+                if mine == theirs or mine.startswith(theirs + "/") or theirs.startswith(mine + "/"):
+                    problems.append(
+                        f"'paths.{key}' ({folder}) overlaps the protected path '{item}'. The hook "
+                        f"blocks the role that writes there. Use a folder outside {item}, "
+                        f"for example {default}.")
+    return problems
+
+
 def check_config(root: Path, framework: Path) -> list[Finding]:
     path = root / ".cornerstone" / "config.yaml"
     if not path.exists():
@@ -248,6 +289,11 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
         if mode not in MODES:
             add(f"The mode '{mode}' is not valid. Use one of {sorted(MODES)}.")
     for problem in link_config_paths(root)[1]:
+        add(problem)
+    delivery = config.get("delivery", "ci")
+    if delivery not in DELIVERY_MODES:
+        add(f"The delivery '{delivery}' is not valid. Use one of {list(DELIVERY_MODES)}.")
+    for problem in protected_path_problems(config):
         add(problem)
     for waiver in config.get("waivers", []):
         if waiver.get("gate") in {"G3", "G5"}:

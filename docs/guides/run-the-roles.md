@@ -95,10 +95,16 @@ git commit -m "fix(auth): renew the token before it expires" \
 A commit with no `Role:` trailer counts as an implementer commit. K6 fails if an implementer commit
 changes a test or a check.
 
+## A ticket from another tracker
+
+The roles need the ticket text, not a GitHub issue. Save the ticket in a file, for example
+`docs/plans/TICKET-123.md`, with the acceptance criteria. Give the path to each role.
+
 ## Run the checks
 
 Run `commands.all_checks` from `.cornerstone/config.yaml` before you open the PR. CI runs the same
-checks again (G3). The CI result is the evidence, not a statement from an agent (P1).
+checks again (G3). The CI result is the evidence, not a statement from an agent (P1). With `delivery: local`, there
+is no CI job. Run `stone gate` and put its output in the PR.
 
 ## Open the PR
 
