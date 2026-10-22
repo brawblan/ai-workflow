@@ -49,6 +49,8 @@ If `.cornerstone/specialists.md` exists, run `stone specialists --base <integrat
 - For a specialist with the status `missing`, stop. Tell the user to start its `run` command in a new
   session. Do not run the review in this session.
 - For a status `blocking`, tell the user that G4 cannot pass until a human decides.
+- Commit each findings report in the PR. Add the lines `Ticket: <id>` and `Personas: <IDs>` to the
+  PR body. Check K20 in CI reads them, and fails on a blocking finding.
 
 ## 4. Map the evidence to each COA
 

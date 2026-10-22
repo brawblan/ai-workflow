@@ -230,6 +230,16 @@ A repo can connect its own review agents or skills to the roles ([D59](README.md
   `reviewed`.
 - The command cannot start a specialist. The reviewer has no tool to start another agent (P2). A
   person, or `ticket-delivery` with the user, starts each one in a new session.
+- Check K20 runs the same rule in G3 ([D66](README.md#decisions)). `stone render` adds the K20 step
+  to the G3 workflow if a selected profile lists K20. The step reads the PR labels and these PR
+  body lines: `Ticket: <id>` and `Personas: <ids>`. K20 fails on these items:
+  - a `blocking` specialist
+  - a `missing` report of a `blocks: true` specialist
+  - a matched change with no `Ticket:` line
+
+  A `missing` report of another specialist is a warning. Commit each report in the PR, or K20
+  cannot see it. A heading with `waiver (K20)` and text under it passes, with a notice.
+  K20 is a warning until 2026-11-05.
 
 ### Local delivery (`delivery: local`)
 
@@ -237,7 +247,8 @@ Use it when one developer runs the roles in a shared repo before the team agrees
 `stone render` then writes no file in `.github/workflows/`. It prints a warning that G3 is local
 only, and the lines to add to `.git/info/exclude`. It writes nothing outside the rendered set.
 `stone gate` runs K6, K7, and `commands.all_checks` on the machine, and prints a table for the
-Evidence section of the PR. See [D56](README.md#decisions).
+Evidence section of the PR. See [D56](README.md#decisions). With `specialists`, it also runs K20.
+K20 needs `--body`, and `--labels` gives the PR labels.
 
 `stone render` and `stone check` fail if `paths.plans` or `paths.reports` overlaps the harness
 folder, `.cornerstone/`, `paths.tests`, or `paths.checks`. The hook blocks a role that writes there. Use
