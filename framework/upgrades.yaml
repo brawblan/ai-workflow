@@ -1,0 +1,38 @@
+# The record of each release. `stone upgrade` reads it, and `stone check` validates it.
+# Newest first. Rules and the form: framework/versioning.md.
+versions:
+  - version: 1.1.0
+    kind: minor
+    released: null            # set the date when you tag the release
+    summary: Optional settings for a local-only setup, role commits, opt-in adoption, specialist reviews, and ticket files.
+    config:
+      added:
+        - {key: delivery, default: ci, note: "ci, or local: no workflow file (D56)."}
+        - {key: adoption, default: all, note: "all, or opt-in: only marked PRs get the G3 checks (D58)."}
+        - {key: commits.by, default: agent, note: "agent, or human: the role gives a commit message (D57)."}
+        - {key: commits.trailers, default: commit, note: "commit, notes, or none. none does not render K6 (D57)."}
+        - {key: commits.message_format, default: null, note: "A file in the repo, or a URL, that the roles follow (D57)."}
+        - {key: specialists, default: null, note: "A list of specialist reviews (D59)."}
+        - {key: tickets.source, default: github, note: "github, or file (D60)."}
+        - {key: tickets.path, default: null, note: "With source file: a path with {id} once (D60)."}
+      renamed: []
+      removed: []
+    files:
+      - {path: .cornerstone/checks/protected_paths.py, change: changed, note: "K6 reads a role from a git note, and skips a human commit in opt-in mode (D57, D58)."}
+      - {path: .cornerstone/hooks/protect-paths.py, change: changed, note: "The hook has a rule for the shaper (D60)."}
+      - {path: .cornerstone/specialists.md, change: added, note: "Only with a specialists section (D59)."}
+    steps:
+      - "Install the new stone, and set framework_version to 1.1.0."
+      - "Run stone render. Commit the changed generated files alone, with the trailers Role generator and Actor agent."
+      - "The link check of stone check tests fewer files by default (D54). Set checks.links.paths, or run stone check --links all, to keep the old scope."
+      - "A session that has no role name now gets the implementer rules, also when STONE_ROLE is empty (D55)."
+  - version: 1.0.0
+    kind: major
+    released: 2026-10-21
+    summary: The first release. All 10 profiles, the stone CLI, and the first adapter.
+    config:
+      added: []
+      renamed: []
+      removed: []
+    files: []
+    steps: []

@@ -86,6 +86,7 @@ nav:
       - Upgrade a dependency: docs/guides/dependency-upgrade.md
       - Refresh an adapter: docs/guides/adapter-refresh.md
       - Refactor or migrate: docs/guides/refactor-migration.md
+      - Upgrade Cornerstone: docs/guides/upgrade-cornerstone.md
       - Run the roles: docs/guides/run-the-roles.md
   - Framework:
       - framework/README.md
@@ -93,6 +94,7 @@ nav:
       - Vocabulary: framework/vocabulary.md
       - Workflow model: framework/workflow-model.md
       - Gates: framework/gates.md
+      - Versioning: framework/versioning.md
       - Checks: framework/checks.md
       - Modes: framework/modes.md
       - Profiles:

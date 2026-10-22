@@ -54,6 +54,8 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 - Record each design decision in the "Decisions" table of `framework/README.md` (D1, D2, ...).
 - Support each new rule with evidence. Add the source to the dossier and cite its ID.
 - Give each new component (rule, skill, role, hook, check) an eval plan and a review date (P5).
+- If a PR adds, renames, or removes a config key, or changes a generated file, add it to the newest
+  entry of `framework/upgrades.yaml`. See [versioning.md](framework/versioning.md).
 
 ## Skills
 
