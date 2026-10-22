@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from stone import (__version__, evals, evidence_check, framework_check, gate, render, specialists,
-                   specs, writing_check)
+                   specs, upgrade, writing_check)
 from stone.findings import report
 
 
@@ -45,6 +45,15 @@ def _parser() -> argparse.ArgumentParser:
     special.add_argument("--ticket", required=True, help="The ticket ID. It names the reports.")
     special.add_argument("--labels", default="", help="The labels of the ticket, with commas.")
     special.add_argument("--personas", default="", help="The persona IDs of the ticket, with commas.")
+
+    up = commands.add_parser(
+        "upgrade", help="Plan the move to a new Cornerstone version. --apply makes the move.")
+    up.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    up.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
+    up.add_argument("--to", metavar="VERSION",
+                    help="The target version. Default: the newest released version.")
+    up.add_argument("--apply", action="store_true",
+                    help="Set framework_version and render. Stops if a person must act first.")
 
     spec = commands.add_parser("spec", help="Work with the specs of the repo.")
     spec_commands = spec.add_subparsers(dest="spec_command", required=True)
@@ -110,6 +119,8 @@ def main(argv: list[str] | None = None) -> int:
         return _render(args.root, args.framework, args.dry_run)
     if args.command == "gate":
         return _gate(args.root, args.base, args.body)
+    if args.command == "upgrade":
+        return _upgrade(args)
     if args.command == "specialists":
         return _specialists(args)
     if args.command == "spec":
@@ -143,6 +154,22 @@ def _gate(root: Path, base: str | None, body: Path | None) -> int:
     failed = [step.name for step in steps if not (step.passed or step.skipped)]
     print(f"\nstone gate: {len(failed)} failed.", file=sys.stderr)
     return 1 if failed else 0
+
+
+def _upgrade(args: argparse.Namespace) -> int:
+    framework = args.framework or args.root / "framework"
+    try:
+        if args.apply:
+            written = upgrade.apply(args.root, framework, args.to)
+            print(f"stone upgrade: applied. {len(written)} file(s) written or in drift. Commit the "
+                  "generated files alone, with the trailers 'Role: generator' and 'Actor: agent'.")
+            return 0
+        text, _, code = upgrade.plan(args.root, framework, args.to)
+    except (upgrade.UpgradeError, render.RenderError) as error:
+        print(f"stone upgrade: {error}")
+        return 2
+    print(text)
+    return code
 
 
 def _split(text: str) -> list[str]:

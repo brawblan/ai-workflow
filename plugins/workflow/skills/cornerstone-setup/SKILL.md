@@ -109,6 +109,17 @@ Report:
 
 Offer to open a PR with the `dev-pr` skill.
 
+## Upgrade an existing setup
+
+If `.cornerstone/config.yaml` exists and the user asks to upgrade, do not run steps 1 to 3 again.
+
+1. Run `stone upgrade --framework <clone>/framework`. Show the plan.
+2. For each action under "need a person", ask the user, and change the config. Ask only for the facts
+   that a new key needs. A new optional key needs no answer.
+3. Run `stone upgrade --framework <clone>/framework --apply`. Do the manual steps of the plan.
+4. Run `stone check`. Commit the generated files alone, with the trailers `Role: generator` and
+   `Actor: agent`.
+
 ## Eval
 
 See [references/eval.md](references/eval.md).

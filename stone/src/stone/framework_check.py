@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from stone import personas_check, results, specialists, specs
+from stone import __version__, personas_check, results, specialists, specs, upgrade
 from stone.findings import Finding
 from stone.markdown import link_file, relative_links, split_frontmatter, table_rows
 
@@ -438,6 +438,36 @@ def check_components(root: Path, framework: Path) -> list[Finding]:
     return findings
 
 
+def check_upgrades(root: Path, framework: Path) -> list[Finding]:
+    """The record of releases must be valid (versioning.md). A framework folder without it is old."""
+    if not (framework / upgrade.FILE).exists():
+        return []
+    path = (framework / upgrade.FILE)
+    label = str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
+    return [Finding(label, 1, CHECK, message) for message in upgrade.problems(framework)]
+
+
+def check_version(root: Path) -> list[Finding]:
+    """Warn if framework_version in the repo config is not the version of the installed stone."""
+    path = root / ".cornerstone" / "config.yaml"
+    if not path.exists():
+        return []
+    config = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    value = config.get("framework_version") if isinstance(config, dict) else None
+    try:
+        have, installed = upgrade.parse(value), upgrade.parse(__version__)
+    except upgrade.UpgradeError:
+        return []  # no version, or not a full tag: stone render reports it
+    if have == installed:
+        return []
+    word = "older" if have < installed else "newer"
+    hint = ("Run stone upgrade to see what changed." if have < installed
+            else "Install a newer stone, or set framework_version to the installed version.")
+    return [Finding(str(path.relative_to(root)), 1, CHECK,
+                    f"framework_version {value} is {word} than the installed stone {__version__}. "
+                    + hint, "warning")]
+
+
 def run(root: Path, framework: Path | None = None, links: str = "default") -> list[Finding]:
     """Run all framework checks. `framework` defaults to `<root>/framework`.
 
@@ -450,4 +480,5 @@ def run(root: Path, framework: Path | None = None, links: str = "default") -> li
     docs = link_scope(root, framework, links)
     return (check_profiles(framework) + check_links(root, docs) + check_neutral(framework)
             + check_config(root, framework) + check_components(root, framework)
+            + check_upgrades(root, framework) + check_version(root)
             + personas_check.run(root) + specs.check(root))
