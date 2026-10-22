@@ -105,7 +105,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/implementer.md
-  hash: f7bb2597b71cde11384f5baf00889aab4e81fc584a0890e72f2f75e87a0c5514
+  hash: ba0b49142cd55e33c39b6ab0ccef0ce38a6b6ebef12502574e74ac03e90e3b7c
 - id: role.investigator
   kind: role
   purpose: Read, run, and report. Write only in the reports path, or anywhere on a
@@ -136,7 +136,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/reviewer.md
-  hash: f8197133228034ca5d404252068295ef03b6ca9bfbdb4f091f05dbb8e219195b
+  hash: 69d57b24cd58e8d1adafe663f458c8b4621f08a36575384e91c2e15048c7f90d
 - id: role.shaper
   kind: role
   purpose: Interview the human until the ticket meets the Definition of Ready.
@@ -150,7 +150,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/shaper.md
-  hash: 75e06e816eaa3225b353e5e850b30a37d2a1ee53b9d0b64e0e8bba7d4394c2a5
+  hash: aa52b5cf5920c72c62d312c4c130d3f90955661a69daa1ff257052e592679c7d
 - id: role.tester
   kind: role
   purpose: Write independent tests from the ticket and the diff.
@@ -164,7 +164,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/tester.md
-  hash: acc8a24d3af04e92bcdd9686f0f96cd09727fec5e2875cf717d26e2678ecb6f9
+  hash: 329929de8838ad3490418eff40e4139c042ae0e57978a0dec00ac5e66f0cc02a
 - id: trigger.label.debugging
   kind: ci-job
   purpose: Start the first role of the profile when a human adds the trigger label

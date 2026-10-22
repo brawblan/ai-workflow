@@ -15,7 +15,7 @@ Write replies with the core rules of ASD-STE100 (Simplified Technical English):
 ## Visuals
 
 - If a reader understands a point faster by seeing it, use a visual.
-- Diagrams: add them without asking. Use Mermaid in repo files, and a small ASCII sketch in terminal chat.
+- Diagrams: add them only on request. Use Mermaid in repo files, and a small ASCII sketch in terminal chat.
 - Web pages and explainers: offer them in one line first. The default explainer is an animated
   step-through page with optional browser narration. Make an MP4 only on request.
 - Use only free tools that are already installed. Do not suggest paid tools or subscriptions.

@@ -1,6 +1,6 @@
 """Run the stone unit tests with one subprocess per test class, N classes at a time.
 
-Usage: python stone/tests/run_parallel.py [-j N] [-v] [--list]
+Usage: python stone/tests/run_parallel.py [-j N] [-v | -q] [--list]
 
 It runs the same tests as `python -m unittest discover -s stone/tests`. The parent loads each
 `test*.py` module with the unittest loader and groups its tests by TestCase class. Each class runs
@@ -121,8 +121,11 @@ def run_unit(folder: Path, unit: Unit, verbose: bool) -> UnitResult:
     return UnitResult(unit.name, time.monotonic() - start, proc.returncode, output, unit.tests)
 
 
-def main(folder: Path, jobs: int | None = None, verbose: bool = False) -> int:
-    """Run each test class in `folder` in its own subprocess. Return 1 if any unit fails."""
+def main(folder: Path, jobs: int | None = None, verbose: bool = False, quiet: bool = False) -> int:
+    """Run each test class in `folder` in its own subprocess. Return 1 if any unit fails.
+
+    With `quiet`, print only the failed units and the summary (D63).
+    """
     start = time.monotonic()
     units = find_units(folder)
     results: list[UnitResult] = []
@@ -132,7 +135,8 @@ def main(folder: Path, jobs: int | None = None, verbose: bool = False) -> int:
             result = future.result()
             results.append(result)
             status = "ok" if result.returncode == 0 else "FAIL"
-            print(f"{result.name:<60} {result.seconds:7.2f}s  {status}", flush=True)
+            if not quiet or result.returncode != 0:
+                print(f"{result.name:<60} {result.seconds:7.2f}s  {status}", flush=True)
             if result.returncode != 0 or verbose:
                 print(result.output, flush=True)
     failed = sorted(result.name for result in results if result.returncode != 0)
@@ -150,6 +154,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("-j", "--jobs", type=int, default=None, help="units at a time (default: CPU count)")
     parser.add_argument("-v", "--verbose", action="store_true", help="print the output of each unit")
+    parser.add_argument("-q", "--quiet", action="store_true", help="print only the failed units and the summary")
     parser.add_argument("--list", action="store_true", help="print the units and their test counts, do not run")
     return parser.parse_args(argv)
 
@@ -163,4 +168,4 @@ if __name__ == "__main__":
             print(f"{planned_unit.tests:5d}  {planned_unit.name}")
         print(f"\n{sum(unit.tests for unit in planned)} tests in {len(planned)} units")
         sys.exit(0)
-    sys.exit(main(tests_folder, args.jobs, args.verbose))
+    sys.exit(main(tests_folder, args.jobs, args.verbose, args.quiet))

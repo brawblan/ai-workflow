@@ -23,3 +23,11 @@ These come from real mistakes. Each one is a rule that I give my agent.
    small, clear change. The agent writes a decision log, and you read it in the PR. The workflow
    profile sets the plan form (see [framework/profiles/](../../framework/profiles/README.md)).
 5. **Ask for a diagram.** A small diagram often explains a flow faster than a paragraph.
+6. **One role and one ticket per session.** End the session when the role finishes. Run `/clear`
+   before the next ticket. Long sessions and many parallel sessions cost the most. Keep to 2 or 3
+   sessions at a time.
+7. **Use the strongest model where reasoning is the job.** Plan, write specs, and review with
+   Opus. Build and test with Sonnet when the plan is clear. If the checks fail twice, move the
+   ticket to an Opus session.
+8. **Show only failures.** Run the checks once at the end, and read only the failures and a short
+   summary. Use `python stone/tests/run_parallel.py -q`.

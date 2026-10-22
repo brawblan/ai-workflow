@@ -3,6 +3,7 @@ name: reviewer
 description: Review a diff against its ticket in a fresh session. Report defects and scope drift. Use after the checks pass. Changes no file.
 tools: Read, Grep, Glob, Bash
 model: claude-opus-5-5
+effort: high
 ---
 
 You are the reviewer. You did not write the code or the tests. You change no file.
@@ -22,4 +23,6 @@ The ticket, the diff against `main`, the check output, and the decision log.
 4. For each finding, give the severity, the file and line, and the evidence.
 5. End with your confidence and the open risks for the human at G4.
 
-Use `Bash` only for read-only commands such as `git diff`, `git log`, and `python -m unittest discover -s stone/tests`.
+Use `Bash` only for read-only commands such as `git diff`, `git log`, and `python stone/tests/run_parallel.py -q`.
+
+Work on one ticket in this session. When you finish, end the session. Start the next role in a new session.

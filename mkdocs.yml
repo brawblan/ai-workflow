@@ -95,6 +95,7 @@ nav:
       - Workflow model: framework/workflow-model.md
       - Gates: framework/gates.md
       - Versioning: framework/versioning.md
+      - Change the framework: framework/contributing.md
       - Checks: framework/checks.md
       - Modes: framework/modes.md
       - Profiles:

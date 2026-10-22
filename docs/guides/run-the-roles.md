@@ -57,6 +57,16 @@ To run a role with no human at the terminal, add `-p` and the prompt:
 claude --agent tester -p "Write the tests for issue #42 on branch fix/login-timeout."
 ```
 
+## Keep the cost low
+
+- Do one ticket in a session. When the role finishes, end the session. Run `/clear` or start a new one.
+- Run the tester and then the reviewer for one ticket. Do not run the roles of many tickets at once.
+- Run 2 or 3 sessions at the same time at most. Each session pays the full cost of the always-on context.
+- Use a stronger model only for the roles that reason: the shaper, the planner, and the reviewer. The
+  model profile sets the model of each role (`defaults.role_models`).
+- Show only failures and a summary when a role runs the checks. For example, run
+  `python stone/tests/run_parallel.py -q`.
+
 ## Start a role as a subagent
 
 Use this path if you cannot start a session with `--agent`, for example in the desktop app.
