@@ -32,8 +32,9 @@ sys.dont_write_bytecode = True  # no __pycache__ folder in .cornerstone/lib
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
 try:
     from path_match import covers  # the same match as K6 (D62)
-except ImportError:
-    print("Blocked: .cornerstone/lib/path_match.py is missing. Run stone render.", file=sys.stderr)
+except Exception:  # a missing or broken module blocks the edit: exit code 1 would let it through
+    print("Blocked: .cornerstone/lib/path_match.py is missing or broken. Run stone render.",
+          file=sys.stderr)
     sys.exit(2)
 
 

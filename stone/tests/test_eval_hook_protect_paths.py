@@ -26,13 +26,12 @@ from unittest import mock
 
 import yaml
 
+from path_match_helpers import (FRAMEWORK, HOOK, K6, PATH_MATCH, PREFIX_ONLY_COVERS, REPO,
+                                prefix_only_covers)
 from stone import cli, evals
 
-REPO = Path(__file__).resolve().parents[2]
-FRAMEWORK = REPO / "framework"
 EVAL = REPO / "evals" / "hook-protect-paths"
 GRADE = EVAL / "grade.py"
-HOOK_FILE = ".cornerstone/hooks/protect-paths.py"
 SCENARIOS = {s["id"]: s for s in
              yaml.safe_load((EVAL / "scenarios.yaml").read_text(encoding="utf-8"))["scenarios"]}
 # H1 to H5 pin the shell-write gap (D39). H6 to H8 test how the hook finds the role (D55, #126).
@@ -44,13 +43,8 @@ GLOB_MATCH = ("H9",)
 GROUPS = (SHELL_WRITE, ROLE_LOOKUP, GLOB_MATCH)
 COLOCATED_TEST = "src/widget/widget.test.js"
 COLOCATED_SOURCE = "src/widget/widget.js"
-# The match rule before D62. A hook or K6 with this rule cannot protect a colocated test file.
-# The hook and K6 import `covers` from one rendered module (D62), so a test puts the old rule there.
-PATH_MATCH_FILE = ".cornerstone/lib/path_match.py"
-K6_FILE = ".cornerstone/checks/protected_paths.py"
-PREFIX_ONLY_COVERS = ('def covers(patterns, path):\n'
-                      '    return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/")'
-                      ' for p in patterns)\n')
+# A hook or K6 with the match rule before D62 (PREFIX_ONLY_COVERS) cannot protect a colocated test
+# file. The hook and K6 import `covers` from one rendered module (D62), so a test puts it there.
 HOOK_ROLES = ("implementer", "tester", "planner", "investigator", "reviewer")
 ROLE_CALL = "role = find_role(event)"
 
@@ -72,7 +66,7 @@ def role_checks(scenario: dict[str, Any]) -> list[dict[str, Any]]:
 
 class GraderCase(unittest.TestCase):
     def workspace(self, sid: str, variant: str = "with") -> Path:
-        ws = evals.prepare(EVAL, SCENARIOS[sid], FRAMEWORK, HOOK_FILE, variant).path
+        ws = evals.prepare(EVAL, SCENARIOS[sid], FRAMEWORK, HOOK, variant).path
         self.addCleanup(shutil.rmtree, ws.parent, True)
         return ws
 
@@ -187,14 +181,14 @@ class GapClosedTest(GraderCase):
 
     def test_a_hook_that_blocks_the_shell_command_fails(self) -> None:
         ws = self.workspace("H1")
-        (ws / HOOK_FILE).write_text("import sys\nsys.exit(2)\n", encoding="utf-8")
+        (ws / HOOK).write_text("import sys\nsys.exit(2)\n", encoding="utf-8")
         detail = self.expect(False, "hook_ignores_bash", ws,
                              graders(SCENARIOS["H1"])["hook_ignores_bash"])
         self.assertIn("D39", detail)
 
     def test_a_hook_that_blocks_nothing_fails(self) -> None:
         ws = self.workspace("H1")
-        (ws / HOOK_FILE).write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+        (ws / HOOK).write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
         detail = self.expect(False, "hook_ignores_bash", ws,
                              graders(SCENARIOS["H1"])["hook_ignores_bash"])
         self.assertIn("does not block a file-tool edit", detail)
@@ -205,7 +199,7 @@ class RoleFromInputTest(GraderCase):
 
     def replace_role_lookup(self, ws: Path, line: str) -> None:
         """Change only the role lookup of the rendered hook to `line`."""
-        hook = ws / HOOK_FILE
+        hook = ws / HOOK
         text = hook.read_text(encoding="utf-8")
         self.assertEqual(text.count(ROLE_CALL), 1, "the rendered hook has no single role lookup")
         hook.write_text(text.replace(ROLE_CALL, line), encoding="utf-8")
@@ -241,7 +235,7 @@ class RoleFromInputTest(GraderCase):
     def test_each_role_check_fails_in_the_without_variant(self) -> None:
         for sid in ROLE_LOOKUP:
             ws = self.workspace(sid, "without")
-            self.assertFalse((ws / HOOK_FILE).exists())
+            self.assertFalse((ws / HOOK).exists())
             for index, args in enumerate(role_checks(SCENARIOS[sid])):
                 with self.subTest(scenario=sid, check=index):
                     detail = self.expect(False, "role_from_input", ws, args)
@@ -281,7 +275,7 @@ class RoleFromInputTest(GraderCase):
     def test_a_hook_that_blocks_nothing_fails_each_role_check(self) -> None:
         for sid in ROLE_LOOKUP:
             ws = self.workspace(sid)
-            (ws / HOOK_FILE).write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
+            (ws / HOOK).write_text("import sys\nsys.exit(0)\n", encoding="utf-8")
             for index, args in enumerate(role_checks(SCENARIOS[sid])):
                 with self.subTest(scenario=sid, check=index):
                     detail = self.expect(False, "role_from_input", ws, args)
@@ -326,14 +320,14 @@ class GlobMatchTest(GraderCase):
         The hook and K6 do not change, so a changed decision comes from the module that they
         import.
         """
-        target = ws / PATH_MATCH_FILE
+        target = ws / PATH_MATCH
         text = target.read_text(encoding="utf-8")
         found = [node for node in ast.parse(text).body
                  if isinstance(node, ast.FunctionDef) and node.name == "covers"]
-        self.assertEqual(len(found), 1, f"{PATH_MATCH_FILE} has no single covers function")
+        self.assertEqual(len(found), 1, f"{PATH_MATCH} has no single covers function")
         lines = text.splitlines(keepends=True)
         start, end = found[0].lineno - 1, found[0].end_lineno
-        before = {name: (ws / name).read_bytes() for name in (HOOK_FILE, K6_FILE)}
+        before = {name: (ws / name).read_bytes() for name in (HOOK, K6)}
         target.write_text("".join(lines[:start]) + PREFIX_ONLY_COVERS + "".join(lines[end:]),
                           encoding="utf-8")
         self.assertNotEqual(target.read_text(encoding="utf-8"), text)
@@ -357,8 +351,7 @@ class GlobMatchTest(GraderCase):
         tests = self.fixture_config("H9")["paths"]["tests"]
         self.assertTrue(any(char in value for value in tests for char in "*?["), tests)
         prefixes = [value for value in tests if not any(char in value for char in "*?[")]
-        self.assertFalse(any(COLOCATED_TEST == p.rstrip("/") or
-                             COLOCATED_TEST.startswith(p.rstrip("/") + "/") for p in prefixes))
+        self.assertFalse(prefix_only_covers(prefixes, COLOCATED_TEST), prefixes)
         self.assertTrue((EVAL / SCENARIOS["H9"]["fixture"] / COLOCATED_TEST).is_file())
         self.assertTrue((EVAL / SCENARIOS["H9"]["fixture"] / COLOCATED_SOURCE).is_file())
 
@@ -382,7 +375,7 @@ class GlobMatchTest(GraderCase):
     def test_each_role_check_fails_in_the_without_variant(self) -> None:
         for sid in GLOB_MATCH:
             ws = self.workspace(sid, "without")
-            self.assertFalse((ws / HOOK_FILE).exists())
+            self.assertFalse((ws / HOOK).exists())
             for index, args in enumerate(role_checks(SCENARIOS[sid])):
                 with self.subTest(scenario=sid, check=index):
                     self.assertIn("no hook file", self.expect(False, "role_from_input", ws, args))

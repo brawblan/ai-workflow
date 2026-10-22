@@ -30,19 +30,16 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import yaml
 
+from path_match_helpers import FRAMEWORK, HOOK, K6, PATH_MATCH, REPO, prefix_only_covers
 from stone import cli, framework_check, render
 
-REPO = Path(__file__).resolve().parents[2]
-FRAMEWORK = REPO / "framework"
 TODAY = dt.date(2026, 10, 22)
-HOOK = ".cornerstone/hooks/protect-paths.py"
-K6 = ".cornerstone/checks/protected_paths.py"
-PATH_MATCH = ".cornerstone/lib/path_match.py"
 TEMPLATE = FRAMEWORK / "adapters" / "claude-code" / "templates" / "lib" / "path_match.py"
 GOLDEN = Path(__file__).resolve().parent / "golden"
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
@@ -68,11 +65,6 @@ owners: {default: octocat}
 def config(tests: list[str], checks: list[str]) -> str:
     return (CONFIG.replace("TESTS", f"  tests: {json.dumps(tests)}")
             .replace("CHECKS", f"  checks: {json.dumps(checks)}"))
-
-
-def old_covers(prefixes: list[str], path: str) -> bool:
-    """The match rule before D62 (the main branch): the path, or a path under the folder."""
-    return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/") for p in prefixes)
 
 
 class RenderedRepo(unittest.TestCase):
@@ -137,24 +129,29 @@ class RenderedRepo(unittest.TestCase):
         return subprocess.run([sys.executable, "-B", K6, base], cwd=self.root,
                               capture_output=True, text=True)
 
+    @contextlib.contextmanager
+    def new_branch(self, name: str) -> Iterator[str]:
+        """Check out a new branch from main, give the base commit, then go back to a clean main."""
+        base = self.git("rev-parse", "HEAD").strip()
+        self.git("checkout", "-q", "-b", name)
+        try:
+            yield base
+        finally:
+            self.git("checkout", "-q", "-f", "main")
+            self.git("clean", "-fdq")
+
     @staticmethod
     def named(output: str) -> set[str]:
         return set(re.findall(r"changes (\S+), a protected path", output))
 
     def k6_named_for_an_implementer_commit(self, paths: list[str]) -> set[str]:
         """Commit each path with no Role trailer on a new branch, run K6, and go back."""
-        base = self.git("rev-parse", "HEAD").strip()
-        branch = f"probe-{len(paths)}-{abs(hash(tuple(paths)))}"
-        self.git("checkout", "-q", "-b", branch)
-        try:
+        with self.new_branch(f"probe-{len(paths)}-{abs(hash(tuple(paths)))}") as base:
             self.commit({p: f"{p}\n" for p in paths}, "feat: change files")
             run = self.k6(base)
-            named = self.named(run.stdout)
-            self.assertEqual(run.returncode, 1 if named else 0, run.stdout + run.stderr)
-            return named
-        finally:
-            self.git("checkout", "-q", "-f", "main")
-            self.git("clean", "-fdq")
+        named = self.named(run.stdout)
+        self.assertEqual(run.returncode, 1 if named else 0, run.stdout + run.stderr)
+        return named
 
 
 # Each value shows one rule. The probes below keep each value apart from the others.
@@ -253,15 +250,10 @@ class GlobRulesTest(RenderedRepo):
         self.assertEqual(named, set(COVERED_BY_TESTS + COVERED_BY_CHECKS))
 
     def test_k6_passes_a_tester_commit_to_glob_test_paths(self) -> None:
-        base = self.git("rev-parse", "HEAD").strip()
-        self.git("checkout", "-q", "-b", "tester-commit")
-        try:
+        with self.new_branch("tester-commit") as base:
             self.commit({p: "x\n" for p in COVERED_BY_TESTS}, "test: add tests\n\nRole: tester")
             run = self.k6(base)
-            self.assertEqual(run.returncode, 0, run.stdout)
-        finally:
-            self.git("checkout", "-q", "-f", "main")
-            self.git("clean", "-fdq")
+        self.assertEqual(run.returncode, 0, run.stdout)
 
     def test_hook_starts_a_glob_at_the_worktree_root(self) -> None:
         # A linked worktree gets the same rules: the path is relative to its work tree.
@@ -301,13 +293,14 @@ class NoGlobTest(RenderedRepo):
         codes = self.hook_codes(NO_GLOB_PROBES, "implementer")
         for path in NO_GLOB_PROBES:
             with self.subTest(path=path):
-                self.assertEqual(codes[path], 2 if old_covers(self.protected(), path) else 0)
+                old = prefix_only_covers(self.protected(), path)
+                self.assertEqual(codes[path], 2 if old else 0)
 
     def test_hook_gives_the_old_tester_decisions(self) -> None:
         codes = self.hook_codes(NO_GLOB_PROBES, "tester")
         for path in NO_GLOB_PROBES:
             with self.subTest(path=path):
-                self.assertEqual(codes[path], 0 if old_covers(NO_GLOB_TESTS, path) else 2)
+                self.assertEqual(codes[path], 0 if prefix_only_covers(NO_GLOB_TESTS, path) else 2)
 
     def test_the_prefix_rule_covers_a_folder_and_an_exact_file_only(self) -> None:
         # The expected values written out, so that the old rule above is not the only oracle.
@@ -320,7 +313,7 @@ class NoGlobTest(RenderedRepo):
     def test_k6_gives_the_old_decisions(self) -> None:
         files = [p for p in NO_GLOB_PROBES if p not in ("tests", "it", "ci")]
         named = self.k6_named_for_an_implementer_commit(files)
-        self.assertEqual(named, {p for p in files if old_covers(self.protected(), p)})
+        self.assertEqual(named, {p for p in files if prefix_only_covers(self.protected(), p)})
         self.assertEqual(named, {"tests/test_a.py", "tests/deep/b.py", "spec/helper.rb",
                                  "test.d/a.py", "it/a.py", "ci/x.yml"})
 
@@ -347,27 +340,21 @@ class ColocatedTest(RenderedRepo):
         self.assertEqual(self.hook("src/widget/widget.js", "tester"), 2)
 
     def test_k6_fails_an_implementer_commit_to_the_colocated_test_file(self) -> None:
-        base = self.git("rev-parse", "HEAD").strip()
-        self.git("checkout", "-q", "-b", "colocated")
-        self.addCleanup(self.git, "clean", "-fdq")
-        self.addCleanup(self.git, "checkout", "-q", "-f", "main")
-        self.commit({"src/widget/widget.js": "export const a = 1;\n"}, "feat: widget")
-        self.commit({"src/widget/widget.test.js": "test\n"}, "test: widget\n\nRole: tester")
-        run = self.k6(base)
-        self.assertEqual(run.returncode, 0, run.stdout)
-        self.commit({"src/widget/widget.test.js": "changed\n"},
-                    "fix: widget test\n\nRole: implementer")
-        run = self.k6(base)
+        with self.new_branch("colocated") as base:
+            self.commit({"src/widget/widget.js": "export const a = 1;\n"}, "feat: widget")
+            self.commit({"src/widget/widget.test.js": "test\n"}, "test: widget\n\nRole: tester")
+            run = self.k6(base)
+            self.assertEqual(run.returncode, 0, run.stdout)
+            self.commit({"src/widget/widget.test.js": "changed\n"},
+                        "fix: widget test\n\nRole: implementer")
+            run = self.k6(base)
         self.assertEqual(run.returncode, 1, run.stdout)
         self.assertEqual(self.named(run.stdout), {"src/widget/widget.test.js"})
 
     def test_k6_fails_a_commit_with_no_role_trailer_to_the_colocated_test_file(self) -> None:
-        base = self.git("rev-parse", "HEAD").strip()
-        self.git("checkout", "-q", "-b", "colocated-no-role")
-        self.addCleanup(self.git, "clean", "-fdq")
-        self.addCleanup(self.git, "checkout", "-q", "-f", "main")
-        self.commit({"src/widget/widget.test.js": "changed\n"}, "fix: widget test")
-        run = self.k6(base)
+        with self.new_branch("colocated-no-role") as base:
+            self.commit({"src/widget/widget.test.js": "changed\n"}, "fix: widget test")
+            run = self.k6(base)
         self.assertEqual(run.returncode, 1, run.stdout)
         self.assertEqual(self.named(run.stdout), {"src/widget/widget.test.js"})
 
@@ -390,13 +377,10 @@ class ColocatedTest(RenderedRepo):
                 self.assertEqual(self.hook(PATH_MATCH, role), 2)
 
     def test_k6_names_an_implementer_change_to_the_match_module(self) -> None:
-        base = self.git("rev-parse", "HEAD").strip()
-        self.git("checkout", "-q", "-b", "module-change")
-        self.addCleanup(self.git, "clean", "-fdq")
-        self.addCleanup(self.git, "checkout", "-q", "-f", "main")
         text = (self.root / PATH_MATCH).read_text(encoding="utf-8")
-        self.commit({PATH_MATCH: text + "# changed\n"}, "refactor: match module")
-        run = self.k6(base)
+        with self.new_branch("module-change") as base:
+            self.commit({PATH_MATCH: text + "# changed\n"}, "refactor: match module")
+            run = self.k6(base)
         self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
         self.assertEqual(self.named(run.stdout), {PATH_MATCH})
 
@@ -511,10 +495,17 @@ ALLOWED_EDITS = [
     ("docs/reports/T-1.md", "investigator", None),
     ("src/a.py", "shaper", None),
 ]
+K6_MODULE_MESSAGE = "K6: .cornerstone/lib/path_match.py is missing or broken. Run stone render."
+# A module that does not import: (text, the error of a plain import). Exit code 1 of the hook
+# would let the edit through, so each one must give exit code 2.
+BROKEN_MODULES = {
+    "a syntax error": ("def covers(patterns, path:\n    return False\n", "SyntaxError"),
+    "an error on import": ("raise RuntimeError('broken on purpose')\n", "RuntimeError"),
+}
 
 
-class MissingModuleTest(RenderedRepo):
-    """D62: if the match module is missing, the hook blocks each edit, and K6 fails."""
+class ModuleGuardCase(RenderedRepo):
+    """D62: if the match module is missing or broken, the hook blocks each edit, and K6 fails."""
 
     TESTS = ["**/*.test.js", "tests/"]
 
@@ -524,6 +515,47 @@ class MissingModuleTest(RenderedRepo):
         # The control: with the module, the hook allows each of these edits.
         cls.codes_with_module = {edit: cls.run_hook(*edit).returncode for edit in ALLOWED_EDITS}
         cls.module_text = (cls.root / PATH_MATCH).read_text(encoding="utf-8")
+
+    def assert_hook_blocks_each_edit(self) -> None:
+        """Each allowed edit, and an edit outside the repo, exits 2 and names the module."""
+        self.assertEqual(set(self.codes_with_module.values()), {0}, self.codes_with_module)
+        with tempfile.TemporaryDirectory() as outside:
+            edits = [*ALLOWED_EDITS, (str(Path(outside) / "a.txt"), "implementer", None)]
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                runs = list(pool.map(lambda edit: self.run_hook(*edit), edits))
+        for (path, role, agent_type), run in zip(edits, runs):
+            with self.subTest(path=path, role=role, agent_type=agent_type):
+                self.assertEqual(run.returncode, 2, run.stderr)
+                self.assertIn(PATH_MATCH, run.stderr)
+                self.assertNotIn("Traceback", run.stderr)
+
+    def assert_k6_message(self, base: str, commit: str) -> None:
+        with self.subTest(commit=commit):
+            run = self.k6(base)
+            self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+            self.assertIn(K6_MODULE_MESSAGE, run.stdout)
+            self.assertNotIn("Traceback", run.stdout + run.stderr)
+
+    def assert_k6_fails_with_its_message(self, branch: str) -> None:
+        """K6 exits 1 with its message, with no commit and for a tester commit."""
+        with self.new_branch(branch) as base:
+            self.assert_k6_message(base, "none")
+            self.commit({"tests/test_a.py": "x\n", "src/a.test.js": "x\n"},
+                        "test: add tests\n\nRole: tester")
+            self.assert_k6_message(base, "a tester commit")
+            # The control: the same commits pass K6 when the module is there.
+            (self.root / PATH_MATCH).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / PATH_MATCH).write_text(self.module_text, encoding="utf-8")
+            run = self.k6(base)
+            self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+
+
+class MissingModuleTest(ModuleGuardCase):
+    """D62: if the match module is missing, the hook blocks each edit, and K6 fails."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
         cls.git("rm", "-q", PATH_MATCH)
         cls.git("commit", "-qm", "chore: remove the match module\n\nRole: generator")
 
@@ -533,37 +565,42 @@ class MissingModuleTest(RenderedRepo):
         self.assertTrue((self.root / K6).is_file())
 
     def test_hook_blocks_each_edit_and_names_the_module(self) -> None:
-        self.assertEqual(set(self.codes_with_module.values()), {0}, self.codes_with_module)
-        for path, role, agent_type in ALLOWED_EDITS:
-            with self.subTest(path=path, role=role, agent_type=agent_type):
-                run = self.run_hook(path, role, agent_type)
-                self.assertEqual(run.returncode, 2, run.stderr)
-                self.assertIn(PATH_MATCH, run.stderr)
+        self.assert_hook_blocks_each_edit()
 
-    def test_hook_blocks_an_edit_outside_the_repo(self) -> None:
-        with tempfile.TemporaryDirectory() as outside:
-            run = self.run_hook(str(Path(outside) / "a.txt"), "implementer")
-        self.assertEqual(run.returncode, 2, run.stderr)
-        self.assertIn(PATH_MATCH, run.stderr)
+    def test_k6_exits_1_and_prints_its_message_with_no_traceback(self) -> None:
+        self.assert_k6_fails_with_its_message("tester-commit-no-module")
 
-    def test_k6_fails_with_a_nonzero_code(self) -> None:
-        base = self.git("rev-parse", "HEAD").strip()
-        with self.subTest(case="no commit"):
-            run = self.k6(base)
-            self.assertNotEqual(run.returncode, 0, run.stdout + run.stderr)
-        self.git("checkout", "-q", "-b", "tester-commit-no-module")
-        self.addCleanup(self.git, "clean", "-fdq")
-        self.addCleanup(self.git, "checkout", "-q", "-f", "main")
-        self.commit({"tests/test_a.py": "x\n", "src/a.test.js": "x\n"},
-                    "test: add tests\n\nRole: tester")
-        with self.subTest(case="a tester commit"):
-            run = self.k6(base)
-            self.assertNotEqual(run.returncode, 0, run.stdout + run.stderr)
-        # The control: the same commits pass K6 when the module is there.
-        (self.root / PATH_MATCH).parent.mkdir(parents=True, exist_ok=True)
-        (self.root / PATH_MATCH).write_text(self.module_text, encoding="utf-8")
-        run = self.k6(base)
-        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+
+class BrokenModuleTest(ModuleGuardCase):
+    """D62: if the match module does not import, the hook blocks each edit, and K6 fails."""
+
+    def break_module(self, text: str) -> None:
+        """Write text to the module, and write the real module back after the test."""
+        self.addCleanup((self.root / PATH_MATCH).write_text, self.module_text, encoding="utf-8")
+        (self.root / PATH_MATCH).write_text(text, encoding="utf-8")
+
+    def test_each_broken_module_raises_its_error_on_a_plain_import(self) -> None:
+        # The control: each case is broken in the way that its name says.
+        for case, (text, error) in BROKEN_MODULES.items():
+            with self.subTest(case=case):
+                self.break_module(text)
+                run = subprocess.run([sys.executable, "-B", "-c", "import path_match"],
+                                     cwd=(self.root / PATH_MATCH).parent, capture_output=True,
+                                     text=True)
+                self.assertNotEqual(run.returncode, 0, run.stderr)
+                self.assertIn(error, run.stderr)
+
+    def test_hook_blocks_each_edit_and_names_the_module(self) -> None:
+        for case, (text, _) in BROKEN_MODULES.items():
+            with self.subTest(case=case):
+                self.break_module(text)
+                self.assert_hook_blocks_each_edit()
+
+    def test_k6_exits_1_and_prints_its_message_with_no_traceback(self) -> None:
+        for number, (case, (text, _)) in enumerate(BROKEN_MODULES.items()):
+            with self.subTest(case=case):
+                self.break_module(text)
+                self.assert_k6_fails_with_its_message(f"tester-commit-broken-module-{number}")
 
 
 class NoBytecodeTest(RenderedRepo):
@@ -600,18 +637,17 @@ class NoBytecodeTest(RenderedRepo):
                 env=self.plain_env(CLAUDE_PROJECT_DIR=str(self.root), STONE_ROLE=role),
                 capture_output=True, text=True)
             self.assertIn(run.returncode, (0, 2), run.stderr)
-        base = self.git("rev-parse", "HEAD").strip()
-        self.git("checkout", "-q", "-b", "bytecode")
-        self.addCleanup(self.git, "clean", "-fdq")
-        self.addCleanup(self.git, "checkout", "-q", "-f", "main")
-        self.commit({"src/a.test.js": "x\n"}, "feat: change a test")
-        run = subprocess.run([sys.executable, K6, base], cwd=self.root, env=self.plain_env(),
-                             capture_output=True, text=True)
-        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
-        self.assertEqual(self.named(run.stdout), {"src/a.test.js"})
-        self.assertEqual(self.pycache_folders(self.root / ".cornerstone"), [])
-        status = self.git("status", "--porcelain", "--untracked-files=all", "--", ".cornerstone")
-        self.assertEqual(status, "")
+        with self.new_branch("bytecode") as base:
+            self.commit({"src/a.test.js": "x\n"}, "feat: change a test")
+            run = subprocess.run([sys.executable, K6, base], cwd=self.root, env=self.plain_env(),
+                                 capture_output=True, text=True)
+            self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+            self.assertEqual(self.named(run.stdout), {"src/a.test.js"})
+            # Before the clean of the branch: an untracked __pycache__ folder must still show.
+            self.assertEqual(self.pycache_folders(self.root / ".cornerstone"), [])
+            status = self.git("status", "--porcelain", "--untracked-files=all", "--",
+                              ".cornerstone")
+            self.assertEqual(status, "")
 
 
 class InvalidGlobTest(unittest.TestCase):
