@@ -172,6 +172,107 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(self.run_hook("src/a.py", "tester"), 2)
         self.assertEqual(self.run_hook("src/a.py", "reviewer"), 2)
 
+    # Issue #126, D54: the hook finds the role in agent_type, then STONE_ROLE, then implementer.
+    HOOK_ROLES = ("implementer", "tester", "planner", "investigator", "reviewer")
+    ROLE_PROBES = ("tests/test_a.py", "src/a.py", "docs/plans/p.md", "docs/reports/r.md")
+    # The exit codes for ROLE_PROBES. Each role has a different pattern.
+    ROLE_PATTERN = {"implementer": (2, 0, 0, 0), "tester": (0, 2, 2, 2),
+                    "planner": (2, 2, 0, 2), "investigator": (2, 2, 2, 0),
+                    "reviewer": (2, 2, 2, 2)}
+    UNSET = object()
+    ABSENT = object()
+
+    def role_seen(self, stone_role: object = UNSET, agent_type: object = ABSENT,
+                  agent_id: str | None = None) -> str:
+        """Run the hook on each probe path and return the role that its exit codes show."""
+        env = {k: v for k, v in os.environ.items() if k != "STONE_ROLE"}
+        env["CLAUDE_PROJECT_DIR"] = str(self.root)
+        if stone_role is not self.UNSET:
+            env["STONE_ROLE"] = stone_role
+        codes = []
+        for path in self.ROLE_PROBES:
+            event: dict = {"hook_event_name": "PreToolUse", "tool_name": "Edit",
+                           "tool_input": {"file_path": str(self.root / path)}}
+            if agent_type is not self.ABSENT:
+                event["agent_type"] = agent_type
+            if agent_id is not None:
+                event["agent_id"] = agent_id
+            run = subprocess.run([sys.executable, ".cornerstone/hooks/protect-paths.py"],
+                                 cwd=self.root, input=json.dumps(event), env=env,
+                                 capture_output=True, text=True)
+            codes.append(run.returncode)
+        for role, pattern in self.ROLE_PATTERN.items():
+            if tuple(codes) == pattern:
+                return role
+        return f"no role: {codes}"
+
+    def test_hook_role_patterns_are_distinct(self) -> None:
+        self.render()
+        self.assertEqual(len(set(self.ROLE_PATTERN.values())), len(self.ROLE_PATTERN))
+        for role in self.HOOK_ROLES:
+            self.assertEqual(self.role_seen(stone_role=role), role)
+
+    def test_hook_agent_type_role_wins_over_stone_role(self) -> None:
+        self.render()
+        for role in self.HOOK_ROLES:
+            for env_role in self.HOOK_ROLES:
+                with self.subTest(agent_type=role, stone_role=env_role):
+                    self.assertEqual(self.role_seen(stone_role=env_role, agent_type=role), role)
+
+    def test_hook_agent_type_role_with_no_stone_role(self) -> None:
+        self.render()
+        for role in self.HOOK_ROLES:
+            with self.subTest(agent_type=role):
+                self.assertEqual(self.role_seen(agent_type=role), role)
+                self.assertEqual(self.role_seen(stone_role="", agent_type=role), role)
+
+    def test_hook_subagent_uses_the_role_in_agent_type(self) -> None:
+        # A lead session (STONE_ROLE=implementer) starts a tester subagent.
+        self.render()
+        self.assertEqual(self.role_seen(stone_role="implementer", agent_type="tester",
+                                        agent_id="a1b2c3"), "tester")
+        for role in self.HOOK_ROLES:
+            with self.subTest(agent_type=role):
+                self.assertEqual(self.role_seen(agent_type=role, agent_id="sub-1"), role)
+                self.assertEqual(self.role_seen(stone_role="reviewer", agent_type=role,
+                                                agent_id="sub-1"), role)
+
+    def test_hook_tester_subagent_can_edit_tests_under_an_implementer_lead(self) -> None:
+        self.render()
+        event = json.dumps({"agent_type": "tester", "agent_id": "a1b2c3",
+                            "tool_input": {"file_path": str(self.root / "tests/test_a.py")}})
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(self.root), "STONE_ROLE": "implementer"}
+        run = subprocess.run([sys.executable, ".cornerstone/hooks/protect-paths.py"],
+                             cwd=self.root, input=event, env=env, capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stderr)
+
+    def test_hook_no_agent_type_uses_stone_role(self) -> None:
+        self.render()
+        for role in self.HOOK_ROLES:
+            with self.subTest(stone_role=role):
+                self.assertEqual(self.role_seen(stone_role=role), role)
+
+    def test_hook_agent_type_that_is_not_a_hook_role_uses_stone_role(self) -> None:
+        self.render()
+        for agent in ("Explore", "general-purpose", "shaper", "", None):
+            for role in self.HOOK_ROLES:
+                with self.subTest(agent_type=agent, stone_role=role):
+                    self.assertEqual(self.role_seen(stone_role=role, agent_type=agent), role)
+                    self.assertEqual(self.role_seen(stone_role=role, agent_type=agent,
+                                                    agent_id="sub-1"), role)
+
+    def test_hook_no_role_anywhere_uses_implementer(self) -> None:
+        self.render()
+        for stone_role in (self.UNSET, ""):
+            with self.subTest(stone_role="unset" if stone_role is self.UNSET else "empty"):
+                self.assertEqual(self.role_seen(stone_role=stone_role), "implementer")
+                for agent in ("Explore", "general-purpose", "shaper", "", None):
+                    with self.subTest(agent_type=agent):
+                        self.assertEqual(self.role_seen(stone_role=stone_role, agent_type=agent),
+                                         "implementer")
+                        self.assertEqual(self.role_seen(stone_role=stone_role, agent_type=agent,
+                                                        agent_id="sub-1"), "implementer")
+
     def test_hook_uses_the_main_checkout_root(self) -> None:
         self.render()
         self.git("init", "-q")
