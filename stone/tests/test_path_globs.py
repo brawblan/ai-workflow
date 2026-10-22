@@ -1,4 +1,4 @@
-"""Tests for issue #119 and D56: a glob in `paths.tests` and `paths.checks`.
+"""Tests for issue #119 and D62: a glob in `paths.tests` and `paths.checks`.
 
 The tests render a temp repo with the real framework, as test_render.py does. Then they run the
 rendered hook (.cornerstone/hooks/protect-paths.py) and the rendered K6
@@ -64,7 +64,7 @@ def config(tests: list[str], checks: list[str]) -> str:
 
 
 def old_covers(prefixes: list[str], path: str) -> bool:
-    """The match rule before D56 (the main branch): the path, or a path under the folder."""
+    """The match rule before D62 (the main branch): the path, or a path under the folder."""
     return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/") for p in prefixes)
 
 

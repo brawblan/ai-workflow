@@ -37,13 +37,13 @@ SCENARIOS = {s["id"]: s for s in
 # H1 to H5 pin the shell-write gap (D39). H6 to H8 test how the hook finds the role (D55, #126).
 SHELL_WRITE = ("H1", "H2", "H3", "H4", "H5")
 ROLE_LOOKUP = ("H6", "H7", "H8")
-# H9 tests a glob in paths.tests: a test file next to its source file (D56, #119).
+# H9 tests a glob in paths.tests: a test file next to its source file (D62, #119).
 # It uses role_from_input and k6_fails, so it is not in ROLE_LOOKUP.
 GLOB_MATCH = ("H9",)
 GROUPS = (SHELL_WRITE, ROLE_LOOKUP, GLOB_MATCH)
 COLOCATED_TEST = "src/widget/widget.test.js"
 COLOCATED_SOURCE = "src/widget/widget.js"
-# The match rule before D56. A hook or K6 with this rule cannot protect a colocated test file.
+# The match rule before D62. A hook or K6 with this rule cannot protect a colocated test file.
 PREFIX_ONLY_COVERS = ('def covers(patterns, path):\n'
                       '    return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/")'
                       ' for p in patterns)\n\n\n')
@@ -311,14 +311,14 @@ class RoleFromInputTest(GraderCase):
 
 
 class GlobMatchTest(GraderCase):
-    """H9: a glob in paths.tests protects a test file next to its source file (D56, #119)."""
+    """H9: a glob in paths.tests protects a test file next to its source file (D62, #119)."""
 
     def fixture_config(self, sid: str) -> dict[str, Any]:
         path = EVAL / SCENARIOS[sid]["fixture"] / ".cornerstone" / "config.yaml"
         return yaml.safe_load(path.read_text(encoding="utf-8"))
 
     def use_prefix_only_covers(self, ws: Path, file: str) -> None:
-        """Make the rendered file use the match rule from before D56."""
+        """Make the rendered file use the match rule from before D62."""
         target = ws / file
         text = target.read_text(encoding="utf-8")
         self.assertEqual(text.count(MAIN_GUARD), 1, f"{file} has no single main guard")
