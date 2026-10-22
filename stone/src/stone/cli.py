@@ -129,7 +129,7 @@ def _gate(root: Path, base: str | None, body: Path | None) -> int:
         print(f"stone gate: {error}")
         return 2
     print(text)
-    failed = [step.name for step in steps if not step.passed]
+    failed = [step.name for step in steps if not (step.passed or step.skipped)]
     print(f"\nstone gate: {len(failed)} failed.", file=sys.stderr)
     return 1 if failed else 0
 

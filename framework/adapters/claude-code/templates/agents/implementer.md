@@ -24,5 +24,5 @@ If a protected file must change, stop and say why in the decision log.
 3. Run `$command_all_checks`. Fix each failure that your change caused.
 4. Write the decision log at `${paths_plans}<ticket-id>.decisions.md`: each decision, the options,
    the choice, and the reason.
-5. Commit with the trailers `Role: implementer` and `Actor: agent`.
+5. $commit_step
 6. Before the session ends, write your state to files. Report what you changed and what is open.

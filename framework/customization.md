@@ -47,6 +47,10 @@ commands:                          # exactly as a person types them
   differential: <command>         # K12 step
   mutation: <command>             # K10 step. It gets BASE_REF and MUTATION_SCORE_MIN.
   all_checks: <command>
+commits:                           # optional. These are the defaults.
+  by: agent                        # agent: the role commits. human: the role gives a message.
+  trailers: commit                 # commit, notes (git notes), or none
+  message_format: docs/commit-format.md   # optional: a file in the repo, or a URL
 paths:
   source: [src/]
   tests: [tests/]                  # protected for the implementer
@@ -127,6 +131,22 @@ Make sure that each command passes before you add it to `commands`.
 
 CI does not know the profile of a PR. So each step runs on each PR in the repo. For example, a repo
 with single-ticket and refactor-migration runs K10 on each single-ticket PR too.
+
+### Commits (`commits`)
+
+The implementer and the tester read this section (#121, [D57](README.md#decisions)).
+
+| Key | Value | Effect |
+| --- | --- | --- |
+| `by` | `agent` (default) | The role commits. |
+| `by` | `human` | The role does not commit. It ends with a proposed commit message. |
+| `trailers` | `commit` (default) | `Role:` and `Actor:` go in the commit message. |
+| `trailers` | `notes` | The role writes `Role:` and `Actor:` to the git notes ref `refs/notes/cornerstone`. Check K6 reads the note if the commit has no trailer. Git does not push notes by default, so the history stays clean. To check in CI, push the ref with `git push origin refs/notes/cornerstone`. |
+| `trailers` | `none` | No role record. `stone render` warns, and does not render K6. `stone gate` shows K6 as skipped. |
+| `message_format` | a path or a URL | The roles follow it. `stone check` fails if a path is not a file in the repo. |
+
+Git can lose a note when a person rebases. Run `git config notes.rewriteRef refs/notes/cornerstone`
+to keep notes through a rebase or an amend.
 
 ### Local delivery (`delivery: local`)
 

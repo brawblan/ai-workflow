@@ -224,6 +224,8 @@ def branch_name_problems(config: dict[str, Any]) -> list[str]:
 
 
 DELIVERY_MODES = ("ci", "local")
+COMMIT_BY = ("agent", "human")
+COMMIT_TRAILERS = ("commit", "notes", "none")
 HARNESS_DIRS = (".claude/", ".cornerstone/")  # the hook protects these for every role
 FOLDER_DEFAULTS = {"plans": "docs/plans/", "reports": "docs/reports/"}
 
@@ -264,6 +266,29 @@ def protected_path_problems(config: dict[str, Any]) -> list[str]:
     return problems
 
 
+def commit_problems(root: Path, config: dict[str, Any]) -> list[str]:
+    """Return the problems of the `commits` section of the repo config."""
+    section = config.get("commits")
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["'commits' must be a map with the keys by, trailers, and message_format."]
+    problems = []
+    for key, allowed in (("by", COMMIT_BY), ("trailers", COMMIT_TRAILERS)):
+        if section.get(key, allowed[0]) not in allowed:
+            problems.append(f"'commits.{key}' is '{section[key]}'. Use one of {list(allowed)}.")
+    unknown = sorted(set(section) - {"by", "trailers", "message_format"})
+    if unknown:
+        problems.append(f"'commits.{unknown[0]}' is not a key. Use by, trailers, or message_format.")
+    fmt = section.get("message_format")
+    if fmt is not None and (not isinstance(fmt, str) or not fmt.strip()):
+        problems.append("'commits.message_format' must be a file path or a URL.")
+    elif fmt and not re.match(r"https?://", fmt) and not (root / fmt).is_file():
+        problems.append(f"'commits.message_format' is '{fmt}', which is not a file in the repo. "
+                        "Use the path of a file, or a URL.")
+    return problems
+
+
 def check_config(root: Path, framework: Path) -> list[Finding]:
     path = root / ".cornerstone" / "config.yaml"
     if not path.exists():
@@ -293,7 +318,7 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     delivery = config.get("delivery", "ci")
     if delivery not in DELIVERY_MODES:
         add(f"The delivery '{delivery}' is not valid. Use one of {list(DELIVERY_MODES)}.")
-    for problem in protected_path_problems(config):
+    for problem in protected_path_problems(config) + commit_problems(root, config):
         add(problem)
     for waiver in config.get("waivers", []):
         if waiver.get("gate") in {"G3", "G5"}:
