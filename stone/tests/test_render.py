@@ -73,7 +73,7 @@ class RenderTest(unittest.TestCase):
         result = self.render()
         self.assertEqual(sorted(result.wrote), sorted(ROLE_FILES + OTHER_FILES + [ST_LABEL]))
         tester = (self.root / ".claude/agents/tester.md").read_text(encoding="utf-8")
-        self.assertIn("model: claude-opus-5-5", tester)
+        self.assertIn("model: claude-sonnet-5-5\neffort: medium\n", tester)
         self.assertIn("Write tests only here: `tests/`", tester)
         self.assertIn("Run `python -m unittest`", tester)
         entry = {c["id"]: c for c in self.manifest()["components"]}["role.shaper"]

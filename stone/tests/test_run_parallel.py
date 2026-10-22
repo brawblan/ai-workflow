@@ -103,12 +103,12 @@ def make_folder(files: dict[str, str]) -> Iterator[Path]:
         yield folder
 
 
-def run_in(files: dict[str, str]) -> tuple[int, str]:
+def run_in(files: dict[str, str], quiet: bool = False) -> tuple[int, str]:
     """Write `files` into a temporary folder, run the runner on it, and return (exit code, output)."""
     with make_folder(files) as folder:
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            code = run_parallel.main(folder, jobs=2)
+            code = run_parallel.main(folder, jobs=2, quiet=quiet)
         return code, out.getvalue()
 
 
@@ -133,6 +133,19 @@ class RunParallelTest(unittest.TestCase):
         self.assertIn("MARKER-expected-failure", output)  # the captured output of the failed unit
         self.assertIn("FAILED units: test_rp_bad.Failing", output)
         self.assertIn("Ran 3 tests in 2 units", output)
+
+    def test_quiet_prints_only_the_failed_units_and_the_summary(self) -> None:
+        code, output = run_in({"test_rp_good.py": PASSING, "test_rp_bad.py": FAILING}, quiet=True)
+        self.assertEqual(code, 1)
+        self.assertRegex(output, r"test_rp_bad\.Failing\s+\S+s\s+FAIL")
+        self.assertNotRegex(output, r"test_rp_good\.Passing")
+        self.assertIn("Ran 3 tests in 2 units", output)
+
+    def test_quiet_with_no_failure_prints_only_the_summary(self) -> None:
+        code, output = run_in({"test_rp_a.py": PASSING}, quiet=True)
+        self.assertEqual(code, 0)
+        self.assertNotIn("test_rp_a", output)
+        self.assertIn("OK", output)
 
     def test_all_passing_units_give_exit_0(self) -> None:
         code, output = run_in({"test_rp_a.py": PASSING, "test_rp_b.py": PASSING, "helper.py": FAILING})
