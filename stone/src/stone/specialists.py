@@ -1,0 +1,251 @@
+"""Specialist reviews (#123): the config, the trigger match, and the findings check."""
+
+from __future__ import annotations
+
+import datetime as dt
+import hashlib
+import json
+import re
+import subprocess
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any
+
+from stone import personas_check
+
+ID_PREFIX = "specialist."
+DOC = ".cornerstone/specialists.md"
+STAGES = ("verify",)  # after the tester, before the reviewer
+KEYS = {"id", "run", "when", "stage", "blocks", "owner", "eval"}
+WHEN_KEYS = ("paths", "personas_with", "labels")
+SLUG = re.compile(r"^[a-z][a-z0-9-]*$")
+HIGH = re.compile(r"^[\s>*_`-]*(?:\d+[.)]\s*)?[*_`]*severity[*_`]*\s*[:=][*_`\s]*high\b",
+                  re.I | re.M)
+
+
+class SpecialistError(Exception):
+    """An input is not valid. No specialist ran."""
+
+
+def listed(config: dict[str, Any]) -> list[dict[str, Any]]:
+    section = config.get("specialists")
+    return [item for item in section if isinstance(item, dict)] if isinstance(section, list) else []
+
+
+def problems(config: dict[str, Any]) -> list[str]:
+    """Return the problems of the `specialists` section of the repo config."""
+    section = config.get("specialists")
+    if section is None:
+        return []
+    if not isinstance(section, list):
+        return ["'specialists' must be a list of specialists."]
+    found: list[str] = []
+    seen: set[str] = set()
+    for number, item in enumerate(section, 1):
+        if not isinstance(item, dict):
+            found.append(f"'specialists' item {number} must be a map.")
+            continue
+        name = str(item.get("id", ""))
+        label = f"specialist '{name}'" if name else f"specialists item {number}"
+        if not SLUG.match(name):
+            found.append(f"The {label} needs an 'id' in lower case, with digits and '-'.")
+        elif name in seen:
+            found.append(f"The {label} has an ID that is used twice.")
+        seen.add(name)
+        if not str(item.get("run") or "").strip():
+            found.append(f"The {label} needs 'run': the command or the agent to start.")
+        unknown = sorted(set(item) - KEYS)
+        if unknown:
+            found.append(f"The {label} has the key '{unknown[0]}'. Use one of {sorted(KEYS)}.")
+        if item.get("stage", STAGES[0]) not in STAGES:
+            found.append(f"The {label} has stage '{item['stage']}'. Use one of {list(STAGES)}.")
+        if not isinstance(item.get("blocks", False), bool):
+            found.append(f"The {label} needs 'blocks' to be true or false.")
+        for key in ("owner", "eval"):
+            if key in item and not str(item[key] or "").strip():
+                found.append(f"The {label} has an empty '{key}'. Give a value, or remove the key.")
+        found += _when_problems(label, item.get("when"))
+    return found
+
+
+def _when_problems(label: str, when: Any) -> list[str]:
+    if when is None:
+        return []
+    if not isinstance(when, dict):
+        return [f"The {label} needs 'when' to be a map."]
+    found = []
+    for key, value in when.items():
+        if key not in WHEN_KEYS:
+            found.append(f"The {label} has 'when.{key}'. Use one of {list(WHEN_KEYS)}.")
+        elif not (isinstance(value, list) and value
+                  and all(isinstance(v, str) and v.strip() for v in value)):
+            found.append(f"The {label} needs 'when.{key}' to be a list of text values.")
+    return found
+
+
+def glob_regex(pattern: str) -> re.Pattern[str]:
+    """Return a regex for a path glob. `**` crosses folders, `*` and `?` do not."""
+    pattern = pattern.strip().removeprefix("./")
+    if pattern.endswith("/"):
+        pattern += "**"
+    out, i = "", 0
+    while i < len(pattern):
+        if pattern.startswith("**/", i):
+            out, i = out + "(?:.*/)?", i + 3
+        elif pattern.startswith("**", i):
+            out, i = out + ".*", i + 2
+        elif pattern[i] == "*":
+            out, i = out + "[^/]*", i + 1
+        elif pattern[i] == "?":
+            out, i = out + "[^/]", i + 1
+        else:
+            out, i = out + re.escape(pattern[i]), i + 1
+    return re.compile(out + r"\Z")
+
+
+def reasons(spec: dict[str, Any], files: list[str], labels: list[str],
+            limits: dict[str, list[str]]) -> list[str]:
+    """Return why a specialist matched. A specialist with no trigger always matches."""
+    when = spec.get("when") or {}
+    if not when:
+        return ["always"]
+    found = []
+    for pattern in when.get("paths") or []:
+        regex = glob_regex(pattern)
+        hit = next((path for path in files if regex.match(path)), None)
+        if hit:
+            found.append(f"paths: {hit} matches {pattern}")
+    wanted = {label.lower() for label in when.get("labels") or []}
+    found += [f"labels: {label}" for label in labels if label.lower() in wanted]
+    for term in when.get("personas_with") or []:
+        for persona, texts in limits.items():
+            if any(term.lower() in text.lower() for text in texts):
+                found.append(f"personas_with: '{term}' in the limits of {persona}")
+    return found
+
+
+def persona_limits(root: Path, ids: list[str]) -> dict[str, list[str]]:
+    """Return the limit texts of each named persona, from the personas file."""
+    path = root / personas_check.PERSONAS_FILE
+    if not ids:
+        return {}
+    if not path.exists():
+        raise SpecialistError(f"{personas_check.PERSONAS_FILE}: no file, but --personas names "
+                              "personas.")
+    by_id = {p.fields.get("id", ""): p for p in personas_check.parse(path.read_text("utf-8"))}
+    unknown = [name for name in ids if name not in by_id]
+    if unknown:
+        raise SpecialistError(f"The persona '{unknown[0]}' is not in "
+                              f"{personas_check.PERSONAS_FILE}.")
+    return {name: [by_id[name].fields.get("limits", ""),
+                   *(text for _, text in by_id[name].items.get("limits", []))] for name in ids}
+
+
+def changed_files(root: Path, base: str) -> list[str]:
+    for rev in (f"{base}...HEAD", f"{base}..HEAD"):
+        done = subprocess.run(["git", "diff", "--name-only", rev], cwd=root,
+                              capture_output=True, text=True)
+        if done.returncode == 0:
+            return done.stdout.split()
+    raise SpecialistError(f"git cannot diff against '{base}'. Give a base that exists.")
+
+
+def reports_folder(config: dict[str, Any]) -> str:
+    """Return `paths.reports` as a folder that ends with '/'. The default is docs/reports/."""
+    value = (config.get("paths") or {}).get("reports") or "docs/reports/"
+    value = str(value[0] if isinstance(value, list) and value else value)
+    return value if value.endswith("/") else value + "/"
+
+
+def report_path(root: Path, config: dict[str, Any], ticket: str, name: str) -> Path:
+    return root / f"{reports_folder(config)}{ticket}.{name}.md"
+
+
+@dataclass
+class Row:
+    spec: dict[str, Any]
+    why: list[str]
+    status: str  # reviewed, missing, or blocking
+
+    def line(self) -> str:
+        blocks = "yes" if self.spec.get("blocks") else "no"
+        return (f"| {self.spec['id']} | {'; '.join(self.why)} | `{self.spec['run']}` | {blocks} "
+                f"| {self.status} |")
+
+
+def run(root: Path, config: dict[str, Any], base: str, labels: list[str], persona_ids: list[str],
+        ticket: str) -> tuple[list[Row], str]:
+    """Match the specialists to a change and check their findings reports."""
+    files = changed_files(root, base)
+    limits = persona_limits(root, persona_ids)
+    rows = []
+    for spec in listed(config):
+        why = reasons(spec, files, labels, limits)
+        if not why:
+            continue
+        path = report_path(root, config, ticket, spec["id"])
+        if not path.is_file():
+            status = "missing"
+        elif spec.get("blocks") and HIGH.search(path.read_text(encoding="utf-8")):
+            status = "blocking"
+        else:
+            status = "reviewed"
+        rows.append(Row(spec, why, status))
+    if not rows:
+        return rows, "No specialist review matched this change."
+    lines = ["Specialist findings (run order):", "",
+             "| ID | Why it matched | Run | Blocks | Status |", "| --- | --- | --- | --- | --- |"]
+    lines += [row.line() for row in rows]
+    for row in rows:
+        if row.status == "missing":
+            lines.append(f"\nMissing: start `{row.spec['run']}` in a new session. It writes "
+                         f"{report_path(root, config, ticket, row.spec['id']).relative_to(root)}.")
+        if row.status == "blocking":
+            lines.append(f"\nBlocking: {row.spec['id']} has a finding with severity high. "
+                         "G4 cannot pass until a human decides.")
+    return rows, "\n".join(lines)
+
+
+def document(config: dict[str, Any]) -> str:
+    """Return the text of `.cornerstone/specialists.md`."""
+    reports = reports_folder(config)
+    lines = ["<!-- Generated by stone render. Do not edit: change `specialists` in "
+             ".cornerstone/config.yaml and render again. -->",
+             "# Specialist reviews", "",
+             "A specialist review runs in a fresh session after the tester and before the reviewer "
+             "(P2). The reviewer reads its findings as an input.", "",
+             "Run this command to find the specialists that the change needs:", "",
+             "```bash",
+             "stone specialists --base <base-branch> --labels <labels> --personas <ids> "
+             "--ticket <ticket-id>", "```", "",
+             "A trigger matches if one of its conditions matches. A specialist with no trigger "
+             "always runs.", "",
+             "| Order | ID | Run | Trigger | Blocks |", "| --- | --- | --- | --- | --- |"]
+    for number, spec in enumerate(listed(config), 1):
+        when = spec.get("when") or {}
+        trigger = "; ".join(f"{key}: {', '.join(f'`{v}`' for v in when[key])}"
+                            for key in WHEN_KEYS if key in when) or "always"
+        lines.append(f"| {number} | {spec['id']} | `{spec['run']}` | {trigger} | "
+                     f"{'yes' if spec.get('blocks') else 'no'} |")
+    lines += ["", "## Findings report", "",
+              f"Each specialist writes its findings to `{reports}<ticket-id>.<id>.md`. Each finding "
+              "has a line `Severity: high`, `Severity: medium`, or `Severity: low`.", "",
+              "A missing report is a missing review. For a specialist with Blocks `yes`, a finding "
+              "with severity high stops G4."]
+    return "\n".join(lines) + "\n"
+
+
+def manifest_entry(spec: dict[str, Any], old: dict[str, Any] | None, config: dict[str, Any],
+                   today: dt.date, review_by: dt.date) -> dict[str, Any]:
+    """Return the manifest entry of one specialist (P5). The source is `repo`."""
+    return {
+        "id": ID_PREFIX + spec["id"], "kind": "specialist",
+        "purpose": f"Specialist review '{spec['id']}': {spec['run']}", "principle": ["P2"],
+        "source": "repo",
+        "owner": spec.get("owner") or (old or {}).get("owner") or config["owners"]["default"],
+        "eval": str(spec.get("eval") or ""), "models_tested": [],
+        "added": str(old["added"]) if old else today.isoformat(),
+        "review_by": str(old["review_by"]) if old else review_by.isoformat(),
+        "files": [],
+        "hash": hashlib.sha256(json.dumps(spec, sort_keys=True).encode()).hexdigest(),
+    }

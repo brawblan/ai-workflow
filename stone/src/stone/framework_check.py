@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from stone import personas_check, results, specs
+from stone import personas_check, results, specialists, specs
 from stone.findings import Finding
 from stone.markdown import link_file, relative_links, split_frontmatter, table_rows
 
@@ -28,7 +28,7 @@ REQUIRED_KEYS = ["id", "name", "version", "purpose", "triggers", "stages", "role
 MATRIX_VALUE = {"—": "skip", "yes": "required", "if needed": "if-needed"}
 VENDOR_NAMES = ["claude", "codex", "cursor", "copilot", "gemini", "openspec", "kiro",
                 "anthropic", "openai"]
-EVAL_OPTIONAL_KINDS = {"check"}  # lifecycle.md: a check is its own test, so its eval can be ""
+EVAL_OPTIONAL_KINDS = {"check", "doc", "specialist"}  # lifecycle.md: a check is its own test, so its eval can be ""
 
 
 def _first_column(rows: list[list[str]]) -> list[str]:
@@ -362,7 +362,7 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     if adoption not in ADOPTION_MODES:
         add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
     for problem in (protected_path_problems(config) + commit_problems(root, config)
-                    + ticket_problems(config)):
+                    + ticket_problems(config) + specialists.problems(config)):
         add(problem)
     for waiver in config.get("waivers", []):
         if waiver.get("gate") in {"G3", "G5"}:

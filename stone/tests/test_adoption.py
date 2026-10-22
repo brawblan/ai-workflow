@@ -92,6 +92,13 @@ class AdoptionTest(unittest.TestCase):
                          "cornerstone=false")
         self.assertEqual(self.marker("", '["cornerstone-x"]'), "cornerstone=false")
 
+    def test_the_marker_must_name_a_profile_of_the_config(self) -> None:
+        self.render("adoption: opt-in\n")
+        self.assertEqual(self.marker("Profile: other\n", "[]"), "cornerstone=false")
+        self.assertEqual(self.marker("Profile: <id>\n", "[]"), "cornerstone=false")
+        self.assertEqual(self.marker("Profile: single-ticket-x\n", "[]"), "cornerstone=false")
+        self.assertEqual(self.marker("Profile: single-ticket  \n", "[]"), "cornerstone=true")
+
     def test_role_files_get_the_marker_rule_only_in_opt_in(self) -> None:
         self.render()
         self.assertNotIn("cornerstone`", (self.root / ".claude/agents/tester.md").read_text())

@@ -66,7 +66,18 @@ limits:
   mutation_score_changed_code: 0.6
 tickets:                           # optional. Where the ticket lives (#137)
   source: github                   # github (default), or file
-  path: docs/tickets/{id}.txt   # with source: file. {id} is the ticket ID.
+  path: docs/tickets/{id}.txt      # with source: file. {id} is the ticket ID.
+specialists:                       # optional: reviews by a specialist agent or skill (#123)
+  - id: accessibility
+    run: <command>                # the command, agent, or skill that starts the review
+    when:                          # any one match starts it. No `when`: it always runs.
+      paths: ["**/components/**"]
+      personas_with: [screen reader]   # a word in the limits of a persona of the ticket
+      labels: [a11y]
+    stage: verify                  # after the tester, before the reviewer (the only stage)
+    blocks: false                  # true: a finding with severity high stops G4
+    owner: <github-username>       # optional. Default: owners.default
+    eval: evals/accessibility/     # optional, but P5 asks for an eval plan
 owners:
   default: <github-username>
   solo: false                      # true if one human fills all human roles (see modes.md)
@@ -148,7 +159,11 @@ Use it when only some people or some tickets use Cornerstone ([D58](README.md#de
   workflows, so it still runs for each PR.
 - K6 does not count a commit with `Actor: human` and no `Role:` as an implementer commit. A
   commit with no trailer still counts as an implementer commit.
+- The line must name a profile of this repo config, and nothing else, for example
+  `Profile: single-ticket`. A line such as `Profile: x` or `Profile: single-ticket-2` is not a marker.
 - The role files of the implementer and the tester tell the role to add the marker to a PR.
+- Anyone can remove the marker, and an unmarked PR gets no check. Turn on branch protection with a
+  required human review for the base branch, so that review controls the PRs that G3 skips.
 
 ### Tickets as files (`tickets`)
 
@@ -180,6 +195,26 @@ The implementer and the tester read this section (#121, [D57](README.md#decision
 
 Git can lose a note when a person rebases. Run `git config notes.rewriteRef refs/notes/cornerstone`
 to keep notes through a rebase or an amend.
+
+### Specialist reviews (`specialists`)
+
+A repo can connect its own review agents or skills to the roles ([D59](README.md#decisions)).
+
+- `stone render` writes `.cornerstone/specialists.md`: each specialist, its trigger, and the order.
+  The reviewer role file tells the reviewer to read the specialist findings as an input.
+- Each specialist gets a manifest entry with `source: repo`, an owner, and a review date (P5).
+  `stone render` warns if a specialist has no `eval` plan.
+- `stone specialists --base BASE --ticket ID [--labels a,b] [--personas x,y]` lists the specialists
+  that match the change, in config order. A trigger matches if one `when` condition matches:
+  - `paths`: a glob (`*` does not cross a folder, `**` does) on the files changed since BASE.
+  - `labels`: a label of the ticket.
+  - `personas_with`: a word in the `limits` of a persona that `--personas` names.
+- A specialist writes its findings to `<paths.reports>/<ticket-id>.<id>.md`. Each finding has a line
+  such as `Severity: high`. The command reports a specialist with no file as `missing`. It reports
+  a `blocks: true` specialist with a high finding as `blocking`. It exits with 1 if one is not
+  `reviewed`.
+- The command cannot start a specialist. The reviewer has no tool to start another agent (P2). A
+  person, or `ticket-delivery` with the user, starts each one in a new session.
 
 ### Local delivery (`delivery: local`)
 

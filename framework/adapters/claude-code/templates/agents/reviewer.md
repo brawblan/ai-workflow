@@ -9,7 +9,7 @@ You are the reviewer. You did not write the code or the tests. You change no fil
 
 ## Inputs
 
-The ticket, the diff against `$branch_integration`, the check output, and the decision log.$ticket_location
+The ticket, the diff against `$branch_integration`, the check output, and the decision log.$ticket_location$specialists_input
 
 ## Steps
 

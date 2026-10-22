@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from stone import framework_check, results, triggers
+from stone import framework_check, results, specialists, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -33,14 +33,15 @@ COMMIT_DEFAULTS = {"by": "agent", "trailers": "commit"}
 MARKER_IF = "        if: steps.marker.outputs.cornerstone == 'true'"
 PR_TYPES = "    types: [opened, synchronize, reopened, edited, labeled, unlabeled]"
 MARKER_STEP = r"""      # Opt-in adoption (#122): only a PR with a "Profile: <id>" line or the label cornerstone
-      # gets the Cornerstone checks. The repo's own CI is in other workflows.
+      # gets the Cornerstone checks. The ID must be a profile of this repo. The repo's own CI is in
+      # other workflows.
       - name: Find the Cornerstone marker
         id: marker
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         run: |
-          if printf '%s\n' "${PR_BODY}" | tr -d '\r' | grep -Eq '^Profile: *[^ ]+' ||
+          if printf '%s\n' "${PR_BODY}" | tr -d '\r' | grep -Eq '^Profile: *(PROFILE_IDS)[[:space:]]*$' ||
             printf '%s\n' "${PR_LABELS}" | grep -Fq '"cornerstone"'; then
             echo "cornerstone=true" >> "${GITHUB_OUTPUT}"
           else
@@ -225,11 +226,14 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     values.update({
         "adoption_json": json.dumps("opt-in" if opt_in else "all"),
         "marker_if": MARKER_IF if opt_in else "",
-        "marker_step": MARKER_STEP if opt_in else "",
+        "marker_step": (MARKER_STEP.replace("PROFILE_IDS", "|".join(config.get("profiles") or []))
+                        if opt_in else ""),
         "pr_types": PR_TYPES if opt_in else "",
         "marker_rule": (" If you open or edit a PR, add the line `Profile: <id>` to the PR body, "
                         "or the label `cornerstone`. The G3 workflow skips a PR with neither."
                         if opt_in else ""),
+        "specialists_input": (" Also read the specialist findings that `.cornerstone/specialists.md` "
+                              "lists." if specialists.listed(config) else ""),
         "k6_tail": " The paths are:" if no_k6 else " Check K6 fails the commit in CI:",
         "k6_checks_commit": "" if no_k6 else " Check K6 checks the commit."})
     values["paths_plans"] = one_folder(_get(config, "paths.plans"))
@@ -354,6 +358,10 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
+    if specialists.listed(config):
+        components.append(Component(
+            "doc.specialists", "doc", "Specialist reviews: the list, the triggers, and the order.",
+            ["P2"], "", {specialists.DOC: specialists.document(config)}))
     try:
         components.extend([] if local else trigger_components(framework, harness, registry, profiles, config,
                                              defaults["role_models"]))
@@ -550,7 +558,16 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
 
     tested = results.result_models(root)
     result = Result()
-    entries = [entry for entry in manifest.get("components", []) if entry.get("source") == "repo"]
+    entries = [entry for entry in manifest.get("components", [])
+               if entry.get("source") == "repo"
+               and not entry["id"].startswith(specialists.ID_PREFIX)]  # from the config, below
+    for spec in specialists.listed(config):
+        entry_id = specialists.ID_PREFIX + spec["id"]
+        if not spec.get("eval"):
+            print(f"warning: {entry_id} has no eval plan (P5). Set 'eval' in its config.",
+                  file=sys.stderr)
+        entries.append(specialists.manifest_entry(spec, old_entries.get(entry_id), config, today,
+                                                  add_months(today, REVIEW_MONTHS)))
     to_write: dict[str, str] = {}
     for component in components:
         old = old_entries.get(component.id)

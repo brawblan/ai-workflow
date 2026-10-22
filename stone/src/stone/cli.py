@@ -6,8 +6,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from stone import (__version__, evals, evidence_check, framework_check, gate, render, specs,
-                   writing_check)
+from stone import (__version__, evals, evidence_check, framework_check, gate, render, specialists,
+                   specs, writing_check)
 from stone.findings import report
 
 
@@ -36,6 +36,15 @@ def _parser() -> argparse.ArgumentParser:
                                       "or branches.main>.")
     local.add_argument("--body", type=Path,
                        help="A file with the PR body, for the K7 profile line and waiver.")
+
+    special = commands.add_parser(
+        "specialists", help="Find the specialist reviews that a change needs, and their reports.")
+    special.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    special.add_argument("--base", help="The base branch. Default: origin/<branches.integration "
+                                        "or branches.main>.")
+    special.add_argument("--ticket", required=True, help="The ticket ID. It names the reports.")
+    special.add_argument("--labels", default="", help="The labels of the ticket, with commas.")
+    special.add_argument("--personas", default="", help="The persona IDs of the ticket, with commas.")
 
     spec = commands.add_parser("spec", help="Work with the specs of the repo.")
     spec_commands = spec.add_subparsers(dest="spec_command", required=True)
@@ -101,6 +110,8 @@ def main(argv: list[str] | None = None) -> int:
         return _render(args.root, args.framework, args.dry_run)
     if args.command == "gate":
         return _gate(args.root, args.base, args.body)
+    if args.command == "specialists":
+        return _specialists(args)
     if args.command == "spec":
         return _spec(args.root, args.spec_command, getattr(args, "plan", ""))
     if args.command == "check-evidence":
@@ -132,6 +143,22 @@ def _gate(root: Path, base: str | None, body: Path | None) -> int:
     failed = [step.name for step in steps if not (step.passed or step.skipped)]
     print(f"\nstone gate: {len(failed)} failed.", file=sys.stderr)
     return 1 if failed else 0
+
+
+def _split(text: str) -> list[str]:
+    return [item.strip() for item in text.split(",") if item.strip()]
+
+
+def _specialists(args: argparse.Namespace) -> int:
+    try:
+        config = gate.load_config(args.root)
+        rows, text = specialists.run(args.root, config, args.base or gate.default_base(config),
+                                     _split(args.labels), _split(args.personas), args.ticket)
+    except (gate.GateError, specialists.SpecialistError) as error:
+        print(f"stone specialists: {error}")
+        return 2
+    print(text)
+    return 1 if any(row.status != "reviewed" for row in rows) else 0
 
 
 def _spec(root: Path, command: str, plan: str) -> int:
