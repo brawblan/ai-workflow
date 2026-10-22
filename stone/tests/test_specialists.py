@@ -3,6 +3,7 @@
 import contextlib
 import datetime as dt
 import io
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -14,6 +15,17 @@ from stone import cli, framework_check, render, specialists
 from test_render import CONFIG, FRAMEWORK
 
 TODAY = dt.date(2026, 10, 17)
+TEMPLATE = FRAMEWORK / "adapters" / "claude-code" / "templates" / "lib" / "path_match.py"
+HARNESS = FRAMEWORK / "adapters" / "claude-code"
+BAD_GLOB = {"id": "a", "run": "x", "when": {"paths": ["src/[a"]}}
+
+
+def put_module(root: Path) -> Path:
+    """Copy the path match template to the place where render writes it."""
+    target = root / specialists.MATCH_MODULE
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(TEMPLATE, target)
+    return target
 A11Y = """specialists:
   - id: accessibility
     run: claude --agent accessibility-lead
@@ -69,8 +81,15 @@ class ConfigTest(unittest.TestCase):
 
 
 class MatchTest(unittest.TestCase):
+    def setUp(self) -> None:
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.root = Path(folder.name)
+        put_module(self.root)
+        self.covers = specialists.path_matcher(self.root)
+
     def test_glob(self) -> None:
-        match = lambda pattern, path: bool(specialists.glob_regex(pattern).match(path))  # noqa
+        match = lambda pattern, path: self.covers([pattern], path)  # noqa
         self.assertTrue(match("**/components/**", "src/ui/components/Button.tsx"))
         self.assertTrue(match("**/components/**", "components/a.tsx"))
         self.assertTrue(match("src/*.css.js", "src/a.css.js"))
@@ -80,18 +99,54 @@ class MatchTest(unittest.TestCase):
         self.assertTrue(match("a?.py", "ab.py"))
         self.assertFalse(match("*.py", "a/b.py"))
 
+    def test_d65_rules(self) -> None:
+        match = lambda pattern, path: self.covers([pattern], path)  # noqa
+        self.assertTrue(match("docs", "docs/a.md"))
+        self.assertTrue(match("src/*", "src/x/a.py"))
+        self.assertTrue(match("src/[ab].py", "src/a.py"))
+        self.assertFalse(match("./src/*.py", "src/a.py"))
+
+    def test_d65_rules_through_reasons(self) -> None:
+        for pattern, path in (("docs", "docs/a.md"), ("src/*", "src/x/a.py"),
+                              ("src/[ab].py", "src/a.py")):
+            spec = {"id": "a", "run": "x", "when": {"paths": [pattern]}}
+            self.assertTrue(specialists.reasons(spec, [path], [], {}, self.covers), pattern)
+        spec = {"id": "a", "run": "x", "when": {"paths": ["./src/*.py"]}}
+        self.assertEqual(specialists.reasons(spec, ["src/a.py"], [], {}, self.covers), [])
+
     def test_reasons(self) -> None:
         spec = yaml.safe_load(A11Y)["specialists"][0]
-        self.assertEqual(specialists.reasons(spec, ["README.md"], [], {}), [])
+        covers = self.covers
+        self.assertEqual(specialists.reasons(spec, ["README.md"], [], {}, covers), [])
         self.assertIn("paths: src/a.css.js matches src/*.css.js",
-                      specialists.reasons(spec, ["src/a.css.js"], [], {}))
-        self.assertEqual(specialists.reasons(spec, [], ["A11Y"], {}), ["labels: A11Y"])
+                      specialists.reasons(spec, ["src/a.css.js"], [], {}, covers))
+        self.assertEqual(specialists.reasons(spec, [], ["A11Y"], {}, covers), ["labels: A11Y"])
         self.assertEqual(
-            specialists.reasons(spec, [], [], {"sam": ["Uses a Screen Reader"]}),
+            specialists.reasons(spec, [], [], {"sam": ["Uses a Screen Reader"]}, covers),
             ["personas_with: 'screen reader' in the limits of sam"])
 
     def test_no_trigger_always_matches(self) -> None:
-        self.assertEqual(specialists.reasons({"id": "x", "run": "y"}, [], [], {}), ["always"])
+        self.assertEqual(specialists.reasons({"id": "x", "run": "y"}, [], [], {}, None), ["always"])
+
+    def test_labels_only_needs_no_covers(self) -> None:
+        spec = {"id": "a", "run": "x", "when": {"labels": ["a11y"]}}
+        self.assertEqual(specialists.reasons(spec, ["a.py"], ["a11y"], {}, None), ["labels: a11y"])
+
+    def test_bad_glob_raises(self) -> None:
+        with self.assertRaises(specialists.SpecialistError) as caught:
+            specialists.reasons(BAD_GLOB, ["src/a.py"], [], {}, self.covers)
+        self.assertIn("'when.paths'", str(caught.exception))
+        self.assertIn("'a'", str(caught.exception))
+
+    def test_missing_or_broken_module(self) -> None:
+        for text in (None, "def (", "x = 1\n"):
+            with self.subTest(text=text), tempfile.TemporaryDirectory() as name:
+                root = Path(name)
+                if text is not None:
+                    (root / specialists.MATCH_MODULE).parent.mkdir(parents=True)
+                    (root / specialists.MATCH_MODULE).write_text(text, encoding="utf-8")
+                with self.assertRaisesRegex(specialists.SpecialistError, "Run stone render"):
+                    specialists.path_matcher(root)
 
 
 class RunTest(unittest.TestCase):
@@ -100,6 +155,7 @@ class RunTest(unittest.TestCase):
         self.root = Path(self.folder.name)
         (self.root / ".cornerstone").mkdir()
         (self.root / "constitution").mkdir()
+        put_module(self.root)
         (self.root / "constitution" / "personas.md").write_text(PERSONAS, encoding="utf-8")
         self.config = yaml.safe_load(CONFIG + A11Y)
         (self.root / ".cornerstone" / "config.yaml").write_text(CONFIG + A11Y, encoding="utf-8")
@@ -175,6 +231,29 @@ class RunTest(unittest.TestCase):
             self.run_for(persona_ids=["ghost"])
         with self.assertRaisesRegex(specialists.SpecialistError, "cannot diff"):
             specialists.run(self.root, self.config, "origin/none", [], [], "T1")
+
+    def test_missing_module_fails_when_a_path_trigger_exists(self) -> None:
+        self.change("README.md")
+        (self.root / specialists.MATCH_MODULE).unlink()
+        with self.assertRaisesRegex(specialists.SpecialistError, "Run stone render"):
+            self.run_for()
+
+    def test_missing_module_is_fine_without_path_triggers(self) -> None:
+        self.config["specialists"][0]["when"] = {"labels": ["a11y"]}
+        self.change("README.md")
+        (self.root / specialists.MATCH_MODULE).unlink()
+        rows, _ = self.run_for(labels=["a11y"])
+        self.assertEqual([r.spec["id"] for r in rows], ["accessibility", "security"])
+
+    def test_cli_missing_module_exits_2(self) -> None:
+        self.change("README.md")
+        (self.root / specialists.MATCH_MODULE).unlink()
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            code = cli.main(["specialists", "--root", str(self.root), "--base", "origin/dev",
+                             "--ticket", "T1"])
+        self.assertEqual(code, 2)
+        self.assertIn("Run stone render", out.getvalue() + err.getvalue())
 
     def test_cli_exit_codes(self) -> None:
         self.change("README.md")
@@ -264,6 +343,17 @@ class RenderTest(unittest.TestCase):
         self.assertEqual([f.message for f in framework_check.check_components(self.root, FRAMEWORK)], [])
         with self.assertRaisesRegex(render.RenderError, "needs 'run'"):
             self.render("specialists:\n  - id: a\n")
+
+    def test_bad_when_paths_glob_fails_check_and_render(self) -> None:
+        config = {"specialists": [BAD_GLOB]}
+        found = framework_check.path_pattern_problems(config, HARNESS)
+        self.assertEqual(len(found), 1)
+        self.assertTrue(found[0].startswith("'when.paths' of the specialist 'a': "), found)
+        good = {"specialists": [{"id": "a", "run": "x", "when": {"paths": ["src/*.py", "docs/"]}}]}
+        self.assertEqual(framework_check.path_pattern_problems(good, HARNESS), [])
+        with self.assertRaisesRegex(render.RenderError, "'when.paths' of the specialist 'a'"):
+            self.render("specialists:\n  - id: a\n    run: x\n"
+                        "    when:\n      paths: [\"src/[a\"]\n")
 
 
 if __name__ == "__main__":
