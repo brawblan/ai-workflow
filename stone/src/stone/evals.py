@@ -344,7 +344,11 @@ def _changed(ws: Workspace) -> list[str]:
     return sorted(set(committed.split("\0") + [item[3:] for item in status.split("\0")]) - {""})
 
 
-def _under(path: str, prefixes: list[str]) -> bool:
+def under(path: str, prefixes: list[str]) -> bool:
+    """Return True if `path` is a prefix or is under one. It matches no glob (D62).
+
+    The one copy of this rule: evals/hook-protect-paths/grade.py imports it (D64).
+    """
     return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/") for p in prefixes)
 
 
@@ -366,12 +370,12 @@ def _file_absent(ws: Workspace, item: dict[str, Any], folder: Path) -> tuple[boo
 
 
 def _unchanged(ws: Workspace, item: dict[str, Any], _: Path) -> tuple[bool, str]:
-    hits = [p for p in _changed(ws) if _under(p, item["paths"])]
+    hits = [p for p in _changed(ws) if under(p, item["paths"])]
     return not hits, ", ".join(hits) or "no change"
 
 
 def _only_changed(ws: Workspace, item: dict[str, Any], _: Path) -> tuple[bool, str]:
-    outside = [p for p in _changed(ws) if not _under(p, item["paths"])]
+    outside = [p for p in _changed(ws) if not under(p, item["paths"])]
     return not outside, ", ".join(outside) or "no change outside"
 
 

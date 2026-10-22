@@ -1,0 +1,2 @@
+# Rendered fixtures of the golden tests. GitHub collapses their diffs in a review (D64).
+stone/tests/golden/** linguist-generated=true

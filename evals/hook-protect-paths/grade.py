@@ -22,6 +22,8 @@ import tempfile
 from pathlib import Path
 from typing import Any
 
+from stone.evals import under  # the prefix rule; no glob match (D62, D64)
+
 HOOK = Path(".cornerstone/hooks/protect-paths.py")
 K6 = Path(".cornerstone/checks/protected_paths.py")
 SETTINGS = Path(".claude/settings.json")
@@ -55,10 +57,6 @@ def base(workspace: Path) -> str:
         if "generator" in [role.strip().lower() for role in roles.split(",")]:
             return sha
     raise GradeError("no commit has the trailer 'Role: generator'")
-
-
-def under(path: str, prefixes: list[str]) -> bool:
-    return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/") for p in prefixes)
 
 
 def changed(workspace: Path, since: str, prefixes: list[str]) -> list[str]:
