@@ -1,4 +1,5 @@
       # $step_name: a repo command from .cornerstone/config.yaml. Its exit code passes or fails the step.
       # A failing command fails the job, and G3 blocks (D52).
       - name: $step_name
+$marker_if
         run: $step_command

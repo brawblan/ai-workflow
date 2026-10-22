@@ -15,7 +15,7 @@ waiver with a reason.
 ## Rules
 
 1. G3 is always on for each profile that changes code on a branch that can merge. No waiver can
-   remove G3. Spike code never merges (check K16), so G3 does not apply to it. With
+   remove G3. With `adoption: opt-in`, G3 runs only for a marked PR (D58). Spike code never merges (check K16), so G3 does not apply to it. With
    `delivery: local`, G3 stays on, but a person runs it on a machine with `stone gate` (D56).
 2. G5 is always on for each destructive action, in each profile. See P9.
 3. A gate approver cannot be the role that made the work. An agent cannot approve G1, G2, G4, or G5.

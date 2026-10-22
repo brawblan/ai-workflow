@@ -62,7 +62,8 @@ Follow the `dev-pr` skill. Fill its evidence sections from steps 2 to 5:
 
 - **Profile line:** if the repo has `.cornerstone/config.yaml`, put `Profile: <id>` at the top of
   the PR body. Check K7 uses it to pick the size limit. If `profiles` has one id, use it. If it
-  has more, use the profile in the ticket. If the ticket names none, ask the user.
+  has more, use the profile in the ticket. If the ticket names none, ask the user. If the config has `adoption: opt-in`, this line (or the
+  label `cornerstone`) is what turns the Cornerstone checks on for the PR.
 - **Waiver (P10):** if the diff is over the K7 limit, tell the user. The user splits the PR, or
   approves a `Waiver (P10)` section with the reason, the owner, and the end date.
 - **Evidence:** the COA table from step 4, or the summary from step 5.

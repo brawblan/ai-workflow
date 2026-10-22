@@ -31,6 +31,7 @@ harness: <harness-adapter-name>    # a file name in framework/adapters/
 model_profile: <model-family>      # a file in framework/adapters/<harness>/models/
 spec_tool: plain                   # plain, or a spec-tool adapter name
 profiles: [single-ticket, bug-triage, debugging]
+adoption: all                      # all (default), or opt-in: only marked PRs (see below)
 delivery: ci                       # ci (default), or local: no workflow files (see below)
 branches:
   integration: dev
@@ -129,8 +130,22 @@ The K10 step needs `limits.mutation_score_changed_code`. If it has no value, ren
 A failing command fails the job, and G3 blocks the merge (D52). The steps have no `continue-on-error`.
 Make sure that each command passes before you add it to `commands`.
 
-CI does not know the profile of a PR. So each step runs on each PR in the repo. For example, a repo
+With `adoption: all`, CI does not know the profile of a PR. So each step runs on each PR in the repo. For example, a repo
 with single-ticket and refactor-migration runs K10 on each single-ticket PR too.
+
+### Opt-in adoption (`adoption: opt-in`)
+
+Use it when only some people or some tickets use Cornerstone ([D58](README.md#decisions)).
+
+- A PR is a Cornerstone PR if its body has a line that starts with `Profile: <id>`, or it has the
+  label `cornerstone`.
+- The G3 workflow always starts. A first step finds the marker. Each Cornerstone step (K6, K7,
+  K14, K15, the repo commands, and `commands.all_checks`) runs only for a marked PR. The workflow
+  also runs again when a PR is edited, labeled, or unlabeled. The repo's own CI is in other
+  workflows, so it still runs for each PR.
+- K6 does not count a commit with `Actor: human` and no `Role:` as an implementer commit. A
+  commit with no trailer still counts as an implementer commit.
+- The role files of the implementer and the tester tell the role to add the marker to a PR.
 
 ### Commits (`commits`)
 
