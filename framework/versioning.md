@@ -60,8 +60,9 @@ installed `stone`.
    `stone check-writing --diff origin/main`.
 2. In `upgrades.yaml`, set `released` of the newest entry to the date of the release.
 3. Set the same version in `stone/pyproject.toml` and in `stone/src/stone/__init__.py`.
-4. Set `framework_version` in this repo's `.cornerstone/config.yaml` to the version, and run
-   `stone upgrade --apply`. Commit the generated files alone.
-5. If a skill changed, raise the version in the `plugin.json` file of the plugin.
-6. Merge. Tag the merge commit `vX.Y.Z`. Copy the summary, the config changes, and the steps of the
+4. If a skill changed, raise the version in the `plugin.json` file of the plugin.
+5. Merge. Tag the merge commit `vX.Y.Z`. Copy the summary, the config changes, and the steps of the
    entry into the notes of the release.
+6. Now move this repo to the new version. Set `framework_version` in `.cornerstone/config.yaml`, and
+   run `stone upgrade --apply`. Commit the generated files alone. Do this after the tag exists,
+   because the G3 workflow installs `stone` from the tag.
