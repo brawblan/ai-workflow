@@ -76,7 +76,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/reviewer.md
-  hash: f8197133228034ca5d404252068295ef03b6ca9bfbdb4f091f05dbb8e219195b
+  hash: 69d57b24cd58e8d1adafe663f458c8b4621f08a36575384e91c2e15048c7f90d
 - id: trigger.schedule.code-audit
   kind: ci-job
   purpose: Start the first role of the profile on its schedule. Post its report as
