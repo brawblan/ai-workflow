@@ -25,6 +25,7 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | --- | --- |
 | Install the CLI | `pip install ./stone` |
 | Unit tests | `python -m unittest discover -s stone/tests` |
+| Unit tests, in parallel (about 3 times faster) | `python stone/tests/run_parallel.py` |
 | Validate the framework | `stone check` |
 | Writing check (K17) on your changes | `stone check-writing --diff origin/main` |
 | Validate the plugin | `claude plugin validate .` |
