@@ -8,7 +8,9 @@ and criterion 5 (the last line is JSON with a boolean `pass` and a string `detai
 
 from __future__ import annotations
 
+import atexit
 import contextlib
+import functools
 import io
 import json
 import os
@@ -91,6 +93,24 @@ def commit(cwd: Path, message: str) -> None:
     git(cwd, "commit", "-q", "--allow-empty", "-m", message)
 
 
+@functools.cache
+def base_repo(scenario_id: str) -> Path:
+    """The fixture of the scenario as a git repo, then its change as a second commit.
+
+    Made once for each scenario; each workspace copies it.
+    """
+    scenario = SCENARIOS[scenario_id]
+    base = Path(tempfile.mkdtemp(prefix=f"tester-base-{scenario_id}-"))
+    atexit.register(shutil.rmtree, base, ignore_errors=True)
+    repo = base / scenario_id
+    shutil.copytree(EVAL / scenario["fixture"], repo)
+    git(repo, "init", "-q", "-b", "main")
+    commit(repo, "chore: fixture base")
+    git(repo, "apply", str(EVAL / scenario["change"]))
+    commit(repo, "feat: the change under test")
+    return repo
+
+
 def grader_checks(scenario: dict[str, Any]) -> list[dict[str, Any]]:
     return [item for item in scenario["expect"] if item["check"] == "grader"]
 
@@ -108,13 +128,8 @@ class GraderCase(unittest.TestCase):
     def workspace(self, scenario_id: str, files: dict[str, str] | None = None,
                   committed: bool = True) -> Path:
         """The fixture and the change of the scenario, then `files` (path: text)."""
-        scenario = SCENARIOS[scenario_id]
         ws = self.tmp / scenario_id
-        shutil.copytree(EVAL / scenario["fixture"], ws)
-        git(ws, "init", "-q", "-b", "main")
-        commit(ws, "chore: fixture base")
-        git(ws, "apply", str(EVAL / scenario["change"]))
-        commit(ws, "feat: the change under test")
+        shutil.copytree(base_repo(scenario_id), ws, symlinks=True)
         for rel, text in (files or {}).items():
             (ws / rel).parent.mkdir(parents=True, exist_ok=True)
             (ws / rel).write_text(text, encoding="utf-8")
