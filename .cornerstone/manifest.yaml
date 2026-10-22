@@ -14,7 +14,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .cornerstone/checks/protected_paths.py
-  hash: ab4d016544f83b92279aa1c9392e5a258f89b147310140211c1fc097c96fd51a
+  hash: 139b43c145966417afa77ffb9bb78a5f55a64b2bbcbc852561ff802fc23cb3fa
 - id: check.k7
   kind: check
   purpose: K7. Fail if the diff is over the size limit of the PR profile and has no
@@ -60,7 +60,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .cornerstone/hooks/protect-paths.py
-  hash: 6aa2c67e387af055b264ec8f0ca369cb341efbce7675f720a93e7e89c2dd88b0
+  hash: 7b3be04404effd9e2884b85d160e713f85806a6dbb7e2e30ad107248c757eda5
 - id: hook.settings
   kind: hook
   purpose: Register the protected-path hook in the harness settings. Other keys stay
