@@ -36,7 +36,7 @@ commands:
   test_unit: python -m unittest
   all_checks: make check
 paths:
-  tests: [tests/]
+  tests: [tests/, "**/*.test.js"]
   checks: [.github/workflows/, .cornerstone/checks/]
   plans: docs/plans/
 owners: {default: octocat}
@@ -44,6 +44,7 @@ owners: {default: octocat}
 ALL_ROLES = ["implementer", "investigator", "planner", "reviewer", "shaper", "tester"]
 INVESTIGATOR = ".claude/agents/investigator.md"
 HOOK = ".cornerstone/hooks/protect-paths.py"
+PATH_MATCH = ".cornerstone/lib/path_match.py"  # the hook and K6 import it (D62)
 SETTINGS = ".claude/settings.json"
 K6 = ".cornerstone/checks/protected_paths.py"
 K7 = ".cornerstone/checks/change_size.py"
@@ -51,7 +52,7 @@ K15 = ".cornerstone/checks/instruction_size.py"
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
 K16_WORKFLOW = ".github/workflows/cornerstone-k16.yml"
 MANIFEST = ".cornerstone/manifest.yaml"
-ALWAYS = [HOOK, SETTINGS, MANIFEST]
+ALWAYS = [HOOK, PATH_MATCH, SETTINGS, MANIFEST]
 REPORT_PROFILES = ["bug-triage", "code-audit", "spike"]
 
 
@@ -512,7 +513,7 @@ class InvestigatorHookTest(RenderBase):
     def test_ac5_investigator_on_a_spike_branch_cannot_write_harness_paths(self) -> None:
         self.git_repo_on("spike/can-x-do-y")
         for path in (".claude/settings.json", ".claude/agents/investigator.md",
-                     ".claude/new.md", ".cornerstone/config.yaml", HOOK, K6,
+                     ".claude/new.md", ".cornerstone/config.yaml", HOOK, K6, PATH_MATCH,
                      ".cornerstone/manifest.yaml"):
             with self.subTest(path=path):
                 self.assertEqual(self.hook(path, "investigator"), 2)

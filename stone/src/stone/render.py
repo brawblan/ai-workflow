@@ -312,6 +312,9 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     if model_profile.get("status") != "active":
         print(f"warning: model profile {model_profile['id']} has status "
               f"'{model_profile.get('status')}', not 'active'", file=sys.stderr)
+    problems = framework_check.path_pattern_problems(config, harness)
+    if problems:
+        raise RenderError(f"{CONFIG}: {problems[0]}")
     adapter_roles = {entry["role"] for entry in registry if entry["kind"] == "role"}
     profiles = load_profiles(framework, config["profiles"], adapter_roles)
     defaults = model_profile["defaults"]

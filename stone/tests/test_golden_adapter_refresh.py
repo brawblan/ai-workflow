@@ -56,13 +56,15 @@ SCHEDULE_WORKFLOW = f".github/workflows/cornerstone-{PROFILE}-schedule.yml"  # t
 K6 = ".cornerstone/checks/protected_paths.py"
 K7 = ".cornerstone/checks/change_size.py"
 HOOK = ".cornerstone/hooks/protect-paths.py"
+PATH_MATCH = ".cornerstone/lib/path_match.py"  # the match module that the hook and K6 import (D62)
 SETTINGS = ".claude/settings.json"
 ROLES = ["implementer", "investigator", "reviewer", "tester"]  # the profile `roles`, sorted
 COMPONENTS = FRAMEWORK / "adapters" / "claude-code" / "components.yaml"
 # The components that this profile must render at the least. A later sibling component can add to
 # the derived set, but it cannot take one of these out.
 PINNED_IDS = {f"role.{role}" for role in ROLES} | {
-    "check.k6", "check.k7", "ci-job.checks", "hook.protect-paths", "hook.settings"}
+    "check.k6", "check.k7", "ci-job.checks", "hook.path-match", "hook.protect-paths",
+    "hook.settings"}
 HINT = f"If the change is intended, run with {UPDATE_ENV}=1 to write the fixtures again."
 
 
@@ -354,9 +356,11 @@ class ProfilePinTest(RenderedRepo):
         # The profile text: "the four role files, the protected-path hook, checks K6 and K7, and the
         # G3 workflow. It also writes the weekly trigger workflow (D31). It writes no model profile."
         # This pin is fixed on purpose: it pins the prose. If render writes a new file for this
-        # profile, the profile text must change too.
+        # profile, the profile text must change too. "The protected-path hook" is the hook, its
+        # settings entry, and the match module that it imports (D62).
         want = sorted([f".claude/agents/{role}.md" for role in ROLES]
-                      + [HOOK, SETTINGS, K6, K7, WORKFLOW, SCHEDULE_WORKFLOW, MANIFEST])
+                      + [HOOK, PATH_MATCH, SETTINGS, K6, K7, WORKFLOW, SCHEDULE_WORKFLOW,
+                         MANIFEST])
         self.assertEqual(sorted(self.files), want)
         for path in self.files:
             with self.subTest(path=path):

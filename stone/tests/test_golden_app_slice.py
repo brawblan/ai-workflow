@@ -66,11 +66,12 @@ FILES = [".claude/agents/implementer.md", ".claude/agents/planner.md",
          ".claude/agents/reviewer.md", ".claude/agents/shaper.md", ".claude/agents/tester.md",
          ".claude/settings.json", ".cornerstone/checks/change_size.py",
          ".cornerstone/checks/protected_paths.py", ".cornerstone/hooks/protect-paths.py",
-         MANIFEST, WORKFLOW, LABEL_WORKFLOW]
+         ".cornerstone/lib/path_match.py", MANIFEST, WORKFLOW, LABEL_WORKFLOW]
 NOT_WRITTEN = [".claude/agents/investigator.md", ".cornerstone/checks/instruction_size.py",
                ".github/workflows/cornerstone-k16.yml"]
-COMPONENTS = ["check.k6", "check.k7", "ci-job.checks", "hook.protect-paths", "hook.settings",
-              "role.implementer", "role.planner", "role.reviewer", "role.shaper", "role.tester",
+COMPONENTS = ["check.k6", "check.k7", "ci-job.checks", "hook.path-match", "hook.protect-paths",
+              "hook.settings", "role.implementer", "role.planner", "role.reviewer", "role.shaper",
+              "role.tester",
               f"trigger.label.{PROFILE}"]
 REPO_STEPS = ["K4 integration tests", "K5 acceptance tests", "K8 architecture fitness",
               "K10 mutation score"]

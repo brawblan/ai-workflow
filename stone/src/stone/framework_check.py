@@ -223,6 +223,41 @@ def branch_name_problems(config: dict[str, Any]) -> list[str]:
             for key, value in branches.items() if value is not None and not isinstance(value, str)]
 
 
+def path_compiler(harness: Path) -> Any:
+    """Return compile_path from the component with `provides: path_match`, or None if none.
+
+    The hook and K6 import the module that render writes from the same template (D62), so this
+    check and the rendered files use one match rule. The template is a file of the framework,
+    like the other templates that render fills.
+    """
+    registry = harness / "components.yaml"
+    if not registry.is_file():
+        return None
+    for entry in (yaml.safe_load(registry.read_text(encoding="utf-8")) or {}).get("components", []):
+        if entry.get("provides") == "path_match":
+            namespace: dict[str, Any] = {}
+            exec((harness / "templates" / entry["template"]).read_text(encoding="utf-8"), namespace)
+            return namespace["compile_path"]
+    return None
+
+
+def path_pattern_problems(config: dict[str, Any], harness: Path) -> list[str]:
+    """Name each glob in `paths.tests` and `paths.checks` that is not valid."""
+    paths = config.get("paths")
+    compile_path = path_compiler(harness) if isinstance(paths, dict) else None
+    if compile_path is None:
+        return []
+    problems = []
+    for key in ("tests", "checks"):
+        value = paths.get(key) or []
+        for pattern in value if isinstance(value, list) else [value]:
+            try:
+                compile_path(str(pattern))
+            except ValueError as error:
+                problems.append(f"'paths.{key}': {error}")
+    return problems
+
+
 DELIVERY_MODES = ("ci", "local")
 TICKET_SOURCES = ("github", "file")
 ADOPTION_MODES = ("all", "opt-in")
@@ -342,6 +377,8 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     for problem in branch_name_problems(config):
         add(problem)
     harness = config.get("harness", "")
+    for problem in path_pattern_problems(config, framework / "adapters" / str(harness)):
+        add(problem)
     if not (framework / "adapters" / f"{harness}.md").exists():
         add(f"The harness '{harness}' has no adapter file. Use a file name in adapters/.")
     profile = config.get("model_profile")

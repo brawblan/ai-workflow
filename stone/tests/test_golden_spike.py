@@ -50,12 +50,12 @@ HINT = f"If the change is intended, run with {UPDATE_ENV}=1 to write the fixture
 
 # Pins from framework/profiles/spike.md: roles [shaper, investigator], G3 skip, K16 in checks.
 FILES = [".claude/agents/investigator.md", ".claude/agents/shaper.md", ".claude/settings.json",
-         ".cornerstone/hooks/protect-paths.py", MANIFEST,
+         ".cornerstone/hooks/protect-paths.py", ".cornerstone/lib/path_match.py", MANIFEST,
          ".github/workflows/cornerstone-k16.yml"]
 NOT_WRITTEN = [".github/workflows/cornerstone-checks.yml",
                ".cornerstone/checks/protected_paths.py"]
-COMPONENTS = ["check.k16", "hook.protect-paths", "hook.settings", "role.investigator",
-              "role.shaper"]
+COMPONENTS = ["check.k16", "hook.path-match", "hook.protect-paths", "hook.settings",
+              "role.investigator", "role.shaper"]
 
 
 def tree_files(folder: Path, skip: frozenset[str] = frozenset()) -> dict[str, bytes]:

@@ -19,8 +19,8 @@ from pathlib import Path
 # The shaper changes only the TICKET file, if the ticket is a file (#137).
 # The investigator changes only REPORTS, except on a SPIKE_PREFIX branch, which never merges (K16).
 # No branch lets the investigator change HARNESS: the hook, the checks, and the harness settings.
-PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "tests/"]
-TESTS = ["tests/"]
+PROTECTED = ["**/*.test.js", ".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "tests/"]
+TESTS = ["tests/", "**/*.test.js"]
 PLANS = ["docs/plans/"]
 REPORTS = ["docs/reports/"]
 HARNESS = [".claude/", ".cornerstone/"]
@@ -28,9 +28,14 @@ TICKET = ""  # the ticket file of the shaper (tickets.path). "" if the ticket is
 SPIKE_PREFIX = "spike/"
 ROLES = ("implementer", "tester", "planner", "investigator", "reviewer", "shaper")
 
-
-def covers(prefixes: list[str], path: str) -> bool:
-    return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/") for p in prefixes)
+sys.dont_write_bytecode = True  # no __pycache__ folder in .cornerstone/lib
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+try:
+    from path_match import covers  # the same match as K6 (D62)
+except Exception:  # a missing or broken module blocks the edit: exit code 1 would let it through
+    print("Blocked: .cornerstone/lib/path_match.py is missing or broken. Run stone render.",
+          file=sys.stderr)
+    sys.exit(2)
 
 
 def is_ticket(path: str) -> bool:

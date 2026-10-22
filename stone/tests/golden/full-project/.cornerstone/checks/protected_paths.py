@@ -8,8 +8,17 @@ the same rule. Usage: protected_paths.py <base>
 
 import subprocess
 import sys
+from pathlib import Path
 
-PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "tests/"]
+sys.dont_write_bytecode = True  # no __pycache__ folder in .cornerstone/lib
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "lib"))
+try:
+    from path_match import covers  # the same match as the hook (D62)
+except Exception:
+    print("K6: .cornerstone/lib/path_match.py is missing or broken. Run stone render.")
+    sys.exit(1)
+
+PROTECTED = ["**/*.test.js", ".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "tests/"]
 TRAILERS = "commit"  # "commit": the Role trailer. "notes": also the git note (#121).
 NOTES_REF = "refs/notes/cornerstone"
 ADOPTION = "all"  # "opt-in": a human commit with no Role is not an implementer commit
@@ -33,10 +42,6 @@ def role_of(sha: str) -> str:
     return roles[-1].lower() if roles else "implementer"
 
 
-def covers(path: str) -> bool:
-    return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/") for p in PROTECTED)
-
-
 def main(base: str) -> int:
     failures = 0
     if TRAILERS == "notes":  # a note is not in a clone by default
@@ -47,7 +52,7 @@ def main(base: str) -> int:
         if role != "implementer":
             continue
         files = git("diff-tree", "--no-commit-id", "--name-only", "-r", sha).split("\n")
-        for path in filter(covers, files):
+        for path in (file for file in files if covers(PROTECTED, file)):
             failures += 1
             print(f"K6: commit {sha[:12]} (Role: {role}) changes {path}, a protected path. "
                   "Revert the change. A test change belongs in a 'Role: tester' commit. A check "
