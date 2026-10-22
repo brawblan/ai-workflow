@@ -11,7 +11,7 @@ import yaml
 
 from stone import personas_check, results, specs
 from stone.findings import Finding
-from stone.markdown import relative_links, split_frontmatter, table_rows
+from stone.markdown import link_file, relative_links, split_frontmatter, table_rows
 
 CHECK = "stone check"
 GATE_VALUES: dict[str, set[str]] = {
@@ -116,13 +116,82 @@ def _check_profile(path: Path, data: dict[str, Any], stages: set[str], roles: se
     return found
 
 
+# The files that Cornerstone owns (issue #124). The link check reads only these by default.
+LINK_FILES = ["AGENTS.md", "CLAUDE.md"]
+LINK_FOLDERS = ["constitution", ".cornerstone"]
+LINK_MODES = ("default", "all")
+
+
+def link_config_paths(root: Path) -> tuple[list[str], list[str]]:
+    """Return (paths, problems) from `checks.links.paths` in the repo config."""
+    path = root / specs.CONFIG
+    if not path.exists():
+        return [], []
+    try:
+        config = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError:
+        return [], []  # check_config reports a config that is not valid
+    checks = config.get("checks") if isinstance(config, dict) else None
+    links = checks.get("links") if isinstance(checks, dict) else None
+    value = links.get("paths") if isinstance(links, dict) else None
+    if value is None:
+        return [], []
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        return [], ["'checks.links.paths' must be a list of file and folder paths."]
+    resolved = root.resolve()
+    outside = [item for item in value if not (resolved / item).resolve().is_relative_to(resolved)]
+    if outside:
+        return [], [f"'checks.links.paths' has '{outside[0]}', which is outside the repo. "
+                    "Use a path in the repo."]
+    return value, []
+
+
+def link_scope(root: Path, framework: Path | None = None, mode: str = "default") -> list[Path]:
+    """Return the Markdown files for the link check.
+
+    `all`: each Markdown file in the repo. `default`: the files that Cornerstone owns
+    (`AGENTS.md`, `CLAUDE.md`, `constitution/`, `.cornerstone/`, the plans and specs folders, the
+    framework folder), and the paths in `checks.links.paths`.
+    """
+    root = root.resolve()
+    if mode == "all":
+        return [p for p in sorted(root.rglob("*.md"))
+                if ".git" not in p.parts and "node_modules" not in p.parts]
+    targets = [root / name for name in LINK_FILES + LINK_FOLDERS]
+    for key in ("plans", "specs"):
+        try:
+            targets.append(specs.config_path(root, key))
+        except specs.SpecError:
+            pass  # K19 reports a path that is not valid
+    if framework and framework.resolve().is_relative_to(root):
+        targets.append(framework.resolve())
+    targets += [root / item for item in link_config_paths(root)[0]]
+    files: set[Path] = set()
+    for target in targets:
+        if target.is_dir():
+            files.update(p for p in target.rglob("*.md") if ".git" not in p.parts)
+        elif target.suffix == ".md" and target.is_file():
+            files.add(target)
+    return sorted(files)
+
+
+def link_target(root: Path, path: Path, target: str) -> Path:
+    """Return the file that a link points to. A link that starts with / starts at the repo root."""
+    name = link_file(target)
+    if name.startswith("/"):
+        return (root / name.lstrip("/")).resolve()
+    return (path.parent / name).resolve()
+
+
 def check_links(root: Path, paths: list[Path]) -> list[Finding]:
     findings: list[Finding] = []
+    root = root.resolve()
     for path in paths:
+        path = path.resolve()
         if "templates" in path.relative_to(root).parts:
             continue  # template links resolve in the target repo, not here
         for line, target in relative_links(path):
-            if not (path.parent / target.split("#")[0]).resolve().exists():
+            if link_file(target) and not link_target(root, path, target).exists():
                 findings.append(Finding(str(path.relative_to(root)), line, CHECK,
                                         f"The link '{target}' points to no file. Fix the path."))
     return findings
@@ -178,6 +247,8 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     for mode in config.get("modes_allowed", []):
         if mode not in MODES:
             add(f"The mode '{mode}' is not valid. Use one of {sorted(MODES)}.")
+    for problem in link_config_paths(root)[1]:
+        add(problem)
     for waiver in config.get("waivers", []):
         if waiver.get("gate") in {"G3", "G5"}:
             add(f"A waiver removes {waiver['gate']}. No waiver can remove G3 or G5. Remove it.")
@@ -252,14 +323,16 @@ def check_components(root: Path, framework: Path) -> list[Finding]:
     return findings
 
 
-def run(root: Path, framework: Path | None = None) -> list[Finding]:
-    """Run all framework checks. `framework` defaults to `<root>/framework`."""
+def run(root: Path, framework: Path | None = None, links: str = "default") -> list[Finding]:
+    """Run all framework checks. `framework` defaults to `<root>/framework`.
+
+    `links` is `default` (the Cornerstone files) or `all` (each Markdown file) for the link check.
+    """
     framework = framework or root / "framework"
     if not framework.is_dir():
         return [Finding(str(root), 1, CHECK,
                         "No framework folder. Run stone from the repo root, or pass --framework.")]
-    docs = [p for p in sorted(root.rglob("*.md"))
-            if ".git" not in p.parts and "node_modules" not in p.parts]
+    docs = link_scope(root, framework, links)
     return (check_profiles(framework) + check_links(root, docs) + check_neutral(framework)
             + check_config(root, framework) + check_components(root, framework)
             + personas_check.run(root) + specs.check(root))
