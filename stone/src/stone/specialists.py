@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from stone import personas_check
 
 ID_PREFIX = "specialist."
 DOC = ".cornerstone/specialists.md"
+MATCH_MODULE = ".cornerstone/lib/path_match.py"  # render writes it; the hook and K6 import it
 STAGES = ("verify",)  # after the tester, before the reviewer
 KEYS = {"id", "run", "when", "stage", "blocks", "owner", "eval"}
 WHEN_KEYS = ("paths", "personas_with", "labels")
@@ -83,36 +85,34 @@ def _when_problems(label: str, when: Any) -> list[str]:
     return found
 
 
-def glob_regex(pattern: str) -> re.Pattern[str]:
-    """Return a regex for a path glob. `**` crosses folders, `*` and `?` do not."""
-    pattern = pattern.strip().removeprefix("./")
-    if pattern.endswith("/"):
-        pattern += "**"
-    out, i = "", 0
-    while i < len(pattern):
-        if pattern.startswith("**/", i):
-            out, i = out + "(?:.*/)?", i + 3
-        elif pattern.startswith("**", i):
-            out, i = out + ".*", i + 2
-        elif pattern[i] == "*":
-            out, i = out + "[^/]*", i + 1
-        elif pattern[i] == "?":
-            out, i = out + "[^/]", i + 1
-        else:
-            out, i = out + re.escape(pattern[i]), i + 1
-    return re.compile(out + r"\Z")
+def path_matcher(root: Path) -> Callable[[list[str], str], bool]:
+    """Return `covers` of the rendered match module: the match of `paths.tests` (D62, D65)."""
+    path = root / MATCH_MODULE
+    namespace: dict[str, Any] = {}
+    try:
+        exec(compile(path.read_text(encoding="utf-8"), str(path), "exec"), namespace)
+        return namespace["covers"]
+    except Exception as error:  # a missing or broken module, as in the hook
+        raise SpecialistError(f"{MATCH_MODULE} is missing or broken. Run stone render.") from error
 
 
 def reasons(spec: dict[str, Any], files: list[str], labels: list[str],
-            limits: dict[str, list[str]]) -> list[str]:
-    """Return why a specialist matched. A specialist with no trigger always matches."""
+            limits: dict[str, list[str]],
+            covers: Callable[[list[str], str], bool] | None) -> list[str]:
+    """Return why a specialist matched. A specialist with no trigger always matches.
+
+    `covers` is the path match from path_matcher. It can be None if the spec has no `when.paths`.
+    """
     when = spec.get("when") or {}
     if not when:
         return ["always"]
     found = []
     for pattern in when.get("paths") or []:
-        regex = glob_regex(pattern)
-        hit = next((path for path in files if regex.match(path)), None)
+        try:
+            hit = next((path for path in files if covers([pattern], path)), None)
+        except ValueError as error:
+            message = f"'when.paths' of the specialist '{spec['id']}': {error}"
+            raise SpecialistError(message) from error
         if hit:
             found.append(f"paths: {hit} matches {pattern}")
     wanted = {label.lower() for label in when.get("labels") or []}
@@ -178,9 +178,12 @@ def run(root: Path, config: dict[str, Any], base: str, labels: list[str], person
     """Match the specialists to a change and check their findings reports."""
     files = changed_files(root, base)
     limits = persona_limits(root, persona_ids)
+    specs = listed(config)
+    covers = (path_matcher(root) if any((spec.get("when") or {}).get("paths") for spec in specs)
+              else None)
     rows = []
-    for spec in listed(config):
-        why = reasons(spec, files, labels, limits)
+    for spec in specs:
+        why = reasons(spec, files, labels, limits, covers)
         if not why:
             continue
         path = report_path(root, config, ticket, spec["id"])

@@ -17,6 +17,7 @@ versions:
     steps:
       - "Run stone render. Commit the changed generated files alone, with the trailers Role generator and Actor agent."
       - "To keep a role on a stronger model, set it in the model profile of the repo. Render again."
+      - "Check the when.paths values of each specialist. They use the rules of paths.tests (D65). A value that starts with ./ no longer matches."
   - version: 1.1.0
     kind: minor
     released: 2026-10-22
