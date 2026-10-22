@@ -38,6 +38,16 @@ with the ticket and the diff. Use the repo's role file if it has one (for exampl
   `stone spec apply <id>`. Commit its output alone, with the trailers `Role: generator` and
   `Actor: agent`. Then run the checks again.
 
+### Specialist reviews
+
+If `.cornerstone/specialists.md` exists, run `stone specialists --base <integration branch> --ticket
+<id> --labels <ticket labels> --personas <ticket persona IDs>`.
+
+- Add a "Specialist findings" section to the PR evidence with its table.
+- For a specialist with the status `missing`, stop. Tell the user to start its `run` command in a new
+  session. Do not run the review in this session.
+- For a status `blocking`, tell the user that G4 cannot pass until a human decides.
+
 ## 4. Map the evidence to each COA
 
 Mark each COA with one status:
