@@ -10,10 +10,22 @@ import subprocess
 import sys
 
 PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "stone/tests/"]
+TRAILERS = "commit"  # "commit": the Role trailer. "notes": also the git note (#121).
+NOTES_REF = "refs/notes/cornerstone"
 
 
 def git(*args: str) -> str:
     return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout
+
+
+def role_of(sha: str) -> str:
+    roles = git("log", "-1", "--format=%(trailers:key=Role,valueonly)", sha).split()
+    if not roles and TRAILERS == "notes":
+        note = subprocess.run(["git", "notes", f"--ref={NOTES_REF}", "show", sha],
+                              capture_output=True, text=True).stdout
+        roles = [line.split(":", 1)[1].strip() for line in note.splitlines()
+                 if line.lower().startswith("role:")]
+    return roles[-1].lower() if roles else "implementer"
 
 
 def covers(path: str) -> bool:
@@ -22,9 +34,11 @@ def covers(path: str) -> bool:
 
 def main(base: str) -> int:
     failures = 0
+    if TRAILERS == "notes":  # a note is not in a clone by default
+        subprocess.run(["git", "fetch", "-q", "origin", f"{NOTES_REF}:{NOTES_REF}"],
+                       capture_output=True)
     for sha in git("rev-list", "--no-merges", f"{base}..HEAD").split():
-        roles = git("log", "-1", "--format=%(trailers:key=Role,valueonly)", sha).split()
-        role = roles[-1].lower() if roles else "implementer"
+        role = role_of(sha)
         if role != "implementer":
             continue
         files = git("diff-tree", "--no-commit-id", "--name-only", "-r", sha).split("\n")
