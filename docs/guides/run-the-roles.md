@@ -79,6 +79,11 @@ for P2, because the lead session starts the subagent and gives it its prompt. Th
 
 ## Commit with trailers
 
+The repo config can change this. With `commits.by: human`, the implementer and the tester do not
+commit. They end with a proposed message, and you commit it. With `commits.trailers: notes`, the
+role goes in a git note, not in the message. With `commits.trailers: none`, nothing records the
+role, and there is no K6. See [Commits](../../framework/customization.md#commits-commits).
+
 Check K6 reads two trailers on each commit. The agent roles add them. Add them to your own commits
 too:
 

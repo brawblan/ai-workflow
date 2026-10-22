@@ -57,6 +57,10 @@ and `paths.checks`. Look for these first.
   Otherwise leave `delivery` out. Keep `paths.plans` and `paths.reports` out of `.claude/`,
   `.cornerstone/`, and the test and check paths.
 
+- Ask: "Do the roles commit, or do you? Does the repo have a commit message format?" Set
+  `commits.by` and `commits.message_format`. If trailers must stay out of the history, set
+  `commits.trailers` to `notes` or `none`, and tell the user what K6 loses.
+
 ## 4. Write the config
 
 1. Write `.cornerstone/config.yaml` with the fields in `customization.md`, in the same order.

@@ -29,6 +29,7 @@ PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
                     "branch_integration_json": "branches.integration"}
 MODEL_VALUES = {"instruction_file_max_lines"}  # template values from `defaults` in the model profile
 FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "docs/reports/"}
+COMMIT_DEFAULTS = {"by": "agent", "trailers": "commit"}
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 DEFAULT_PR_LINES = 600  # D4, customization.md
@@ -202,6 +203,35 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     return {key: value for key, value in values.items() if "TODO(" not in value}
 
 
+def commit_settings(config: dict[str, Any]) -> dict[str, str]:
+    section = config.get("commits")
+    section = section if isinstance(section, dict) else {}
+    return {**COMMIT_DEFAULTS, **{key: str(value) for key, value in section.items() if value}}
+
+
+def commit_values(config: dict[str, Any], role: str) -> dict[str, str]:
+    """Return the commit step of a role (#121). The default is the text from before the config."""
+    settings = commit_settings(config)
+    by, trailers = settings["by"], settings["trailers"]
+    actor = "agent" if by == "agent" else "human"
+    note = f'`git notes --ref=cornerstone add -m "Role: {role}" -m "Actor: {actor}" HEAD`'
+    if by == "agent":
+        text = {"commit": f"Commit with the trailers `Role: {role}` and `Actor: {actor}`.",
+                "notes": f"Commit with no trailers. Then record the role with {note}.",
+                "none": "Commit with no trailers and no git notes."}[trailers]
+    else:
+        text = {"commit": "Do not commit. End with a proposed commit message that has the "
+                          f"trailers `Role: {role}` and `Actor: {actor}`.",
+                "notes": "Do not commit. End with a proposed commit message. Also give "
+                         f"the command that records the role, for the human to run: {note}.",
+                "none": "Do not commit. End with a proposed commit message with no trailers."}[trailers]
+    if settings.get("message_format"):
+        text += f" Follow the commit message format in `{settings['message_format']}`."
+    return {"commit_step": text,
+            "commit_failing_test": ("Commit the\nfailing test." if by == "agent"  # the break keeps the line wrap
+                                    else "Keep the failing test.")}
+
+
 def build_components(framework: Path, config: dict[str, Any]) -> list[Component]:
     harness = framework / "adapters" / config["harness"]
     registry_path = harness / "components.yaml"
@@ -220,6 +250,14 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     model_values = {name: str(defaults[name]) for name in MODEL_VALUES
                     if defaults.get(name) not in (None, "")}
 
+    # With `commits.trailers: none`, K6 cannot read a role, so it is not rendered (#121).
+    off = ({entry["id"] for entry in registry if entry.get("needs_trailers")}
+           if commit_settings(config)["trailers"] == "none" else set())
+    if off:
+        print("warning: commits.trailers is none. K6 cannot run, so it is not rendered. "
+              "Nothing checks that an implementer commit leaves the protected paths.",
+              file=sys.stderr)
+
     # A component with `ci_step` adds a step to the G3 workflow, only if it is rendered.
     steps: dict[str, str | None] = {step_name(entry["id"]): None
                                     for entry in registry if entry.get("ci_step")}
@@ -227,14 +265,14 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     base_values = {**template_values(config, ""), **model_values,
                    "size_limits_json": limits_json}
     for entry in registry:
-        if entry.get("ci_step") and needed(entry, profiles):
+        if entry.get("ci_step") and needed(entry, profiles) and entry["id"] not in off:
             steps[step_name(entry["id"])] = substitute(harness, entry["ci_step"], base_values,
                                                        steps, config)
 
     local = config.get("delivery", "ci") == "local"
     components = []
     for entry in registry:
-        if "trigger" in entry or not needed(entry, profiles):
+        if "trigger" in entry or not needed(entry, profiles) or entry["id"] in off:
             continue
         if local and entry["kind"] == "ci-job":
             continue  # delivery: local writes no workflow file
@@ -242,6 +280,8 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         values = {**template_values(config, model), **model_values,
                   "size_limits_json": limits_json,
                   **{name: step for name, step in steps.items() if step is not None}}
+        values.update(commit_values(config, entry.get("role", "")))
+        values["trailers_json"] = json.dumps(commit_settings(config)["trailers"])
         for block in BLOCKS:
             values.setdefault(block, "")
         if entry.get("steps"):

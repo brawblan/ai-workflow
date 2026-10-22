@@ -53,6 +53,8 @@ name one, use `dev` if it exists on `origin`. Otherwise use the default branch f
 - If the repo uses role trailers (it has `.cornerstone/config.yaml`, or its docs say so), add
   `Role: <role>` and `Actor: agent|human` to each commit. A commit with no `Role:` trailer counts
   as an implementer commit, and check K6 fails if it changes a test, check, or CI path.
+  If `commits.trailers` in the config is `notes` or `none`, do not add trailers to the message.
+  If `commits.by` is `human`, do not commit: give the message.
 - End the message with a `Co-Authored-By: Claude <model name> <noreply@anthropic.com>` line.
   Use the name of the model that does the work, for example `Claude Opus 5.5`. If the harness
   gives an exact attribution line, use that line.

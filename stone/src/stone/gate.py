@@ -25,6 +25,11 @@ class Step:
     command: list[str] | str
     passed: bool = False
     output: str = ""
+    skipped: str = ""  # the reason, if the check did not run
+
+    @property
+    def result(self) -> str:
+        return f"skipped ({self.skipped})" if self.skipped else "pass" if self.passed else "FAIL"
 
 
 def _git(root: Path, *args: str) -> str:
@@ -45,7 +50,8 @@ def default_base(config: dict[str, Any]) -> str:
 
 
 def plan(root: Path, config: dict[str, Any], base: str, body: Path | None) -> list[Step]:
-    for script in ("protected_paths.py", "change_size.py"):
+    no_k6 = (config.get("commits") or {}).get("trailers") == "none"
+    for script in ("change_size.py",) if no_k6 else ("protected_paths.py", "change_size.py"):
         if not (root / CHECKS / script).exists():
             raise GateError(f"{CHECKS / script}: no file. Run stone render first.")
     all_checks = str((config.get("commands") or {}).get("all_checks") or "").strip()
@@ -54,8 +60,10 @@ def plan(root: Path, config: dict[str, Any], base: str, body: Path | None) -> li
     size = [sys.executable, str(CHECKS / "change_size.py"), base, "--mode", "block"]
     if body:
         size += ["--body", str(body)]
-    return [Step("K6 protected paths",
-                 [sys.executable, str(CHECKS / "protected_paths.py"), base]),
+    k6 = Step("K6 protected paths", [sys.executable, str(CHECKS / "protected_paths.py"), base])
+    if no_k6:
+        k6.skipped = "commits.trailers: none"
+    return [k6,
             Step("K7 change size", size),
             Step("All checks", all_checks)]
 
@@ -72,9 +80,9 @@ def evidence(steps: list[Step], base: str, head: str, today: dt.date) -> str:
     lines = [f"G3 on the developer machine (delivery: local), {today.isoformat()}.",
              f"Base `{base}`, head `{head or 'unknown'}`.", "",
              "| Check | Result |", "| --- | --- |"]
-    lines += [f"| {step.name} | {'pass' if step.passed else 'FAIL'} |" for step in steps]
+    lines += [f"| {step.name} | {step.result} |" for step in steps]
     for step in steps:
-        if not step.passed and step.output:
+        if not (step.passed or step.skipped) and step.output:
             lines += ["", f"{step.name}:", "", "```", *step.output.splitlines()[-30:], "```"]
     return "\n".join(lines)
 
@@ -85,6 +93,7 @@ def run(root: Path, base: str | None = None, body: Path | None = None,
     base = base or default_base(config)
     steps = plan(root, config, base, body)
     for step in steps:
-        run_step(root, step)
+        if not step.skipped:
+            run_step(root, step)
     head = _git(root, "rev-parse", "--short", "HEAD")
     return steps, evidence(steps, base, head, today or dt.date.today())
