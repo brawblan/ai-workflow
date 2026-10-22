@@ -1,5 +1,21 @@
 framework_version: 0.8.0
 components:
+- id: hook.path-match
+  kind: hook
+  purpose: Match a path against paths.tests and paths.checks. The hook and K6 import
+    it.
+  principle:
+  - P2
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .cornerstone/lib/path_match.py
+  hash: f2f05f2a1c56c9e1a9534bff3111ee50c3836c43edd764af6d3975b8fbe92a65
 - id: hook.protect-paths
   kind: hook
   purpose: Block an edit to a path that the current role must not change.
@@ -14,7 +30,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .cornerstone/hooks/protect-paths.py
-  hash: 594a9367215097a827dfc10fc1de1e3595a0a304385b6b63d07f53467e1d377d
+  hash: d062e0fcc3b0732ea97a26bec28133b24f447fed60819bd7dc88c7e3ae9ad8e3
 - id: hook.settings
   kind: hook
   purpose: Register the protected-path hook in the harness settings. Other keys stay

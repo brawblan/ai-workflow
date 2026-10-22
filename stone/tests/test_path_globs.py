@@ -3,6 +3,7 @@
 The tests render a temp repo with the real framework, as test_render.py does. Then they run the
 rendered hook (.cornerstone/hooks/protect-paths.py) and the rendered K6
 (.cornerstone/checks/protected_paths.py) as subprocesses. They do not import the match function.
+The hook and K6 import `covers` from one rendered module, .cornerstone/lib/path_match.py (D62).
 
 The rules (owner choice, issue #119):
 - A glob starts at the repo root.
@@ -24,12 +25,15 @@ import io
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+
+import yaml
 
 from stone import cli, framework_check, render
 
@@ -38,6 +42,9 @@ FRAMEWORK = REPO / "framework"
 TODAY = dt.date(2026, 10, 22)
 HOOK = ".cornerstone/hooks/protect-paths.py"
 K6 = ".cornerstone/checks/protected_paths.py"
+PATH_MATCH = ".cornerstone/lib/path_match.py"
+TEMPLATE = FRAMEWORK / "adapters" / "claude-code" / "templates" / "lib" / "path_match.py"
+GOLDEN = Path(__file__).resolve().parent / "golden"
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com",
            "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
@@ -106,16 +113,21 @@ class RenderedRepo(unittest.TestCase):
             cls.git("add", path)
         cls.git("commit", "-qm", message)
 
-    def hook(self, path: str, role: str, agent_type: str | None = None) -> int:
+    @classmethod
+    def run_hook(cls, path: str, role: str, agent_type: str | None = None,
+                 cwd: Path | None = None) -> subprocess.CompletedProcess:
         """Run the rendered hook for a file-tool edit of path (relative to the root)."""
         event: dict = {"hook_event_name": "PreToolUse", "tool_name": "Write",
-                       "tool_input": {"file_path": str(self.root / path)}}
+                       "tool_input": {"file_path": str(cls.root / path)}}
         if agent_type is not None:
             event["agent_type"] = agent_type
-        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(self.root), "STONE_ROLE": role}
-        return subprocess.run([sys.executable, "-B", HOOK], cwd=self.root,
-                              input=json.dumps(event), env=env, capture_output=True,
-                              text=True).returncode
+        env = {**os.environ, "CLAUDE_PROJECT_DIR": str(cls.root), "STONE_ROLE": role}
+        return subprocess.run([sys.executable, "-B", str(cls.root / HOOK)],
+                              cwd=cwd or cls.root, input=json.dumps(event), env=env,
+                              capture_output=True, text=True)
+
+    def hook(self, path: str, role: str, agent_type: str | None = None) -> int:
+        return self.run_hook(path, role, agent_type).returncode
 
     def hook_codes(self, paths: list[str], role: str) -> dict[str, int]:
         with ThreadPoolExecutor(max_workers=8) as pool:
@@ -359,46 +371,247 @@ class ColocatedTest(RenderedRepo):
         self.assertEqual(run.returncode, 1, run.stdout)
         self.assertEqual(self.named(run.stdout), {"src/widget/widget.test.js"})
 
+    def test_hook_finds_the_match_module_from_another_working_folder(self) -> None:
+        # The harness runs the hook by its full path. The working folder can be any folder.
+        (self.root / "src" / "widget").mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory() as outside:
+            for cwd in (self.root / "src" / "widget", Path(outside)):
+                with self.subTest(cwd=str(cwd)):
+                    run = self.run_hook("src/widget/widget.test.js", "implementer", cwd=cwd)
+                    self.assertEqual(run.returncode, 2, run.stderr)
+                    self.assertIn("src/widget/widget.test.js", run.stderr)
+                    run = self.run_hook("src/widget/widget.js", "implementer", cwd=cwd)
+                    self.assertEqual(run.returncode, 0, run.stderr)
 
-def match_function_text(path: Path) -> dict[str, str]:
-    """Return the source of `covers` and of each top-level name that it uses, by name."""
-    text = path.read_text(encoding="utf-8")
-    tree = ast.parse(text)
-    nodes: dict[str, ast.AST] = {}
-    for node in tree.body:
-        if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
-            nodes[node.name] = node
-        elif isinstance(node, ast.Assign):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    nodes[target.id] = node
-    found: dict[str, str] = {}
-    todo = ["covers"]
-    while todo:
-        name = todo.pop()
-        if name in found or name not in nodes:
-            continue
-        found[name] = ast.get_source_segment(text, nodes[name]) or ""
-        todo += [sub.id for sub in ast.walk(nodes[name]) if isinstance(sub, ast.Name)]
-    return found
+    def test_the_match_module_is_a_protected_path(self) -> None:
+        # A role that changes the module changes the rule of the hook and of K6.
+        for role in ("implementer", "tester", "planner", "investigator", "reviewer"):
+            with self.subTest(role=role):
+                self.assertEqual(self.hook(PATH_MATCH, role), 2)
+
+    def test_k6_names_an_implementer_change_to_the_match_module(self) -> None:
+        base = self.git("rev-parse", "HEAD").strip()
+        self.git("checkout", "-q", "-b", "module-change")
+        self.addCleanup(self.git, "clean", "-fdq")
+        self.addCleanup(self.git, "checkout", "-q", "-f", "main")
+        text = (self.root / PATH_MATCH).read_text(encoding="utf-8")
+        self.commit({PATH_MATCH: text + "# changed\n"}, "refactor: match module")
+        run = self.k6(base)
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertEqual(self.named(run.stdout), {PATH_MATCH})
 
 
-class SameMatchFunctionTest(RenderedRepo):
-    """Criterion 3: the hook and K6 have the same match function text."""
+# The names of the match code (D62). Only the rendered module defines them.
+MATCH_NAMES = ("covers", "_glob_level", "compile_path", "GLOB_CHARS")
+
+
+def defined_names(path: Path) -> set[str]:
+    """Return each name that a file defines: a function, a class, or an assigned name."""
+    names: set[str] = set()
+    for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+            names.add(node.name)
+        elif isinstance(node, (ast.Assign, ast.AnnAssign, ast.AugAssign, ast.NamedExpr)):
+            targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+            names |= {sub.id for target in targets for sub in ast.walk(target)
+                      if isinstance(sub, ast.Name)}
+    return names
+
+
+def path_match_imports(path: Path) -> list[list[str]]:
+    """Return the imported names of each `from path_match import ...` in a file."""
+    return [[alias.name for alias in node.names]
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8")))
+            if isinstance(node, ast.ImportFrom) and node.module == "path_match"]
+
+
+def match_code_files(root: Path, folders: tuple[str, ...] = (".claude", ".cornerstone")) -> dict:
+    """Return, for each match name, the Python files under root/folders that define it.
+
+    A linked worktree under .claude/worktrees/ is a copy of a repo, not a part of this one.
+    """
+    files = sorted(p for folder in folders for p in (root / folder).rglob("*.py")
+                   if not p.relative_to(root).as_posix().startswith(".claude/worktrees/"))
+    return {name: sorted(p.relative_to(root).as_posix() for p in files
+                         if name in defined_names(p))
+            for name in MATCH_NAMES}
+
+
+def golden_roots() -> list[Path]:
+    """Return each golden repo that has a rendered hook."""
+    return sorted(hook.parents[2] for hook in GOLDEN.rglob("protect-paths.py")
+                  if hook.parent.name == "hooks" and hook.parent.parent.name == ".cornerstone")
+
+
+class OneMatchModuleTest(RenderedRepo):
+    """Criterion 3 and D62: the match code has one copy, the module that the hook and K6 import."""
 
     TESTS = ["**/*.test.js", "tests/"]
 
-    def assert_same(self, hook: Path, k6: Path) -> None:
-        in_hook, in_k6 = match_function_text(hook), match_function_text(k6)
-        self.assertIn("covers", in_hook)
-        self.assertIn("covers", in_k6)
-        self.assertEqual(in_hook, in_k6)
+    def assert_no_match_code_and_one_import(self, root: Path) -> None:
+        for file in (HOOK, K6):
+            with self.subTest(root=str(root), file=file):
+                text = (root / file).read_text(encoding="utf-8")
+                self.assertFalse(set(MATCH_NAMES) & defined_names(root / file),
+                                 sorted(set(MATCH_NAMES) & defined_names(root / file)))
+                self.assertNotIn("def covers", text)
+                self.assertNotIn("_glob_level", text)
+                self.assertNotIn("compile_path", text)
+                self.assertEqual(path_match_imports(root / file), [["covers"]])
 
-    def test_rendered_hook_and_k6_have_the_same_match_function(self) -> None:
-        self.assert_same(self.root / HOOK, self.root / K6)
+    def test_rendered_hook_and_k6_define_no_match_code_and_import_covers(self) -> None:
+        self.assert_no_match_code_and_one_import(self.root)
 
-    def test_the_files_of_this_repo_have_the_same_match_function(self) -> None:
-        self.assert_same(REPO / HOOK, REPO / K6)
+    def test_the_hook_and_k6_of_this_repo_define_no_match_code_and_import_covers(self) -> None:
+        self.assert_no_match_code_and_one_import(REPO)
+
+    def test_the_match_code_exists_once_in_a_rendered_repo(self) -> None:
+        self.assertEqual(match_code_files(self.root),
+                         {name: [PATH_MATCH] for name in MATCH_NAMES})
+
+    def test_the_match_code_exists_once_in_this_repo(self) -> None:
+        self.assertEqual(match_code_files(REPO), {name: [PATH_MATCH] for name in MATCH_NAMES})
+
+    def test_each_golden_repo_has_the_match_code_once(self) -> None:
+        roots = golden_roots()
+        self.assertGreaterEqual(len(roots), 11, roots)
+        for root in roots:
+            with self.subTest(golden=root.relative_to(GOLDEN).as_posix()):
+                self.assertEqual(match_code_files(root, (".cornerstone",)),
+                                 {name: [PATH_MATCH] for name in MATCH_NAMES})
+                self.assertEqual(path_match_imports(root / HOOK), [["covers"]])
+                if (root / K6).exists():
+                    self.assertEqual(path_match_imports(root / K6), [["covers"]])
+
+    def test_the_rendered_module_is_the_template_that_stone_check_uses(self) -> None:
+        # stone check tests each glob with the template, so the module must be the same text.
+        template = TEMPLATE.read_bytes()
+        self.assertEqual((self.root / PATH_MATCH).read_bytes(), template)
+        self.assertEqual((REPO / PATH_MATCH).read_bytes(), template)
+        for root in golden_roots():
+            with self.subTest(golden=root.relative_to(GOLDEN).as_posix()):
+                self.assertEqual((root / PATH_MATCH).read_bytes(), template)
+
+    def test_the_manifest_lists_the_module_as_component_hook_path_match(self) -> None:
+        manifest = yaml.safe_load((self.root / ".cornerstone/manifest.yaml")
+                                  .read_text(encoding="utf-8"))
+        entries = {c["id"]: c for c in manifest["components"]}
+        self.assertIn("hook.path-match", entries)
+        self.assertEqual(entries["hook.path-match"]["kind"], "hook")
+        self.assertEqual(entries["hook.path-match"]["files"], [PATH_MATCH])
+
+
+# Paths that the hook allows when the module is there: (path, STONE_ROLE, agent_type).
+ALLOWED_EDITS = [
+    ("src/widget/widget.js", "implementer", None),
+    ("src/widget/widget.js", "", "implementer"),
+    ("src/widget/widget.test.js", "tester", None),
+    ("tests/test_a.py", "", "tester"),
+    ("docs/plans/T-1.md", "planner", None),
+    ("docs/reports/T-1.md", "investigator", None),
+    ("src/a.py", "shaper", None),
+]
+
+
+class MissingModuleTest(RenderedRepo):
+    """D62: if the match module is missing, the hook blocks each edit, and K6 fails."""
+
+    TESTS = ["**/*.test.js", "tests/"]
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        super().setUpClass()
+        # The control: with the module, the hook allows each of these edits.
+        cls.codes_with_module = {edit: cls.run_hook(*edit).returncode for edit in ALLOWED_EDITS}
+        cls.module_text = (cls.root / PATH_MATCH).read_text(encoding="utf-8")
+        cls.git("rm", "-q", PATH_MATCH)
+        cls.git("commit", "-qm", "chore: remove the match module\n\nRole: generator")
+
+    def test_the_module_is_missing_and_the_hook_is_there(self) -> None:
+        self.assertFalse((self.root / PATH_MATCH).exists())
+        self.assertTrue((self.root / HOOK).is_file())
+        self.assertTrue((self.root / K6).is_file())
+
+    def test_hook_blocks_each_edit_and_names_the_module(self) -> None:
+        self.assertEqual(set(self.codes_with_module.values()), {0}, self.codes_with_module)
+        for path, role, agent_type in ALLOWED_EDITS:
+            with self.subTest(path=path, role=role, agent_type=agent_type):
+                run = self.run_hook(path, role, agent_type)
+                self.assertEqual(run.returncode, 2, run.stderr)
+                self.assertIn(PATH_MATCH, run.stderr)
+
+    def test_hook_blocks_an_edit_outside_the_repo(self) -> None:
+        with tempfile.TemporaryDirectory() as outside:
+            run = self.run_hook(str(Path(outside) / "a.txt"), "implementer")
+        self.assertEqual(run.returncode, 2, run.stderr)
+        self.assertIn(PATH_MATCH, run.stderr)
+
+    def test_k6_fails_with_a_nonzero_code(self) -> None:
+        base = self.git("rev-parse", "HEAD").strip()
+        with self.subTest(case="no commit"):
+            run = self.k6(base)
+            self.assertNotEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.git("checkout", "-q", "-b", "tester-commit-no-module")
+        self.addCleanup(self.git, "clean", "-fdq")
+        self.addCleanup(self.git, "checkout", "-q", "-f", "main")
+        self.commit({"tests/test_a.py": "x\n", "src/a.test.js": "x\n"},
+                    "test: add tests\n\nRole: tester")
+        with self.subTest(case="a tester commit"):
+            run = self.k6(base)
+            self.assertNotEqual(run.returncode, 0, run.stdout + run.stderr)
+        # The control: the same commits pass K6 when the module is there.
+        (self.root / PATH_MATCH).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / PATH_MATCH).write_text(self.module_text, encoding="utf-8")
+        run = self.k6(base)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+
+
+class NoBytecodeTest(RenderedRepo):
+    """The hook and K6 write no __pycache__ folder in .cornerstone/lib (D62)."""
+
+    TESTS = ["**/*.test.js", "tests/"]
+
+    @staticmethod
+    def plain_env(**extra: str) -> dict[str, str]:
+        """The environment with no setting that stops or moves the bytecode files."""
+        env = {k: v for k, v in os.environ.items()
+               if k not in ("PYTHONDONTWRITEBYTECODE", "PYTHONPYCACHEPREFIX")}
+        return {**env, **extra}
+
+    def pycache_folders(self, folder: Path) -> list[str]:
+        return sorted(p.relative_to(folder).as_posix() for p in folder.rglob("__pycache__"))
+
+    def test_a_plain_import_of_the_module_writes_bytecode_here(self) -> None:
+        # The control: this Python writes a __pycache__ folder for a plain import.
+        with tempfile.TemporaryDirectory() as tmp:
+            shutil.copy(self.root / PATH_MATCH, tmp)
+            subprocess.run([sys.executable, "-c", "import path_match"], cwd=tmp, check=True,
+                           env=self.plain_env(), capture_output=True)
+            self.assertEqual(self.pycache_folders(Path(tmp)), ["__pycache__"])
+
+    def test_the_hook_and_k6_write_no_pycache_folder(self) -> None:
+        # Run them as the harness settings and the CI step do: python3 and the file, no -B.
+        event = {"hook_event_name": "PreToolUse", "tool_name": "Write"}
+        for path, role in (("src/a.test.js", "implementer"), ("src/a.js", "implementer"),
+                           ("tests/test_a.py", "tester")):
+            run = subprocess.run(
+                [sys.executable, str(self.root / HOOK)], cwd=self.root,
+                input=json.dumps({**event, "tool_input": {"file_path": str(self.root / path)}}),
+                env=self.plain_env(CLAUDE_PROJECT_DIR=str(self.root), STONE_ROLE=role),
+                capture_output=True, text=True)
+            self.assertIn(run.returncode, (0, 2), run.stderr)
+        base = self.git("rev-parse", "HEAD").strip()
+        self.git("checkout", "-q", "-b", "bytecode")
+        self.addCleanup(self.git, "clean", "-fdq")
+        self.addCleanup(self.git, "checkout", "-q", "-f", "main")
+        self.commit({"src/a.test.js": "x\n"}, "feat: change a test")
+        run = subprocess.run([sys.executable, K6, base], cwd=self.root, env=self.plain_env(),
+                             capture_output=True, text=True)
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertEqual(self.named(run.stdout), {"src/a.test.js"})
+        self.assertEqual(self.pycache_folders(self.root / ".cornerstone"), [])
+        status = self.git("status", "--porcelain", "--untracked-files=all", "--", ".cornerstone")
+        self.assertEqual(status, "")
 
 
 class InvalidGlobTest(unittest.TestCase):
@@ -500,6 +713,31 @@ class InvalidGlobTest(unittest.TestCase):
             result = render.render(self.root, FRAMEWORK, today=TODAY)
         self.assertEqual(result.exit_code, 0)
         self.assertTrue((self.root / HOOK).exists())
+
+    def test_check_and_render_test_each_glob_with_the_match_module_template(self) -> None:
+        # D62: stone check uses the template of the module that the hook and K6 import. A copy of
+        # the framework gets a template that also rejects a glob with "zzz".
+        framework = Path(self.folder.name) / "framework"
+        shutil.copytree(FRAMEWORK, framework)
+        template = framework / TEMPLATE.relative_to(FRAMEWORK)
+        template.write_text(template.read_text(encoding="utf-8") + (
+            "\n\n_compile_path = compile_path\n\n\n"
+            "def compile_path(pattern: str):\n"
+            "    if 'zzz' in pattern:\n"
+            "        raise ValueError(f\"'{pattern}' has zzz.\")\n"
+            "    return _compile_path(pattern)\n"), encoding="utf-8")
+        self.configure(["tests/", "zzz/*.test.js"])
+        self.assertEqual(self.glob_findings(), [])  # the real template accepts the glob
+        named = [f for f in framework_check.check_config(self.root, framework)
+                 if "paths.tests" in f.message]
+        self.assertEqual(len(named), 1)
+        self.assertIn("zzz", named[0].message)
+        self.assertEqual(named[0].severity, "error")
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(render.RenderError) as caught:
+                render.render(self.root, framework, today=TODAY)
+        self.assertIn("paths.tests", str(caught.exception))
+        self.assertFalse((self.root / PATH_MATCH).exists())
 
     def test_a_config_with_no_glob_has_no_glob_finding(self) -> None:
         self.configure(["tests/", "spec/helper.rb"], [".github/workflows/", "ci"])

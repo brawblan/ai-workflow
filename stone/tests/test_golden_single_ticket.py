@@ -58,11 +58,12 @@ HINT = f"If the change is intended, run with {UPDATE_ENV}=1 to write the fixture
 FILES = [".claude/agents/implementer.md", ".claude/agents/reviewer.md",
          ".claude/agents/shaper.md", ".claude/agents/tester.md", ".claude/settings.json",
          ".cornerstone/checks/change_size.py", ".cornerstone/checks/protected_paths.py",
-         ".cornerstone/hooks/protect-paths.py", MANIFEST, WORKFLOW, LABEL_WORKFLOW]
+         ".cornerstone/hooks/protect-paths.py", ".cornerstone/lib/path_match.py", MANIFEST,
+         WORKFLOW, LABEL_WORKFLOW]
 NOT_WRITTEN = [".claude/agents/planner.md", ".claude/agents/investigator.md",
                ".cornerstone/checks/instruction_size.py", ".github/workflows/cornerstone-k16.yml"]
-COMPONENTS = ["check.k6", "check.k7", "ci-job.checks", "hook.protect-paths", "hook.settings",
-              "role.implementer", "role.reviewer", "role.shaper", "role.tester",
+COMPONENTS = ["check.k6", "check.k7", "ci-job.checks", "hook.path-match", "hook.protect-paths",
+              "hook.settings", "role.implementer", "role.reviewer", "role.shaper", "role.tester",
               f"trigger.label.{PROFILE}"]
 
 

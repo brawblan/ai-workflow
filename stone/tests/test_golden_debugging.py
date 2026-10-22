@@ -60,7 +60,8 @@ COMPONENTS = FRAMEWORK / "adapters" / "claude-code" / "components.yaml"
 # The components that this profile must render at the least. A later sibling component can add to
 # the derived set, but it cannot take one of these out.
 PINNED_IDS = {f"role.{role}" for role in ROLES} | {
-    "check.k6", "check.k7", "ci-job.checks", "hook.protect-paths", "hook.settings"}
+    "check.k6", "check.k7", "ci-job.checks", "hook.path-match", "hook.protect-paths",
+    "hook.settings"}
 HINT = f"If the change is intended, run with {UPDATE_ENV}=1 to write the fixtures again."
 
 

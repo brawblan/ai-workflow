@@ -29,7 +29,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .cornerstone/checks/protected_paths.py
-  hash: f7e1a08bff3178a38ec52f6c9b983a0d6f5f6f55d732f815492b95f674c07c0c
+  hash: 39b6c7b8bdcd71b6d477ae3e7797c6e21e72badb3b0528928dbad60629cc8a9f
 - id: check.k7
   kind: check
   purpose: K7. Fail if the diff is over the size limit of the PR profile and has no
@@ -60,6 +60,22 @@ components:
   files:
   - .github/workflows/cornerstone-checks.yml
   hash: 9d7f14612fd5eb9dc09732873832d6e824e740254f98f880c58e98651187c692
+- id: hook.path-match
+  kind: hook
+  purpose: Match a path against paths.tests and paths.checks. The hook and K6 import
+    it.
+  principle:
+  - P2
+  - P6
+  source: framework
+  owner: octocat
+  eval: evals/hook-protect-paths/
+  models_tested: []
+  added: '2026-10-18'
+  review_by: '2027-04-18'
+  files:
+  - .cornerstone/lib/path_match.py
+  hash: f2f05f2a1c56c9e1a9534bff3111ee50c3836c43edd764af6d3975b8fbe92a65
 - id: hook.protect-paths
   kind: hook
   purpose: Block an edit to a path that the current role must not change.
@@ -74,7 +90,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .cornerstone/hooks/protect-paths.py
-  hash: d5096b7c1512169508678fc53661b7752bbc7f087de45c222590bb45ed657064
+  hash: c1ccd97525de206f7ac944f936e9d2eb91b775cd5ceca5bcb9eaafcb5b9ad5e5
 - id: hook.settings
   kind: hook
   purpose: Register the protected-path hook in the harness settings. Other keys stay

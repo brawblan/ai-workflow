@@ -8,6 +8,7 @@ when it must act as the model.
 
 from __future__ import annotations
 
+import ast
 import contextlib
 import errno
 import importlib.util
@@ -44,10 +45,12 @@ GROUPS = (SHELL_WRITE, ROLE_LOOKUP, GLOB_MATCH)
 COLOCATED_TEST = "src/widget/widget.test.js"
 COLOCATED_SOURCE = "src/widget/widget.js"
 # The match rule before D62. A hook or K6 with this rule cannot protect a colocated test file.
+# The hook and K6 import `covers` from one rendered module (D62), so a test puts the old rule there.
+PATH_MATCH_FILE = ".cornerstone/lib/path_match.py"
+K6_FILE = ".cornerstone/checks/protected_paths.py"
 PREFIX_ONLY_COVERS = ('def covers(patterns, path):\n'
                       '    return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/")'
-                      ' for p in patterns)\n\n\n')
-MAIN_GUARD = 'if __name__ == "__main__":'
+                      ' for p in patterns)\n')
 HOOK_ROLES = ("implementer", "tester", "planner", "investigator", "reviewer")
 ROLE_CALL = "role = find_role(event)"
 
@@ -317,13 +320,24 @@ class GlobMatchTest(GraderCase):
         path = EVAL / SCENARIOS[sid]["fixture"] / ".cornerstone" / "config.yaml"
         return yaml.safe_load(path.read_text(encoding="utf-8"))
 
-    def use_prefix_only_covers(self, ws: Path, file: str) -> None:
-        """Make the rendered file use the match rule from before D62."""
-        target = ws / file
+    def use_prefix_only_covers(self, ws: Path) -> None:
+        """Replace `covers` in the rendered match module with the match rule from before D62.
+
+        The hook and K6 do not change, so a changed decision comes from the module that they
+        import.
+        """
+        target = ws / PATH_MATCH_FILE
         text = target.read_text(encoding="utf-8")
-        self.assertEqual(text.count(MAIN_GUARD), 1, f"{file} has no single main guard")
-        target.write_text(text.replace(MAIN_GUARD, PREFIX_ONLY_COVERS + MAIN_GUARD),
+        found = [node for node in ast.parse(text).body
+                 if isinstance(node, ast.FunctionDef) and node.name == "covers"]
+        self.assertEqual(len(found), 1, f"{PATH_MATCH_FILE} has no single covers function")
+        lines = text.splitlines(keepends=True)
+        start, end = found[0].lineno - 1, found[0].end_lineno
+        before = {name: (ws / name).read_bytes() for name in (HOOK_FILE, K6_FILE)}
+        target.write_text("".join(lines[:start]) + PREFIX_ONLY_COVERS + "".join(lines[end:]),
                           encoding="utf-8")
+        self.assertNotEqual(target.read_text(encoding="utf-8"), text)
+        self.assertEqual({name: (ws / name).read_bytes() for name in before}, before)
 
     def test_each_glob_scenario_uses_role_from_input_and_k6_fails(self) -> None:
         for sid in GLOB_MATCH:
@@ -382,7 +396,7 @@ class GlobMatchTest(GraderCase):
 
     def test_a_hook_with_the_prefix_rule_fails_each_role_check_of_h9(self) -> None:
         ws = self.workspace("H9")
-        self.use_prefix_only_covers(ws, HOOK_FILE)
+        self.use_prefix_only_covers(ws)
         for index, args in enumerate(role_checks(SCENARIOS["H9"])):
             with self.subTest(check=index):
                 detail = self.expect(False, "role_from_input", ws, args)
@@ -390,8 +404,7 @@ class GlobMatchTest(GraderCase):
 
     def test_a_k6_with_the_prefix_rule_fails_k6_fails_of_h9(self) -> None:
         ws = self.workspace("H9")
-        k6 = ".cornerstone/checks/protected_paths.py"
-        self.use_prefix_only_covers(ws, k6)
+        self.use_prefix_only_covers(ws)
         # k6_fails starts at the newest render commit, so commit the change as a render.
         subprocess.run(["git", "commit", "-qam", "chore: render\n\nRole: generator"], cwd=ws,
                        check=True, capture_output=True, env={**os.environ, **evals.GIT_ENV})

@@ -53,13 +53,14 @@ HINT = f"If the change is intended, run with {UPDATE_ENV}=1 to write the fixture
 # triggers [command, schedule:monthly]. D31: render writes one workflow for each trigger that is
 # not `command`.
 FILES = [".claude/agents/investigator.md", ".claude/agents/reviewer.md",
-         ".claude/settings.json", ".cornerstone/hooks/protect-paths.py", MANIFEST,
+         ".claude/settings.json", ".cornerstone/hooks/protect-paths.py",
+         ".cornerstone/lib/path_match.py", MANIFEST,
          f".github/workflows/cornerstone-{PROFILE}-schedule.yml"]
 NOT_WRITTEN = [".github/workflows/cornerstone-checks.yml",
                ".github/workflows/cornerstone-k16.yml",
                ".cornerstone/checks/protected_paths.py"]
-COMPONENTS = ["hook.protect-paths", "hook.settings", "role.investigator", "role.reviewer",
-              f"trigger.schedule.{PROFILE}"]
+COMPONENTS = ["hook.path-match", "hook.protect-paths", "hook.settings", "role.investigator",
+              "role.reviewer", f"trigger.schedule.{PROFILE}"]
 
 
 def tree_files(folder: Path, skip: frozenset[str] = frozenset()) -> dict[str, bytes]:
