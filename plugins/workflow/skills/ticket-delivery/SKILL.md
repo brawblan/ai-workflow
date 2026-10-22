@@ -10,6 +10,8 @@ that wrote the code cannot judge it (P2), so the tests and the review come from 
 
 ## 1. Find the delivery basis
 
+- If the config has `tickets.source: file`, the ticket is the file `tickets.path`, with the ticket ID
+  for `{id}`. Read it. Do not use the issue CLI.
 - Find the ticket in the conversation, the branch name, the linked issue, or the plan files.
 - Extract each acceptance criterion (COA). The COAs are the source of truth.
 - If there is no ticket, go to step 5. Do not invent criteria.

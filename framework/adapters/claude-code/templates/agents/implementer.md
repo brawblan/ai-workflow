@@ -19,7 +19,7 @@ If a protected file must change, stop and say why in the decision log.
 
 ## Steps
 
-1. Read the ticket. Use only the ticket, the plan (if there is one), and the code.
+1. Read the ticket. Use only the ticket, the plan (if there is one), and the code.$ticket_location
 2. Make the smallest change that meets each acceptance criterion.
 3. Run `$command_all_checks`. Fix each failure that your change caused.
 4. Write the decision log at `${paths_plans}<ticket-id>.decisions.md`: each decision, the options,

@@ -49,6 +49,19 @@ MARKER_STEP = r"""      # Opt-in adoption (#122): only a PR with a "Profile: <id
             echo "::notice::No Cornerstone marker on this PR, so the Cornerstone checks are skipped."
           fi
 """
+SHAPER_FORM = """The section has this form, with one line for each field of the Definition of Ready:
+
+```
+## Definition of Ready
+Problem: <the problem or goal>
+Acceptance criteria:
+- <a testable criterion>
+Non-goals: <what the change does not do>
+Test oracle: <how a person knows that it works>
+Personas: <IDs>, or none
+```
+
+Add `Reproduction:` for a bug and `Time box:` for a spike or an audit, if the profile needs them."""
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 DEFAULT_PR_LINES = 600  # D4, customization.md
@@ -209,6 +222,7 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
             values[f"limit_{key}"] = str(value)
     opt_in = config.get("adoption", "all") == "opt-in"
     no_k6 = commit_settings(config)["trailers"] == "none"
+    values.update(ticket_values(config))
     values.update({
         "adoption_json": json.dumps("opt-in" if opt_in else "all"),
         "marker_if": MARKER_IF if opt_in else "",
@@ -235,6 +249,26 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
         protected = tests + checks + ALWAYS_PROTECTED + [values["paths_specs"]]
         values["protected_json"] = json.dumps(sorted(set(protected)))
     return {key: value for key, value in values.items() if "TODO(" not in value}
+
+
+def ticket_values(config: dict[str, Any]) -> dict[str, str]:
+    """Return the ticket source for the role files and the hook (#137)."""
+    section = config.get("tickets")
+    section = section if isinstance(section, dict) else {}
+    if section.get("source") != "file" or not section.get("path"):
+        return {"ticket_location": "", "tickets_json": json.dumps(""),
+                "shaper_tools": "Read, Grep, Glob, Bash",
+                "shaper_write": "Write the answers into the ticket fields. Do not invent a requirement.",
+                "shaper_end": "Use `Bash` only to read the ticket with the issue CLI. "
+                              "Do not change files in the repo."}
+    path = str(section["path"])
+    return {"ticket_location": f" The ticket is the file `{path}`. `{{id}}` is the ticket ID.",
+            "tickets_json": json.dumps(path),
+            "shaper_tools": "Read, Grep, Glob, Bash, Write, Edit",
+            "shaper_write": "Write the answers into the Definition of Ready section of the ticket "
+                            "file. Do not invent a requirement.",
+            "shaper_end": "Change only the ticket file. A hook blocks the file tools on other "
+                          "paths. Use `Bash` only to read files.\n\n" + SHAPER_FORM}
 
 
 def commit_settings(config: dict[str, Any]) -> dict[str, str]:

@@ -64,6 +64,8 @@ and `paths.checks`. Look for these first.
 - Ask: "Will each contributor use Cornerstone, or only some PRs?" If only some, set
   `adoption: opt-in`. Tell the user that an unmarked PR gets no checks.
 
+- Ask: "Is the ticket a GitHub issue, or a file (for example from Jira)?" If a file, set
+  `tickets.source: file` and `tickets.path` with `{id}`, for example `docs/tickets/{id}.txt`.
 - Ask: "Does the repo have specialist review agents or skills, for example accessibility or
   security?" If yes, add them to `specialists`, with the trigger and `blocks`. Ask for an `eval`
   plan for each one.

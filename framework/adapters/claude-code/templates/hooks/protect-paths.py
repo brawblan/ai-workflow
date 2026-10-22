@@ -10,11 +10,13 @@ A path is relative to the git work tree that holds it, so a linked worktree gets
 
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 
 # The implementer must not change PROTECTED. The tester changes only TESTS. The planner only PLANS.
+# The shaper changes only the TICKET file, if the ticket is a file (#137).
 # The investigator changes only REPORTS, except on a SPIKE_PREFIX branch, which never merges (K16).
 # No branch lets the investigator change HARNESS: the hook, the checks, and the harness settings.
 PROTECTED = $protected_json
@@ -22,12 +24,18 @@ TESTS = $tests_json
 PLANS = $plans_json
 REPORTS = $reports_json
 HARNESS = $harness_json
+TICKET = $tickets_json  # the ticket file of the shaper (tickets.path). "" if the ticket is not a file.
 SPIKE_PREFIX = "spike/"
-ROLES = ("implementer", "tester", "planner", "investigator", "reviewer")
+ROLES = ("implementer", "tester", "planner", "investigator", "reviewer", "shaper")
 
 
 def covers(prefixes: list[str], path: str) -> bool:
     return any(path == p.rstrip("/") or path.startswith(p.rstrip("/") + "/") for p in prefixes)
+
+
+def is_ticket(path: str) -> bool:
+    pattern = re.escape(TICKET).replace(re.escape("{id}"), "[^/]+")
+    return re.fullmatch(pattern, path) is not None
 
 
 def find_role(event: dict) -> str:
@@ -97,6 +105,8 @@ def main() -> int:
     elif role == "investigator" and not covers(REPORTS, path) and not on_spike_branch(tree):
         reason = (f"is not a report path. The investigator writes only in {', '.join(REPORTS)}, "
                   f"or on a {SPIKE_PREFIX} branch")
+    elif role == "shaper" and TICKET and not is_ticket(path):
+        reason = f"is not the ticket file. The shaper changes only {TICKET}"
     elif role == "reviewer":
         reason = "cannot change. The reviewer changes no file"
     else:

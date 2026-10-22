@@ -103,7 +103,10 @@ changes a test or a check.
 ## A ticket from another tracker
 
 The roles need the ticket text, not a GitHub issue. Save the ticket in a file, for example
-`docs/plans/TICKET-123.md`, with the acceptance criteria. Give the path to each role.
+`.claude/prompts/PROJ-123.txt`. Set `tickets.source: file` and `tickets.path:
+docs/tickets/{id}.txt` in `.cornerstone/config.yaml`, and render again. The shaper then writes the
+Definition of Ready fields into the file, in the section `## Definition of Ready`. The other roles
+read the ticket from the same path. See [Tickets as files](../../framework/customization.md#tickets-as-files-tickets).
 
 ## Run the checks
 
