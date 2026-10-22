@@ -17,16 +17,19 @@ sources:
     read: 2026-10-17
 
 defaults:
-  role_models:                     # all roles use the model in global/settings.json until evals show a cheaper fit
+  role_models:                     # D63: the strongest model where reasoning is the job; Sonnet for plan-following work
     shaper: claude-opus-5-5
     planner: claude-opus-5-5
-    implementer: claude-opus-5-5
-    tester: claude-opus-5-5
+    implementer: claude-sonnet-5-5
+    tester: claude-sonnet-5-5
     reviewer: claude-opus-5-5
     investigator: claude-opus-5-5
-  effort:
+  effort:                          # D63: the `effort` field of the role file; an empty role keeps the session effort
+    shaper: medium
     planner: high
-    implementer: high
+    implementer: medium
+    tester: medium
+    reviewer: high
   instruction_file_max_lines: 300
 
 idioms:

@@ -351,6 +351,8 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         values = {**template_values(config, model), **model_values,
                   "size_limits_json": limits_json,
                   **{name: step for name, step in steps.items() if step is not None}}
+        effort = (defaults.get("effort") or {}).get(entry.get("role", ""), "")
+        values["effort_line"] = f"\neffort: {effort}" if effort else ""  # D63: the effort of the role
         values.update(commit_values(config, entry.get("role", "")))
         values["trailers_json"] = json.dumps(commit_settings(config)["trailers"])
         for block in BLOCKS:

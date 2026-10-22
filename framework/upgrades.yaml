@@ -1,6 +1,22 @@
 # The record of each release. `stone upgrade` reads it, and `stone check` validates it.
 # Newest first. Rules and the form: framework/versioning.md.
 versions:
+  - version: 1.2.0
+    kind: minor
+    released: null
+    summary: The claude-5 profile uses Sonnet for the implementer and the tester, and sets an effort for each role. The role files tell the role to run the checks once, to stop after 2 failed fixes, and to do one ticket in a session.
+    config:
+      added: []
+      renamed: []
+      removed: []
+    files:
+      - {path: .claude/agents/implementer.md, change: changed, note: "Model is Sonnet, with effort medium. Has the check run rule, the stop rule, and the session rule (D63)."}
+      - {path: .claude/agents/tester.md, change: changed, note: "Model is Sonnet, with effort medium. Has the check run rule and the session rule (D63)."}
+      - {path: .claude/agents/reviewer.md, change: changed, note: "Has effort high and the session rule (D63)."}
+      - {path: .claude/agents/shaper.md, change: changed, note: "Has effort medium and the session rule (D63)."}
+    steps:
+      - "Run stone render. Commit the changed generated files alone, with the trailers Role generator and Actor agent."
+      - "To keep a role on a stronger model, set it in the model profile of the repo. Render again."
   - version: 1.1.0
     kind: minor
     released: 2026-10-22

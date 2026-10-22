@@ -2,7 +2,7 @@
 name: reviewer
 description: Review a diff against its ticket in a fresh session. Report defects and scope drift. Use after the checks pass. Changes no file.
 tools: Read, Grep, Glob, Bash
-model: $model
+model: $model$effort_line
 ---
 
 You are the reviewer. You did not write the code or the tests. You change no file.
@@ -23,3 +23,5 @@ The ticket, the diff against `$branch_integration`, the check output, and the de
 5. End with your confidence and the open risks for the human at G4.
 
 Use `Bash` only for read-only commands such as `git diff`, `git log`, and `$command_test_unit`.
+
+Work on one ticket in this session. When you finish, end the session. Start the next role in a new session.

@@ -29,7 +29,7 @@ A full render for all 10 profiles writes 22 components. This table lists each on
 - Measured by tests only: `check.k6`. A check is its own test (D43).
 - Not measured: 17 components. Each has an eval plan in the adapter component list. The eval
   folder does not exist yet.
-- Every run used `claude-opus-5-5`. No other model is measured (dossier G5).
+- Every run used `claude-opus-5-5`, except one `role.tester` run on `claude-sonnet-5-5` (2026-10-22). No other model is measured (dossier G5).
 - k = 3 for each run. A rate is the share of passed checks. "With" has the component. "Without" does
   not.
 
@@ -38,7 +38,7 @@ A full render for all 10 profiles writes 22 components. This table lists each on
 | `role.shaper` | none | no run | 2027-04-18 (proposed) |
 | `role.planner` | [role-planner](./role-planner/) | 2026-10-18, `claude-opus-5-5`. P1 to P5, latest run of each scenario. Outcome 1.00 with, 0.80 without (P2 fails without). Contract 1.00 with, 0.40 without. | Measured |
 | `role.implementer` | none | no run | 2027-04-18 (proposed) |
-| `role.tester` | [role-tester](./role-tester/) | T1, T3, T4: 2026-10-18. T2: 2026-10-19, after D42. Outcome 1.00 with and without in all four. Contract 1.00 with. Contract 0.00 without. The T2 result of 2026-10-18 is from before D42 (see the note below). | Measured |
+| `role.tester` | [role-tester](./role-tester/) | T1, T3, T4: 2026-10-18. T2: 2026-10-19, after D42. Outcome 1.00 with and without in all four. Contract 1.00 with. Contract 0.00 without. The run of 2026-10-22 on `claude-sonnet-5-5` (with only, k = 3): outcome 1.00 and contract 1.00 in all four, 12 of 12 runs pass. The T2 result of 2026-10-18 is from before D42 (see the note below). | Measured |
 | `role.reviewer` | none | no run | 2027-04-18 (proposed) |
 | `role.investigator` | none | no run | 2027-04-18 (proposed) |
 | `hook.protect-paths` | [hook-protect-paths](./hook-protect-paths/) | 2026-10-21, `claude-opus-5-5`, after D48. H1 to H5. Every check passes in 30 of 30 runs, in both variants. Outcome 1.00 with and without. pass^k is 1 in all rows. The run of 2026-10-19 passed `bash_write_lands` in 4 of 30 runs (see the note below). | Measured. Review D39 by 2027-04-18. |

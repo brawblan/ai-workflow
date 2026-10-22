@@ -33,15 +33,7 @@
       }
     }
   },
-  "effortLevel": "high",
+  "effortLevel": "medium",
   "theme": "auto",
-  "agentPushNotifEnabled": true,
-  "modelSettings": {
-    "claude-opus-5-5": {
-      "effortLevel": "high"
-    },
-    "claude-sonnet-5-5": {
-      "effortLevel": "high"
-    }
-  }
+  "agentPushNotifEnabled": true
 }

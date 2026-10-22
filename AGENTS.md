@@ -25,13 +25,13 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | --- | --- |
 | Install the CLI | `pip install ./stone` |
 | Unit tests | `python -m unittest discover -s stone/tests` |
-| Unit tests, in parallel (about 3 times faster) | `python stone/tests/run_parallel.py` |
+| Unit tests, in parallel (about 3 times faster). Add `-q` to show only failures and the summary | `python stone/tests/run_parallel.py` |
 | Validate the framework | `stone check` |
 | Writing check (K17) on your changes | `stone check-writing --diff origin/main` |
 | Validate the plugin | `claude plugin validate .` |
 | Preview the docs site | `pip install -r website/requirements.txt && mkdocs serve` |
 | Try a skill before you push | `claude --plugin-dir plugins/workflow` |
-| All checks before a push | `python -m unittest discover -s stone/tests && stone check && stone check-writing --diff origin/main` |
+| All checks before a push | `python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/main` |
 
 ## Rules for every task
 
@@ -48,14 +48,8 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 
 ## Framework changes
 
-- Keep the core neutral. Put each harness, vendor, model, or spec-tool name in `framework/adapters/`.
-  `stone check` fails on a vendor name in the core.
-- When you change a profile, update the gates table in `framework/gates.md` in the same PR.
-- Record each design decision in the "Decisions" table of `framework/README.md` (D1, D2, ...).
-- Support each new rule with evidence. Add the source to the dossier and cite its ID.
-- Give each new component (rule, skill, role, hook, check) an eval plan and a review date (P5).
-- If a PR adds, renames, or removes a config key, or changes a generated file, add it to the newest
-  entry of `framework/upgrades.yaml`. See [versioning.md](framework/versioning.md).
+Before you change `framework/`, read [framework/contributing.md](framework/contributing.md). The core stays
+tool-neutral, and `stone check` fails on a vendor name in it.
 
 ## Skills
 
@@ -76,16 +70,13 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 - Open each PR into `main`. Never push to `main` directly. Never force-push a shared branch.
 - Commit messages: `type(scope): summary` (for example `feat(stone): ...`, `docs(framework): ...`).
   Explain why in the body.
-- PR body sections, in this order: Summary, Why this change, Validation run, Risks, Rollback plan,
-  Evidence, Decision log, Review findings, Confidence. Check K14 needs the last four. Give each
-  a heading of its own, for example `## Confidence`. If a section does not apply, write `None` and
-  the reason.
+- PR body: use the nine sections of the `dev-pr` skill, each under its own heading. K14 tests the
+  last four. If a section does not apply, write `None` and the reason.
 
 ## Writing
 
-- Human-facing text (docs, PR bodies, commits, reports) follows ASD-STE100. See
-  [framework/writing.md](framework/writing.md) for the scope and
-  [ste.md](plugins/workflow/skills/ste-writing/references/ste.md) for the rules.
-- Do not rewrite old text only for style.
-- If K17 flags a correct use of a word, add `<!-- ste-ignore -->` at the end of that line.
+- Human-facing text follows ASD-STE100 (K17 checks it). Scope: [framework/writing.md](framework/writing.md).
+  Rules: [ste.md](plugins/workflow/skills/ste-writing/references/ste.md).
+- Do not rewrite old text only for style. To keep a correct word that K17 flags, add
+  `<!-- ste-ignore -->` at the end of that line.
 - Diagrams in repo files use Mermaid.

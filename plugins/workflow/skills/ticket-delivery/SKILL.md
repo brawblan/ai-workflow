@@ -1,6 +1,6 @@
 ---
 name: ticket-delivery
-description: "Collect the evidence that a ticket's acceptance criteria (COAs) are met: the tester's tests, the check output, and the reviewer's findings, each from its own session. Then open the PR with the dev-pr skill, with the evidence sections filled. It does not verify its own work. If no ticket exists, summarize the work instead. Use when asked to verify a ticket, check COAs, confirm acceptance criteria, collect evidence, summarize completed work, or deliver a ticket as a PR."
+description: "Collect the evidence that a ticket's acceptance criteria are met, then open the PR. Use when asked to verify a ticket, check COAs, or deliver a ticket as a PR."
 ---
 
 # Ticket Delivery
