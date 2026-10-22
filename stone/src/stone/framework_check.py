@@ -224,6 +224,7 @@ def branch_name_problems(config: dict[str, Any]) -> list[str]:
 
 
 DELIVERY_MODES = ("ci", "local")
+TICKET_SOURCES = ("github", "file")
 ADOPTION_MODES = ("all", "opt-in")
 COMMIT_BY = ("agent", "human")
 COMMIT_TRAILERS = ("commit", "notes", "none")
@@ -290,6 +291,44 @@ def commit_problems(root: Path, config: dict[str, Any]) -> list[str]:
     return problems
 
 
+def ticket_problems(config: dict[str, Any]) -> list[str]:
+    """Return the problems of the `tickets` section of the repo config (#137)."""
+    section = config.get("tickets")
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["'tickets' must be a map with the keys source and path."]
+    problems = []
+    source = section.get("source", "github")
+    if source not in TICKET_SOURCES:
+        problems.append(f"'tickets.source' is '{source}'. Use one of {list(TICKET_SOURCES)}.")
+    unknown = sorted(set(section) - {"source", "path"})
+    if unknown:
+        problems.append(f"'tickets.{unknown[0]}' is not a key. Use source or path.")
+    path = section.get("path")
+    if source != "file":
+        if path is not None:
+            problems.append("'tickets.path' is only for 'tickets.source: file'. Remove it.")
+        return problems
+    if not isinstance(path, str) or not path.strip():
+        return problems + ["'tickets.source: file' needs 'tickets.path', for example "
+                           ".claude/prompts/{id}.txt."]
+    if path.count("{id}") != 1:
+        problems.append("'tickets.path' needs '{id}' once. It stands for the ticket ID.")
+    if path.startswith("/") or ".." in Path(path).parts or re.search(r"[*?\[]", path):
+        problems.append("'tickets.path' must be a path in the repo, with no '..' and no glob.")
+    folder = _folder_prefix(path.split("{id}")[0] + "x").rpartition("/")[0] or ""
+    paths = config.get("paths") if isinstance(config.get("paths"), dict) else {}
+    for key in ("tests", "checks"):
+        for item in _paths(paths.get(key)):
+            theirs = _folder_prefix(item)
+            if theirs and folder and (folder == theirs or folder.startswith(theirs + "/")
+                                      or theirs.startswith(folder + "/")):
+                problems.append(f"'tickets.path' ({path}) overlaps 'paths.{key}' ({item}). The "
+                                "shaper could change a protected file. Use another folder.")
+    return problems
+
+
 def check_config(root: Path, framework: Path) -> list[Finding]:
     path = root / ".cornerstone" / "config.yaml"
     if not path.exists():
@@ -322,7 +361,8 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     adoption = config.get("adoption", "all")
     if adoption not in ADOPTION_MODES:
         add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
-    for problem in protected_path_problems(config) + commit_problems(root, config):
+    for problem in (protected_path_problems(config) + commit_problems(root, config)
+                    + ticket_problems(config)):
         add(problem)
     for waiver in config.get("waivers", []):
         if waiver.get("gate") in {"G3", "G5"}:

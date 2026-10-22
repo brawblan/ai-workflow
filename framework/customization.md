@@ -64,6 +64,9 @@ limits:
   function_lines: 60
   cyclomatic: 10
   mutation_score_changed_code: 0.6
+tickets:                           # optional. Where the ticket lives (#137)
+  source: github                   # github (default), or file
+  path: docs/tickets/{id}.txt   # with source: file. {id} is the ticket ID.
 owners:
   default: <github-username>
   solo: false                      # true if one human fills all human roles (see modes.md)
@@ -146,6 +149,21 @@ Use it when only some people or some tickets use Cornerstone ([D58](README.md#de
 - K6 does not count a commit with `Actor: human` and no `Role:` as an implementer commit. A
   commit with no trailer still counts as an implementer commit.
 - The role files of the implementer and the tester tell the role to add the marker to a PR.
+
+### Tickets as files (`tickets`)
+
+With `tickets.source: file`, the ticket is a file, not a GitHub issue ([D60](README.md#decisions)).
+This fits a tracker such as Jira, and a local-only setup.
+
+- `tickets.path` has `{id}` once, for the ticket ID. It is a path in the repo, with no glob and no
+  `..`. `stone check` fails if it overlaps `paths.tests` or `paths.checks`.
+- The shaper gets the tools `Write` and `Edit`. The hook lets the shaper change only the files that
+  match `tickets.path`. A Bash write is not blocked, as for the other roles.
+- The implementer, tester, and reviewer files, and `ticket-delivery`, read the ticket from that
+  path. They do not use the issue CLI.
+- The shaper writes the Definition of Ready fields in the section `## Definition of Ready` of the
+  file, one `Field: value` line for each field. A G1 check ([#115](https://github.com/brawblan/ai-workflow/issues/115))
+  can read this form.
 
 ### Commits (`commits`)
 

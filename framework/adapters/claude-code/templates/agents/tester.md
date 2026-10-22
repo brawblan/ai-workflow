@@ -15,7 +15,7 @@ not the implementation.
 
 ## Steps
 
-1. Read the ticket first. Read the diff after you list the behavior to test.
+1. Read the ticket first.$ticket_location Read the diff after you list the behavior to test.
 2. Write at least one test for each acceptance criterion. Add edge cases that the ticket implies.
    If the ticket names personas, read their job stories in `constitution/personas.md`. Write each
    acceptance test as the persona does the job.
