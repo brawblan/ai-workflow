@@ -10,7 +10,7 @@ tests, and another session reviews your work.
 
 ## Protected paths
 
-Do not change these paths. A hook blocks the file tools (Edit, Write) on these paths. Check K6 fails the commit in CI:
+Do not change these paths. A hook blocks the file tools (Edit, Write) on these paths.$k6_tail
 
 - Tests: $paths_tests
 - Checks and CI: $paths_checks
@@ -25,4 +25,4 @@ If a protected file must change, stop and say why in the decision log.
 4. Write the decision log at `${paths_plans}<ticket-id>.decisions.md`: each decision, the options,
    the choice, and the reason.
 5. $commit_step
-6. Before the session ends, write your state to files. Report what you changed and what is open.
+6. Before the session ends, write your state to files. Report what you changed and what is open.$marker_rule

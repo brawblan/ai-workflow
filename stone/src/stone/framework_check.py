@@ -224,6 +224,7 @@ def branch_name_problems(config: dict[str, Any]) -> list[str]:
 
 
 DELIVERY_MODES = ("ci", "local")
+ADOPTION_MODES = ("all", "opt-in")
 COMMIT_BY = ("agent", "human")
 COMMIT_TRAILERS = ("commit", "notes", "none")
 HARNESS_DIRS = (".claude/", ".cornerstone/")  # the hook protects these for every role
@@ -318,6 +319,9 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     delivery = config.get("delivery", "ci")
     if delivery not in DELIVERY_MODES:
         add(f"The delivery '{delivery}' is not valid. Use one of {list(DELIVERY_MODES)}.")
+    adoption = config.get("adoption", "all")
+    if adoption not in ADOPTION_MODES:
+        add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
     for problem in protected_path_problems(config) + commit_problems(root, config):
         add(problem)
     for waiver in config.get("waivers", []):

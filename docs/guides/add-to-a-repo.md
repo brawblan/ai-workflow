@@ -83,6 +83,21 @@ Limits:
   if you keep trailers out of commits on a shared branch.
 - To move to the team workflow, remove `delivery: local`, render again, and commit the result.
 
+## Adopt in steps
+
+A team can move from one developer to all contributors in three steps.
+
+| Step | Config | What changes |
+| --- | --- | --- |
+| 1. Local only | `delivery: local` | One developer. No workflow file. See the section above. |
+| 2. Opt-in | `adoption: opt-in` | The G3 workflow runs only for a PR with a `Profile: <id>` line or the label `cornerstone`. Other PRs pass as before. |
+| 3. All | `adoption: all` (default) | Each PR is a Cornerstone PR. |
+
+To go from step 1 to step 2, remove `delivery: local`, add `adoption: opt-in`, render, and commit
+the result. In step 2, a marked PR gets all checks. An unmarked PR gets none of them, so review is
+the only control for it. A human who commits with `Actor: human` and no `Role:` is not an
+implementer commit for K6.
+
 ## Commit the result
 
 Make two commits. K6 needs the render output in its own commit.

@@ -2,6 +2,7 @@
       # mutation score is under MUTATION_SCORE_MIN (limits.mutation_score_changed_code).
       # A failing command fails the job, and G3 blocks (D52).
       - name: $step_name
+$marker_if
         env:
           BASE_REF: origin/$${{ github.base_ref }}
           MUTATION_SCORE_MIN: $limit_mutation_score_changed_code

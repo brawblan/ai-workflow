@@ -61,6 +61,9 @@ and `paths.checks`. Look for these first.
   `commits.by` and `commits.message_format`. If trailers must stay out of the history, set
   `commits.trailers` to `notes` or `none`, and tell the user what K6 loses.
 
+- Ask: "Will each contributor use Cornerstone, or only some PRs?" If only some, set
+  `adoption: opt-in`. Tell the user that an unmarked PR gets no checks.
+
 ## 4. Write the config
 
 1. Write `.cornerstone/config.yaml` with the fields in `customization.md`, in the same order.
