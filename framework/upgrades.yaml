@@ -3,8 +3,8 @@
 versions:
   - version: 1.1.0
     kind: minor
-    released: null            # set the date when you tag the release
-    summary: Optional settings for a local-only setup, role commits, opt-in adoption, specialist reviews, and ticket files.
+    released: 2026-10-22
+    summary: Optional settings for a local-only setup, role commits, opt-in adoption, specialist reviews, and ticket files. New commands stone gate, stone specialists, and stone upgrade.
     config:
       added:
         - {key: delivery, default: ci, note: "ci, or local: no workflow file (D56)."}
