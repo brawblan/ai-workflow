@@ -172,7 +172,7 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(self.run_hook("src/a.py", "tester"), 2)
         self.assertEqual(self.run_hook("src/a.py", "reviewer"), 2)
 
-    # Issue #126, D54: the hook finds the role in agent_type, then STONE_ROLE, then implementer.
+    # Issue #126, D55: the hook finds the role in agent_type, then STONE_ROLE, then implementer.
     HOOK_ROLES = ("implementer", "tester", "planner", "investigator", "reviewer")
     ROLE_PROBES = ("tests/test_a.py", "src/a.py", "docs/plans/p.md", "docs/reports/r.md")
     # The exit codes for ROLE_PROBES. Each role has a different pattern.

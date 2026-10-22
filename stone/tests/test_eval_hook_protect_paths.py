@@ -34,7 +34,7 @@ GRADE = EVAL / "grade.py"
 HOOK_FILE = ".cornerstone/hooks/protect-paths.py"
 SCENARIOS = {s["id"]: s for s in
              yaml.safe_load((EVAL / "scenarios.yaml").read_text(encoding="utf-8"))["scenarios"]}
-# H1 to H5 pin the shell-write gap (D39). H6 to H8 test how the hook finds the role (D54, #126).
+# H1 to H5 pin the shell-write gap (D39). H6 to H8 test how the hook finds the role (D55, #126).
 SHELL_WRITE = ("H1", "H2", "H3", "H4", "H5")
 ROLE_LOOKUP = ("H6", "H7", "H8")
 HOOK_ROLES = ("implementer", "tester", "planner", "investigator", "reviewer")
@@ -186,7 +186,7 @@ class GapClosedTest(GraderCase):
 
 
 class RoleFromInputTest(GraderCase):
-    """H6 to H8: the hook finds the role from agent_type in the hook input (issue #126, D54)."""
+    """H6 to H8: the hook finds the role from agent_type in the hook input (issue #126, D55)."""
 
     def replace_role_lookup(self, ws: Path, line: str) -> None:
         """Change only the role lookup of the rendered hook to `line`."""
@@ -273,7 +273,7 @@ class RoleFromInputTest(GraderCase):
                     self.assertIn("expected 2", detail)
 
     def test_an_empty_stone_role_is_an_implementer(self) -> None:
-        # D54: an empty STONE_ROLE gives implementer. The old lookup gave no limit.
+        # D55: an empty STONE_ROLE gives implementer. The old lookup gave no limit.
         args = {"input": {}, "stone_role": "", "allowed": ["src/stats.py"],
                 "blocked": ["tests/test_stats.py"]}
         ws = self.workspace("H8")
