@@ -61,6 +61,28 @@ Check these config fields with care. They decide what the agent can change.
 | `paths.checks` | The implementer and the tester cannot change these paths. Put your CI and lint config here. |
 | `owners.solo` | Set `true` only if you are the only human. It allows the [solo developer rule](../../framework/modes.md#solo-developer). |
 
+## Local-only adoption
+
+Use this when you want the roles in a shared repo before the team agrees to the workflow. Other
+contributors must see no change.
+
+1. Set `delivery: local` in `.cornerstone/config.yaml`. The setup skill asks "Will the team adopt
+   this now, or only you?" and sets it.
+2. Keep `paths.plans` and `paths.reports` in folders such as `docs/plans/` and `docs/reports/`.
+   Do not put them in `.cornerstone/` or `.claude/`: the hook blocks the roles there, and
+   `stone check` fails.
+3. Run `stone render`. It writes no workflow file. It prints the lines to add to
+   `.git/info/exclude`. Add them. A file that git already tracks stays tracked.
+4. Before you open the PR, run `stone gate --base origin/main`. Put its output in the Evidence
+   section.
+
+Limits:
+
+- P1 is weaker. The evidence comes from your machine. No required status check stops a merge.
+- K6 counts a commit with no `Role:` trailer as an implementer commit. Read the K6 result by hand
+  if you keep trailers out of commits on a shared branch.
+- To move to the team workflow, remove `delivery: local`, render again, and commit the result.
+
 ## Commit the result
 
 Make two commits. K6 needs the render output in its own commit.

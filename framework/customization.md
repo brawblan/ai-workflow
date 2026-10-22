@@ -31,6 +31,7 @@ harness: <harness-adapter-name>    # a file name in framework/adapters/
 model_profile: <model-family>      # a file in framework/adapters/<harness>/models/
 spec_tool: plain                   # plain, or a spec-tool adapter name
 profiles: [single-ticket, bug-triage, debugging]
+delivery: ci                       # ci (default), or local: no workflow files (see below)
 branches:
   integration: dev
   main: main
@@ -126,6 +127,18 @@ Make sure that each command passes before you add it to `commands`.
 
 CI does not know the profile of a PR. So each step runs on each PR in the repo. For example, a repo
 with single-ticket and refactor-migration runs K10 on each single-ticket PR too.
+
+### Local delivery (`delivery: local`)
+
+Use it when one developer runs the roles in a shared repo before the team agrees to the workflow.
+`stone render` then writes no file in `.github/workflows/`. It prints a warning that G3 is local
+only, and the lines to add to `.git/info/exclude`. It writes nothing outside the rendered set.
+`stone gate` runs K6, K7, and `commands.all_checks` on the machine, and prints a table for the
+Evidence section of the PR. See [D56](README.md#decisions).
+
+`stone render` and `stone check` fail if `paths.plans` or `paths.reports` overlaps the harness
+folder, `.cornerstone/`, `paths.tests`, or `paths.checks`. The hook blocks a role that writes there. Use
+folders such as `docs/plans/` and `docs/reports/`, and ignore them in git.
 
 ## Profile override (`.cornerstone/profiles/<profile>.yaml`)
 

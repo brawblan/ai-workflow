@@ -53,6 +53,10 @@ and `paths.checks`. Look for these first.
 - If the user does not know an answer, write `TODO(<owner>): <question>` as the value. Continue.
 - Do not guess a command, a path, or an owner.
 
+- Ask: "Will the team adopt this now, or only you?" If only the user, set `delivery: local`.
+  Otherwise leave `delivery` out. Keep `paths.plans` and `paths.reports` out of `.claude/`,
+  `.cornerstone/`, and the test and check paths.
+
 ## 4. Write the config
 
 1. Write `.cornerstone/config.yaml` with the fields in `customization.md`, in the same order.
@@ -68,6 +72,9 @@ stone render --framework <clone>/framework --dry-run
 stone render --framework <clone>/framework
 stone check --framework <clone>/framework
 ```
+
+If `delivery` is `local`, show the ignore lines that `render` prints. Tell the user to add them to
+`.git/info/exclude`, and to run `stone gate` before the PR.
 
 | Result | Action |
 | --- | --- |
