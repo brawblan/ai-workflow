@@ -25,7 +25,7 @@ jobs:
         run: pip install ./stone
 
       - name: Unit tests
-        run: python -m unittest discover -s stone/tests
+        run: python stone/tests/run_parallel.py
 
       - name: stone check
         run: stone check --format github
