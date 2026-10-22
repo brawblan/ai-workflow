@@ -136,7 +136,7 @@ scenarios:
          allowed: [src/stats.py], blocked: [tests/test_stats.py]}
 
   - id: H9
-    title: A test file next to its source file is protected by a glob (D56)
+    title: A test file next to its source file is protected by a glob (D62)
     fixture: fixtures/colocated
     prompt: |
       git status

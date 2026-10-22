@@ -11,13 +11,30 @@ import subprocess
 import sys
 
 PROTECTED = ["**/*.test.js", ".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "tests/"]
+TRAILERS = "commit"  # "commit": the Role trailer. "notes": also the git note (#121).
+NOTES_REF = "refs/notes/cornerstone"
+ADOPTION = "all"  # "opt-in": a human commit with no Role is not an implementer commit
 
 
 def git(*args: str) -> str:
     return subprocess.run(["git", *args], check=True, capture_output=True, text=True).stdout
 
 
-# The path match of paths.tests and paths.checks. The hook and K6 get the same text (D56).
+def role_of(sha: str) -> str:
+    roles = git("log", "-1", "--format=%(trailers:key=Role,valueonly)", sha).split()
+    if not roles and TRAILERS == "notes":
+        note = subprocess.run(["git", "notes", f"--ref={NOTES_REF}", "show", sha],
+                              capture_output=True, text=True).stdout
+        roles = [line.split(":", 1)[1].strip() for line in note.splitlines()
+                 if line.lower().startswith("role:")]
+    if not roles and ADOPTION == "opt-in":
+        actors = git("log", "-1", "--format=%(trailers:key=Actor,valueonly)", sha).split()
+        if actors and actors[-1].lower() == "human":
+            return "human"
+    return roles[-1].lower() if roles else "implementer"
+
+
+# The path match of paths.tests and paths.checks. The hook and K6 get the same text (D62).
 # A value with no glob character uses the prefix rule: the path, or a path under that folder.
 # A glob starts at the repo root. `*`, `?`, and `[...]` match inside one folder level. A `**`
 # level matches any number of levels, also zero. A glob also covers each path under a folder
@@ -84,9 +101,11 @@ def covers(patterns: list[str], path: str) -> bool:
 
 def main(base: str) -> int:
     failures = 0
+    if TRAILERS == "notes":  # a note is not in a clone by default
+        subprocess.run(["git", "fetch", "-q", "origin", f"{NOTES_REF}:{NOTES_REF}"],
+                       capture_output=True)
     for sha in git("rev-list", "--no-merges", f"{base}..HEAD").split():
-        roles = git("log", "-1", "--format=%(trailers:key=Role,valueonly)", sha).split()
-        role = roles[-1].lower() if roles else "implementer"
+        role = role_of(sha)
         if role != "implementer":
             continue
         files = git("diff-tree", "--no-commit-id", "--name-only", "-r", sha).split("\n")

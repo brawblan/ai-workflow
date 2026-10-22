@@ -1,0 +1,5 @@
+      - name: K6 protected paths
+$marker_if
+        env:
+          BASE_REF: $${{ github.base_ref }}
+        run: python3 .cornerstone/checks/protected_paths.py "origin/$${BASE_REF}"

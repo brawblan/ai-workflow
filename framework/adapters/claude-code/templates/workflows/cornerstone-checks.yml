@@ -4,6 +4,7 @@ name: cornerstone-checks
 
 on:
   pull_request:
+$pr_types
 
 permissions:
   contents: read
@@ -16,14 +17,12 @@ jobs:
         with:
           fetch-depth: 0 # K6 reads each commit since the base branch
 
-      - name: K6 protected paths
-        env:
-          BASE_REF: $${{ github.base_ref }}
-        run: python3 .cornerstone/checks/protected_paths.py "origin/$${BASE_REF}"
-
+$marker_step
+$ci_step_check_k6
       # K7 blocks (D45). A "Waiver (P10)" section in the PR body passes.
       # The limit comes from the "Profile: <id>" line in the PR body.
       - name: K7 change size
+$marker_if
         env:
           BASE_REF: $${{ github.base_ref }}
           PR_BODY: $${{ github.event.pull_request.body }}
@@ -33,6 +32,7 @@ jobs:
 
       # stone comes from the framework tag in framework_version. A venv keeps it apart from the repo.
       - name: Install stone
+$marker_if
         env:
           STONE_TAG: v$framework_version
         run: |
@@ -42,6 +42,7 @@ jobs:
 
       # K14 blocks (D45, D49). The PR body needs the Evidence, Decision log, Review findings, and Confidence sections.
       - name: K14 PR evidence
+$marker_if
         env:
           PR_BODY: $${{ github.event.pull_request.body }}
         run: |
@@ -50,8 +51,10 @@ jobs:
 
 $ci_step_check_k15
       - name: Install
+$marker_if
         run: $command_install
 
       - name: All checks
+$marker_if
         run: $command_all_checks
 $check_steps

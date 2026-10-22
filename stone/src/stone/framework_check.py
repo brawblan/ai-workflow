@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from stone import personas_check, results, specs
+from stone import __version__, personas_check, results, specialists, specs, upgrade
 from stone.findings import Finding
 from stone.markdown import link_file, relative_links, split_frontmatter, table_rows
 
@@ -28,7 +28,7 @@ REQUIRED_KEYS = ["id", "name", "version", "purpose", "triggers", "stages", "role
 MATRIX_VALUE = {"—": "skip", "yes": "required", "if needed": "if-needed"}
 VENDOR_NAMES = ["claude", "codex", "cursor", "copilot", "gemini", "openspec", "kiro",
                 "anthropic", "openai"]
-EVAL_OPTIONAL_KINDS = {"check"}  # lifecycle.md: a check is its own test, so its eval can be ""
+EVAL_OPTIONAL_KINDS = {"check", "doc", "specialist"}  # lifecycle.md: a check is its own test, so its eval can be ""
 
 
 def _first_column(rows: list[list[str]]) -> list[str]:
@@ -226,7 +226,7 @@ def branch_name_problems(config: dict[str, Any]) -> list[str]:
 def path_compiler(harness: Path) -> Any:
     """Return compile_path from the `path_match` part of the adapter, or None if it has none.
 
-    The hook and K6 get the text of the same part (D56), so this check and the rendered files use
+    The hook and K6 get the text of the same part (D62), so this check and the rendered files use
     one match rule. The part is a file of the framework, like the templates that render fills.
     """
     registry = harness / "components.yaml"
@@ -258,6 +258,112 @@ def path_pattern_problems(config: dict[str, Any], harness: Path) -> list[str]:
     return problems
 
 
+DELIVERY_MODES = ("ci", "local")
+TICKET_SOURCES = ("github", "file")
+ADOPTION_MODES = ("all", "opt-in")
+COMMIT_BY = ("agent", "human")
+COMMIT_TRAILERS = ("commit", "notes", "none")
+HARNESS_DIRS = (".claude/", ".cornerstone/")  # the hook protects these for every role
+FOLDER_DEFAULTS = {"plans": "docs/plans/", "reports": "docs/reports/"}
+
+
+def _folder_prefix(value: Any) -> str:
+    """Return the folder of a path or glob, with no './' and no trailing '/'."""
+    text = re.split(r"[*?\[]", str(value).strip())[0]  # a glob counts up to its first wildcard
+    if text != str(value).strip():
+        text = text.rpartition("/")[0]
+    return text.removeprefix("./").rstrip("/")
+
+
+def _paths(value: Any) -> list[str]:
+    return [str(item) for item in (value if isinstance(value, list) else [value]) if item]
+
+
+def protected_path_problems(config: dict[str, Any]) -> list[str]:
+    """Return a problem for each plans or reports folder that overlaps a protected path.
+
+    The hook blocks a role that writes to a protected path, so the implementer could not write
+    its decision log, and the investigator could not write a report there.
+    """
+    paths = config.get("paths") if isinstance(config.get("paths"), dict) else {}
+    protected = [(item, _folder_prefix(item)) for item in
+                 [*HARNESS_DIRS, *_paths(paths.get("tests")), *_paths(paths.get("checks"))]]
+    problems = []
+    for key, default in FOLDER_DEFAULTS.items():
+        for folder in _paths(paths.get(key)) or [default]:
+            mine = _folder_prefix(folder)
+            for item, theirs in protected:
+                if not theirs:
+                    continue  # a glob with no folder part: it cannot be compared
+                if mine == theirs or mine.startswith(theirs + "/") or theirs.startswith(mine + "/"):
+                    problems.append(
+                        f"'paths.{key}' ({folder}) overlaps the protected path '{item}'. The hook "
+                        f"blocks the role that writes there. Use a folder outside {item}, "
+                        f"for example {default}.")
+    return problems
+
+
+def commit_problems(root: Path, config: dict[str, Any]) -> list[str]:
+    """Return the problems of the `commits` section of the repo config."""
+    section = config.get("commits")
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["'commits' must be a map with the keys by, trailers, and message_format."]
+    problems = []
+    for key, allowed in (("by", COMMIT_BY), ("trailers", COMMIT_TRAILERS)):
+        if section.get(key, allowed[0]) not in allowed:
+            problems.append(f"'commits.{key}' is '{section[key]}'. Use one of {list(allowed)}.")
+    unknown = sorted(set(section) - {"by", "trailers", "message_format"})
+    if unknown:
+        problems.append(f"'commits.{unknown[0]}' is not a key. Use by, trailers, or message_format.")
+    fmt = section.get("message_format")
+    if fmt is not None and (not isinstance(fmt, str) or not fmt.strip()):
+        problems.append("'commits.message_format' must be a file path or a URL.")
+    elif fmt and not re.match(r"https?://", fmt) and not (root / fmt).is_file():
+        problems.append(f"'commits.message_format' is '{fmt}', which is not a file in the repo. "
+                        "Use the path of a file, or a URL.")
+    return problems
+
+
+def ticket_problems(config: dict[str, Any]) -> list[str]:
+    """Return the problems of the `tickets` section of the repo config (#137)."""
+    section = config.get("tickets")
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["'tickets' must be a map with the keys source and path."]
+    problems = []
+    source = section.get("source", "github")
+    if source not in TICKET_SOURCES:
+        problems.append(f"'tickets.source' is '{source}'. Use one of {list(TICKET_SOURCES)}.")
+    unknown = sorted(set(section) - {"source", "path"})
+    if unknown:
+        problems.append(f"'tickets.{unknown[0]}' is not a key. Use source or path.")
+    path = section.get("path")
+    if source != "file":
+        if path is not None:
+            problems.append("'tickets.path' is only for 'tickets.source: file'. Remove it.")
+        return problems
+    if not isinstance(path, str) or not path.strip():
+        return problems + ["'tickets.source: file' needs 'tickets.path', for example "
+                           ".claude/prompts/{id}.txt."]
+    if path.count("{id}") != 1:
+        problems.append("'tickets.path' needs '{id}' once. It stands for the ticket ID.")
+    if path.startswith("/") or ".." in Path(path).parts or re.search(r"[*?\[]", path):
+        problems.append("'tickets.path' must be a path in the repo, with no '..' and no glob.")
+    folder = _folder_prefix(path.split("{id}")[0] + "x").rpartition("/")[0] or ""
+    paths = config.get("paths") if isinstance(config.get("paths"), dict) else {}
+    for key in ("tests", "checks"):
+        for item in _paths(paths.get(key)):
+            theirs = _folder_prefix(item)
+            if theirs and folder and (folder == theirs or folder.startswith(theirs + "/")
+                                      or theirs.startswith(folder + "/")):
+                problems.append(f"'tickets.path' ({path}) overlaps 'paths.{key}' ({item}). The "
+                                "shaper could change a protected file. Use another folder.")
+    return problems
+
+
 def check_config(root: Path, framework: Path) -> list[Finding]:
     path = root / ".cornerstone" / "config.yaml"
     if not path.exists():
@@ -285,6 +391,15 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
         if mode not in MODES:
             add(f"The mode '{mode}' is not valid. Use one of {sorted(MODES)}.")
     for problem in link_config_paths(root)[1]:
+        add(problem)
+    delivery = config.get("delivery", "ci")
+    if delivery not in DELIVERY_MODES:
+        add(f"The delivery '{delivery}' is not valid. Use one of {list(DELIVERY_MODES)}.")
+    adoption = config.get("adoption", "all")
+    if adoption not in ADOPTION_MODES:
+        add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
+    for problem in (protected_path_problems(config) + commit_problems(root, config)
+                    + ticket_problems(config) + specialists.problems(config)):
         add(problem)
     for waiver in config.get("waivers", []):
         if waiver.get("gate") in {"G3", "G5"}:
@@ -360,6 +475,36 @@ def check_components(root: Path, framework: Path) -> list[Finding]:
     return findings
 
 
+def check_upgrades(root: Path, framework: Path) -> list[Finding]:
+    """The record of releases must be valid (versioning.md). A framework folder without it is old."""
+    if not (framework / upgrade.FILE).exists():
+        return []
+    path = (framework / upgrade.FILE)
+    label = str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
+    return [Finding(label, 1, CHECK, message) for message in upgrade.problems(framework)]
+
+
+def check_version(root: Path) -> list[Finding]:
+    """Warn if framework_version in the repo config is not the version of the installed stone."""
+    path = root / ".cornerstone" / "config.yaml"
+    if not path.exists():
+        return []
+    config = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+    value = config.get("framework_version") if isinstance(config, dict) else None
+    try:
+        have, installed = upgrade.parse(value), upgrade.parse(__version__)
+    except upgrade.UpgradeError:
+        return []  # no version, or not a full tag: stone render reports it
+    if have == installed:
+        return []
+    word = "older" if have < installed else "newer"
+    hint = ("Run stone upgrade to see what changed." if have < installed
+            else "Install a newer stone, or set framework_version to the installed version.")
+    return [Finding(str(path.relative_to(root)), 1, CHECK,
+                    f"framework_version {value} is {word} than the installed stone {__version__}. "
+                    + hint, "warning")]
+
+
 def run(root: Path, framework: Path | None = None, links: str = "default") -> list[Finding]:
     """Run all framework checks. `framework` defaults to `<root>/framework`.
 
@@ -372,4 +517,5 @@ def run(root: Path, framework: Path | None = None, links: str = "default") -> li
     docs = link_scope(root, framework, links)
     return (check_profiles(framework) + check_links(root, docs) + check_neutral(framework)
             + check_config(root, framework) + check_components(root, framework)
+            + check_upgrades(root, framework) + check_version(root)
             + personas_check.run(root) + specs.check(root))

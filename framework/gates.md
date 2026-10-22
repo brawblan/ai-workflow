@@ -15,13 +15,15 @@ waiver with a reason.
 ## Rules
 
 1. G3 is always on for each profile that changes code on a branch that can merge. No waiver can
-   remove G3. Spike code never merges (check K16), so G3 does not apply to it.
+   remove G3. With `adoption: opt-in`, G3 runs only for a marked PR (D58). Spike code never merges (check K16), so G3 does not apply to it. With
+   `delivery: local`, G3 stays on, but a person runs it on a machine with `stone gate` (D56).
 2. G5 is always on for each destructive action, in each profile. See P9.
 3. A gate approver cannot be the role that made the work. An agent cannot approve G1, G2, G4, or G5.
    The only exception is the [solo developer](modes.md#solo-developer) rule for G4.
 4. A gate decision is recorded where the work is: a label, a PR review, or a CI status.
 5. Before a human passes G2 or G4, the agent states its confidence and the open risks (P11).
 6. The [mode](modes.md) does not change the gates. Only the profile and recorded waivers change them.
+7. A specialist review with `blocks: true` and a high finding stops G4 until a human decides (D59).
 
 ## Gate selection by profile
 

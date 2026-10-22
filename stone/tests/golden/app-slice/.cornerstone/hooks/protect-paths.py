@@ -16,6 +16,7 @@ import sys
 from pathlib import Path
 
 # The implementer must not change PROTECTED. The tester changes only TESTS. The planner only PLANS.
+# The shaper changes only the TICKET file, if the ticket is a file (#137).
 # The investigator changes only REPORTS, except on a SPIKE_PREFIX branch, which never merges (K16).
 # No branch lets the investigator change HARNESS: the hook, the checks, and the harness settings.
 PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "tests/"]
@@ -23,11 +24,12 @@ TESTS = ["tests/"]
 PLANS = ["docs/plans/"]
 REPORTS = ["docs/reports/"]
 HARNESS = [".claude/", ".cornerstone/"]
+TICKET = ""  # the ticket file of the shaper (tickets.path). "" if the ticket is not a file.
 SPIKE_PREFIX = "spike/"
-ROLES = ("implementer", "tester", "planner", "investigator", "reviewer")
+ROLES = ("implementer", "tester", "planner", "investigator", "reviewer", "shaper")
 
 
-# The path match of paths.tests and paths.checks. The hook and K6 get the same text (D56).
+# The path match of paths.tests and paths.checks. The hook and K6 get the same text (D62).
 # A value with no glob character uses the prefix rule: the path, or a path under that folder.
 # A glob starts at the repo root. `*`, `?`, and `[...]` match inside one folder level. A `**`
 # level matches any number of levels, also zero. A glob also covers each path under a folder
@@ -90,6 +92,11 @@ def covers(patterns: list[str], path: str) -> bool:
         elif any(regex.fullmatch("/".join(levels[:n])) for n in range(1, len(levels) + 1)):
             return True
     return False
+
+
+def is_ticket(path: str) -> bool:
+    pattern = re.escape(TICKET).replace(re.escape("{id}"), "[^/]+")
+    return re.fullmatch(pattern, path) is not None
 
 
 def find_role(event: dict) -> str:
@@ -159,6 +166,8 @@ def main() -> int:
     elif role == "investigator" and not covers(REPORTS, path) and not on_spike_branch(tree):
         reason = (f"is not a report path. The investigator writes only in {', '.join(REPORTS)}, "
                   f"or on a {SPIKE_PREFIX} branch")
+    elif role == "shaper" and TICKET and not is_ticket(path):
+        reason = f"is not the ticket file. The shaper changes only {TICKET}"
     elif role == "reviewer":
         reason = "cannot change. The reviewer changes no file"
     else:

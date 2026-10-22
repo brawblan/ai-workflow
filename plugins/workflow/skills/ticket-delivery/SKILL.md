@@ -10,6 +10,8 @@ that wrote the code cannot judge it (P2), so the tests and the review come from 
 
 ## 1. Find the delivery basis
 
+- If the config has `tickets.source: file`, the ticket is the file `tickets.path`, with the ticket ID
+  for `{id}`. Read it. Do not use the issue CLI.
 - Find the ticket in the conversation, the branch name, the linked issue, or the plan files.
 - Extract each acceptance criterion (COA). The COAs are the source of truth.
 - If there is no ticket, go to step 5. Do not invent criteria.
@@ -38,6 +40,16 @@ with the ticket and the diff. Use the repo's role file if it has one (for exampl
   `stone spec apply <id>`. Commit its output alone, with the trailers `Role: generator` and
   `Actor: agent`. Then run the checks again.
 
+### Specialist reviews
+
+If `.cornerstone/specialists.md` exists, run `stone specialists --base <integration branch> --ticket
+<id> --labels <ticket labels> --personas <ticket persona IDs>`.
+
+- Add a "Specialist findings" section to the PR evidence with its table.
+- For a specialist with the status `missing`, stop. Tell the user to start its `run` command in a new
+  session. Do not run the review in this session.
+- For a status `blocking`, tell the user that G4 cannot pass until a human decides.
+
 ## 4. Map the evidence to each COA
 
 Mark each COA with one status:
@@ -62,7 +74,8 @@ Follow the `dev-pr` skill. Fill its evidence sections from steps 2 to 5:
 
 - **Profile line:** if the repo has `.cornerstone/config.yaml`, put `Profile: <id>` at the top of
   the PR body. Check K7 uses it to pick the size limit. If `profiles` has one id, use it. If it
-  has more, use the profile in the ticket. If the ticket names none, ask the user.
+  has more, use the profile in the ticket. If the ticket names none, ask the user. If the config has `adoption: opt-in`, this line (or the
+  label `cornerstone`) is what turns the Cornerstone checks on for the PR.
 - **Waiver (P10):** if the diff is over the K7 limit, tell the user. The user splits the PR, or
   approves a `Waiver (P10)` section with the reason, the owner, and the end date.
 - **Evidence:** the COA table from step 4, or the summary from step 5.

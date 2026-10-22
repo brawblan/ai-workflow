@@ -6,7 +6,8 @@ import argparse
 import sys
 from pathlib import Path
 
-from stone import __version__, evals, evidence_check, framework_check, render, specs, writing_check
+from stone import (__version__, evals, evidence_check, framework_check, gate, render, specialists,
+                   specs, upgrade, writing_check)
 from stone.findings import report
 
 
@@ -27,6 +28,32 @@ def _parser() -> argparse.ArgumentParser:
     build.add_argument("--root", type=Path, default=Path("."), help="Target repo. Default: '.'.")
     build.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
     build.add_argument("--dry-run", action="store_true", help="Print the changes. Write nothing.")
+
+    local = commands.add_parser(
+        "gate", help="G3 on this machine (delivery: local): run K6, K7, and commands.all_checks.")
+    local.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    local.add_argument("--base", help="The base branch. Default: origin/<branches.integration "
+                                      "or branches.main>.")
+    local.add_argument("--body", type=Path,
+                       help="A file with the PR body, for the K7 profile line and waiver.")
+
+    special = commands.add_parser(
+        "specialists", help="Find the specialist reviews that a change needs, and their reports.")
+    special.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    special.add_argument("--base", help="The base branch. Default: origin/<branches.integration "
+                                        "or branches.main>.")
+    special.add_argument("--ticket", required=True, help="The ticket ID. It names the reports.")
+    special.add_argument("--labels", default="", help="The labels of the ticket, with commas.")
+    special.add_argument("--personas", default="", help="The persona IDs of the ticket, with commas.")
+
+    up = commands.add_parser(
+        "upgrade", help="Plan the move to a new Cornerstone version. --apply makes the move.")
+    up.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    up.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
+    up.add_argument("--to", metavar="VERSION",
+                    help="The target version. Default: the newest released version.")
+    up.add_argument("--apply", action="store_true",
+                    help="Set framework_version and render. Stops if a person must act first.")
 
     spec = commands.add_parser("spec", help="Work with the specs of the repo.")
     spec_commands = spec.add_subparsers(dest="spec_command", required=True)
@@ -90,6 +117,12 @@ def main(argv: list[str] | None = None) -> int:
         return 1 if blocking else 0
     if args.command == "render":
         return _render(args.root, args.framework, args.dry_run)
+    if args.command == "gate":
+        return _gate(args.root, args.base, args.body)
+    if args.command == "upgrade":
+        return _upgrade(args)
+    if args.command == "specialists":
+        return _specialists(args)
     if args.command == "spec":
         return _spec(args.root, args.spec_command, getattr(args, "plan", ""))
     if args.command == "check-evidence":
@@ -109,6 +142,50 @@ def main(argv: list[str] | None = None) -> int:
     errors = sum(1 for f in findings if f.severity == "error")
     print(f"K17: {errors} error(s), {len(findings) - errors} warning(s), mode {args.mode}.")
     return 1 if blocking else 0
+
+
+def _gate(root: Path, base: str | None, body: Path | None) -> int:
+    try:
+        steps, text = gate.run(root, base, body)
+    except gate.GateError as error:
+        print(f"stone gate: {error}")
+        return 2
+    print(text)
+    failed = [step.name for step in steps if not (step.passed or step.skipped)]
+    print(f"\nstone gate: {len(failed)} failed.", file=sys.stderr)
+    return 1 if failed else 0
+
+
+def _upgrade(args: argparse.Namespace) -> int:
+    framework = args.framework or args.root / "framework"
+    try:
+        if args.apply:
+            written = upgrade.apply(args.root, framework, args.to)
+            print(f"stone upgrade: applied. {len(written)} file(s) written or in drift. Commit the "
+                  "generated files alone, with the trailers 'Role: generator' and 'Actor: agent'.")
+            return 0
+        text, _, code = upgrade.plan(args.root, framework, args.to)
+    except (upgrade.UpgradeError, render.RenderError) as error:
+        print(f"stone upgrade: {error}")
+        return 2
+    print(text)
+    return code
+
+
+def _split(text: str) -> list[str]:
+    return [item.strip() for item in text.split(",") if item.strip()]
+
+
+def _specialists(args: argparse.Namespace) -> int:
+    try:
+        config = gate.load_config(args.root)
+        rows, text = specialists.run(args.root, config, args.base or gate.default_base(config),
+                                     _split(args.labels), _split(args.personas), args.ticket)
+    except (gate.GateError, specialists.SpecialistError) as error:
+        print(f"stone specialists: {error}")
+        return 2
+    print(text)
+    return 1 if any(row.status != "reviewed" for row in rows) else 0
 
 
 def _spec(root: Path, command: str, plan: str) -> int:

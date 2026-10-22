@@ -26,11 +26,13 @@ A later layer wins over an earlier layer, with these limits:
 ## Repo config (`.cornerstone/config.yaml`)
 
 ```yaml
-framework_version: 1.0.0           # tag of brawblan/ai-workflow. G3 installs stone from it.
+framework_version: 1.1.0           # tag of brawblan/ai-workflow. G3 installs stone from it. See versioning.md.
 harness: <harness-adapter-name>    # a file name in framework/adapters/
 model_profile: <model-family>      # a file in framework/adapters/<harness>/models/
 spec_tool: plain                   # plain, or a spec-tool adapter name
 profiles: [single-ticket, bug-triage, debugging]
+adoption: all                      # all (default), or opt-in: only marked PRs (see below)
+delivery: ci                       # ci (default), or local: no workflow files (see below)
 branches:
   integration: dev
   main: main
@@ -46,6 +48,10 @@ commands:                          # exactly as a person types them
   differential: <command>         # K12 step
   mutation: <command>             # K10 step. It gets BASE_REF and MUTATION_SCORE_MIN.
   all_checks: <command>
+commits:                           # optional. These are the defaults.
+  by: agent                        # agent: the role commits. human: the role gives a message.
+  trailers: commit                 # commit, notes (git notes), or none
+  message_format: docs/commit-format.md   # optional: a file in the repo, or a URL
 paths:
   source: [src/]
   tests: [tests/]                  # protected for the implementer
@@ -58,6 +64,20 @@ limits:
   function_lines: 60
   cyclomatic: 10
   mutation_score_changed_code: 0.6
+tickets:                           # optional. Where the ticket lives (#137)
+  source: github                   # github (default), or file
+  path: docs/tickets/{id}.txt      # with source: file. {id} is the ticket ID.
+specialists:                       # optional: reviews by a specialist agent or skill (#123)
+  - id: accessibility
+    run: <command>                # the command, agent, or skill that starts the review
+    when:                          # any one match starts it. No `when`: it always runs.
+      paths: ["**/components/**"]
+      personas_with: [screen reader]   # a word in the limits of a persona of the ticket
+      labels: [a11y]
+    stage: verify                  # after the tester, before the reviewer (the only stage)
+    blocks: false                  # true: a finding with severity high stops G4
+    owner: <github-username>       # optional. Default: owners.default
+    eval: evals/accessibility/     # optional, but P5 asks for an eval plan
 owners:
   default: <github-username>
   solo: false                      # true if one human fills all human roles (see modes.md)
@@ -85,7 +105,7 @@ Write each `branches.*` value as a quoted YAML string if it could parse as a num
 (`"1.10"`, `"yes"`). YAML reads `1.10` as `1.1` and `yes` as `True`, and K16 then compares the wrong
 name. `stone render` and `stone check` fail on a `branches.*` value that is not a string (D34).
 
-Each value in `paths.tests` and `paths.checks` is a folder, a file, or a glob (D56). A folder or
+Each value in `paths.tests` and `paths.checks` is a folder, a file, or a glob (D62). A folder or
 a file protects that path and each path under it. A value with `*`, `?`, or `[` is a glob. It
 starts at the repo root:
 
@@ -139,8 +159,89 @@ The K10 step needs `limits.mutation_score_changed_code`. If it has no value, ren
 A failing command fails the job, and G3 blocks the merge (D52). The steps have no `continue-on-error`.
 Make sure that each command passes before you add it to `commands`.
 
-CI does not know the profile of a PR. So each step runs on each PR in the repo. For example, a repo
+With `adoption: all`, CI does not know the profile of a PR. So each step runs on each PR in the repo. For example, a repo
 with single-ticket and refactor-migration runs K10 on each single-ticket PR too.
+
+### Opt-in adoption (`adoption: opt-in`)
+
+Use it when only some people or some tickets use Cornerstone ([D58](README.md#decisions)).
+
+- A PR is a Cornerstone PR if its body has a line that starts with `Profile: <id>`, or it has the
+  label `cornerstone`.
+- The G3 workflow always starts. A first step finds the marker. Each Cornerstone step (K6, K7,
+  K14, K15, the repo commands, and `commands.all_checks`) runs only for a marked PR. The workflow
+  also runs again when a PR is edited, labeled, or unlabeled. The repo's own CI is in other
+  workflows, so it still runs for each PR.
+- K6 does not count a commit with `Actor: human` and no `Role:` as an implementer commit. A
+  commit with no trailer still counts as an implementer commit.
+- The line must name a profile of this repo config, and nothing else, for example
+  `Profile: single-ticket`. A line such as `Profile: x` or `Profile: single-ticket-2` is not a marker.
+- The role files of the implementer and the tester tell the role to add the marker to a PR.
+- Anyone can remove the marker, and an unmarked PR gets no check. Turn on branch protection with a
+  required human review for the base branch, so that review controls the PRs that G3 skips.
+
+### Tickets as files (`tickets`)
+
+With `tickets.source: file`, the ticket is a file, not a GitHub issue ([D60](README.md#decisions)).
+This fits a tracker such as Jira, and a local-only setup.
+
+- `tickets.path` has `{id}` once, for the ticket ID. It is a path in the repo, with no glob and no
+  `..`. `stone check` fails if it overlaps `paths.tests` or `paths.checks`.
+- The shaper gets the tools `Write` and `Edit`. The hook lets the shaper change only the files that
+  match `tickets.path`. A Bash write is not blocked, as for the other roles.
+- The implementer, tester, and reviewer files, and `ticket-delivery`, read the ticket from that
+  path. They do not use the issue CLI.
+- The shaper writes the Definition of Ready fields in the section `## Definition of Ready` of the
+  file, one `Field: value` line for each field. A G1 check ([#115](https://github.com/brawblan/ai-workflow/issues/115))
+  can read this form.
+
+### Commits (`commits`)
+
+The implementer and the tester read this section (#121, [D57](README.md#decisions)).
+
+| Key | Value | Effect |
+| --- | --- | --- |
+| `by` | `agent` (default) | The role commits. |
+| `by` | `human` | The role does not commit. It ends with a proposed commit message. |
+| `trailers` | `commit` (default) | `Role:` and `Actor:` go in the commit message. |
+| `trailers` | `notes` | The role writes `Role:` and `Actor:` to the git notes ref `refs/notes/cornerstone`. Check K6 reads the note if the commit has no trailer. Git does not push notes by default, so the history stays clean. To check in CI, push the ref with `git push origin refs/notes/cornerstone`. |
+| `trailers` | `none` | No role record. `stone render` warns, and does not render K6. `stone gate` shows K6 as skipped. |
+| `message_format` | a path or a URL | The roles follow it. `stone check` fails if a path is not a file in the repo. |
+
+Git can lose a note when a person rebases. Run `git config notes.rewriteRef refs/notes/cornerstone`
+to keep notes through a rebase or an amend.
+
+### Specialist reviews (`specialists`)
+
+A repo can connect its own review agents or skills to the roles ([D59](README.md#decisions)).
+
+- `stone render` writes `.cornerstone/specialists.md`: each specialist, its trigger, and the order.
+  The reviewer role file tells the reviewer to read the specialist findings as an input.
+- Each specialist gets a manifest entry with `source: repo`, an owner, and a review date (P5).
+  `stone render` warns if a specialist has no `eval` plan.
+- `stone specialists --base BASE --ticket ID [--labels a,b] [--personas x,y]` lists the specialists
+  that match the change, in config order. A trigger matches if one `when` condition matches:
+  - `paths`: a glob (`*` does not cross a folder, `**` does) on the files changed since BASE.
+  - `labels`: a label of the ticket.
+  - `personas_with`: a word in the `limits` of a persona that `--personas` names.
+- A specialist writes its findings to `<paths.reports>/<ticket-id>.<id>.md`. Each finding has a line
+  such as `Severity: high`. The command reports a specialist with no file as `missing`. It reports
+  a `blocks: true` specialist with a high finding as `blocking`. It exits with 1 if one is not
+  `reviewed`.
+- The command cannot start a specialist. The reviewer has no tool to start another agent (P2). A
+  person, or `ticket-delivery` with the user, starts each one in a new session.
+
+### Local delivery (`delivery: local`)
+
+Use it when one developer runs the roles in a shared repo before the team agrees to the workflow.
+`stone render` then writes no file in `.github/workflows/`. It prints a warning that G3 is local
+only, and the lines to add to `.git/info/exclude`. It writes nothing outside the rendered set.
+`stone gate` runs K6, K7, and `commands.all_checks` on the machine, and prints a table for the
+Evidence section of the PR. See [D56](README.md#decisions).
+
+`stone render` and `stone check` fail if `paths.plans` or `paths.reports` overlaps the harness
+folder, `.cornerstone/`, `paths.tests`, or `paths.checks`. The hook blocks a role that writes there. Use
+folders such as `docs/plans/` and `docs/reports/`, and ignore them in git.
 
 ## Profile override (`.cornerstone/profiles/<profile>.yaml`)
 

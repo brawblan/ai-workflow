@@ -79,6 +79,11 @@ for P2, because the lead session starts the subagent and gives it its prompt. Th
 
 ## Commit with trailers
 
+The repo config can change this. With `commits.by: human`, the implementer and the tester do not
+commit. They end with a proposed message, and you commit it. With `commits.trailers: notes`, the
+role goes in a git note, not in the message. With `commits.trailers: none`, nothing records the
+role, and there is no K6. See [Commits](../../framework/customization.md#commits-commits).
+
 Check K6 reads two trailers on each commit. The agent roles add them. Add them to your own commits
 too:
 
@@ -95,10 +100,19 @@ git commit -m "fix(auth): renew the token before it expires" \
 A commit with no `Role:` trailer counts as an implementer commit. K6 fails if an implementer commit
 changes a test or a check.
 
+## A ticket from another tracker
+
+The roles need the ticket text, not a GitHub issue. Save the ticket in a file, for example
+`.claude/prompts/PROJ-123.txt`. Set `tickets.source: file` and `tickets.path:
+docs/tickets/{id}.txt` in `.cornerstone/config.yaml`, and render again. The shaper then writes the
+Definition of Ready fields into the file, in the section `## Definition of Ready`. The other roles
+read the ticket from the same path. See [Tickets as files](../../framework/customization.md#tickets-as-files-tickets).
+
 ## Run the checks
 
 Run `commands.all_checks` from `.cornerstone/config.yaml` before you open the PR. CI runs the same
-checks again (G3). The CI result is the evidence, not a statement from an agent (P1).
+checks again (G3). The CI result is the evidence, not a statement from an agent (P1). With `delivery: local`, there
+is no CI job. Run `stone gate` and put its output in the PR.
 
 ## Open the PR
 

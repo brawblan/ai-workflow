@@ -1,4 +1,4 @@
-framework_version: 0.5.0
+framework_version: 1.1.0
 components:
 - id: check.k6
   kind: check
@@ -14,7 +14,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .cornerstone/checks/protected_paths.py
-  hash: 139b43c145966417afa77ffb9bb78a5f55a64b2bbcbc852561ff802fc23cb3fa
+  hash: 7f6e2b07df4a733b307f499662890f1138bf272bcf6998f4a620d3ceed461228
 - id: check.k7
   kind: check
   purpose: K7. Fail if the diff is over the size limit of the PR profile and has no
@@ -44,7 +44,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .github/workflows/cornerstone-checks.yml
-  hash: 1e79768beecaaed2dc6b120b122ac578efa35def41ef637e6f16c637d91b29e1
+  hash: 9bae7f5df752ddabffcc4b73a7f056ec37263a8665ee5f0f35b0c2b57298cea1
 - id: hook.protect-paths
   kind: hook
   purpose: Block an edit to a path that the current role must not change.
@@ -60,7 +60,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .cornerstone/hooks/protect-paths.py
-  hash: 7b3be04404effd9e2884b85d160e713f85806a6dbb7e2e30ad107248c757eda5
+  hash: 4e5cd3e452d24eb3213d5e9f01399ba603003f32bb89bec0ebc8185da8b91bed
 - id: hook.settings
   kind: hook
   purpose: Register the protected-path hook in the harness settings. Other keys stay

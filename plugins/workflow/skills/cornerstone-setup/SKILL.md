@@ -53,6 +53,23 @@ and `paths.checks`. Look for these first.
 - If the user does not know an answer, write `TODO(<owner>): <question>` as the value. Continue.
 - Do not guess a command, a path, or an owner.
 
+- Ask: "Will the team adopt this now, or only you?" If only the user, set `delivery: local`.
+  Otherwise leave `delivery` out. Keep `paths.plans` and `paths.reports` out of `.claude/`,
+  `.cornerstone/`, and the test and check paths.
+
+- Ask: "Do the roles commit, or do you? Does the repo have a commit message format?" Set
+  `commits.by` and `commits.message_format`. If trailers must stay out of the history, set
+  `commits.trailers` to `notes` or `none`, and tell the user what K6 loses.
+
+- Ask: "Will each contributor use Cornerstone, or only some PRs?" If only some, set
+  `adoption: opt-in`. Tell the user that an unmarked PR gets no checks.
+
+- Ask: "Is the ticket a GitHub issue, or a file (for example from Jira)?" If a file, set
+  `tickets.source: file` and `tickets.path` with `{id}`, for example `docs/tickets/{id}.txt`.
+- Ask: "Does the repo have specialist review agents or skills, for example accessibility or
+  security?" If yes, add them to `specialists`, with the trigger and `blocks`. Ask for an `eval`
+  plan for each one.
+
 ## 4. Write the config
 
 1. Write `.cornerstone/config.yaml` with the fields in `customization.md`, in the same order.
@@ -68,6 +85,9 @@ stone render --framework <clone>/framework --dry-run
 stone render --framework <clone>/framework
 stone check --framework <clone>/framework
 ```
+
+If `delivery` is `local`, show the ignore lines that `render` prints. Tell the user to add them to
+`.git/info/exclude`, and to run `stone gate` before the PR.
 
 | Result | Action |
 | --- | --- |
@@ -88,6 +108,17 @@ Report:
    status check (G3), and require a PR review (G4).
 
 Offer to open a PR with the `dev-pr` skill.
+
+## Upgrade an existing setup
+
+If `.cornerstone/config.yaml` exists and the user asks to upgrade, do not run steps 1 to 3 again.
+
+1. Run `stone upgrade --framework <clone>/framework`. Show the plan.
+2. For each action under "need a person", ask the user, and change the config. Ask only for the facts
+   that a new key needs. A new optional key needs no answer.
+3. Run `stone upgrade --framework <clone>/framework --apply`. Do the manual steps of the plan.
+4. Run `stone check`. Commit the generated files alone, with the trailers `Role: generator` and
+   `Actor: agent`.
 
 ## Eval
 

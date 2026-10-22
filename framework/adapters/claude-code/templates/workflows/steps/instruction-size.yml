@@ -1,3 +1,4 @@
       # K15 blocks since D52. It fails the job if the instruction file is over the line limit.
       - name: K15 instruction size
+$marker_if
         run: python3 .cornerstone/checks/instruction_size.py --mode block --format github

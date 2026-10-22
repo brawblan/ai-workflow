@@ -1,4 +1,4 @@
-# The path match of paths.tests and paths.checks. The hook and K6 get the same text (D56).
+# The path match of paths.tests and paths.checks. The hook and K6 get the same text (D62).
 # A value with no glob character uses the prefix rule: the path, or a path under that folder.
 # A glob starts at the repo root. `*`, `?`, and `[...]` match inside one folder level. A `**`
 # level matches any number of levels, also zero. A glob also covers each path under a folder

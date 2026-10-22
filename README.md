@@ -3,7 +3,7 @@
 **Cornerstone: a framework for agent-assisted software delivery, where checks decide that work is
 done.**
 
-Version 1.0.0. All 10 profiles are supported, and each generated check blocks.
+Version 1.1.0. All 10 profiles are supported, and each generated check blocks.
 
 This repo holds Cornerstone, its `stone` CLI, the `workflow` plugin skills, my personal agent
 rules, and tips. Read the docs at [brawblan.github.io/ai-workflow](https://brawblan.github.io/ai-workflow/).

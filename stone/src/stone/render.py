@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from stone import framework_check, results, triggers
+from stone import framework_check, results, specialists, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -29,10 +29,43 @@ PLACEHOLDER_HINT = {"tests_json": "paths.tests and paths.checks",
                     "branch_integration_json": "branches.integration"}
 MODEL_VALUES = {"instruction_file_max_lines"}  # template values from `defaults` in the model profile
 FOLDER_DEFAULTS = {"plans": "docs/plans/", "specs": "docs/specs/", "reports": "docs/reports/"}
+COMMIT_DEFAULTS = {"by": "agent", "trailers": "commit"}
+MARKER_IF = "        if: steps.marker.outputs.cornerstone == 'true'"
+PR_TYPES = "    types: [opened, synchronize, reopened, edited, labeled, unlabeled]"
+MARKER_STEP = r"""      # Opt-in adoption (#122): only a PR with a "Profile: <id>" line or the label cornerstone
+      # gets the Cornerstone checks. The ID must be a profile of this repo. The repo's own CI is in
+      # other workflows.
+      - name: Find the Cornerstone marker
+        id: marker
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          if printf '%s\n' "${PR_BODY}" | tr -d '\r' | grep -Eq '^Profile: *(PROFILE_IDS)[[:space:]]*$' ||
+            printf '%s\n' "${PR_LABELS}" | grep -Fq '"cornerstone"'; then
+            echo "cornerstone=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "cornerstone=false" >> "${GITHUB_OUTPUT}"
+            echo "::notice::No Cornerstone marker on this PR, so the Cornerstone checks are skipped."
+          fi
+"""
+SHAPER_FORM = """The section has this form, with one line for each field of the Definition of Ready:
+
+```
+## Definition of Ready
+Problem: <the problem or goal>
+Acceptance criteria:
+- <a testable criterion>
+Non-goals: <what the change does not do>
+Test oracle: <how a person knows that it works>
+Personas: <IDs>, or none
+```
+
+Add `Reproduction:` for a bug and `Time box:` for a spike or an audit, if the profile needs them."""
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 DEFAULT_PR_LINES = 600  # D4, customization.md
-BLOCKS = ["check_steps"]  # placeholders that hold whole lines; render removes an empty one (D29)
+BLOCKS = ["check_steps", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
 
 class RenderError(Exception):
@@ -187,6 +220,22 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     for key, value in (config.get("limits") or {}).items():
         if value is not None and str(value).strip():  # an empty limit has no value
             values[f"limit_{key}"] = str(value)
+    opt_in = config.get("adoption", "all") == "opt-in"
+    no_k6 = commit_settings(config)["trailers"] == "none"
+    values.update(ticket_values(config))
+    values.update({
+        "adoption_json": json.dumps("opt-in" if opt_in else "all"),
+        "marker_if": MARKER_IF if opt_in else "",
+        "marker_step": (MARKER_STEP.replace("PROFILE_IDS", "|".join(config.get("profiles") or []))
+                        if opt_in else ""),
+        "pr_types": PR_TYPES if opt_in else "",
+        "marker_rule": (" If you open or edit a PR, add the line `Profile: <id>` to the PR body, "
+                        "or the label `cornerstone`. The G3 workflow skips a PR with neither."
+                        if opt_in else ""),
+        "specialists_input": (" Also read the specialist findings that `.cornerstone/specialists.md` "
+                              "lists." if specialists.listed(config) else ""),
+        "k6_tail": " The paths are:" if no_k6 else " Check K6 fails the commit in CI:",
+        "k6_checks_commit": "" if no_k6 else " Check K6 checks the commit."})
     values["paths_plans"] = one_folder(_get(config, "paths.plans"))
     values["paths_specs"] = one_folder(_get(config, "paths.specs"), "specs")
     values["paths_reports"] = one_folder(_get(config, "paths.reports"), "reports")
@@ -200,6 +249,55 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
         protected = tests + checks + ALWAYS_PROTECTED + [values["paths_specs"]]
         values["protected_json"] = json.dumps(sorted(set(protected)))
     return {key: value for key, value in values.items() if "TODO(" not in value}
+
+
+def ticket_values(config: dict[str, Any]) -> dict[str, str]:
+    """Return the ticket source for the role files and the hook (#137)."""
+    section = config.get("tickets")
+    section = section if isinstance(section, dict) else {}
+    if section.get("source") != "file" or not section.get("path"):
+        return {"ticket_location": "", "tickets_json": json.dumps(""),
+                "shaper_tools": "Read, Grep, Glob, Bash",
+                "shaper_write": "Write the answers into the ticket fields. Do not invent a requirement.",
+                "shaper_end": "Use `Bash` only to read the ticket with the issue CLI. "
+                              "Do not change files in the repo."}
+    path = str(section["path"])
+    return {"ticket_location": f" The ticket is the file `{path}`. `{{id}}` is the ticket ID.",
+            "tickets_json": json.dumps(path),
+            "shaper_tools": "Read, Grep, Glob, Bash, Write, Edit",
+            "shaper_write": "Write the answers into the Definition of Ready section of the ticket "
+                            "file. Do not invent a requirement.",
+            "shaper_end": "Change only the ticket file. A hook blocks the file tools on other "
+                          "paths. Use `Bash` only to read files.\n\n" + SHAPER_FORM}
+
+
+def commit_settings(config: dict[str, Any]) -> dict[str, str]:
+    section = config.get("commits")
+    section = section if isinstance(section, dict) else {}
+    return {**COMMIT_DEFAULTS, **{key: str(value) for key, value in section.items() if value}}
+
+
+def commit_values(config: dict[str, Any], role: str) -> dict[str, str]:
+    """Return the commit step of a role (#121). The default is the text from before the config."""
+    settings = commit_settings(config)
+    by, trailers = settings["by"], settings["trailers"]
+    actor = "agent" if by == "agent" else "human"
+    note = f'`git notes --ref=cornerstone add -m "Role: {role}" -m "Actor: {actor}" HEAD`'
+    if by == "agent":
+        text = {"commit": f"Commit with the trailers `Role: {role}` and `Actor: {actor}`.",
+                "notes": f"Commit with no trailers. Then record the role with {note}.",
+                "none": "Commit with no trailers and no git notes."}[trailers]
+    else:
+        text = {"commit": "Do not commit. End with a proposed commit message that has the "
+                          f"trailers `Role: {role}` and `Actor: {actor}`.",
+                "notes": "Do not commit. End with a proposed commit message. Also give "
+                         f"the command that records the role, for the human to run: {note}.",
+                "none": "Do not commit. End with a proposed commit message with no trailers."}[trailers]
+    if settings.get("message_format"):
+        text += f" Follow the commit message format in `{settings['message_format']}`."
+    return {"commit_step": text,
+            "commit_failing_test": ("Commit the\nfailing test." if by == "agent"  # the break keeps the line wrap
+                                    else "Keep the failing test.")}
 
 
 def build_components(framework: Path, config: dict[str, Any]) -> list[Component]:
@@ -223,6 +321,14 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     model_values = {name: str(defaults[name]) for name in MODEL_VALUES
                     if defaults.get(name) not in (None, "")}
 
+    # With `commits.trailers: none`, K6 cannot read a role, so it is not rendered (#121).
+    off = ({entry["id"] for entry in registry if entry.get("needs_trailers")}
+           if commit_settings(config)["trailers"] == "none" else set())
+    if off:
+        print("warning: commits.trailers is none. K6 cannot run, so it is not rendered. "
+              "Nothing checks that an implementer commit leaves the protected paths.",
+              file=sys.stderr)
+
     # A component with `ci_step` adds a step to the G3 workflow, only if it is rendered.
     steps: dict[str, str | None] = {step_name(entry["id"]): None
                                     for entry in registry if entry.get("ci_step")}
@@ -230,18 +336,23 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     base_values = {**template_values(config, ""), **model_values,
                    "size_limits_json": limits_json}
     for entry in registry:
-        if entry.get("ci_step") and needed(entry, profiles):
+        if entry.get("ci_step") and needed(entry, profiles) and entry["id"] not in off:
             steps[step_name(entry["id"])] = substitute(harness, entry["ci_step"], base_values,
                                                        steps, config)
 
+    local = config.get("delivery", "ci") == "local"
     components = []
     for entry in registry:
-        if "trigger" in entry or not needed(entry, profiles):
+        if "trigger" in entry or not needed(entry, profiles) or entry["id"] in off:
             continue
+        if local and entry["kind"] == "ci-job":
+            continue  # delivery: local writes no workflow file
         model = defaults["role_models"].get(entry.get("role", ""), "")
         values = {**template_values(config, model), **model_values,
                   "size_limits_json": limits_json,
                   **{name: step for name, step in steps.items() if step is not None}}
+        values.update(commit_values(config, entry.get("role", "")))
+        values["trailers_json"] = json.dumps(commit_settings(config)["trailers"])
         for block in BLOCKS:
             values.setdefault(block, "")
         if entry.get("steps"):
@@ -251,8 +362,12 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
+    if specialists.listed(config):
+        components.append(Component(
+            "doc.specialists", "doc", "Specialist reviews: the list, the triggers, and the order.",
+            ["P2"], "", {specialists.DOC: specialists.document(config)}))
     try:
-        components.extend(trigger_components(framework, harness, registry, profiles, config,
+        components.extend([] if local else trigger_components(framework, harness, registry, profiles, config,
                                              defaults["role_models"]))
     except triggers.TriggerError as error:
         raise RenderError(str(error)) from None
@@ -452,7 +567,16 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
 
     tested = results.result_models(root)
     result = Result()
-    entries = [entry for entry in manifest.get("components", []) if entry.get("source") == "repo"]
+    entries = [entry for entry in manifest.get("components", [])
+               if entry.get("source") == "repo"
+               and not entry["id"].startswith(specialists.ID_PREFIX)]  # from the config, below
+    for spec in specialists.listed(config):
+        entry_id = specialists.ID_PREFIX + spec["id"]
+        if not spec.get("eval"):
+            print(f"warning: {entry_id} has no eval plan (P5). Set 'eval' in its config.",
+                  file=sys.stderr)
+        entries.append(specialists.manifest_entry(spec, old_entries.get(entry_id), config, today,
+                                                  add_months(today, REVIEW_MONTHS)))
     to_write: dict[str, str] = {}
     for component in components:
         old = old_entries.get(component.id)
@@ -495,9 +619,27 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
                          ("drift", result.drift)):
         for path in paths:
             print(f"{label} {path}", file=sys.stderr)
+    if config.get("delivery", "ci") == "local":
+        print("warning: delivery is local. No workflow file was written, so G3 runs on this "
+              "machine only. Run 'stone gate' and paste its output in the PR.", file=sys.stderr)
+        print("Add these lines to .git/info/exclude:", file=sys.stderr)
+        for pattern in ignore_patterns(config, components):
+            print(f"  {pattern}", file=sys.stderr)
     if not dry_run:
         _write(root, to_write)
     return result
+
+
+def ignore_patterns(config: dict[str, Any], components: list[Component]) -> list[str]:
+    """Return the git ignore patterns for the rendered files and the plan and report folders."""
+    patterns = {"AGENTS.md", "constitution/", str(MANIFEST)}  # project-setup writes the first two
+    for component in components:
+        for path in component.files:
+            top = path.split("/")[0]
+            patterns.add(top + "/" if "/" in path else path)
+    for key in ("plans", "specs", "reports"):
+        patterns.add(one_folder(_get(config, f"paths.{key}"), key))
+    return sorted(patterns)
 
 
 def _write(root: Path, files: dict[str, str]) -> None:

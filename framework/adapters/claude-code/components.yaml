@@ -89,6 +89,8 @@ components:
     purpose: K6. Fail if an implementer commit changes a protected path.
     principle: [P2, P6]
     when: {check: K6}
+    needs_trailers: true                     # not rendered if commits.trailers is none
+    ci_step: workflows/steps/k6.yml
     template: checks/protected_paths.py
     parts: {path_match: parts/path_match.py}
     target: .cornerstone/checks/protected_paths.py
