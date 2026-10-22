@@ -88,16 +88,23 @@ def git(cwd: Path, *args: str) -> str:
     return result.stdout
 
 
+# Stop git background maintenance (auto gc). It creates and removes .git/objects/maintenance.lock,
+# and a copytree that runs at the same time fails on the missing file.
+NO_MAINTENANCE = ("-c", "gc.auto=0", "-c", "maintenance.auto=false")
+COPY_IGNORE = shutil.ignore_patterns("*.lock")
+
+
 def commit(cwd: Path, message: str) -> None:
     git(cwd, "add", "-A")
-    git(cwd, "commit", "-q", "--allow-empty", "-m", message)
+    git(cwd, *NO_MAINTENANCE, "commit", "-q", "--allow-empty", "-m", message)
 
 
 @functools.cache
 def base_repo(scenario_id: str) -> Path:
     """The fixture of the scenario as a git repo, then its change as a second commit.
 
-    Made once for each scenario; each workspace copies it.
+    Made once for each scenario; each workspace copies it. The repo config turns off auto gc and
+    auto maintenance, so the copies inherit it.
     """
     scenario = SCENARIOS[scenario_id]
     base = Path(tempfile.mkdtemp(prefix=f"tester-base-{scenario_id}-"))
@@ -105,6 +112,8 @@ def base_repo(scenario_id: str) -> Path:
     repo = base / scenario_id
     shutil.copytree(EVAL / scenario["fixture"], repo)
     git(repo, "init", "-q", "-b", "main")
+    git(repo, "config", "gc.auto", "0")
+    git(repo, "config", "maintenance.auto", "false")
     commit(repo, "chore: fixture base")
     git(repo, "apply", str(EVAL / scenario["change"]))
     commit(repo, "feat: the change under test")
@@ -129,7 +138,7 @@ class GraderCase(unittest.TestCase):
                   committed: bool = True) -> Path:
         """The fixture and the change of the scenario, then `files` (path: text)."""
         ws = self.tmp / scenario_id
-        shutil.copytree(base_repo(scenario_id), ws, symlinks=True)
+        shutil.copytree(base_repo(scenario_id), ws, symlinks=True, ignore=COPY_IGNORE)
         for rel, text in (files or {}).items():
             (ws / rel).parent.mkdir(parents=True, exist_ok=True)
             (ws / rel).write_text(text, encoding="utf-8")
@@ -164,6 +173,32 @@ class GraderCase(unittest.TestCase):
         passed, detail = self.grade(name, ws, args, env)
         self.assertEqual(passed, expected, detail)
         return detail
+
+
+class BaseRepoCacheTest(GraderCase):
+    """Regression: background git maintenance must not break the workspace copy."""
+
+    def test_base_repo_config_turns_off_auto_gc_and_maintenance(self) -> None:
+        for scenario_id in SCENARIOS:
+            with self.subTest(scenario_id):
+                repo = base_repo(scenario_id)
+                self.assertEqual(git(repo, "config", "--local", "gc.auto").strip(), "0")
+                self.assertEqual(git(repo, "config", "--local", "maintenance.auto").strip(),
+                                 "false")
+
+    def test_workspace_inherits_the_config(self) -> None:
+        ws = self.workspace("T1")
+        self.assertEqual(git(ws, "config", "--local", "gc.auto").strip(), "0")
+        self.assertEqual(git(ws, "config", "--local", "maintenance.auto").strip(), "false")
+
+    def test_workspace_copy_skips_a_lock_file_of_the_base_repo(self) -> None:
+        lock = base_repo("T1") / ".git" / "objects" / "maintenance.lock"
+        lock.write_text("", encoding="utf-8")
+        self.addCleanup(lock.unlink, missing_ok=True)
+        ws = self.with_tests("T1", SLUG_STRONG)
+        self.assertFalse((ws / ".git" / "objects" / "maintenance.lock").exists())
+        self.assertEqual(list(ws.rglob("*.lock")), [])
+        self.assertEqual(git(ws, "status", "--porcelain"), "")
 
 
 class KillsMutantsTest(GraderCase):
