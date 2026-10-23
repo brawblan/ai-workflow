@@ -1,9 +1,8 @@
-# The docs site: build it on each PR that changes the docs, and deploy it to GitHub Pages only on a release tag.
+# The docs site: build it on each PR (the check `build` is required), and deploy it to GitHub Pages only on a release tag.
 name: pages
 
 on:
   pull_request:
-    paths: [docs/**, evals/**, framework/**, stone/README.md, website/**, mkdocs.yml, .github/workflows/pages.yml]
   push:
     tags: ['v*']
 
