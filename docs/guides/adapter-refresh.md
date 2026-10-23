@@ -126,9 +126,9 @@ If a component has no eval, keep the idiom as `proposed` and open a ticket to wr
 3. Run `/workflow:ticket-delivery` to open the PR. The PR body needs the line
    `Profile: adapter-refresh`, the guidance diff, the eval table, and the decision log. K7 then uses
    the limit of this profile: 600 changed lines. A human approves the PR (G4).
-4. After the merge into `dev`, release a new framework version: a release PR from `dev` into `main`,
-   then the tag (see [Versioning](../../framework/versioning.md#release-checklist)). Each target repo
-   changes `framework_version` and runs `stone render`.
+4. After the merge into `dev`, release a new framework version. Open a release PR from `dev` into
+   `main`. Then tag the merge commit. See [Versioning](../../framework/versioning.md#release-checklist).
+   Each target repo changes `framework_version` and runs `stone render`.
 
 | Failure | Action |
 | --- | --- |
