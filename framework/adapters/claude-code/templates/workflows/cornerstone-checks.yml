@@ -57,5 +57,6 @@ $marker_if
 
       - name: All checks
 $marker_if
+$all_checks_env
         run: $command_all_checks
 $check_steps

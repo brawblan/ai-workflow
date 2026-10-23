@@ -64,8 +64,10 @@ limits:
   function_lines: 60
   cyclomatic: 10
   mutation_score_changed_code: 0.6
-ci:                                # optional. Steps before `Install` in the G3 job (#162)
-  setup:
+ci:                                # optional. Env of the All checks step in the G3 job (#163)
+  env: {NAME: value}               # plain values. A name matches ^[A-Z_][A-Z0-9_]*$.
+  secrets: [STRIPE_SECRET_KEY]     # names of repo secrets. The step gets ${{ secrets.NAME }}.
+  setup:                           # steps before `Install` (#162)
     node: "22"                     # adds actions/setup-node with this version and cache: npm
     steps:                         # then these steps, in order. Each `uses` needs a commit SHA.
       - {uses: "owner/repo@<40-character sha>", with: {key: value}}
@@ -220,7 +222,7 @@ to keep notes through a rebase or an amend.
 ### CI setup (`ci.setup`)
 
 The G3 job installs with `commands.install` on the default tools of the runner image (#162,
-[D72](README.md#decisions)). `ci.setup` adds steps before `Install`. Without `ci.setup`, the
+[D73](README.md#decisions)). `ci.setup` adds steps before `Install`. Without `ci.setup`, the
 workflow does not change.
 
 | Key | Value | Effect |

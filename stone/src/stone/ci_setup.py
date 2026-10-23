@@ -18,8 +18,9 @@ def problems(config: dict[str, Any]) -> list[str]:
     if section is None:
         return []
     if not isinstance(section, dict):
-        return ["'ci' must be a map. Its only key is setup."]
-    found = [f"'ci.{key}' is not a key. Use setup." for key in sorted(set(section) - {"setup"})]
+        return ["'ci' must be a map. Its keys are env, secrets, and setup."]
+    found = [f"'ci.{key}' is not a key. Use env, secrets, or setup."
+             for key in sorted(set(section) - {"setup", "env", "secrets"})]
     setup = section.get("setup")
     if setup is None:
         return found

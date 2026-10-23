@@ -227,10 +227,20 @@ A spike branch cannot change or remove it. The job checks out no code and has `p
 (dossier F11). It gets the branch names only through `env`. Add the `k16` job as a required status
 check on the main branch and on the integration branch (D33).
 
-## G3 setup steps (`ci.setup`)
+### Env and secrets of the All checks step
+
+`ci.env` and `ci.secrets` in the repo config add an `env:` block to the `All checks` step of the G3
+job (#163). No other step and no role job gets it. A secret appears only as `${{ secrets.NAME }}`.
+`stone check` fails a name that does not match `^[A-Z_][A-Z0-9_]*$`, a name in both keys, and a
+`ci.env` value that has `${{`.
+
+GitHub does not pass secrets to a PR from a fork. The variable is then empty. A test that needs a
+secret must still skip when the variable is empty.
+
+### G3 setup steps (`ci.setup`)
 
 The G3 workflow `cornerstone-checks.yml` renders the steps of `ci.setup` before the `Install` step
-(D72). The key `node` renders `actions/setup-node` v7.1.0, pinned to the commit
+(D73). The key `node` renders `actions/setup-node` v7.1.0, pinned to the commit
 `949feb2413d6458794dcd2491c4babbbce0c15c1`, with `cache: npm`. A `uses` item of `ci.setup.steps` must
 be pinned to a commit SHA of 40 characters. With `adoption: opt-in`, each step has the marker `if`.
 Update the pin with a new tag SHA when you raise the action version.
