@@ -4,21 +4,21 @@ versions:
   - version: 1.3.0
     kind: minor
     released: null
-    summary: Optional keys under ci. ci.env and ci.secrets add an env block to the All checks step of the G3 workflow. ci.setup adds steps before Install. ci.branches limits K6, K7, and K14 to PRs into the listed base branches, so a promotion PR runs only the other checks.
+    summary: Optional keys under ci. ci.env and ci.secrets add an env block to the All checks step of the G3 workflow. ci.setup adds steps before Install. ci.branches limits K6, K7, K14, and K20 to PRs into the listed base branches, so a promotion PR runs only the other checks.
     config:
       added:
         - {key: ci.env, default: none, note: "A map of NAME: value for the All checks step. Plain values only (D72)."}
         - {key: ci.secrets, default: none, note: "A list of repo secret names. The All checks step gets ${{ secrets.NAME }} (D72)."}
         - {key: ci.setup, default: none, note: "node adds a pinned actions/setup-node step with cache npm. steps adds uses/with/run items before Install (D73)."}
-        - {key: ci.branches, default: null, note: "A list of base branches. K6, K7, and K14 run only on a PR into one of them. It must list branches.integration (D74)."}
+        - {key: ci.branches, default: null, note: "A list of base branches. K6, K7, K14, and K20 run only on a PR into one of them. It must list branches.integration (D74)."}
       renamed: []
       removed: []
     files:
-      - {path: .github/workflows/cornerstone-checks.yml, change: changed, note: "The All checks step has an env block, only if ci.env or ci.secrets is set (D72). Setup steps before Install, only if ci.setup is set (D73). The K6, K7, and K14 steps have an if on the base branch, only with ci.branches (D74)."}
+      - {path: .github/workflows/cornerstone-checks.yml, change: changed, note: "The All checks step has an env block, only if ci.env or ci.secrets is set (D72). Setup steps before Install, only if ci.setup is set (D73). The K6, K7, K14, and K20 steps have an if on the base branch, only with ci.branches (D74)."}
     steps:
       - "To pass a secret to the tests, add it as a repo secret, list its name in ci.secrets, and run stone render. A PR from a fork gets an empty value, so the test must skip."
       - "Optional: add ci.setup to .cornerstone/config.yaml, then run stone render."
-      - "To skip K6, K7, and K14 on promotion PRs, set ci.branches to the base branches of the ticket PRs, for example [dev]. Run stone render. Commit the generated file alone, with the trailers Role generator and Actor agent."
+      - "To skip K6, K7, K14, and K20 on promotion PRs, set ci.branches to the base branches of the ticket PRs, for example [dev]. Run stone render. Commit the generated file alone, with the trailers Role generator and Actor agent."
       - "With ci.branches, turn on a required human review for each base branch that is not in the list (G5)."
   - version: 1.2.1
     kind: patch

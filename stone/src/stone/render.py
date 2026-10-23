@@ -463,7 +463,7 @@ def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict
 
 
 def gate_condition(config: dict[str, Any], opt_in: bool) -> str:
-    """Return the `if:` line of the K6, K7, and K14 steps (#164). Empty: the steps always run."""
+    """Return the `if:` line of the K6, K7, K14, and K20 steps (#164). Empty: they always run."""
     parts = ["steps.marker.outputs.cornerstone == 'true'"] if opt_in else []
     # A GitHub expression string uses single quotes. Two single quotes stand for one.
     bases = " || ".join("github.base_ref == '{}'".format(name.replace("'", "''"))

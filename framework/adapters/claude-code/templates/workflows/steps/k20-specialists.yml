@@ -1,7 +1,7 @@
       # K20 is a warning until 2026-11-05, then it blocks (D66). It reads the "Ticket: <id>" and
       # "Personas: <ids>" lines of the PR body, and the PR labels. A "Waiver (K20)" section passes.
       - name: $step_name
-$marker_if
+$gate_if
         env:
           BASE_REF: $${{ github.base_ref }}
           PR_BODY: $${{ github.event.pull_request.body }}
