@@ -45,7 +45,7 @@ class TicketsTest(unittest.TestCase):
     def test_default_shaper_reads_the_issue_and_has_no_file_tool(self) -> None:
         self.render()
         shaper = self.text(".claude/agents/shaper.md")
-        self.assertIn("tools: Read, Grep, Glob, Bash\n", shaper)
+        self.assertIn("tools: Read, Grep, Glob, Bash, StructuredOutput\n", shaper)
         self.assertIn("read the ticket with the issue CLI. Do not change files in the repo.", shaper)
         self.assertNotIn("The ticket is the file", self.text(".claude/agents/implementer.md"))
         self.assertEqual(self.hook("docs/tickets/A-1.txt"), 0)  # no file tool in the role file
@@ -53,7 +53,7 @@ class TicketsTest(unittest.TestCase):
     def test_file_source_gives_the_shaper_write_and_the_form(self) -> None:
         self.render(FILE)
         shaper = self.text(".claude/agents/shaper.md")
-        self.assertIn("tools: Read, Grep, Glob, Bash, Write, Edit\n", shaper)
+        self.assertIn("tools: Read, Grep, Glob, Bash, Write, Edit, StructuredOutput\n", shaper)
         self.assertIn("The ticket is the file `docs/tickets/{id}.txt`.", shaper)
         self.assertIn("Write the answers into the Definition of Ready section of the ticket file.",
                       shaper)
