@@ -65,7 +65,7 @@ Add `Reproduction:` for a bug and `Time box:` for a spike or an audit, if the pr
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 DEFAULT_PR_LINES = 600  # D4, customization.md
-BLOCKS = ["check_steps", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
+BLOCKS = ["check_steps", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
 
 class RenderError(Exception):
@@ -212,7 +212,7 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
         # A list becomes inline code items. A single path stays plain, so a template can extend it.
         values[f"paths_{key}"] = (", ".join(f"`{item}`" for item in value)
                                   if isinstance(value, list) else str(value))
-    problems = framework_check.branch_name_problems(config)
+    problems = framework_check.branch_name_problems(config) + framework_check.ci_branch_problems(config)
     if problems:
         raise RenderError(f"{CONFIG}: {problems[0]}")
     for key, value in (config.get("branches") or {}).items():
@@ -229,6 +229,7 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     values.update({
         "adoption_json": json.dumps("opt-in" if opt_in else "all"),
         "marker_if": MARKER_IF if opt_in else "",
+        "gate_if": gate_condition(config, opt_in),
         "marker_step": (MARKER_STEP.replace("PROFILE_IDS", "|".join(config.get("profiles") or []))
                         if opt_in else ""),
         "pr_types": PR_TYPES if opt_in else "",
@@ -442,6 +443,17 @@ def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict
         text = substitute(harness, step["template"], step_values, {}, config)
         blocks.append("\n" + text.rstrip("\n"))
     return "\n".join(blocks)
+
+
+def gate_condition(config: dict[str, Any], opt_in: bool) -> str:
+    """Return the `if:` line of the K6, K7, and K14 steps (#164). Empty: the steps always run."""
+    parts = ["steps.marker.outputs.cornerstone == 'true'"] if opt_in else []
+    # A GitHub expression string uses single quotes. Two single quotes stand for one.
+    bases = " || ".join("github.base_ref == '{}'".format(name.replace("'", "''"))
+                        for name in _get(config, "ci.branches") or [])
+    if bases:
+        parts.append(f"({bases})" if parts and " || " in bases else bases)
+    return f"        if: {' && '.join(parts)}" if parts else ""
 
 
 def step_name(component_id: str) -> str:

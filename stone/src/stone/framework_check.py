@@ -223,6 +223,23 @@ def branch_name_problems(config: dict[str, Any]) -> list[str]:
             for key, value in branches.items() if value is not None and not isinstance(value, str)]
 
 
+def ci_branch_problems(config: dict[str, Any]) -> list[str]:
+    """Test `ci.branches` (#164): a list of branch names that has `branches.integration`."""
+    ci = config.get("ci")
+    if not isinstance(ci, dict) or ci.get("branches") is None:
+        return []
+    names = ci["branches"]
+    if not isinstance(names, list) or not names or not all(
+            isinstance(name, str) and name.strip() for name in names):
+        return ["'ci.branches' must be a list of base branch names as YAML strings, "
+                'for example ci: {branches: [dev]}. Remove the key to run K6, K7, and K14 on each PR.']
+    integration = (config.get("branches") or {}).get("integration")
+    if isinstance(integration, str) and integration not in names:
+        return [f"'ci.branches' does not list branches.integration '{integration}'. Add it, "
+                "or the ticket PRs skip K6, K7, and K14."]
+    return []
+
+
 def path_compiler(harness: Path) -> Any:
     """Return compile_path from the component with `provides: path_match`, or None if none.
 
@@ -420,6 +437,8 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     adoption = config.get("adoption", "all")
     if adoption not in ADOPTION_MODES:
         add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
+    for problem in ci_branch_problems(config):
+        add(problem)
     for problem in (ticket_folder_problems(config) + protected_path_problems(config)
                     + commit_problems(root, config)
                     + ticket_problems(config) + specialists.problems(config)):

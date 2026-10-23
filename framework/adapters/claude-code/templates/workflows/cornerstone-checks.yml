@@ -22,7 +22,7 @@ $ci_step_check_k6
       # K7 blocks (D45). A "Waiver (P10)" section in the PR body passes.
       # The limit comes from the "Profile: <id>" line in the PR body.
       - name: K7 change size
-$marker_if
+$gate_if
         env:
           BASE_REF: $${{ github.base_ref }}
           PR_BODY: $${{ github.event.pull_request.body }}
@@ -42,7 +42,7 @@ $marker_if
 
       # K14 blocks (D45, D49). The PR body needs the Evidence, Decision log, Review findings, and Confidence sections.
       - name: K14 PR evidence
-$marker_if
+$gate_if
         env:
           PR_BODY: $${{ github.event.pull_request.body }}
         run: |
