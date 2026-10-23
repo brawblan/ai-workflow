@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Review a diff against its ticket in a fresh session. Report defects and scope drift. Use after the checks pass. Changes no file.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, StructuredOutput
 model: claude-opus-5-5
 effort: high
 ---
