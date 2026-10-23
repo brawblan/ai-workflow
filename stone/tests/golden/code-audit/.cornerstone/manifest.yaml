@@ -61,7 +61,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/investigator.md
-  hash: 5bb2f5630dcf014f847a63f02810bf526a6be0f4c7c047fe299270a314567f27
+  hash: 74a87438e55a23789e019cfd4605338af6e9720c9cc97ceaabfe31981830aeff
 - id: role.reviewer
   kind: role
   purpose: Find defects and scope drift in a fresh session.
@@ -76,7 +76,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/reviewer.md
-  hash: 69d57b24cd58e8d1adafe663f458c8b4621f08a36575384e91c2e15048c7f90d
+  hash: 6a9f5184e06dfd0f274230baaa587a49632fd721c0fab0e88740fc38bf292f54
 - id: trigger.schedule.code-audit
   kind: ci-job
   purpose: Start the first role of the profile on its schedule. Post its report as

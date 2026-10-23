@@ -61,7 +61,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/investigator.md
-  hash: 5bb2f5630dcf014f847a63f02810bf526a6be0f4c7c047fe299270a314567f27
+  hash: 74a87438e55a23789e019cfd4605338af6e9720c9cc97ceaabfe31981830aeff
 - id: trigger.issue-opened.bug-triage
   kind: ci-job
   purpose: Start the first role of the profile on each new issue. Post its report
