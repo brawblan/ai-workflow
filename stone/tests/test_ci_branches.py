@@ -1,4 +1,4 @@
-"""Issue #164: ci.branches limits the K6, K7, and K14 steps to PRs into the listed base branches."""
+"""Issue #164: ci.branches limits the K6, K7, K14, and K20 steps to PRs into the listed base branches."""
 
 import contextlib
 import datetime as dt
@@ -14,6 +14,8 @@ from test_render import CONFIG, FRAMEWORK
 
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
 GATES = ("K6 protected paths", "K7 change size", "K14 PR evidence")
+K20 = "K20 specialist findings"
+SPECIALISTS = "specialists:\n  - id: security\n    run: /security-review\n"
 UNGATED = ("All checks", "Install", "Install stone")
 MARKER = "steps.marker.outputs.cornerstone == 'true'"
 
@@ -85,6 +87,38 @@ class CiBranchesTest(unittest.TestCase):
         for name in GATES:
             self.assertEqual(steps[name]["if"], f"{MARKER} && github.base_ref == 'dev'", name)
 
+    def k20(self, extra: str = "") -> dict:
+        return self.steps(self.render(SPECIALISTS + extra))[K20]
+
+    def test_k20_dev_only_has_base_ref_if(self) -> None:
+        self.assertEqual(self.k20("ci:\n  branches: [dev]\n").get("if"), "github.base_ref == 'dev'")
+
+    def test_k20_no_ci_key_has_no_if(self) -> None:
+        self.assertNotIn("if", self.k20())
+        self.assertNotIn("if", self.k20("ci: {}\n"))
+
+    def test_k20_opt_in_without_branches_has_marker_only(self) -> None:
+        self.assertEqual(self.k20("adoption: opt-in\n").get("if"), MARKER)
+
+    def test_k20_opt_in_one_branch(self) -> None:
+        self.assertEqual(self.k20("adoption: opt-in\nci:\n  branches: [dev]\n").get("if"),
+                         f"{MARKER} && github.base_ref == 'dev'")
+
+    def test_k20_opt_in_two_branches(self) -> None:
+        self.assertEqual(
+            self.k20("adoption: opt-in\nci:\n  branches: [dev, staging]\n").get("if"),
+            f"{MARKER} && (github.base_ref == 'dev' || github.base_ref == 'staging')")
+
+    def test_k20_if_equals_the_if_of_k6_k7_k14(self) -> None:
+        cases = ("", "ci: {}\n", "ci:\n  branches: [dev]\n", "ci:\n  branches: [dev, staging]\n",
+                 "adoption: opt-in\n", "adoption: opt-in\nci:\n  branches: [dev]\n",
+                 "adoption: opt-in\nci:\n  branches: [dev, staging]\n")
+        for extra in cases:
+            with self.subTest(extra=extra):
+                steps = self.steps(self.render(SPECIALISTS + extra))
+                for name in GATES:
+                    self.assertEqual(steps[K20].get("if"), steps[name].get("if"), name)
+
 
 class CiBranchProblemsTest(unittest.TestCase):
     def config(self, ci) -> dict:
@@ -103,6 +137,12 @@ class CiBranchProblemsTest(unittest.TestCase):
             with self.subTest(value=value):
                 self.assertTrue(framework_check.ci_branch_problems(
                     self.config({"branches": value})))
+
+    def test_messages_name_k20(self) -> None:
+        bad = framework_check.ci_branch_problems(self.config({"branches": []}))
+        self.assertIn("K6, K7, K14, and K20", bad[0])
+        missing = framework_check.ci_branch_problems(self.config({"branches": ["main"]}))
+        self.assertIn("K6, K7, K14, and K20", missing[0])
 
     def test_render_rejects_list_without_integration(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
