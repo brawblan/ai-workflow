@@ -34,7 +34,7 @@ not write its tests or review it (P2). A check, not an agent, decides that work 
 Prompt:
 
 ```text
-/workflow:cornerstone-setup
+/cornerstone:setup
 This repo uses Spec Kit. Move .specify/memory/constitution.md into constitution/.
 Keep specs/ as history. Do not convert the old specs.
 New work uses Cornerstone tickets, plans, and roles.
@@ -60,7 +60,7 @@ Cornerstone has no OpenSpec adapter (D18). New work uses plain plans. Keep `open
 Prompt:
 
 ```text
-/workflow:cornerstone-setup
+/cornerstone:setup
 This repo uses OpenSpec. Move the rules in openspec/config.yaml into constitution/principles.md.
 Keep openspec/ as history. Do not convert the old changes or specs.
 New work uses Cornerstone tickets, plans, and roles.
@@ -89,7 +89,7 @@ Cornerstone gives agents roles, not personas. A persona in a prompt does not imp
 Prompt:
 
 ```text
-/workflow:cornerstone-setup
+/cornerstone:setup
 This repo uses BMAD. Use the project brief, the PRD, and the architecture document
 as sources for constitution/. Do not copy the agent personas.
 Write user personas in constitution/personas.md from the PRD users.
@@ -114,7 +114,7 @@ This includes a long `CLAUDE.md`, `.cursor/rules/`, `.github/copilot-instruction
 Prompt:
 
 ```text
-/workflow:cornerstone-setup
+/cornerstone:setup
 Merge CLAUDE.md, .cursor/rules/, and .github/copilot-instructions.md into AGENTS.md.
 For each rule, tell me if a CI check can enforce it. List those rules separately.
 ```

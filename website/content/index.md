@@ -116,10 +116,10 @@ selects the gates that apply. See the [workflow model](framework/workflow-model.
 
     ```text
     /plugin marketplace add brawblan/ai-workflow
-    /plugin install workflow@brawblan
+    /plugin install cornerstone@brawblan
     ```
 
-3. In your repo, run `/workflow:cornerstone-setup`. It asks only for the facts that it cannot find.
+3. In your repo, run `/cornerstone:setup`. It asks only for the facts that it cannot find.
    Then `stone render` writes the roles, the hooks, and the CI checks.
 
 ## Pick your situation

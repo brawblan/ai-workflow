@@ -82,7 +82,7 @@ command fails the job, and G3 blocks (D52).
 1. Start the reviewer with the plan and the branch. It reports scope drift from the plan, and
    each scenario of the spec delta that has no test.
 2. Open one PR for each group of tasks that stays under the size limit. Use
-   `/workflow:ticket-delivery`. It applies the spec delta and commits the output alone. To do it
+   `/cornerstone:ticket-delivery`. It applies the spec delta and commits the output alone. To do it
    by hand:
 
    ```bash

@@ -15,7 +15,7 @@ each component that `stone render` writes.
 | Instruction file (repo) | `AGENTS.md`, and `CLAUDE.md` with one line: `@AGENTS.md` | full | Same file for all harnesses that read `AGENTS.md`. |
 | Instruction file (user) | `~/.claude/CLAUDE.md` | full | This repo links it from `global/`. |
 | Instruction size (K15) | `.cornerstone/checks/instruction_size.py` counts the lines of `AGENTS.md` | full | `CLAUDE.md` has one line, so it does not count. |
-| Skill | `.claude/skills/<name>/SKILL.md`, or a skill in the `workflow` plugin | full | Use `disable-model-invocation: true` for skills with side effects. |
+| Skill | `.claude/skills/<name>/SKILL.md`, or a skill in the `cornerstone` plugin | full | Use `disable-model-invocation: true` for skills with side effects. |
 | Role | `.claude/agents/<role>.md` with `name`, `description`, `tools`, `model` | partial | Tools can be limited. Paths cannot be limited by the role file. See "Protected paths". |
 | Fresh session for each role | A separate `claude -p` run for each role | full | A sub-agent also has a fresh context, but the lead agent starts it. Use separate runs where P2 applies. |
 | Headless run | `claude -p "<prompt>" --output-format json` | full | |
@@ -231,7 +231,7 @@ check on the main branch and on the integration branch (D33).
 
 | Skill | Framework place | Change needed |
 | --- | --- | --- |
-| `project-setup` | full-project, Shape | Becomes the Shape step of `cornerstone-setup`. Stays usable alone. |
+| `project-setup` | full-project, Shape | Becomes the Shape step of `setup`. Stays usable alone. |
 | `sdd-plan`, `sdd-build` | Plan, Build | Removed in plugin 0.5.0 (D18). The planner, implementer, and tester role files do this work. |
 | `ticket-delivery` | Verify, Deliver | Done in plugin 0.4.0: it collects the tester, reviewer, and check output as evidence. It does not self-verify. Since plugin 0.7.0 it also branches, commits, and opens the PR with the evidence sections (K14) and the role trailers. It replaces `dev-pr`. |
 | `ste-writing` | Writing standard ([writing.md](../writing.md)) | Load it in each role that writes human-facing text. Add the blind A/B eval. K17 covers the measurable rules. |

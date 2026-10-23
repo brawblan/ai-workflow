@@ -14,12 +14,12 @@ feature then runs as its own [feature](build-a-feature.md) or [small change](sma
 
 ## The order
 
-Write the foundation first. Run `cornerstone-setup` after the walking skeleton exists. `stone render`
+Write the foundation first. Run `setup` after the walking skeleton exists. `stone render`
 needs a test command and the test and check paths. An empty folder has none of them.
 
 ```mermaid
 flowchart LR
-  A[1. Make the repo] --> B[2. Write the foundation] -->|G1| C[3. Plan the skeleton<br/>and the backlog] -->|G2| D[4. Build the<br/>walking skeleton] --> E[5. Run<br/>cornerstone-setup] -->|G4| F[6. Turn on the gates]
+  A[1. Make the repo] --> B[2. Write the foundation] -->|G1| C[3. Plan the skeleton<br/>and the backlog] -->|G2| D[4. Build the<br/>walking skeleton] --> E[5. Run<br/>setup] -->|G4| F[6. Turn on the gates]
 ```
 
 ## Today
@@ -35,13 +35,13 @@ gh repo create my-app --private --source . --push
 ### 2. Write the foundation (Shape, G1)
 
 1. Start Claude Code in the folder.
-2. Run `/workflow:project-setup`.
+2. Run `/cornerstone:project-setup`.
 3. Describe the product in your own words. The skill asks only for the facts that it does not have.
 
 Example prompt:
 
 ```text
-/workflow:project-setup
+/cornerstone:project-setup
 I want to build a web app that lets small farms track which fields they planted, and when.
 The users are the farmer and a seasonal worker on a phone in the field.
 ```
@@ -93,7 +93,7 @@ The skeleton is done when:
 Commit with the trailers `Role: implementer` and `Actor: human`. See
 [Run the roles](run-the-roles.md#commit-with-trailers).
 
-### 5. Run cornerstone-setup
+### 5. Run the setup skill
 
 Follow [Add Cornerstone to a repo](add-to-a-repo.md). The repo now has the commands and paths that
 `stone render` needs.
@@ -127,6 +127,6 @@ Start each backlog item with [Build a feature](build-a-feature.md) or
 
 ## Not built yet
 
-- The foundation still comes from `/workflow:project-setup`. The shaper role shapes tickets, not the
+- The foundation still comes from `/cornerstone:project-setup`. The shaper role shapes tickets, not the
   constitution files.
 - K15 and the K4, K5, and K8 steps block (D52).

@@ -15,7 +15,7 @@ flowchart LR
   Planner --> Review{Approve the plan}
   Review -- G2 --> Build[implementer, then tester]
   Build --> Reviewer[reviewer]
-  Reviewer --> CodePR["/workflow:ticket-delivery"]
+  Reviewer --> CodePR["/cornerstone:ticket-delivery"]
 ```
 
 Each box after the issue is one role. Each role runs in a fresh session. The profile sets which
@@ -23,7 +23,7 @@ roles run. A small change has no planner. It has a decision log.
 
 ## Set up a repo
 
-1. Run `/workflow:cornerstone-setup`. It writes `constitution/`, `AGENTS.md`, and
+1. Run `/cornerstone:setup`. It writes `constitution/`, `AGENTS.md`, and
    `.cornerstone/config.yaml`.
 2. Select the `app-slice` profile for features. `stone render` then writes the planner role file.
 
@@ -60,7 +60,7 @@ The next session finds the plan from the issue ID. It does not need this convers
 1. Start the implementer for each task in the progress file. It writes the decision log.
 2. Start the tester in a separate session. It writes the tests from the plan and the job stories.
 3. Start the reviewer. It compares the diff with the plan.
-4. Run `/workflow:ticket-delivery`. It applies the spec delta, collects the evidence, and opens
+4. Run `/cornerstone:ticket-delivery`. It applies the spec delta, collects the evidence, and opens
    the PR.
 
 If the scope changes during the build, the agent stops. Update the plan first, and get G2 again.

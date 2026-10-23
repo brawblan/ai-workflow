@@ -52,7 +52,7 @@ For what a patch, minor, or major version means, see [Versioning](../../framewor
 
 ## Use the skill
 
-`/workflow:cornerstone-setup` has an upgrade step. It runs `stone upgrade`, asks only for the facts
+`/cornerstone:setup` has an upgrade step. It runs `stone upgrade`, asks only for the facts
 that a new key needs, writes the config diff, and runs the render. Use it when the plan has actions.
 
 ## If something goes wrong
