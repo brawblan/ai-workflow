@@ -4,15 +4,22 @@ versions:
   - version: 1.2.1
     kind: patch
     released: null
-    summary: stone render keeps the indent (a tab, or N spaces) and the final newline of a JSON file that it merges into, for example .claude/settings.json.
+    summary: stone render keeps the indent (a tab, or N spaces) and the final newline of a JSON file that it merges into, for example .claude/settings.json. Each role file lists the tool StructuredOutput, so a trigger run with --json-schema returns its report and the post job posts it.
     config:
       added: []
       renamed: []
       removed: []
     files:
       - {path: .claude/settings.json, change: changed, note: "Render no longer changes the indent of the file (D70)."}
+      - {path: .claude/agents/implementer.md, change: changed, note: "The tools list has StructuredOutput (D71)."}
+      - {path: .claude/agents/tester.md, change: changed, note: "The tools list has StructuredOutput (D71)."}
+      - {path: .claude/agents/reviewer.md, change: changed, note: "The tools list has StructuredOutput (D71)."}
+      - {path: .claude/agents/shaper.md, change: changed, note: "The tools list has StructuredOutput (D71)."}
+      - {path: .claude/agents/planner.md, change: changed, note: "The tools list has StructuredOutput (D71)."}
+      - {path: .claude/agents/investigator.md, change: changed, note: "The tools list has StructuredOutput (D71)."}
     steps:
       - "Run stone render. If a formatter changed the indent of .claude/settings.json, render now keeps it."
+      - "Run stone render. Commit the changed generated files alone, with the trailers Role generator and Actor agent."
   - version: 1.2.0
     kind: minor
     released: 2026-10-22

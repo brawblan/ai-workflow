@@ -260,18 +260,19 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
 
 def ticket_values(config: dict[str, Any]) -> dict[str, str]:
     """Return the ticket source for the role files and the hook (#137)."""
+    # StructuredOutput (D71): a trigger run with --json-schema returns its report only with it.
     section = config.get("tickets")
     section = section if isinstance(section, dict) else {}
     if section.get("source") != "file" or not section.get("path"):
         return {"ticket_location": "", "tickets_json": json.dumps(""),
-                "shaper_tools": "Read, Grep, Glob, Bash",
+                "shaper_tools": "Read, Grep, Glob, Bash, StructuredOutput",
                 "shaper_write": "Write the answers into the ticket fields. Do not invent a requirement.",
                 "shaper_end": "Use `Bash` only to read the ticket with the issue CLI. "
                               "Do not change files in the repo."}
     path = str(section["path"])
     return {"ticket_location": f" The ticket is the file `{path}`. `{{id}}` is the ticket ID.",
             "tickets_json": json.dumps(path),
-            "shaper_tools": "Read, Grep, Glob, Bash, Write, Edit",
+            "shaper_tools": "Read, Grep, Glob, Bash, Write, Edit, StructuredOutput",
             "shaper_write": "Write the answers into the Definition of Ready section of the ticket "
                             "file. Do not invent a requirement.",
             "shaper_end": "Change only the ticket file. A hook blocks the file tools on other "

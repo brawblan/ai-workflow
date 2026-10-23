@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: Change the code to meet one ready ticket and write the decision log. Use for the Build stage. Must not change tests, checks, or CI.
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, StructuredOutput
 model: $model$effort_line
 ---
 
