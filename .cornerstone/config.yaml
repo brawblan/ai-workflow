@@ -10,7 +10,7 @@ branches:
 commands:                          # from AGENTS.md. No lint, type check, or acceptance command yet.
   install: pip install ./stone
   test_unit: python stone/tests/run_parallel.py -q
-  all_checks: python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/main
+  all_checks: python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/dev
 paths:
   source: [stone/src/]
   tests: [stone/tests/]            # protected for the implementer
