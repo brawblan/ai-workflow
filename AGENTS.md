@@ -27,11 +27,11 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | Unit tests | `python -m unittest discover -s stone/tests` |
 | Unit tests, in parallel (about 3 times faster). Add `-q` to show only failures and the summary | `python stone/tests/run_parallel.py` |
 | Validate the framework | `stone check` |
-| Writing check (K17) on your changes | `stone check-writing --diff origin/main` |
+| Writing check (K17) on your changes | `stone check-writing --diff origin/dev` |
 | Validate the plugin | `claude plugin validate .` |
 | Preview the docs site | `pip install -r website/requirements.txt && mkdocs serve` |
 | Try a skill before you push | `claude --plugin-dir plugins/workflow` |
-| All checks before a push | `python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/main` |
+| All checks before a push | `python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/dev` |
 
 ## Rules for every task
 
@@ -65,9 +65,13 @@ tool-neutral, and `stone check` fails on a vendor name in it.
 
 ## Branches and PRs
 
-- Default branch: `main`. Branch from it. Name branches `feature/<slug>`, `fix/<slug>`, or
-  `chore/<slug>`.
-- Open each PR into `main`. Never push to `main` directly. Never force-push a shared branch.
+- `dev` is the integration branch. `main` holds only released code. The default branch of the
+  GitHub repo is still `main`.
+- Branch from `dev`. Name branches `feature/<slug>`, `fix/<slug>`, or `chore/<slug>`.
+- Open each PR into `dev`. Never push to `dev` or `main` directly. Never force-push a shared branch.
+- A release is a PR from `dev` into `main`. Merge it, then tag the merge commit `vX.Y.Z`. The tag
+  deploys the docs site. A push to `dev` or `main` does not. Steps:
+  [versioning.md](framework/versioning.md#release-checklist).
 - Commit messages: `type(scope): summary` (for example `feat(stone): ...`, `docs(framework): ...`).
   Explain why in the body.
 - PR body: use the nine sections of the `dev-pr` skill, each under its own heading. K14 tests the

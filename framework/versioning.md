@@ -56,13 +56,20 @@ installed `stone`.
 
 ## Release checklist
 
-1. Run `python -m unittest discover -s stone/tests`, `stone check`, and
-   `stone check-writing --diff origin/main`.
+`dev` collects merged work. `main` holds only released code. Do the steps in this order.
+
+1. On a branch from `dev`, run `python -m unittest discover -s stone/tests`, `stone check`, and
+   `stone check-writing --diff origin/dev`.
 2. In `upgrades.yaml`, set `released` of the newest entry to the date of the release.
 3. Set the same version in `stone/pyproject.toml` and in `stone/src/stone/__init__.py`.
 4. If a skill changed, raise the version in the `plugin.json` file of the plugin.
-5. Merge. Tag the merge commit `vX.Y.Z`. Copy the summary, the config changes, and the steps of the
-   entry into the notes of the release.
-6. Now move this repo to the new version. Set `framework_version` in `.cornerstone/config.yaml`, and
-   run `stone upgrade --apply`. Commit the generated files alone. Do this after the tag exists,
-   because the G3 workflow installs `stone` from the tag.
+5. Merge the changes of steps 2 to 4 into `dev` with a PR. Then open a release PR from `dev` into `main`. Wait for the checks
+   `stone`, `checks`, and `build`.
+6. The owner merges the release PR with a merge commit. Do not squash it: `dev` and `main` must keep
+   the same history.
+7. Tag the merge commit `vX.Y.Z`, and push the tag. The tag starts the `pages` workflow, which
+   deploys the docs site. A push to `dev` or `main` does not deploy it. Copy the summary, the config
+   changes, and the steps of the entry into the notes of the release.
+8. Now move this repo to the new version. Set `framework_version` in `.cornerstone/config.yaml`, and
+   run `stone upgrade --apply`. Commit the generated files alone. Open this PR into `dev`. Do this
+   after the tag exists, because the G3 workflow installs `stone` from the tag.
