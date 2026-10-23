@@ -185,6 +185,7 @@ flowchart LR
   `run.with` (D44). Thus a difference between the variants comes from the component.
 - The runner writes the transcripts and `runs.jsonl` to `.cornerstone/eval-runs/`. Do not commit
   them. It writes the result table to `evals/results/`. Add the table to the PR.
+- A guidance eval (D69) tests text, not a file that `stone render` writes. Its `scenarios.yaml` has `variants`: a name for each text, and the files that the variant puts in the workspace (`{copy: <file in the eval folder>, to: <path in the repo>}`). All variants use `run.with`. The runner commits the files before the agent starts. Use `--variant <name>` for one variant. The variant `none` is the baseline, and the report gives the outcome rate of each other variant minus `none`. The runner finds the eval by its `component` key, so the component needs no entry in the adapter component list. Pass `--model`, because the role has no model in the model profile.
 - Use `--check-only` to validate the scenarios without a run.
 
 ## Metrics for each profile
