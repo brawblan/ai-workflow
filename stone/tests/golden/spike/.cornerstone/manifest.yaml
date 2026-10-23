@@ -77,7 +77,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/investigator.md
-  hash: 5bb2f5630dcf014f847a63f02810bf526a6be0f4c7c047fe299270a314567f27
+  hash: 74a87438e55a23789e019cfd4605338af6e9720c9cc97ceaabfe31981830aeff
 - id: role.shaper
   kind: role
   purpose: Interview the human until the ticket meets the Definition of Ready.
@@ -91,4 +91,4 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/shaper.md
-  hash: aa52b5cf5920c72c62d312c4c130d3f90955661a69daa1ff257052e592679c7d
+  hash: 4b79970810b144f67f2babc87a2fe0de7d04cf0be69f8a1de1440312209b7c0b

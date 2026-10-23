@@ -105,7 +105,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/implementer.md
-  hash: ba0b49142cd55e33c39b6ab0ccef0ce38a6b6ebef12502574e74ac03e90e3b7c
+  hash: 4bfd71d82355ddb3b6fab5a0a3c3965aada9c2b88094e89213e8c1862e685736
 - id: role.reviewer
   kind: role
   purpose: Find defects and scope drift in a fresh session.
@@ -120,7 +120,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/reviewer.md
-  hash: 69d57b24cd58e8d1adafe663f458c8b4621f08a36575384e91c2e15048c7f90d
+  hash: 6a9f5184e06dfd0f274230baaa587a49632fd721c0fab0e88740fc38bf292f54
 - id: role.shaper
   kind: role
   purpose: Interview the human until the ticket meets the Definition of Ready.
@@ -134,7 +134,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/shaper.md
-  hash: aa52b5cf5920c72c62d312c4c130d3f90955661a69daa1ff257052e592679c7d
+  hash: 4b79970810b144f67f2babc87a2fe0de7d04cf0be69f8a1de1440312209b7c0b
 - id: role.tester
   kind: role
   purpose: Write independent tests from the ticket and the diff.
@@ -148,7 +148,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/tester.md
-  hash: 329929de8838ad3490418eff40e4139c042ae0e57978a0dec00ac5e66f0cc02a
+  hash: 688ce03093ecd73a2ad012aea3a1b4566062dbb0eda92e36b59ecc25707f98d1
 - id: trigger.label.single-ticket
   kind: ci-job
   purpose: Start the first role of the profile when a human adds the trigger label

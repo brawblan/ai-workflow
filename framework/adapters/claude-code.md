@@ -130,7 +130,18 @@ The run job:
 | `prompt` | The role, the profile, the trigger, the event file path, and the profile steps | The pipeline gives the profile steps at run time (D24). |
 | `claude_args` | `--agent <role> --model <model> --max-turns 30 --add-dir <event folder> --allowedTools "Read(./**),Read(/<event folder>/**)" --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch --json-schema <report schema>` | The role reads and reports. It cannot change files or run commands. It reads only the checkout and the event folder (D32). Its only output is the report. It stops with an error after 30 turns (D38). |
 
-The action returns the report in `structured_output`. The post job:
+The action returns the report in `structured_output`. The model returns it with the tool
+`StructuredOutput`, which exists only in a run with `--json-schema`. With `--agent`, the `tools:`
+list of the role file limits the tools of the run. So each role file lists `StructuredOutput` (D71).
+Without it, the run ends with `subtype: success` and no `structured_output`, and the run job fails
+(issue #166). In a session with no `--json-schema`, the name has no effect.
+
+| Tested on | Version | Result |
+| --- | --- | --- |
+| Claude Code | 2.1.292 | `--agent` with `StructuredOutput` in `tools:` returns `structured_output`. Without it, no `structured_output`. |
+| `anthropics/claude-code-action` | v1.0.252 | The run job fails with "Claude did not return structured_output" when the role file does not list the tool. |
+
+The post job:
 
 1. Reads the report from the job output through `env` (dossier F8).
 2. Frames the report (D38). A fixed header says that a model wrote the text from untrusted event
@@ -160,7 +171,7 @@ limits apply:
 | Limit | Effect |
 | --- | --- |
 | No write token in the run job | An injected instruction cannot change the repo, issues, or labels. |
-| Tool allowlist: Read, Grep, Glob | No shell, no edits, no web fetch. The only output is the report. |
+| Tool allowlist: Read, Grep, Glob, StructuredOutput | No shell, no edits, no web fetch. The only output is the report. |
 | Read rules only for `./**` and the event folder | Read, Grep, and Glob cannot open a file outside the checkout, such as `/proc/self/environ` with the harness secret. An unscoped `Read` rule allows all paths, and the report is public (D32, dossier F12). |
 | Event text in a file, not in the prompt or a `run` script | The text cannot inject shell commands (dossier F8). |
 | The post job posts the report as text | A report cannot apply labels. The investigator proposes labels, and a human approves them and the severity at G4. |
@@ -226,6 +237,8 @@ check on the main branch and on the integration branch (D33).
 | tester | Read, Grep, Glob, Edit, Write (tests path only, enforced by hook), Bash (the hook does not see it, D39) | repo config |
 | reviewer | Read, Grep, Glob, Bash (read-only commands) | repo config |
 | investigator | Read, Grep, Glob, Edit, Write (reports path, or a `spike/` branch, enforced by hook), Bash (the hook does not see it, D39) | repo config |
+
+Each role file also lists `StructuredOutput`, so a trigger run can return its report (D71).
 
 ## Existing plugin skills
 

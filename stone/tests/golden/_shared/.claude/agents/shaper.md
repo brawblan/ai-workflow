@@ -1,7 +1,7 @@
 ---
 name: shaper
 description: Interview the ticket author until the ticket meets the Definition of Ready. Use when a ticket fails the G1 check. Does not write code.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, StructuredOutput
 model: claude-opus-5-5
 effort: medium
 ---

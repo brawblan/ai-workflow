@@ -1,7 +1,7 @@
 ---
 name: investigator
 description: Read the code, run commands, and write a findings report. Use for triage, root-cause analysis, audits, upgrade research, and spikes. Writes only in the reports path, or anywhere on a spike branch.
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, StructuredOutput
 model: claude-opus-5-5
 ---
 

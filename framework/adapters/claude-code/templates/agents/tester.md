@@ -1,7 +1,7 @@
 ---
 name: tester
 description: Write independent tests for each acceptance criterion from the ticket and the diff. Use after the implementer finishes. Must not change source code.
-tools: Read, Grep, Glob, Edit, Write, Bash
+tools: Read, Grep, Glob, Edit, Write, Bash, StructuredOutput
 model: $model$effort_line
 ---
 
