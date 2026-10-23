@@ -65,7 +65,7 @@ Add `Reproduction:` for a bug and `Time box:` for a spike or an audit, if the pr
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 DEFAULT_PR_LINES = 600  # D4, customization.md
-BLOCKS = ["check_steps", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
+BLOCKS = ["all_checks_env", "check_steps", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
 
 class RenderError(Exception):
@@ -201,6 +201,16 @@ def one_folder(value: Any, key: str = "plans") -> str:
     return folder if folder.endswith("/") else folder + "/"
 
 
+def all_checks_env(config: dict[str, Any]) -> str:
+    """Return the `env:` lines of the All checks step (#163). A secret is passed by name only."""
+    ci = config.get("ci") or {}
+    env = {name: json.dumps(str(value)) for name, value in (ci.get("env") or {}).items()}
+    env.update({name: "${{ secrets." + name + " }}" for name in ci.get("secrets") or []})
+    if not env:
+        return ""
+    return "        env:\n" + "\n".join(f"          {name}: {value}" for name, value in env.items())
+
+
 def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     """Return the repo facts that templates can use. TODO values are left out on purpose."""
     # The framework tag. The G3 workflow installs stone from it.
@@ -239,6 +249,10 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
                               "lists." if specialists.listed(config) else ""),
         "k6_tail": " The paths are:" if no_k6 else " Check K6 fails the commit in CI:",
         "k6_checks_commit": "" if no_k6 else " Check K6 checks the commit."})
+    problems = framework_check.ci_env_problems(config)
+    if problems:
+        raise RenderError(f"{CONFIG}: {problems[0]}")
+    values["all_checks_env"] = all_checks_env(config)
     plans = one_folder(_get(config, "paths.plans"))
     reports = one_folder(_get(config, "paths.reports"), "reports")
     # '{id}' (#146): the role text names the ticket folder, and the hook matches each ticket folder.
