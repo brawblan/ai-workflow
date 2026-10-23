@@ -96,7 +96,7 @@ flags it.
 1. Run `commands.all_checks`. The new test and all old tests must pass.
 2. Start the reviewer. Ask it to confirm that the fix addresses the root cause and does not hide
    the error.
-3. Run `/workflow:ticket-delivery` to open the PR. A human approves it (G4).
+3. Run `/cornerstone:ticket-delivery` to open the PR. A human approves it (G4).
 
 The PR body needs the line `Profile: debugging`. Check K7 then uses the limit of this profile:
 200 changed lines. It also needs the sections Evidence, Decision log, Review findings, and

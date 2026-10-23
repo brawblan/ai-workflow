@@ -78,7 +78,7 @@ Follow [Run the roles](run-the-roles.md). Each step is a new session.
 
 ### 3. Open the PR (G4)
 
-Run `/workflow:ticket-delivery`. It maps each acceptance criterion to its evidence and opens the PR.
+Run `/cornerstone:ticket-delivery`. It maps each acceptance criterion to its evidence and opens the PR.
 A human approves the PR.
 
 The PR body needs these parts:

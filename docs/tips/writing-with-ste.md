@@ -16,7 +16,7 @@ These are in [`global/AGENTS.md`](../../global/AGENTS.md):
 - Use lists and tables more than paragraphs.
 
 The full rule set is in
-[`ste-writing/references/ste.md`](../../plugins/workflow/skills/ste-writing/references/ste.md).
+[`ste-writing/references/ste.md`](../../plugins/cornerstone/skills/ste-writing/references/ste.md).
 
 ## Before and after
 

@@ -1,6 +1,6 @@
 # Agent guide
 
-This repo holds my AI workflow: the `workflow` plugin (skills), personal settings, tips, and
+This repo holds my AI workflow: the `cornerstone` plugin (skills), personal settings, tips, and
 Cornerstone, a tool-neutral framework for agent-assisted delivery with its `stone` CLI. Read
 [framework/README.md](framework/README.md) before you change the framework.
 
@@ -8,8 +8,8 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 
 | Path | What it is |
 | --- | --- |
-| `plugins/workflow/skills/` | Skills in the open `SKILL.md` format. Generic: no repo-specific facts. |
-| `.claude-plugin/marketplace.json`, `plugins/workflow/.claude-plugin/plugin.json` | Plugin marketplace and plugin version |
+| `plugins/cornerstone/skills/` | Skills in the open `SKILL.md` format. Generic: no repo-specific facts. |
+| `.claude-plugin/marketplace.json`, `plugins/cornerstone/.claude-plugin/plugin.json` | Plugin marketplace and plugin version |
 | `global/` | The owner's personal rules and settings. `install.sh` links them into `~/.claude`. |
 | `framework/` | Cornerstone: principles, modes, gates, checks, profiles, adapters, generator design |
 | `framework/adapters/` | The only place for harness, vendor, model, and spec-tool details (P12) |
@@ -30,7 +30,7 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | Writing check (K17) on your changes | `stone check-writing --diff origin/dev` |
 | Validate the plugin | `claude plugin validate .` |
 | Preview the docs site | `pip install -r website/requirements.txt && mkdocs serve` |
-| Try a skill before you push | `claude --plugin-dir plugins/workflow` |
+| Try a skill before you push | `claude --plugin-dir plugins/cornerstone` |
 | All checks before a push | `python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/dev` |
 
 ## Rules for every task
@@ -54,7 +54,7 @@ tool-neutral, and `stone check` fails on a vendor name in it.
 ## Skills
 
 - Keep skills generic. Repo facts go in the target repo's `AGENTS.md`.
-- If you change a skill, increase `version` in `plugins/workflow/.claude-plugin/plugin.json`.
+- If you change a skill, increase `version` in `plugins/cornerstone/.claude-plugin/plugin.json`.
 
 ## Code
 
@@ -80,7 +80,7 @@ tool-neutral, and `stone check` fails on a vendor name in it.
 ## Writing
 
 - Human-facing text follows ASD-STE100 (K17 checks it). Scope: [framework/writing.md](framework/writing.md).
-  Rules: [ste.md](plugins/workflow/skills/ste-writing/references/ste.md).
+  Rules: [ste.md](plugins/cornerstone/skills/ste-writing/references/ste.md).
 - Do not rewrite old text only for style. To keep a correct word that K17 flags, add
   `<!-- ste-ignore -->` at the end of that line.
 - Diagrams in repo files use Mermaid.

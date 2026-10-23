@@ -63,7 +63,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 | --- | --- | --- |
 | D1 | The framework name is Cornerstone. The CLI is `stone`. The repo stays `ai-workflow`. | This file, [generator/design.md](generator/design.md) |
 | D2 | A repo MAY add a waiver to skip G4 for dependency patch versions. Minor and major versions always need G4. The waiver file is not built yet (D51). | [profiles/dependency-upgrade.md](profiles/dependency-upgrade.md) |
-| D3 | `cornerstone-setup` is the entry skill. It runs `project-setup` as its Shape step. `project-setup` stays usable alone. | [generator/design.md](generator/design.md) |
+| D3 | `setup` is the entry skill. It runs `project-setup` as its Shape step. `project-setup` stays usable alone. | [generator/design.md](generator/design.md) |
 | D4 | Default limits: 600 changed lines for a PR, 300 lines for the instruction file. A profile can tighten them. | [principles.md](principles.md), [customization.md](customization.md) |
 | D5 | A solo developer MAY pass G4 on their own human-centric work, after an agent review and with all checks passing. | [modes.md](modes.md#solo-developer) |
 | D6 | Model idioms live in a model profile under each harness adapter, not in the adapter itself. | [adapters/contract.md](adapters/contract.md#what-a-model-profile-must-provide) |
@@ -154,7 +154,7 @@ Do these items in order. Each item is one PR or more.
    - 3a3. Done in plugin 0.6.0 and stone 0.6: check K19 and `stone spec sync` (D22). The planner,
      the tester, the reviewer, the hook, and the guides use the specs. K19 is an error since
      2026-10-21 (D53).
-   - 3a. Done in plugin 0.3.0: the `cornerstone-setup` entry skill, the repo config of this repo,
+   - 3a. Done in plugin 0.3.0: the `setup` entry skill, the repo config of this repo,
      and a `stone render` run in this repo.
    - 3b. Done in plugin 0.4.0. `ticket-delivery` does not self-verify. It has the evidence
      sections. Habit 4 in `docs/tips/README.md` says that the profile sets the plan form
@@ -237,6 +237,6 @@ Do these items in order. Each item is one PR or more.
 
 ## Relation to the plugin in this repo
 
-The `workflow` plugin skills are the first harness implementation of parts of this framework.
+The `cornerstone` plugin skills are the first harness implementation of parts of this framework.
 The [gap analysis](../docs/research/dossier.md#3-gap-analysis-of-this-repo-brawblanai-workflow-v021)
 shows what must change.

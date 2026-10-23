@@ -6,7 +6,7 @@ file. Many AI coding tools can read this format. The folder path is different in
 ## Coding agents (Copilot, Cursor, Codex, Gemini CLI, and others)
 
 1. Find your tool's skills folder in its docs. Many tools read `.agents/skills/` in a project.
-2. Copy one folder from [`plugins/workflow/skills/`](../../plugins/workflow/skills/) into it.
+2. Copy one folder from [`plugins/cornerstone/skills/`](../../plugins/cornerstone/skills/) into it.
    Copy the whole folder, not only `SKILL.md`. Some skills have a `references/` folder.
 3. Restart the tool, and ask it to list its skills.
 
