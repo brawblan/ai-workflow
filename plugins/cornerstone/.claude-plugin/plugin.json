@@ -1,0 +1,10 @@
+{
+  "name": "cornerstone",
+  "version": "0.8.0",
+  "description": "Skills for Cornerstone setup, project setup, ticket and PR delivery, and Simplified Technical English writing.",
+  "author": {
+    "name": "Brandon Blankenstein"
+  },
+  "repository": "https://github.com/brawblan/ai-workflow",
+  "license": "MIT"
+}

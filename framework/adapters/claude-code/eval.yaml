@@ -12,6 +12,13 @@ run:
   without: [claude, -p, --model, $model, --output-format, stream-json, --verbose,
             --permission-mode, acceptEdits, --setting-sources, project, --max-budget-usd, $budget,
             --allowedTools, $tools, --, $prompt]
+  # A guidance eval (D69): no --agent, because the workspace has no role file. The default
+  # permission mode denies each tool that --allowedTools does not list, so the writer cannot edit a
+  # file and the report is the text. --setting-sources project keeps the user-level instruction file
+  # out of the run (probe of 2026-10-23: a project CLAUDE.md loaded, the user-level rules did not).
+  guidance: [claude, -p, --model, $model, --output-format, stream-json, --verbose,
+             --permission-mode, default, --setting-sources, project, --max-budget-usd, $budget,
+             --allowedTools, $tools, --, $prompt]
 
 env:   # the hook reads the role from agent_type (set by --agent), and STONE_ROLE is the fallback (D55)
   with: {STONE_ROLE: $role}
@@ -19,6 +26,7 @@ env:   # the hook reads the role from agent_type (set by --agent), and STONE_ROL
 
 tools:   # the same lists as the role files, plus the commands that the role runs
   planner: [Read, Grep, Glob, Write]
+  writer: [Read, Grep, Glob]   # the guidance.writing eval (D69): read-only
   tester: [Read, Grep, Glob, Edit, Write, "Bash(python -m unittest*)", "Bash(git diff*)",
            "Bash(git log*)", "Bash(git show*)", "Bash(git add*)", "Bash(git commit*)",
            "Bash(git status*)"]

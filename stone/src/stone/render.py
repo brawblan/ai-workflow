@@ -260,18 +260,19 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
 
 def ticket_values(config: dict[str, Any]) -> dict[str, str]:
     """Return the ticket source for the role files and the hook (#137)."""
+    # StructuredOutput (D71): a trigger run with --json-schema returns its report only with it.
     section = config.get("tickets")
     section = section if isinstance(section, dict) else {}
     if section.get("source") != "file" or not section.get("path"):
         return {"ticket_location": "", "tickets_json": json.dumps(""),
-                "shaper_tools": "Read, Grep, Glob, Bash",
+                "shaper_tools": "Read, Grep, Glob, Bash, StructuredOutput",
                 "shaper_write": "Write the answers into the ticket fields. Do not invent a requirement.",
                 "shaper_end": "Use `Bash` only to read the ticket with the issue CLI. "
                               "Do not change files in the repo."}
     path = str(section["path"])
     return {"ticket_location": f" The ticket is the file `{path}`. `{{id}}` is the ticket ID.",
             "tickets_json": json.dumps(path),
-            "shaper_tools": "Read, Grep, Glob, Bash, Write, Edit",
+            "shaper_tools": "Read, Grep, Glob, Bash, Write, Edit, StructuredOutput",
             "shaper_write": "Write the answers into the Definition of Ready section of the ticket "
                             "file. Do not invent a requirement.",
             "shaper_end": "Change only the ticket file. A hook blocks the file tools on other "
@@ -527,17 +528,31 @@ def _merge(data: dict[str, Any], fragment: dict[str, Any]) -> None:
             data[key] = value
 
 
+def _json_indent(text: str) -> str:
+    """Return the indent of the first indented line of a JSON text: a tab, or N spaces."""
+    for line in text.splitlines():
+        stripped = line.lstrip(" \t")
+        if stripped and stripped != line:
+            return line[:len(line) - len(stripped)]
+    return "  "
+
+
 def _merge_json(root: Path, path: str, fragment_text: str) -> tuple[bool, str]:
-    """Return (the file has the fragment, the file text with the fragment merged in)."""
+    """Return (the file has the fragment, the file text with the fragment merged in).
+
+    The merged text keeps the indent and the final newline state of the existing file (D70).
+    """
     target = root / path
+    text = target.read_text(encoding="utf-8") if target.exists() else ""
     try:
-        data = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {}
+        data = json.loads(text) if text else {}
     except json.JSONDecodeError as error:
         raise RenderError(f"{path} is not valid JSON: {error}. Fix the file.") from None
     fragment = json.loads(fragment_text)
     present = _contains(data, fragment)
     _merge(data, fragment)
-    return present, json.dumps(data, indent=2) + "\n"
+    newline = "\n" if not text or text.endswith("\n") else ""
+    return present, json.dumps(data, indent=_json_indent(text)) + newline
 
 
 def _manifest_entry(component: Component, old: dict[str, Any] | None, config: dict[str, Any],

@@ -16,7 +16,7 @@ from stone import personas_check
 from stone.writing_check import check_text, load_rules
 
 REPO = Path(__file__).resolve().parents[2]
-RULES = REPO / "plugins" / "workflow" / "skills" / "ste-writing" / "references" / "ste.md"
+RULES = REPO / "plugins" / "cornerstone" / "skills" / "ste-writing" / "references" / "ste.md"
 PERSONAS = "constitution/personas.md"
 
 # 25 words after the ID. The test counts them with str.split(), not with the code under test.

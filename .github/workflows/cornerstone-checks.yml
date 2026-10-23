@@ -52,4 +52,4 @@ jobs:
         run: pip install ./stone
 
       - name: All checks
-        run: python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/main
+        run: python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/dev

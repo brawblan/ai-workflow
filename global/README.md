@@ -7,7 +7,7 @@ me, the owner: it keeps all my devices on the same version. Git is the source of
 | --- | --- |
 | [`AGENTS.md`](AGENTS.md) | My rules for each agent session, in each repo |
 | [`CLAUDE.md`](CLAUDE.md) | `@AGENTS.md` |
-| [`settings.json`](settings.json) | Claude Code settings. It declares the `brawblan` marketplace and enables the `workflow` plugin. |
+| [`settings.json`](settings.json) | Claude Code settings. It declares the `brawblan` marketplace and enables the `cornerstone` plugin. |
 
 ## How the sync works
 
@@ -16,7 +16,7 @@ flowchart LR
   GH[(GitHub: brawblan/ai-workflow)]
   subgraph Device[Each of my devices]
     Clone[~/Repos/ai-workflow] -- symlinks --> Cfg[~/.claude/CLAUDE.md, AGENTS.md, settings.json]
-    Plugin[workflow plugin]
+    Plugin[cornerstone plugin]
   end
   Clone -- git push --> GH
   GH -- git pull --> Clone
@@ -42,19 +42,19 @@ needs only the clone and `install.sh`.
    ```
 
 3. Start Claude Code. It reads the marketplace from the linked `settings.json`.
-   If `/plugin` does not show `workflow@brawblan`, run:
+   If `/plugin` does not show `cornerstone@brawblan`, run:
 
    ```
-   /plugin install workflow@brawblan
+   /plugin install cornerstone@brawblan
    ```
 
 ## Change the workflow
 
 1. Edit the files in `~/Repos/ai-workflow`.
 2. If you changed a skill, increase `version` in
-   [`plugins/workflow/.claude-plugin/plugin.json`](../plugins/workflow/.claude-plugin/plugin.json).
+   [`plugins/cornerstone/.claude-plugin/plugin.json`](../plugins/cornerstone/.claude-plugin/plugin.json).
 3. Run `claude plugin validate .` from the repo root.
-4. To test a skill before you push, run `claude --plugin-dir plugins/workflow`.
+4. To test a skill before you push, run `claude --plugin-dir plugins/cornerstone`.
 5. Commit and push.
 6. Run `/plugin marketplace update brawblan`, also on this device.
 

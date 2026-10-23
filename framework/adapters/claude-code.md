@@ -15,7 +15,7 @@ each component that `stone render` writes.
 | Instruction file (repo) | `AGENTS.md`, and `CLAUDE.md` with one line: `@AGENTS.md` | full | Same file for all harnesses that read `AGENTS.md`. |
 | Instruction file (user) | `~/.claude/CLAUDE.md` | full | This repo links it from `global/`. |
 | Instruction size (K15) | `.cornerstone/checks/instruction_size.py` counts the lines of `AGENTS.md` | full | `CLAUDE.md` has one line, so it does not count. |
-| Skill | `.claude/skills/<name>/SKILL.md`, or a skill in the `workflow` plugin | full | Use `disable-model-invocation: true` for skills with side effects. |
+| Skill | `.claude/skills/<name>/SKILL.md`, or a skill in the `cornerstone` plugin | full | Use `disable-model-invocation: true` for skills with side effects. |
 | Role | `.claude/agents/<role>.md` with `name`, `description`, `tools`, `model` | partial | Tools can be limited. Paths cannot be limited by the role file. See "Protected paths". |
 | Fresh session for each role | A separate `claude -p` run for each role | full | A sub-agent also has a fresh context, but the lead agent starts it. Use separate runs where P2 applies. |
 | Headless run | `claude -p "<prompt>" --output-format json` | full | |
@@ -130,7 +130,18 @@ The run job:
 | `prompt` | The role, the profile, the trigger, the event file path, and the profile steps | The pipeline gives the profile steps at run time (D24). |
 | `claude_args` | `--agent <role> --model <model> --max-turns 30 --add-dir <event folder> --allowedTools "Read(./**),Read(/<event folder>/**)" --disallowedTools Bash,Edit,Write,NotebookEdit,WebFetch,WebSearch --json-schema <report schema>` | The role reads and reports. It cannot change files or run commands. It reads only the checkout and the event folder (D32). Its only output is the report. It stops with an error after 30 turns (D38). |
 
-The action returns the report in `structured_output`. The post job:
+The action returns the report in `structured_output`. The model returns it with the tool
+`StructuredOutput`, which exists only in a run with `--json-schema`. With `--agent`, the `tools:`
+list of the role file limits the tools of the run. So each role file lists `StructuredOutput` (D71).
+Without it, the run ends with `subtype: success` and no `structured_output`, and the run job fails
+(issue #166). In a session with no `--json-schema`, the name has no effect.
+
+| Tested on | Version | Result |
+| --- | --- | --- |
+| Claude Code | 2.1.292 | `--agent` with `StructuredOutput` in `tools:` returns `structured_output`. Without it, no `structured_output`. |
+| `anthropics/claude-code-action` | v1.0.252 | The run job fails with "Claude did not return structured_output" when the role file does not list the tool. |
+
+The post job:
 
 1. Reads the report from the job output through `env` (dossier F8).
 2. Frames the report (D38). A fixed header says that a model wrote the text from untrusted event
@@ -160,7 +171,7 @@ limits apply:
 | Limit | Effect |
 | --- | --- |
 | No write token in the run job | An injected instruction cannot change the repo, issues, or labels. |
-| Tool allowlist: Read, Grep, Glob | No shell, no edits, no web fetch. The only output is the report. |
+| Tool allowlist: Read, Grep, Glob, StructuredOutput | No shell, no edits, no web fetch. The only output is the report. |
 | Read rules only for `./**` and the event folder | Read, Grep, and Glob cannot open a file outside the checkout, such as `/proc/self/environ` with the harness secret. An unscoped `Read` rule allows all paths, and the report is public (D32, dossier F12). |
 | Event text in a file, not in the prompt or a `run` script | The text cannot inject shell commands (dossier F8). |
 | The post job posts the report as text | A report cannot apply labels. The investigator proposes labels, and a human approves them and the severity at G4. |
@@ -227,13 +238,13 @@ check on the main branch and on the integration branch (D33).
 | reviewer | Read, Grep, Glob, Bash (read-only commands) | repo config |
 | investigator | Read, Grep, Glob, Edit, Write (reports path, or a `spike/` branch, enforced by hook), Bash (the hook does not see it, D39) | repo config |
 
+Each role file also lists `StructuredOutput`, so a trigger run can return its report (D71).
+
 ## Existing plugin skills
 
 | Skill | Framework place | Change needed |
 | --- | --- | --- |
-| `project-setup` | full-project, Shape | Becomes the Shape step of `cornerstone-setup`. Stays usable alone. |
+| `project-setup` | full-project, Shape | Becomes the Shape step of `setup`. Stays usable alone. |
 | `sdd-plan`, `sdd-build` | Plan, Build | Removed in plugin 0.5.0 (D18). The planner, implementer, and tester role files do this work. |
-| `ticket-delivery` | Verify, Deliver | Done in plugin 0.4.0: it collects the tester, reviewer, and check output as evidence. It does not self-verify. |
-| `dev-pr` | Deliver | Done in plugin 0.4.0: the PR evidence sections (K14) and the role trailers. |
-| `backlog-sequencer` | Intake | No change. |
+| `ticket-delivery` | Verify, Deliver | Done in plugin 0.4.0: it collects the tester, reviewer, and check output as evidence. It does not self-verify. Since plugin 0.7.0 it also branches, commits, and opens the PR with the evidence sections (K14) and the role trailers. It replaces `dev-pr`. |
 | `ste-writing` | Writing standard ([writing.md](../writing.md)) | Load it in each role that writes human-facing text. Add the blind A/B eval. K17 covers the measurable rules. |

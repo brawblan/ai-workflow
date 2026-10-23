@@ -11,7 +11,7 @@ and the repo config. The same inputs MUST give the same files.
 
 | Item | Value |
 | --- | --- |
-| Trigger | A person runs the CLI, or the `cornerstone-setup` skill runs it |
+| Trigger | A person runs the CLI, or the `setup` skill runs it |
 | Inputs | `framework/` (this repo, at a version tag), the selected harness adapter and model profile, `.cornerstone/config.yaml`, profile overrides |
 | Outputs | Instruction file, skills, roles, hooks, CI workflows, check scripts, templates, `.cornerstone/manifest.yaml` |
 | Owner | brawblan |
@@ -25,7 +25,7 @@ repo config.
 | Part | Job |
 | --- | --- |
 | `stone` CLI (Python 3) | Read the inputs, validate them, render the templates, write the files and the manifest. |
-| `cornerstone-setup` skill | The entry skill. Run `project-setup` as the Shape step (constitution and `AGENTS.md`). Then survey the repo, interview the human for missing facts, write `.cornerstone/config.yaml`, and run the CLI. `project-setup` stays usable alone. |
+| `setup` skill | The entry skill. Run `project-setup` as the Shape step (constitution and `AGENTS.md`). Then survey the repo, interview the human for missing facts, write `.cornerstone/config.yaml`, and run the CLI. `project-setup` stays usable alone. |
 | Templates | Text files with `$name` placeholders in `framework/adapters/<adapter>/templates/` (D12). |
 | Component list | `framework/adapters/<adapter>/components.yaml`: the id, kind, purpose, principle, eval, template, and target path of each component. A component can have `when` (D24) and `ci_step`, a step that render adds to the G3 workflow (D28). |
 

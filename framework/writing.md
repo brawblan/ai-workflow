@@ -9,7 +9,7 @@ STE is a component like any other. It stays only while the evidence shows that i
 ## Rule source
 
 The rules and the shared dictionary are in one file:
-[`plugins/workflow/skills/ste-writing/references/ste.md`](../plugins/workflow/skills/ste-writing/references/ste.md).
+[`plugins/cornerstone/skills/ste-writing/references/ste.md`](../plugins/cornerstone/skills/ste-writing/references/ste.md).
 This file does not copy them. It refers to them by number (for example "rule 8").
 
 Each target repo MAY add a project dictionary, by default `docs/style/ste.md`. Its terms come first.

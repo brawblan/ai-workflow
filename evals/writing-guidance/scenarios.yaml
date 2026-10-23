@@ -1,0 +1,105 @@
+# Eval of the writing guidance (lifecycle.md, "Eval design"). Run:
+#   stone eval guidance.writing --model <model> --trials 3
+# The component is the text that tells an agent how to write (the always-loaded rules and the
+# ste-writing skill). It is not a file that `stone render` writes, so it has no entry in the adapter
+# component list. `variants` replaces with and without (D69): each variant puts one CLAUDE.md in the
+# workspace, and the prompt, the tools, and the fixture stay the same.
+#   none     no writing guidance (the baseline)
+#   always   the Writing and Visuals sections of global/AGENTS.md: the text in every session
+#   current  always, plus the ste-writing skill body and ste.md: the text when the skill loads
+#   short    the 6-line candidate that replaces always and current
+# The variant files are snapshots of origin/dev at 1f7bff7 (2026-10-23). Do not edit them after the
+# first run. Add a new variant for a new text, so that old results stay comparable.
+# grade.py reads the final text of the run from STONE_EVAL_REPORT and tests it with the K17 rules
+# of the pinned file grader-ste.txt. The tasks give no cause for a dictionary term, so there is no
+# dictionary check. The W2 word limit is 160: a smoke run showed a correct, clean answer of 122 words.
+# The limit only catches a reply that is an essay.
+
+component: guidance.writing
+role: writer
+task: |
+  You write text for a human reader. Use only the facts in the prompt and the files of this repo.
+  Do not change any file. Reply with the final text only.
+
+variants:
+  none: []
+  always:
+    - {copy: variants/always/CLAUDE.md, to: CLAUDE.md}
+  current:
+    - {copy: variants/current/CLAUDE.md, to: CLAUDE.md}
+  short:
+    - {copy: variants/short/CLAUDE.md, to: CLAUDE.md}
+
+scenarios:
+  - id: W1
+    title: A PR body with five fixed sections
+    fixture: fixtures/shop
+    prompt: |
+      Write the body of a pull request. The change adds Cart.save_for_later(name) in
+      src/shop/cart.py. It moves a line from the cart to a saved list. A saved line does not count in
+      Cart.total(). The PR adds 6 unit tests. The unit tests pass. The repo has no lint. Old carts
+      give the same total as before. To undo the change, revert the merge commit.
+      Use these headings, in this order: Summary, Why this change, Validation run, Risks,
+      Rollback plan.
+    expect:
+      - {check: sections_in_order, path: "@report", kind: contract,
+         sections: [Summary, Why this change, Validation run, Risks, Rollback plan]}
+      - {check: grader, name: k17_errors}
+      - {check: grader, name: sentence_length}
+      - {check: grader, name: vague_words}
+      - {check: grader, name: paragraph_length}
+      - {check: grader, name: answer_first}
+      - {check: grader, name: no_filler_close}
+      - {check: unchanged, paths: [src/, tests/, README.md]}
+
+  - id: W2
+    title: A chat answer about the code
+    fixture: fixtures/shop
+    prompt: |
+      A teammate asks in chat: "Why does Cart.total() return 0 for a cart that has only a
+      discount line?" Read the code in src/shop and answer the question in chat.
+    expect:
+      - {check: matches, path: "@report", pattern: "max\\(0|clamp|never (below|less than) zero|below zero|at zero|floor"}
+      - {check: grader, name: max_words, limit: 160}
+      - {check: grader, name: k17_errors}
+      - {check: grader, name: sentence_length}
+      - {check: grader, name: vague_words}
+      - {check: grader, name: paragraph_length}
+      - {check: grader, name: answer_first}
+      - {check: grader, name: no_filler_close}
+      - {check: unchanged, paths: [src/, tests/, README.md]}
+
+  - id: W3
+    title: A decision-log entry
+    fixture: fixtures/shop
+    prompt: |
+      Write one entry for a decision log. Give the decision, the options, the choice, and the
+      reason. The decision: where to keep the saved-for-later list. Option A: in the Cart object.
+      Option B: in a new database table. The choice is A. The reason: carts live in memory and the
+      repo has no database. The risk: the saved list is lost when the process restarts.
+    expect:
+      - {check: matches, path: "@report", pattern: "restart"}
+      - {check: grader, name: k17_errors}
+      - {check: grader, name: sentence_length}
+      - {check: grader, name: vague_words}
+      - {check: grader, name: paragraph_length}
+      - {check: grader, name: answer_first}
+      - {check: grader, name: no_filler_close}
+      - {check: unchanged, paths: [src/, tests/, README.md]}
+
+  - id: W4
+    title: A README section with steps
+    fixture: fixtures/shop
+    prompt: |
+      Write the README section "Run the checks" for this repo. Read the README.md first. Give the
+      steps as a numbered list. Add one line about what to do if a test fails.
+    expect:
+      - {check: matches, path: "@report", pattern: "^\\s*1[.)]\\s", kind: contract}
+      - {check: matches, path: "@report", pattern: "unittest"}
+      - {check: grader, name: k17_errors}
+      - {check: grader, name: sentence_length}
+      - {check: grader, name: vague_words}
+      - {check: grader, name: paragraph_length}
+      - {check: grader, name: answer_first}
+      - {check: grader, name: no_filler_close}
+      - {check: unchanged, paths: [src/, tests/, README.md]}

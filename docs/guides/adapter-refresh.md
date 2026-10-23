@@ -22,7 +22,7 @@ flowchart LR
   I --> C{Anything changed?}
   C -->|no| X[Stop: one line in the run log]
   C -->|yes| B[implementer:<br/>profile with status proposed]
-  B --> T[tester:<br/>three eval runs] --> K[stone check] -->|G3| R[reviewer] --> PR[PR] -->|G4| M[Merge and tag]
+  B --> T[tester:<br/>three eval runs] --> K[stone check] -->|G3| R[reviewer] --> PR[PR] -->|G4| M[Merge into dev,<br/>release PR, tag]
 ```
 
 Caption: each role is a new session.
@@ -123,11 +123,12 @@ If a component has no eval, keep the idiom as `proposed` and open a ticket to wr
 1. Run `stone check` and `stone render --dry-run`. Use a sample repo for the second command (G3).
 2. Start the reviewer: `STONE_ROLE=reviewer claude --agent reviewer`. Ask it to check each kept
    idiom against its source and its eval result.
-3. Run `/workflow:ticket-delivery` to open the PR. The PR body needs the line
+3. Run `/cornerstone:ticket-delivery` to open the PR. The PR body needs the line
    `Profile: adapter-refresh`, the guidance diff, the eval table, and the decision log. K7 then uses
    the limit of this profile: 600 changed lines. A human approves the PR (G4).
-4. After the merge, tag a new framework version. Each target repo changes `framework_version` and
-   runs `stone render`.
+4. After the merge into `dev`, release a new framework version. Open a release PR from `dev` into
+   `main`. Then tag the merge commit. See [Versioning](../../framework/versioning.md#release-checklist).
+   Each target repo changes `framework_version` and runs `stone render`.
 
 | Failure | Action |
 | --- | --- |

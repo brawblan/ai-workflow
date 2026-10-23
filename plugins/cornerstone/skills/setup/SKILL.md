@@ -1,10 +1,10 @@
 ---
-name: cornerstone-setup
+name: setup
 description: "Set up a repo for the Cornerstone workflow: run project-setup as the Shape step, survey the repo, ask only for missing facts, write .cornerstone/config.yaml, then run stone render and stone check. Use when asked to set up Cornerstone, onboard a repo to the agent workflow framework, write or update the Cornerstone repo config, or render the role files, hooks, and CI checks. Triggers: 'set up cornerstone', 'cornerstone-setup', 'run stone render for this repo'."
 disable-model-invocation: true
 ---
 
-# cornerstone-setup
+# setup
 
 The entry skill for Cornerstone. It collects the repo facts and writes the repo config. The `stone`
 CLI writes all other files. Do not write role files, hooks, or CI workflows by hand.
@@ -107,7 +107,7 @@ Report:
 3. The manual steps that the generator cannot do: make the `cornerstone-checks` job a required
    status check (G3), and require a PR review (G4).
 
-Offer to open a PR with the `dev-pr` skill.
+Offer to open a PR with the `ticket-delivery` skill.
 
 ## Upgrade an existing setup
 

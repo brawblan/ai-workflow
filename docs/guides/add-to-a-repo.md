@@ -28,7 +28,7 @@ Use this guide when a repo has code but no agent framework. A repo with only an 
    pip install ~/Repos/ai-workflow/stone
    ```
 
-2. Install the `workflow` plugin. See the [install steps](../../README.md#install-the-plugin-for-claude-code).
+2. Install the `cornerstone` plugin. See the [install steps](../../README.md#install-the-plugin-for-claude-code).
 3. Make sure that the repo has a test command, and that CI runs it.
 
 ## Steps
@@ -39,7 +39,7 @@ Use this guide when a repo has code but no agent framework. A repo with only an 
    git switch -c chore/cornerstone-setup
    ```
 
-2. Start Claude Code in the repo, and run `/workflow:cornerstone-setup`.
+2. Start Claude Code in the repo, and run `/cornerstone:setup`.
 3. Answer the questions. The skill reads the repo first, so it asks only for missing facts.
 
 The skill does these steps in order:
@@ -109,7 +109,7 @@ Make two commits. K6 needs the render output in its own commit.
 2. The config and the render output: `.cornerstone/`, `.claude/`, and the CI workflow. Use the
    trailers `Role: generator` and `Actor: agent`.
 
-Then open the PR with `/workflow:dev-pr`. Your approval of that PR is G4.
+Then open the PR with `/cornerstone:ticket-delivery`. Your approval of that PR is G4.
 
 ## Turn on the gates
 

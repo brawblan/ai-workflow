@@ -1,8 +1,8 @@
-# Eval plan: cornerstone-setup
+# Eval plan: setup
 
 | Item | Value |
 | --- | --- |
-| Component | `skill.cornerstone-setup` |
+| Component | `skill.setup` |
 | Purpose | Collect the repo facts, write `.cornerstone/config.yaml`, and run `stone render` and `stone check`. |
 | Principle | P3 (judgment goes into the inputs), P5 |
 | Why not a check | A check cannot find the facts or interview the human. `stone check` validates the result. |

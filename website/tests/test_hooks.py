@@ -33,10 +33,10 @@ class RewriteLinksTest(unittest.TestCase):
 
     def test_folder_off_the_site_goes_to_github_tree(self) -> None:
         with tempfile.TemporaryDirectory() as root:
-            (Path(root) / "plugins" / "workflow").mkdir(parents=True)
-            text = "[skills](../../plugins/workflow/)"
+            (Path(root) / "plugins" / "cornerstone").mkdir(parents=True)
+            text = "[skills](../../plugins/cornerstone/)"
             self.assertEqual(rewrite(text, root),
-                             "[skills](https://github.com/brawblan/ai-workflow/tree/main/plugins/workflow)")
+                             "[skills](https://github.com/brawblan/ai-workflow/tree/main/plugins/cornerstone)")
 
     def test_external_and_anchor_links_stay(self) -> None:
         for text in ("[a](https://example.com/x.md)", "[b](#pick-a-guide)", "[c](mailto:a@b.c)",

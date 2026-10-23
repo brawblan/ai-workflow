@@ -23,7 +23,7 @@
     ]
   },
   "enabledPlugins": {
-    "workflow@brawblan": true
+    "cornerstone@brawblan": true
   },
   "extraKnownMarketplaces": {
     "brawblan": {

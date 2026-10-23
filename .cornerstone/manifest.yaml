@@ -44,7 +44,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .github/workflows/cornerstone-checks.yml
-  hash: f33f7e2837f3f36b2004fac1a99d408b88420e3bd26b9902ca5021fb421325f4
+  hash: c1b2f495d4bbc6e2c62b9f578e94a20f8119d67ba3a4c539273c826ed3fef7de
 - id: hook.path-match
   kind: hook
   purpose: Match a path against paths.tests and paths.checks. The hook and K6 import
@@ -106,7 +106,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/implementer.md
-  hash: 8894f78f732f7eef692ea33b3f3578eacd5e6fbf1880e24ff56fae1ed5182565
+  hash: 79db91a3274677bceeda714fe37b4326510617cbb29c401ab53c91258508f7fb
 - id: role.reviewer
   kind: role
   purpose: Find defects and scope drift in a fresh session.

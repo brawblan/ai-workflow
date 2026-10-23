@@ -2,6 +2,8 @@
 
 Rules for a PR that changes `framework/`. `AGENTS.md` points here.
 
+- Open the PR into `branches.integration` (`dev` in this repo). A release is a PR from `dev` into
+  `main`. See the release checklist in [versioning.md](versioning.md).
 - Keep the core neutral. Put each harness, vendor, model, or spec-tool name in `framework/adapters/`.
   `stone check` fails on a vendor name in the core.
 - When you change a profile, update the gates table in `framework/gates.md` in the same PR.

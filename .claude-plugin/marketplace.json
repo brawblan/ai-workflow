@@ -4,13 +4,13 @@
     "name": "Brandon Blankenstein"
   },
   "metadata": {
-    "description": "Brandon Blankenstein's AI workflow: Cornerstone setup, PR delivery, backlog upkeep, and STE writing."
+    "description": "Brandon Blankenstein's AI workflow: Cornerstone setup, ticket and PR delivery, and STE writing."
   },
   "plugins": [
     {
-      "name": "workflow",
-      "source": "./plugins/workflow",
-      "description": "Skills for Cornerstone setup, project setup, PR delivery, backlog sequencing, and Simplified Technical English writing."
+      "name": "cornerstone",
+      "source": "./plugins/cornerstone",
+      "description": "Skills for Cornerstone setup, project setup, ticket and PR delivery, and Simplified Technical English writing."
     }
   ]
 }

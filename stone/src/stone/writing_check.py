@@ -12,7 +12,7 @@ from stone.findings import Finding
 from stone.markdown import Block, prose_blocks, table_rows
 
 CHECK = "K17"
-DEFAULT_RULES = Path("plugins/workflow/skills/ste-writing/references/ste.md")
+DEFAULT_RULES = Path("plugins/cornerstone/skills/ste-writing/references/ste.md")
 DEFAULT_DICTIONARY = Path("docs/style/ste.md")
 # Agent-facing text is out of scope (writing.md, "Scope"). Golden files are rendered templates.
 DEFAULT_EXCLUDE = ["*SKILL.md", "*/skills/*", "AGENTS.md", "*/AGENTS.md", "CLAUDE.md",

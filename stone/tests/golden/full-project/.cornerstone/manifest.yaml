@@ -121,7 +121,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/planner.md
-  hash: 6007848336b42ffe1c0c18dd9b08a08ce4d8b1dbf810847be3ec717c0fe572e6
+  hash: 3c36629e6ea6c3156694c544acf0e6562be819187aada63c8fa9a4f2669795d1
 - id: role.reviewer
   kind: role
   purpose: Find defects and scope drift in a fresh session.
@@ -136,7 +136,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/reviewer.md
-  hash: 69d57b24cd58e8d1adafe663f458c8b4621f08a36575384e91c2e15048c7f90d
+  hash: 6a9f5184e06dfd0f274230baaa587a49632fd721c0fab0e88740fc38bf292f54
 - id: role.shaper
   kind: role
   purpose: Interview the human until the ticket meets the Definition of Ready.
@@ -150,4 +150,4 @@ components:
   review_by: '2027-04-18'
   files:
   - .claude/agents/shaper.md
-  hash: aa52b5cf5920c72c62d312c4c130d3f90955661a69daa1ff257052e592679c7d
+  hash: 4b79970810b144f67f2babc87a2fe0de7d04cf0be69f8a1de1440312209b7c0b

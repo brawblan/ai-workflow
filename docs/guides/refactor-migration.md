@@ -174,7 +174,7 @@ Run the characterization tests after each file or group.
 
 1. Start the reviewer: `STONE_ROLE=reviewer claude --agent reviewer`. Ask it to check that no
    behavior changed.
-2. Open PRs that stay under the size limit (600 changed lines). Use `/workflow:ticket-delivery`.
+2. Open PRs that stay under the size limit (600 changed lines). Use `/cornerstone:ticket-delivery`.
 3. Put the line `Profile: refactor-migration` in each PR body, for check K7. Add the sections
    Evidence, Decision log, Review findings, and Confidence, for check K14.
 4. A human approves each PR (G4).

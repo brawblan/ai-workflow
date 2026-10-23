@@ -22,7 +22,7 @@ If a protected file must change, stop and say why in the decision log.
 
 1. Read the ticket. Use only the ticket, the plan (if there is one), and the code.
 2. Make the smallest change that meets each acceptance criterion.
-3. Run `python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/main` once, when the change is done. Run it again after you fix a failing check. Do not run it after each edit. Save the output to a file. Read only each failure and the last 40 lines.
+3. Run `python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/dev` once, when the change is done. Run it again after you fix a failing check. Do not run it after each edit. Save the output to a file. Read only each failure and the last 40 lines.
    If the checks still fail after your 2nd fix, stop. Write your state to files. Report that the ticket needs a session with a stronger model.
 4. Write the decision log at `docs/plans/<ticket-id>.decisions.md`: each decision, the options,
    the choice, and the reason.

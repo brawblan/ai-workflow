@@ -151,6 +151,69 @@ class RenderTest(unittest.TestCase):
                          "Edit|Write|MultiEdit|NotebookEdit")
         self.assertIn(".claude/settings.json", self.render().skipped)
 
+    def merge_into(self, existing: dict | None, indent: str | int | None, final_newline: bool = True
+                   ) -> tuple[str, str]:
+        """Write an existing settings file, render, and return (the text after, the text after a
+        second render)."""
+        settings = self.root / ".claude/settings.json"
+        if existing is not None:
+            settings.parent.mkdir(parents=True)
+            text = json.dumps(existing, indent=indent) + ("\n" if final_newline else "")
+            settings.write_text(text, encoding="utf-8")
+        self.render()
+        first = settings.read_text(encoding="utf-8")
+        self.assertIn(".claude/settings.json", self.render().skipped)
+        return first, settings.read_text(encoding="utf-8")
+
+    def test_settings_merge_keeps_tab_indent(self) -> None:
+        first, second = self.merge_into({"permissions": {"allow": ["Bash(ls)"]}}, "\t")
+        self.assertIn("PreToolUse", json.loads(first)["hooks"])
+        self.assertEqual(first.splitlines()[1], '\t"permissions": {')
+        self.assertNotIn("  ", first)
+        self.assertEqual(second, first)
+
+    def test_settings_merge_keeps_four_space_indent(self) -> None:
+        first, second = self.merge_into({"a": {"b": 1}}, 4)
+        self.assertEqual(first.splitlines()[1], '    "a": {')
+        self.assertEqual(first.splitlines()[2], '        "b": 1')
+        self.assertEqual(second, first)
+
+    def test_settings_merge_keeps_two_space_indent(self) -> None:
+        first, second = self.merge_into({"a": {"b": 1}}, 2)
+        self.assertEqual(first.splitlines()[1], '  "a": {')
+        self.assertEqual(first.splitlines()[2], '    "b": 1')
+        self.assertEqual(second, first)
+
+    def test_settings_new_file_uses_two_spaces(self) -> None:
+        first, second = self.merge_into(None, None)
+        self.assertEqual(first.splitlines()[0], "{")
+        self.assertEqual(first.splitlines()[1][:3], '  "')
+        self.assertTrue(first.endswith("\n"))
+        self.assertEqual(second, first)
+
+    def test_settings_merge_keeps_missing_final_newline(self) -> None:
+        first, second = self.merge_into({"a": 1}, 2, final_newline=False)
+        self.assertFalse(first.endswith("\n"))
+        self.assertTrue(first.endswith("}"))
+        self.assertEqual(second, first)
+
+    def test_settings_merge_keeps_final_newline(self) -> None:
+        first, second = self.merge_into({"a": 1}, 2, final_newline=True)
+        self.assertTrue(first.endswith("}\n"))
+        self.assertFalse(first.endswith("\n\n"))
+        self.assertEqual(second, first)
+
+    def test_settings_whitespace_only_reformat_is_not_drift(self) -> None:
+        self.render()
+        settings = self.root / ".claude/settings.json"
+        data = json.loads(settings.read_text(encoding="utf-8"))
+        reformatted = json.dumps(data, indent="\t")
+        settings.write_text(reformatted, encoding="utf-8")
+        result = self.render()
+        self.assertEqual(result.drift, [])
+        self.assertIn(".claude/settings.json", result.skipped)
+        self.assertEqual(settings.read_text(encoding="utf-8"), reformatted)
+
     def test_removed_hook_entry_is_drift(self) -> None:
         self.render()
         (self.root / ".claude/settings.json").write_text("{}", encoding="utf-8")

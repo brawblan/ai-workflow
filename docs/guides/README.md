@@ -70,4 +70,4 @@ default, see [customization.md](../../framework/customization.md).
 | A clone of [this repo](https://github.com/brawblan/ai-workflow) | The framework files that `stone render` reads |
 | Python 3.11 or later, and `pip install ./stone` from the clone | The `stone` CLI |
 | `git` and the GitHub CLI (`gh`) | Branches, issues, and PRs |
-| Claude Code, with the `workflow` plugin | The only harness adapter at this time. See the [install steps](../../README.md#install-the-plugin-for-claude-code). |
+| Claude Code, with the `cornerstone` plugin | The only harness adapter at this time. See the [install steps](../../README.md#install-the-plugin-for-claude-code). |

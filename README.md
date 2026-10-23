@@ -5,7 +5,7 @@ done.**
 
 Version 1.2.0. All 10 profiles are supported, and each generated check blocks.
 
-This repo holds Cornerstone, its `stone` CLI, the `workflow` plugin skills, my personal agent
+This repo holds Cornerstone, its `stone` CLI, the `cornerstone` plugin skills, my personal agent
 rules, and tips. Read the docs at [brawblan.github.io/ai-workflow](https://brawblan.github.io/ai-workflow/).
 
 ## What Cornerstone is
@@ -62,7 +62,7 @@ Draft v0. The framework is complete enough to use on one profile. Other parts ar
 | [Framework](framework/README.md): principles, workflow model, gates, checks, modes, 10 profiles | Draft v0 |
 | [Harness adapter](framework/adapters/claude-code.md) and [model profile](framework/adapters/claude-code/models/claude-5.yaml) | First adapter. The model profile evals are not written yet. |
 | [`stone`](stone/README.md) 0.9 | `stone check`, `stone check-writing` (K17), `stone check-evidence` (K14), `stone spec apply` and `sync`, `stone render` for the roles of all 10 profiles, and `stone eval`. Some profile checks and the triggers are not rendered yet. |
-| [`workflow` plugin](plugins/workflow/) 0.6.0 | Six skills. `cornerstone-setup` is the entry skill. |
+| [`cornerstone` plugin](plugins/cornerstone/) 0.8.0 | Four skills. `setup` is the entry skill. |
 | This repo | Uses Cornerstone on itself: [`.cornerstone/config.yaml`](.cornerstone/config.yaml) and CI in [`stone.yml`](.github/workflows/stone.yml) |
 
 The next steps are in the [roadmap](framework/README.md#roadmap). The design decisions (D1, D2, ...)
@@ -76,7 +76,7 @@ flowchart LR
     P[Principles] --> M[Workflow model<br/>stages, roles, gates, checks]
     M --> PR[Profiles and modes]
     PR --> A[Adapters and<br/>model profiles]
-    S[cornerstone-setup skill]
+    S[setup skill]
   end
   S -- writes --> C[.cornerstone/config.yaml]
   A --> R[stone render]
@@ -114,11 +114,11 @@ only harness adapter at this time.
    pip install ./ai-workflow/stone
    ```
 
-2. Install the `workflow` plugin (see [Install the plugin](#install-the-plugin-for-claude-code)).
-3. In the target repo, run `/workflow:cornerstone-setup`.
+2. Install the `cornerstone` plugin (see [Install the plugin](#install-the-plugin-for-claude-code)).
+3. In the target repo, run `/cornerstone:setup`.
 
 The skill runs `project-setup` first. That skill writes `AGENTS.md`, `CLAUDE.md`, and
-`constitution/`. Then `cornerstone-setup` asks only for the facts that it cannot find in the repo.
+`constitution/`. Then `setup` asks only for the facts that it cannot find in the repo.
 It writes `.cornerstone/config.yaml`, and runs `stone render` and `stone check`.
 
 For the single-ticket profile, `stone render` writes:
@@ -144,14 +144,12 @@ writes the planner, tester, and reviewer roles, so the plugin has no skill for t
 
 | Skill | What it does |
 | --- | --- |
-| `cornerstone-setup` | Set up a repo for Cornerstone. It runs `project-setup`, writes `.cornerstone/config.yaml`, and runs `stone render` and `stone check`. |
+| `setup` | Set up a repo for Cornerstone. It runs `project-setup`, writes `.cornerstone/config.yaml`, and runs `stone render` and `stone check`. |
 | `project-setup` | Set up a repo for agents: `constitution/` (with personas and job stories), and `AGENTS.md`. It asks only for facts the repo does not have. |
-| `ticket-delivery` | Collect the tester, reviewer, and check evidence for each acceptance criterion. Then open the PR with `dev-pr`. |
-| `dev-pr` | Branch, commit, rebase, validate, and open a PR into the integration branch, with the evidence sections. |
-| `backlog-sequencer` | Sync a `status:blocked` label from "Depends on #N" text. Suggest priority labels. |
+| `ticket-delivery` | Collect the tester, reviewer, and check evidence for each acceptance criterion. Then branch, commit, rebase, and open the PR into the integration branch, with the evidence sections. |
 | `ste-writing` | Write with Simplified Technical English rules, and add diagrams. |
 
-`cornerstone-setup` needs the `stone` CLI and a clone of this repo. The other skills need only `git`
+`setup` needs the `stone` CLI and a clone of this repo. The other skills need only `git`
 and `gh`.
 
 ## Install the plugin for Claude Code
@@ -165,10 +163,10 @@ and `gh`.
 2. Install the plugin:
 
    ```
-   /plugin install workflow@brawblan
+   /plugin install cornerstone@brawblan
    ```
 
-3. Restart Claude Code. The skills have the `workflow:` prefix, for example `/workflow:dev-pr`.
+3. Restart Claude Code. The skills have the `cornerstone:` prefix, for example `/cornerstone:ticket-delivery`.
 
 To get updates, run `/plugin marketplace update brawblan`. You can also turn on auto-update for
 the marketplace in the `/plugin` menu.
@@ -177,12 +175,12 @@ the marketplace in the `/plugin` menu.
 
 The skills use the open `SKILL.md` format. `stone render` has no adapter for other harnesses yet.
 
-1. Copy a folder from `plugins/workflow/skills/` into your agent's skills folder.
+1. Copy a folder from `plugins/cornerstone/skills/` into your agent's skills folder.
    See [docs/tips/other-tools.md](docs/tips/other-tools.md) for each tool.
 2. To set up a repo without the plugin, tell your agent:
 
    ```text
-   Follow plugins/workflow/skills/project-setup/SKILL.md from github.com/brawblan/ai-workflow.
+   Follow plugins/cornerstone/skills/project-setup/SKILL.md from github.com/brawblan/ai-workflow.
    Use the templates next to it.
    ```
 
@@ -196,7 +194,7 @@ The skills use the open `SKILL.md` format. `stone render` has no adapter for oth
 | [`framework/`](framework/README.md) | Cornerstone: principles, workflow model, gates, checks, modes, profiles, lifecycle, writing standard, generator design |
 | [`framework/adapters/`](framework/adapters/contract.md) | Harness adapters, model profiles, spec-tool adapters, and the templates for `stone render` |
 | [`stone/`](stone/README.md) | The `stone` CLI (Python 3.11+, PyYAML only) and its tests |
-| [`plugins/workflow/skills/`](plugins/workflow/skills/) | The plugin skills, and the `project-setup` templates |
+| [`plugins/cornerstone/skills/`](plugins/cornerstone/skills/) | The plugin skills, and the `project-setup` templates |
 | [`docs/research/`](docs/research/dossier.md) | The cited evidence for the framework |
 | [`docs/guides/`](docs/guides/README.md) | How to use Cornerstone, one situation at a time |
 | [`docs/tips/`](docs/tips/README.md) | How I work with agents, and why |
