@@ -227,6 +227,16 @@ A spike branch cannot change or remove it. The job checks out no code and has `p
 (dossier F11). It gets the branch names only through `env`. Add the `k16` job as a required status
 check on the main branch and on the integration branch (D33).
 
+### Env and secrets of the All checks step
+
+`ci.env` and `ci.secrets` in the repo config add an `env:` block to the `All checks` step of the G3
+job (#163). No other step and no role job gets it. A secret appears only as `${{ secrets.NAME }}`.
+`stone check` fails a name that does not match `^[A-Z_][A-Z0-9_]*$`, a name in both keys, and a
+`ci.env` value that has `${{`.
+
+GitHub does not pass secrets to a PR from a fork. The variable is then empty. A test that needs a
+secret must still skip when the variable is empty.
+
 ## Role files (generated)
 
 | Role | Tools | Default model |

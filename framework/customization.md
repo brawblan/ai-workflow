@@ -64,6 +64,9 @@ limits:
   function_lines: 60
   cyclomatic: 10
   mutation_score_changed_code: 0.6
+ci:                                # optional. Env of the All checks step in the G3 job (#163)
+  env: {NAME: value}               # plain values. A name matches ^[A-Z_][A-Z0-9_]*$.
+  secrets: [STRIPE_SECRET_KEY]     # names of repo secrets. The step gets ${{ secrets.NAME }}.
 tickets:                           # optional. Where the ticket lives (#137)
   source: github                   # github (default), or file
   path: docs/tickets/{id}.txt      # with source: file. {id} is the ticket ID.
