@@ -251,5 +251,85 @@ class CiSetupProblemsTest(unittest.TestCase):
         self.assertTrue(any("item 2" in problem for problem in problems), problems)
 
 
+class CiSectionKeyCheckTest(unittest.TestCase):
+    """The keys of the `ci` section are checked in one place: ci_setup.section_problems."""
+
+    def setUp(self) -> None:
+        self.folder = tempfile.TemporaryDirectory()
+        self.root = Path(self.folder.name)
+        (self.root / ".cornerstone").mkdir()
+
+    def tearDown(self) -> None:
+        self.folder.cleanup()
+
+    def write(self, extra: str) -> None:
+        (self.root / ".cornerstone" / "config.yaml").write_text(CONFIG + extra, encoding="utf-8")
+
+    def findings(self, extra: str) -> list[str]:
+        self.write(extra)
+        return [str(f) for f in framework_check.check_config(self.root, FRAMEWORK)]
+
+    def render_message(self, extra: str) -> str:
+        self.write(extra)
+        with contextlib.redirect_stderr(io.StringIO()):
+            with self.assertRaises(render.RenderError) as caught:
+                render.render(self.root, FRAMEWORK, today=dt.date(2026, 10, 17))
+        return str(caught.exception)
+
+    def test_one_wrong_key_gives_one_finding(self) -> None:
+        found = self.findings("ci: {cache: 1}\n")
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("'ci.cache' is not a key", found[0])
+
+    def test_ci_that_is_not_a_map_gives_one_finding(self) -> None:
+        found = self.findings("ci: [a]\n")
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("'ci' must be a map", found[0])
+
+    def test_each_valid_key_alone_gives_no_finding(self) -> None:
+        for line in ("ci: {env: {A: x}}", "ci: {secrets: [A]}", 'ci: {setup: {node: "22"}}',
+                     "ci: {branches: [dev]}"):
+            with self.subTest(line=line):
+                self.assertEqual(self.findings(line + "\n"), [])
+
+    def test_two_wrong_keys_give_two_findings(self) -> None:
+        found = self.findings("ci: {cache: 1, zz: 2}\n")
+        self.assertEqual(len(found), 2, found)
+        self.assertEqual(sum("'ci.cache' is not a key" in f for f in found), 1)
+        self.assertEqual(sum("'ci.zz' is not a key" in f for f in found), 1)
+
+    def test_section_problems_gives_nothing_without_a_section(self) -> None:
+        for config in ({}, {"ci": None}, {"ci": {}}):
+            with self.subTest(config=config):
+                self.assertEqual(ci_setup.section_problems(config), [])
+
+    def test_section_problems_gives_one_error_for_a_non_map(self) -> None:
+        for value in (["a"], "x", 3):
+            with self.subTest(value=value):
+                found = ci_setup.section_problems({"ci": value})
+                self.assertEqual(len(found), 1, found)
+                self.assertIn("'ci' must be a map", found[0])
+
+    def test_section_problems_gives_one_error_for_each_unknown_key(self) -> None:
+        found = ci_setup.section_problems({"ci": {"env": {}, "cache": 1, "zz": 2}})
+        self.assertEqual(len(found), 2, found)
+
+    def test_keys_are_the_four_section_keys(self) -> None:
+        self.assertEqual(ci_setup.KEYS, ("env", "secrets", "setup", "branches"))
+
+    def test_render_and_check_config_give_the_same_message(self) -> None:
+        for line, text in (("ci: {cache: 1}", "'ci.cache' is not a key"),
+                           ("ci: [a]", "'ci' must be a map")):
+            with self.subTest(line=line):
+                message = self.render_message(line + "\n")
+                found = self.findings(line + "\n")
+                self.assertEqual(len(found), 1, found)
+                self.assertIn(text, message)
+                self.assertIn(text, found[0])
+                expected = ci_setup.section_problems({"ci": yaml.safe_load(line)["ci"]})[0]
+                self.assertIn(expected, message)
+                self.assertIn(expected, found[0])
+
+
 if __name__ == "__main__":
     unittest.main()

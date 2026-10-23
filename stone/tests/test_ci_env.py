@@ -11,7 +11,7 @@ from pathlib import Path
 
 import yaml
 
-from stone import framework_check, render
+from stone import ci_setup, framework_check, render
 
 FRAMEWORK = Path(__file__).resolve().parents[2] / "framework"
 TODAY = dt.date(2026, 10, 17)
@@ -136,11 +136,15 @@ class CiEnvProblemsTest(unittest.TestCase):
         self.assertTrue(self.problems({"env": {"TOKEN": "${{ secrets.X }}"}}))
 
     def test_unknown_ci_key(self) -> None:
-        found = self.problems({"vars": {}})
-        self.assertTrue(any("vars" in p for p in found))
+        # The section check lives in ci_setup.section_problems, not here.
+        self.assertEqual(self.problems({"vars": {}}), [])
+        self.assertTrue(any("'ci.vars' is not a key" in p for p in
+                            ci_setup.section_problems({"ci": {"vars": {}}})))
 
     def test_wrong_types(self) -> None:
-        self.assertTrue(self.problems(["a"]))
+        self.assertEqual(self.problems(["a"]), [])
+        self.assertTrue(any("'ci' must be a map" in p for p in
+                            ci_setup.section_problems({"ci": ["a"]})))
         self.assertTrue(self.problems({"env": ["A"]}))
         self.assertTrue(self.problems({"secrets": {"A": "b"}}))
 
