@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from stone import framework_check, results, specialists, specs, triggers
+from stone import ci_setup, framework_check, results, specialists, specs, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -65,7 +65,7 @@ Add `Reproduction:` for a bug and `Time box:` for a spike or an audit, if the pr
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 DEFAULT_PR_LINES = 600  # D4, customization.md
-BLOCKS = ["all_checks_env", "check_steps", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
+BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
 
 class RenderError(Exception):
@@ -233,6 +233,8 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     for key, value in (config.get("limits") or {}).items():
         if value is not None and str(value).strip():  # an empty limit has no value
             values[f"limit_{key}"] = str(value)
+    if ci_setup.problems(config):
+        raise RenderError(f"{CONFIG}: {ci_setup.problems(config)[0]}")
     opt_in = config.get("adoption", "all") == "opt-in"
     no_k6 = commit_settings(config)["trailers"] == "none"
     values.update(ticket_values(config))
@@ -242,6 +244,7 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
         "marker_step": (MARKER_STEP.replace("PROFILE_IDS", "|".join(config.get("profiles") or []))
                         if opt_in else ""),
         "pr_types": PR_TYPES if opt_in else "",
+        "ci_setup": ci_setup.block(config, MARKER_IF if opt_in else ""),
         "marker_rule": (" If you open or edit a PR, add the line `Profile: <id>` to the PR body, "
                         "or the label `cornerstone`. The G3 workflow skips a PR with neither."
                         if opt_in else ""),

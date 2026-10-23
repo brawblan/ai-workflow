@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from stone import __version__, personas_check, results, specialists, specs, upgrade
+from stone import __version__, ci_setup, personas_check, results, specialists, specs, upgrade
 from stone.findings import Finding
 from stone.markdown import link_file, relative_links, split_frontmatter, table_rows
 
@@ -359,9 +359,9 @@ def ci_env_problems(config: dict[str, Any]) -> list[str]:
     if not isinstance(section, dict):
         return ["'ci' must be a map with the keys env and secrets."]
     problems = []
-    unknown = sorted(set(section) - {"env", "secrets"})
+    unknown = sorted(set(section) - {"env", "secrets", "setup"})
     if unknown:
-        problems.append(f"'ci.{unknown[0]}' is not a key. Use env or secrets.")
+        problems.append(f"'ci.{unknown[0]}' is not a key. Use env, secrets, or setup.")
     env = section.get("env") or {}
     secrets = section.get("secrets") or []
     if not isinstance(env, dict):
@@ -456,7 +456,8 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
         add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
     for problem in (ticket_folder_problems(config) + protected_path_problems(config)
                     + commit_problems(root, config)
-                    + ticket_problems(config) + ci_env_problems(config) + specialists.problems(config)):
+                    + ticket_problems(config) + ci_env_problems(config) + specialists.problems(config)
+                    + ci_setup.problems(config)):
         add(problem)
     for waiver in config.get("waivers", []):
         if waiver.get("gate") in {"G3", "G5"}:
