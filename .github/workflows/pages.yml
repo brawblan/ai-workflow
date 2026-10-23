@@ -1,13 +1,11 @@
-# The docs site: build it on each PR that changes the docs, and deploy it to GitHub Pages from main.
+# The docs site: build it on each PR that changes the docs, and deploy it to GitHub Pages only on a release tag.
 name: pages
 
 on:
   pull_request:
     paths: [docs/**, evals/**, framework/**, stone/README.md, website/**, mkdocs.yml, .github/workflows/pages.yml]
   push:
-    branches: [main]
-    paths: [docs/**, evals/**, framework/**, stone/README.md, website/**, mkdocs.yml, .github/workflows/pages.yml]
-  workflow_dispatch:
+    tags: ['v*']
 
 permissions:
   contents: read
@@ -35,13 +33,13 @@ jobs:
       - name: Build
         run: mkdocs build --strict
 
-      - if: github.event_name != 'pull_request'
+      - if: github.event_name == 'push'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: website/build
 
   deploy:
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
     needs: build
     runs-on: ubuntu-latest
     permissions:
