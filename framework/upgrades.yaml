@@ -1,6 +1,18 @@
 # The record of each release. `stone upgrade` reads it, and `stone check` validates it.
 # Newest first. Rules and the form: framework/versioning.md.
 versions:
+  - version: 1.2.1
+    kind: patch
+    released: null
+    summary: stone render keeps the indent (a tab, or N spaces) and the final newline of a JSON file that it merges into, for example .claude/settings.json.
+    config:
+      added: []
+      renamed: []
+      removed: []
+    files:
+      - {path: .claude/settings.json, change: changed, note: "Render no longer changes the indent of the file (D70)."}
+    steps:
+      - "Run stone render. If a formatter changed the indent of .claude/settings.json, render now keeps it."
   - version: 1.2.0
     kind: minor
     released: 2026-10-22
