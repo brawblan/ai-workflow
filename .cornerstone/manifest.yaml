@@ -1,4 +1,4 @@
-framework_version: 1.2.0
+framework_version: 1.2.1
 components:
 - id: check.k6
   kind: check
@@ -44,7 +44,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .github/workflows/cornerstone-checks.yml
-  hash: c1b2f495d4bbc6e2c62b9f578e94a20f8119d67ba3a4c539273c826ed3fef7de
+  hash: e9f159ac30f26a5c3e63dc339fd102a14e84bad84278bb88bb3a4d1cec3f6a7a
 - id: hook.path-match
   kind: hook
   purpose: Match a path against paths.tests and paths.checks. The hook and K6 import
@@ -106,7 +106,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/implementer.md
-  hash: 79db91a3274677bceeda714fe37b4326510617cbb29c401ab53c91258508f7fb
+  hash: a2828f9451b3b3278755c03ad5161cea69df4646427b3258c1ba47a1a8429c2a
 - id: role.reviewer
   kind: role
   purpose: Find defects and scope drift in a fresh session.
@@ -121,7 +121,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/reviewer.md
-  hash: 251dbbb9f9dc9cf4cca48e71cbd07fb076072dca941c4730bf9238950c6726c7
+  hash: e813d74853c4a499412820719e892257917a1c9c6346425692cd9f5f43776f7d
 - id: role.shaper
   kind: role
   purpose: Interview the human until the ticket meets the Definition of Ready.
@@ -135,7 +135,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/shaper.md
-  hash: aa52b5cf5920c72c62d312c4c130d3f90955661a69daa1ff257052e592679c7d
+  hash: 4b79970810b144f67f2babc87a2fe0de7d04cf0be69f8a1de1440312209b7c0b
 - id: role.tester
   kind: role
   purpose: Write independent tests from the ticket and the diff.
@@ -151,7 +151,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/tester.md
-  hash: ca3f944943c17881bebf128e1de4e34f74446135c41265a02b0be0de94c97b31
+  hash: 7dfc624b4dfbba720b44f9c0552fca2ea611e8c1ccf394175f85374b62174150
 - id: trigger.label.single-ticket
   kind: ci-job
   purpose: Start the first role of the profile when a human adds the trigger label
