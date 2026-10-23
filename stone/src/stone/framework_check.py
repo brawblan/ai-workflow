@@ -369,16 +369,15 @@ CI_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 
 
 def ci_env_problems(config: dict[str, Any]) -> list[str]:
-    """Return the problems of `ci.env` and `ci.secrets`, the env of the All checks step (#163)."""
+    """Return the problems of `ci.env` and `ci.secrets`, the env of the All checks step (#163).
+
+    `ci_setup.section_problems` checks the `ci` section itself: a value that is not a map, or
+    an unknown key.
+    """
     section = config.get("ci")
-    if section is None:
-        return []
     if not isinstance(section, dict):
-        return ["'ci' must be a map with the keys env, secrets, setup, and branches."]
+        return []
     problems = []
-    unknown = sorted(set(section) - {"env", "secrets", "setup", "branches"})
-    if unknown:
-        problems.append(f"'ci.{unknown[0]}' is not a key. Use env, secrets, setup, or branches.")
     env = section.get("env") or {}
     secrets = section.get("secrets") or []
     if not isinstance(env, dict):

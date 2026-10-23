@@ -10,17 +10,29 @@ from typing import Any
 SETUP_NODE = "actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0"
 SHA_REF = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 STEP_KEYS = {"name", "uses", "with", "run"}
+# The keys of the `ci` section. Add a new `ci` key here only: `stone check` and `stone render`
+# use this list for the unknown key check.
+KEYS = ("env", "secrets", "setup", "branches")
 
 
-def problems(config: dict[str, Any]) -> list[str]:
-    """Return the problems of the `ci` section of the repo config."""
+def section_problems(config: dict[str, Any]) -> list[str]:
+    """Return the problems of the `ci` section itself: a value that is not a map, or a wrong key."""
     section = config.get("ci")
     if section is None:
         return []
+    names = ", ".join(KEYS[:-1])
     if not isinstance(section, dict):
-        return ["'ci' must be a map. Its keys are env, secrets, setup, and branches."]
-    found = [f"'ci.{key}' is not a key. Use env, secrets, setup, or branches."
-             for key in sorted(set(section) - {"setup", "env", "secrets", "branches"})]
+        return [f"'ci' must be a map with the keys {names}, and {KEYS[-1]}."]
+    return [f"'ci.{key}' is not a key. Use {names}, or {KEYS[-1]}."
+            for key in sorted(set(section) - set(KEYS), key=str)]
+
+
+def problems(config: dict[str, Any]) -> list[str]:
+    """Return the problems of the `ci` section and of `ci.setup`."""
+    found = section_problems(config)
+    section = config.get("ci")
+    if not isinstance(section, dict):
+        return found
     setup = section.get("setup")
     if setup is None:
         return found
