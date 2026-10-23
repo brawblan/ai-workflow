@@ -127,7 +127,7 @@ is no CI job. Run `stone gate` and put its output in the PR.
 ## Open the PR
 
 Run `/workflow:ticket-delivery` in a new session. It collects the tester, reviewer, and check
-evidence for each acceptance criterion. Then it opens the PR with `/workflow:dev-pr`. It does not
+evidence for each acceptance criterion. Then it opens the PR. It does not
 write tests or a review itself. If one is missing, it tells you which role to start.
 
 Put a `Profile: <id>` line in the PR body, for example `Profile: single-ticket`. Check K7 reads it

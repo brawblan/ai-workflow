@@ -109,7 +109,7 @@ Make two commits. K6 needs the render output in its own commit.
 2. The config and the render output: `.cornerstone/`, `.claude/`, and the CI workflow. Use the
    trailers `Role: generator` and `Actor: agent`.
 
-Then open the PR with `/workflow:dev-pr`. Your approval of that PR is G4.
+Then open the PR with `/workflow:ticket-delivery`. Your approval of that PR is G4.
 
 ## Turn on the gates
 

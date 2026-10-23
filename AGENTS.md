@@ -74,7 +74,7 @@ tool-neutral, and `stone check` fails on a vendor name in it.
   [versioning.md](framework/versioning.md#release-checklist).
 - Commit messages: `type(scope): summary` (for example `feat(stone): ...`, `docs(framework): ...`).
   Explain why in the body.
-- PR body: use the nine sections of the `dev-pr` skill, each under its own heading. K14 tests the
+- PR body: use the nine sections of the `ticket-delivery` skill, each under its own heading. K14 tests the
   last four. If a section does not apply, write `None` and the reason.
 
 ## Writing

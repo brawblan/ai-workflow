@@ -113,4 +113,4 @@ Keep the principles in `constitution/principles.md`.
 ## 7. Hand off
 
 Report: the files made or moved, the open `TODO` lines, and any contradictions that you found.
-Offer to open a PR with the `dev-pr` skill.
+Offer to open a PR with the `ticket-delivery` skill.
