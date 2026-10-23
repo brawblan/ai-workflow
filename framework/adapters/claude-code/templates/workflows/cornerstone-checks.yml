@@ -50,6 +50,7 @@ $gate_if
             | "$${RUNNER_TEMP}/stone/bin/stone" check-evidence - --mode block --format github
 
 $ci_step_check_k15
+$ci_setup
       - name: Install
 $marker_if
         run: $command_install

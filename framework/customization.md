@@ -68,6 +68,11 @@ ci:                                # optional. Settings of the G3 job (#163, #16
   env: {NAME: value}               # plain values. A name matches ^[A-Z_][A-Z0-9_]*$.
   secrets: [STRIPE_SECRET_KEY]     # names of repo secrets. The step gets ${{ secrets.NAME }}.
   branches: [dev]                  # K6, K7, and K14 run only on a PR into these branches (#164)
+  setup:                           # steps before `Install` (#162)
+    node: "22"                     # adds actions/setup-node with this version and cache: npm
+    steps:                         # then these steps, in order. Each `uses` needs a commit SHA.
+      - {uses: "owner/repo@<40-character sha>", with: {key: value}}
+      - {run: ./scripts/ci/prepare.sh}
 tickets:                           # optional. Where the ticket lives (#137)
   source: github                   # github (default), or file
   path: docs/tickets/{id}.txt      # with source: file. {id} is the ticket ID.
@@ -187,7 +192,7 @@ Use it when only some people or some tickets use Cornerstone ([D58](README.md#de
 ### Gate steps by base branch (`ci.branches`)
 
 Use it when a repo promotes code with PRs between long-lived branches, for example `dev` to
-`staging` to `main` ([D73](README.md#decisions)).
+`staging` to `main` ([D74](README.md#decisions)).
 
 - K6, K7, and K14 are for ticket PRs. With `ci.branches`, these steps run only when the base
   branch of the PR is in the list. In a PR into another branch, they show as skipped.
@@ -232,6 +237,20 @@ The implementer and the tester read this section (#121, [D57](README.md#decision
 
 Git can lose a note when a person rebases. Run `git config notes.rewriteRef refs/notes/cornerstone`
 to keep notes through a rebase or an amend.
+
+### CI setup (`ci.setup`)
+
+The G3 job installs with `commands.install` on the default tools of the runner image (#162,
+[D73](README.md#decisions)). `ci.setup` adds steps before `Install`. Without `ci.setup`, the
+workflow does not change.
+
+| Key | Value | Effect |
+| --- | --- | --- |
+| `node` | a text, for example `"22"` | A step `actions/setup-node`, pinned to a commit SHA, with this `node-version` and `cache: npm`. |
+| `steps` | a list | Steps after the setup-node step. Each item has `uses` (and `with`) or `run`, and can have `name`. |
+
+`stone check` and `stone render` fail on an unknown key, on a wrong type, and on a `uses` value
+that has no commit SHA. The steps run only in the G3 job, not in the role jobs.
 
 ### Specialist reviews (`specialists`)
 
