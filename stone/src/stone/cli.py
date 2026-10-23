@@ -108,7 +108,9 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
     run.add_argument("--scenario", action="append", metavar="ID",
                      help="Run only this scenario. Repeat for more. Default: all.")
-    run.add_argument("--variant", choices=["with", "without", "both"], default="both")
+    run.add_argument("--variant", default="both",
+                     help="'with', 'without', or 'both' (default). A guidance eval takes the names "
+                          "in the 'variants' of its scenarios.")
     run.add_argument("--trials", type=int, default=1, help="Runs for each scenario and variant.")
     run.add_argument("--model", help="Default: the role model in the model profile.")
     run.add_argument("--budget", default="5", help="The cost limit for each run. Default: 5.")
@@ -262,7 +264,7 @@ def _eval(args: argparse.Namespace) -> int:
     if args.check_only:
         print("stone eval: the scenarios are valid.")
         return 0
-    failed = [run for run in runs if run.variant == "with" and not run.passed()]
+    failed = [run for run in runs if run.variant not in ("without", "none") and not run.passed()]
     print(f"stone eval: {len(runs)} run(s), {len(failed)} failed with the component. "
           f"Results: {result}")
     return 1 if failed else 0

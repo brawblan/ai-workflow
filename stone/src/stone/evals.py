@@ -87,6 +87,7 @@ def load_scenarios(folder: Path) -> dict[str, Any]:
     if not isinstance(scenarios, list):
         problems.append("'scenarios' must be a list")
         scenarios = []
+    problems += _variant_problems(data.get("variants"), folder)
     seen: set[str] = set()
     for number, scenario in enumerate(scenarios, 1):
         if not isinstance(scenario, dict):
@@ -110,6 +111,29 @@ def load_scenarios(folder: Path) -> dict[str, Any]:
     return data
 
 
+def _variant_problems(variants: Any, folder: Path) -> list[str]:
+    """Check the optional `variants` of a guidance eval: a name and the files it puts in the repo."""
+    if variants is None:
+        return []
+    if not isinstance(variants, dict) or not variants:
+        return ["'variants' must be a mapping from a variant name to a list of files"]
+    problems = []
+    for name, files in variants.items():
+        if not isinstance(files, list):
+            problems.append(f"the variant '{name}' must be a list of {{copy, to}} items")
+            continue
+        for item in files:
+            if not isinstance(item, dict) or not item.get("copy") or not item.get("to"):
+                problems.append(f"the variant '{name}' has an item with no 'copy' or 'to'")
+                continue
+            target = Path(str(item["to"]))
+            if target.is_absolute() or ".." in target.parts:
+                problems.append(f"the variant '{name}': 'to' must stay inside the repo: {item['to']}")
+            if not (folder / str(item["copy"])).is_file():
+                problems.append(f"the variant '{name}': the file '{item['copy']}' does not exist")
+    return problems
+
+
 def _check_problems(item: Any, folder: Path) -> list[str]:
     if not isinstance(item, dict) or item.get("check") not in CHECKS:
         name = item.get("check") if isinstance(item, dict) else item
@@ -128,7 +152,26 @@ def _check_problems(item: Any, folder: Path) -> list[str]:
     return problems
 
 
-def find_component(framework: Path, harness: str, component_id: str) -> dict[str, Any]:
+def find_guidance(root: Path, component_id: str) -> dict[str, Any] | None:
+    """Return the entry of a guidance eval: an eval folder whose scenarios name the id and have
+    `variants`. Guidance (a skill, a rule text) is not a file that `stone render` writes, so it is
+    not in the component list of the adapter (D69)."""
+    found: list[str] = []
+    for path in sorted((root / "evals").glob("*/scenarios.yaml")):
+        try:
+            data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        except (yaml.YAMLError, OSError, ValueError):  # a file that is not YAML or not UTF-8
+            continue
+        if isinstance(data, dict) and data.get("component") == component_id and data.get("variants"):
+            found.append(f"evals/{path.parent.name}/")
+    if len(found) > 1:
+        raise EvalError(f"{component_id} is in more than one eval folder: {', '.join(found)}. "
+                        "Give each guidance eval its own component id.")
+    return {"id": component_id, "kind": "guidance", "eval": found[0]} if found else None
+
+
+def find_component(framework: Path, harness: str, component_id: str,
+                   root: Path | None = None) -> dict[str, Any]:
     registry = yaml.safe_load((framework / "adapters" / harness / "components.yaml")
                               .read_text(encoding="utf-8"))["components"]
     for entry in registry:
@@ -136,6 +179,9 @@ def find_component(framework: Path, harness: str, component_id: str) -> dict[str
             if not entry.get("eval"):
                 raise EvalError(f"{component_id} has no eval folder. A check is its own test.")
             return entry
+    guidance = find_guidance(root, component_id) if root else None
+    if guidance:
+        return guidance
     raise EvalError(f"The adapter '{harness}' has no component '{component_id}'.")
 
 
@@ -161,7 +207,7 @@ def load_run_config(path: Path) -> dict[str, Any]:
         raise EvalError(f"{path}: the YAML is not valid: {error}") from None
     if not isinstance(data, dict) or not isinstance(data.get("run"), dict):
         raise EvalError(f"{path}: the file must be a mapping with 'run.with' and 'run.without'.")
-    for variant in VARIANTS:
+    for variant in (*VARIANTS, *(["guidance"] if "guidance" in data["run"] else [])):
         if not isinstance(data["run"].get(variant), list):
             raise EvalError(f"{path}: 'run.{variant}' must be a list of arguments.")
     for key in ("output", "output_where", "env", "tools"):
@@ -207,8 +253,9 @@ def unregister(path: Path, target: str) -> None:
 
 
 def prepare(folder: Path, scenario: dict[str, Any], framework: Path, role_file: str,
-            variant: str) -> Workspace:
-    """Make the workspace: the fixture, the rendered files, and the change of the scenario."""
+            variant: str, files: list[dict[str, Any]] | None = None) -> Workspace:
+    """Make the workspace: the fixture, the rendered files, the files of a guidance variant, and
+    the change of the scenario."""
     path = Path(tempfile.mkdtemp(prefix=f"stone-eval-{scenario['id']}-")) / "repo"
     shutil.copytree(folder / scenario["fixture"], path)
     _git(path, "init", "-q", "-b", "main")
@@ -227,6 +274,12 @@ def prepare(folder: Path, scenario: dict[str, Any], framework: Path, role_file: 
                 if (path / shared).is_file():
                     unregister(path / shared, role_file)
     _commit(path, "chore(cornerstone): render\n\nRole: generator\nActor: agent")
+    for item in files or []:  # a guidance variant: its files are the only difference (D69)
+        target = path / str(item["to"])
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(folder / str(item["copy"]), target)
+    if files:
+        _commit(path, f"chore(eval): the guidance of the variant {variant}")
     if scenario.get("change"):
         _git(path, "apply", "--whitespace=nowarn", str((folder / scenario["change"]).resolve()))
         _commit(path, "feat: the change under test\n\nRole: implementer\nActor: agent")
@@ -292,13 +345,14 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
     run = Run(scenario["id"], variant, trial)
     config = opts["run_config"]
     try:
-        workspace = prepare(folder, scenario, opts["framework"], opts["role_file"], variant)
+        workspace = prepare(folder, scenario, opts["framework"], opts["role_file"], variant,
+                            opts["variants"].get(variant))
     except (EvalError, render.RenderError, OSError) as error:
         run.error = f"the setup failed: {error}"  # the harness does not start
         return run
     # Only a role eval removes the role. For another component, both variants load the same role
     # file, so the hook (or other component) is the only difference (D44).
-    launch = variant if opts["kind"] == "role" else "with"
+    launch = {"role": variant, "guidance": "guidance"}.get(opts["kind"], "with")
     prompt = "\n\n".join(part for part in (data.get("task"), scenario["prompt"]) if part)
     values = {"role": data["role"], "model": opts["model"], "budget": opts["budget"],
               "prompt": prompt, "tools": (config.get("tools") or {}).get(data["role"], [])}
@@ -502,7 +556,7 @@ def summary(component: str, model: str, runs: list[Run]) -> str:
              "| Seconds | Errors |",
              "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
     for sid in dict.fromkeys(r.scenario for r in runs):
-        for variant in VARIANTS:
+        for variant in dict.fromkeys(r.variant for r in runs):
             group = [r for r in runs if r.scenario == sid and r.variant == variant]
             if group:
                 lines.append(
@@ -510,11 +564,15 @@ def summary(component: str, model: str, runs: list[Run]) -> str:
                     f"| {_rate(group, 'outcome'):.2f} | {_rate(group, 'contract'):.2f} "
                     f"| {_mean(group, 'cost_usd', 2)} | {_mean(group, 'output_tokens')} "
                     f"| {_mean(group, 'seconds', 1)} | {sum(bool(r.error) for r in group)} |")
-    with_runs = [r for r in runs if r.variant == "with"]
-    without = [r for r in runs if r.variant == "without"]
-    if with_runs and without:
-        gain = _rate(with_runs, "outcome") - _rate(without, "outcome")
-        lines += ["", f"Outcome pass rate, with minus without: {gain:+.2f}."]
+    names = list(dict.fromkeys(r.variant for r in runs))
+    base = next((name for name in ("without", "none") if name in names), "")
+    others = [name for name in names if name != base]
+    if base and others:
+        lines.append("")
+        for name in others:
+            gain = (_rate([r for r in runs if r.variant == name], "outcome")
+                    - _rate([r for r in runs if r.variant == base], "outcome"))
+            lines.append(f"Outcome pass rate, {name} minus {base}: {gain:+.2f}.")
     return "\n".join(lines) + "\n"
 
 
@@ -526,7 +584,7 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     """Run the eval. Return the runs and the path of the result file ('' for check_only)."""
     framework = framework or root / "framework"
     config = render.load_config(root, framework)
-    entry = find_component(framework, config["harness"], component_id)
+    entry = find_component(framework, config["harness"], component_id, root)
     folder = root / entry["eval"]
     data = load_scenarios(folder)
     scenarios = [s for s in data["scenarios"] if not scenario_ids or s["id"] in scenario_ids]
@@ -538,7 +596,18 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     profile = yaml.safe_load((harness / "models" / f"{config['model_profile']}.yaml")
                              .read_text(encoding="utf-8"))
     model = model or profile["defaults"]["role_models"].get(data["role"], "")
-    variants = VARIANTS if variant == "both" else (variant,)
+    if data.get("variants") and entry.get("kind") != "guidance":
+        raise EvalError(f"{component_id} is in the adapter component list, so it takes the variants "
+                        "'with' and 'without'. Remove 'variants' from its scenarios.")
+    names = tuple(data.get("variants") or VARIANTS)
+    if variant != "both" and variant not in names:
+        raise EvalError(f"The variant '{variant}' is not known. Use 'both' or one of "
+                        f"{list(names)}.")
+    variants = names if variant == "both" else (variant,)
+    if entry.get("kind") == "guidance" and not model:
+        raise EvalError("A guidance eval has no role model. Pass --model.")
+    if entry.get("kind") == "guidance" and "guidance" not in loaded["run"]:
+        raise EvalError("The harness run file has no 'run.guidance' command for a guidance eval.")
     if entry.get("merge") and "without" in variants:
         raise EvalError(f"{component_id} is merged into a shared file. The runner cannot remove "
                         "it for 'without' yet. Use --variant with.")
@@ -552,7 +621,7 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     runs_folder.mkdir(parents=True, exist_ok=True)
     opts = {"framework": framework.resolve(), "role_file": entry.get("target", ""), "kind": entry.get("kind", ""),
             "run_config": loaded, "model": model, "budget": budget, "timeout": timeout,
-            "runs": runs_folder, "keep": keep}
+            "runs": runs_folder, "keep": keep, "variants": data.get("variants") or {}}
     runs: list[Run] = []
     with (runs_folder / "runs.jsonl").open("w", encoding="utf-8") as handle:
         for scenario in scenarios:
