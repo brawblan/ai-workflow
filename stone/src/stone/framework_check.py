@@ -232,11 +232,12 @@ def ci_branch_problems(config: dict[str, Any]) -> list[str]:
     if not isinstance(names, list) or not names or not all(
             isinstance(name, str) and name.strip() for name in names):
         return ["'ci.branches' must be a list of base branch names as YAML strings, "
-                'for example ci: {branches: [dev]}. Remove the key to run K6, K7, and K14 on each PR.']
+                'for example ci: {branches: [dev]}. Remove the key to run K6, K7, K14, and K20 '
+                'on each PR.']
     integration = (config.get("branches") or {}).get("integration")
     if isinstance(integration, str) and integration not in names:
         return [f"'ci.branches' does not list branches.integration '{integration}'. Add it, "
-                "or the ticket PRs skip K6, K7, and K14."]
+                "or the ticket PRs skip K6, K7, K14, and K20."]
     return []
 
 
