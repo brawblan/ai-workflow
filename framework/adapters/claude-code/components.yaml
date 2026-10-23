@@ -6,6 +6,7 @@
 # A ci-job can have `steps`: each step with the same `when` rule goes into the `$check_steps` block of
 # the job template. A step with `command` needs that key in `commands` of the repo config. If the key
 # has no value, render skips the step and warns (D29). A step is part of its ci-job component.
+# A step with `needs: specialists` renders only if the repo config has `specialists` (D66).
 # A component with `trigger` is rendered once for each selected profile with that trigger type, as
 # `<id>.<profile>` (D31). `parts` are fragments that render puts in the template at a `$name` line.
 # `values` are template values of the entry. A value that another trigger entry sets is "" here.
@@ -131,6 +132,11 @@ components:
     target: .github/workflows/cornerstone-checks.yml
     eval: evals/ci-job-checks/
     steps:                                   # the "by profile" checks that run a repo command
+      - id: k20
+        name: K20 specialist findings
+        when: {check: K20}
+        needs: specialists
+        template: workflows/steps/k20-specialists.yml
       - id: k4
         name: K4 integration tests
         when: {check: K4}

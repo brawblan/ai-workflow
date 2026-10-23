@@ -40,6 +40,7 @@ repo config.
 | `stone check` | Validate the config, the profiles, and the manifest. Report drift between files and templates. **Built in v0.1. It tests the eval plan and the review date of each component (D43). No drift test yet.** |
 | `stone check-writing` | Run K17 on files, on the changed lines since a base, or on a PR body. **Built in v0.1.** |
 | `stone check-evidence` | Run K14 on a PR body: fail if a required section is missing or empty. **Built in v0.5.** |
+| `stone check-specialists` | Run K20 on a PR body and the PR labels: fail on a blocking specialist finding or a missing blocking report (D66). **Built in v1.2.** |
 | `stone review` | List the components past `review_by`. Exit code 1 if there are any. |
 | `stone eval <component-id>` | Run the component's eval with and without the component (D26). **Built in v0.9.** |
 | `stone refresh <harness>` | Start the adapter-refresh profile for one harness. Framework repo only. (Later version.) |

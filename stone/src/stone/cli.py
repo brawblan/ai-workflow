@@ -35,7 +35,9 @@ def _parser() -> argparse.ArgumentParser:
     local.add_argument("--base", help="The base branch. Default: origin/<branches.integration "
                                       "or branches.main>.")
     local.add_argument("--body", type=Path,
-                       help="A file with the PR body, for the K7 profile line and waiver.")
+                       help="A file with the PR body, for the K7 profile line and waiver, and "
+                            "for K20.")
+    local.add_argument("--labels", default="", help="The PR labels, with commas. For K20.")
 
     special = commands.add_parser(
         "specialists", help="Find the specialist reviews that a change needs, and their reports.")
@@ -45,6 +47,17 @@ def _parser() -> argparse.ArgumentParser:
     special.add_argument("--ticket", required=True, help="The ticket ID. It names the reports.")
     special.add_argument("--labels", default="", help="The labels of the ticket, with commas.")
     special.add_argument("--personas", default="", help="The persona IDs of the ticket, with commas.")
+
+    k20 = commands.add_parser(
+        "check-specialists", help="K20: fail on a blocking specialist finding or a missing report.")
+    k20.add_argument("body", help="The PR body file. Use '-' to read standard input.")
+    k20.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    k20.add_argument("--base", help="The base branch. Default: origin/<branches.integration "
+                                    "or branches.main>.")
+    k20.add_argument("--labels", default="", help="The PR labels, with commas.")
+    k20.add_argument("--mode", choices=["warn", "block"], default="warn",
+                     help="warn: report only (the first 2 weeks). block: fail on errors.")
+    k20.add_argument("--format", choices=["text", "github"], default="text")
 
     up = commands.add_parser(
         "upgrade", help="Plan the move to a new Cornerstone version. --apply makes the move.")
@@ -118,11 +131,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "render":
         return _render(args.root, args.framework, args.dry_run)
     if args.command == "gate":
-        return _gate(args.root, args.base, args.body)
+        return _gate(args.root, args.base, args.body, _split(args.labels))
     if args.command == "upgrade":
         return _upgrade(args)
     if args.command == "specialists":
         return _specialists(args)
+    if args.command == "check-specialists":
+        return _check_specialists(args)
     if args.command == "spec":
         return _spec(args.root, args.spec_command, getattr(args, "plan", ""))
     if args.command == "check-evidence":
@@ -144,9 +159,9 @@ def main(argv: list[str] | None = None) -> int:
     return 1 if blocking else 0
 
 
-def _gate(root: Path, base: str | None, body: Path | None) -> int:
+def _gate(root: Path, base: str | None, body: Path | None, labels: list[str]) -> int:
     try:
-        steps, text = gate.run(root, base, body)
+        steps, text = gate.run(root, base, body, labels=labels)
     except gate.GateError as error:
         print(f"stone gate: {error}")
         return 2
@@ -186,6 +201,20 @@ def _specialists(args: argparse.Namespace) -> int:
         return 2
     print(text)
     return 1 if any(row.status != "reviewed" for row in rows) else 0
+
+
+def _check_specialists(args: argparse.Namespace) -> int:
+    try:
+        text = sys.stdin.read() if args.body == "-" else Path(args.body).read_text(encoding="utf-8")
+        config = gate.load_config(args.root)
+    except (OSError, UnicodeDecodeError, gate.GateError) as error:
+        print(f"check-specialists: {error}")
+        return 2
+    findings = specialists.check(args.root, config, args.base or gate.default_base(config), text,
+                                 _split(args.labels), "<stdin>" if args.body == "-" else args.body)
+    blocking = report(findings, args.format, warn_only=args.mode == "warn")
+    print(f"K20: {len(findings)} finding(s), mode {args.mode}.")
+    return 1 if blocking else 0
 
 
 def _spec(root: Path, command: str, plan: str) -> int:
