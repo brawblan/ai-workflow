@@ -365,6 +365,40 @@ def commit_problems(root: Path, config: dict[str, Any]) -> list[str]:
     return problems
 
 
+CI_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+
+
+def ci_env_problems(config: dict[str, Any]) -> list[str]:
+    """Return the problems of `ci.env` and `ci.secrets`, the env of the All checks step (#163)."""
+    section = config.get("ci")
+    if section is None:
+        return []
+    if not isinstance(section, dict):
+        return ["'ci' must be a map with the keys env, secrets, and branches."]
+    problems = []
+    unknown = sorted(set(section) - {"env", "secrets", "branches"})
+    if unknown:
+        problems.append(f"'ci.{unknown[0]}' is not a key. Use env, secrets, or branches.")
+    env = section.get("env") or {}
+    secrets = section.get("secrets") or []
+    if not isinstance(env, dict):
+        problems.append("'ci.env' must be a map of NAME: value.")
+        env = {}
+    if not isinstance(secrets, list):
+        problems.append("'ci.secrets' must be a list of names.")
+        secrets = []
+    names = [("ci.env", str(name)) for name in env] + [("ci.secrets", str(name)) for name in secrets]
+    for key, name in names:
+        if not CI_NAME.match(name):
+            problems.append(f"'{key}' has the name '{name}'. A name matches ^[A-Z_][A-Z0-9_]*$.")
+    for name in sorted({str(n) for n in env} & {str(n) for n in secrets}):
+        problems.append(f"The name '{name}' is in ci.env and in ci.secrets. Keep it in one.")
+    for name, value in env.items():
+        if isinstance(value, (dict, list)) or "${{" in str(value):
+            problems.append(f"'ci.env.{name}' must be a plain value. Pass a secret with ci.secrets.")
+    return problems
+
+
 def ticket_problems(config: dict[str, Any]) -> list[str]:
     """Return the problems of the `tickets` section of the repo config (#137)."""
     section = config.get("tickets")
@@ -441,7 +475,7 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
         add(problem)
     for problem in (ticket_folder_problems(config) + protected_path_problems(config)
                     + commit_problems(root, config)
-                    + ticket_problems(config) + specialists.problems(config)):
+                    + ticket_problems(config) + ci_env_problems(config) + specialists.problems(config)):
         add(problem)
     for waiver in config.get("waivers", []):
         if waiver.get("gate") in {"G3", "G5"}:

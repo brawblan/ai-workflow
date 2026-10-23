@@ -36,8 +36,6 @@ delivery: ci                       # ci (default), or local: no workflow files (
 branches:
   integration: dev
   main: main
-ci:                                # optional
-  branches: [dev]                  # K6, K7, and K14 run only on a PR into these branches (see below)
 commands:                          # exactly as a person types them
   install: <command>
   lint: <command>
@@ -66,6 +64,10 @@ limits:
   function_lines: 60
   cyclomatic: 10
   mutation_score_changed_code: 0.6
+ci:                                # optional. Settings of the G3 job (#163, #164)
+  env: {NAME: value}               # plain values. A name matches ^[A-Z_][A-Z0-9_]*$.
+  secrets: [STRIPE_SECRET_KEY]     # names of repo secrets. The step gets ${{ secrets.NAME }}.
+  branches: [dev]                  # K6, K7, and K14 run only on a PR into these branches (#164)
 tickets:                           # optional. Where the ticket lives (#137)
   source: github                   # github (default), or file
   path: docs/tickets/{id}.txt      # with source: file. {id} is the ticket ID.
@@ -185,7 +187,7 @@ Use it when only some people or some tickets use Cornerstone ([D58](README.md#de
 ### Gate steps by base branch (`ci.branches`)
 
 Use it when a repo promotes code with PRs between long-lived branches, for example `dev` to
-`staging` to `main` ([D72](README.md#decisions)).
+`staging` to `main` ([D73](README.md#decisions)).
 
 - K6, K7, and K14 are for ticket PRs. With `ci.branches`, these steps run only when the base
   branch of the PR is in the list. In a PR into another branch, they show as skipped.
