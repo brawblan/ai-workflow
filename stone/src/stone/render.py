@@ -527,17 +527,31 @@ def _merge(data: dict[str, Any], fragment: dict[str, Any]) -> None:
             data[key] = value
 
 
+def _json_indent(text: str) -> str:
+    """Return the indent of the first indented line of a JSON text: a tab, or N spaces."""
+    for line in text.splitlines():
+        stripped = line.lstrip(" \t")
+        if stripped and stripped != line:
+            return line[:len(line) - len(stripped)]
+    return "  "
+
+
 def _merge_json(root: Path, path: str, fragment_text: str) -> tuple[bool, str]:
-    """Return (the file has the fragment, the file text with the fragment merged in)."""
+    """Return (the file has the fragment, the file text with the fragment merged in).
+
+    The merged text keeps the indent and the final newline state of the existing file (D70).
+    """
     target = root / path
+    text = target.read_text(encoding="utf-8") if target.exists() else ""
     try:
-        data = json.loads(target.read_text(encoding="utf-8")) if target.exists() else {}
+        data = json.loads(text) if text else {}
     except json.JSONDecodeError as error:
         raise RenderError(f"{path} is not valid JSON: {error}. Fix the file.") from None
     fragment = json.loads(fragment_text)
     present = _contains(data, fragment)
     _merge(data, fragment)
-    return present, json.dumps(data, indent=2) + "\n"
+    newline = "\n" if not text or text.endswith("\n") else ""
+    return present, json.dumps(data, indent=_json_indent(text)) + newline
 
 
 def _manifest_entry(component: Component, old: dict[str, Any] | None, config: dict[str, Any],
