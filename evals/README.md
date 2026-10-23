@@ -90,6 +90,21 @@ Notes on the results:
   later run of one scenario hides the table of an earlier run of other scenarios. Use the links to
   the earlier result files for those.
 
+## Guidance evals
+
+A guidance eval tests text that tells an agent what to do, for example the writing rules. It is not a component that `stone render` writes, so the table above does not list it (D69). Its scenarios have `variants` (a text for each variant) instead of `with` and `without`. The variant `none` is the baseline.
+
+| Eval | Folder | Variants | Last result |
+| --- | --- | --- | --- |
+| `guidance.writing` | [writing-guidance](./writing-guidance/) | `none` (0 words), `always` (189), `current` (860), `short` (81) | 2026-10-23, `claude-sonnet-5-5`, k = 3, 4 tasks. Outcome minus `none`: `always` +0.25, `current` +0.42, `short` +0.42. Cost $1.98. |
+
+Notes on the `guidance.writing` result:
+
+- **What it shows.** Any of the three texts removes the vague words that `none` uses. `short` scores the same as `current` with about one tenth of the words.
+- **What it does not show.** The run has 4 tasks, 3 trials, and one model. W1 and W4 score 1.00 in every variant, so they carry no signal. The difference between `always` and the others comes from one length limit in W2.
+- **Limit of the grader.** It tests only the rules that a program can test (K17), the first line, and the last line. It does not test whether a reader understands the text. A blind human rating (G8) is still needed before the live text changes.
+- **Tuning after the first output.** Two grader settings changed after the smoke run and the first full run: the W2 word limit (120 to 160) and the closing-offer pattern. Then the full run was repeated. The table above is that repeat.
+
 ## Results
 
 <!-- evals-index -->
