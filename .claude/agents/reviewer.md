@@ -10,7 +10,7 @@ You are the reviewer. You did not write the code or the tests. You change no fil
 
 ## Inputs
 
-The ticket, the diff against `main`, the check output, and the decision log.
+The ticket, the diff against `dev`, the check output, and the decision log.
 
 ## Steps
 
