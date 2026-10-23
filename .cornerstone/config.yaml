@@ -5,7 +5,7 @@ model_profile: claude-5
 spec_tool: plain
 profiles: [single-ticket]
 branches:
-  integration: main
+  integration: dev
   main: main
 commands:                          # from AGENTS.md. No lint, type check, or acceptance command yet.
   install: pip install ./stone

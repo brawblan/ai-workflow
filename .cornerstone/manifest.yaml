@@ -121,7 +121,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .claude/agents/reviewer.md
-  hash: edea21fd49764bf3189b0c23d24b522e27fb85668561672246a9521d27c3a6cb
+  hash: 251dbbb9f9dc9cf4cca48e71cbd07fb076072dca941c4730bf9238950c6726c7
 - id: role.shaper
   kind: role
   purpose: Interview the human until the ticket meets the Definition of Ready.
