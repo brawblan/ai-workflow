@@ -10,7 +10,7 @@
     {
       "name": "workflow",
       "source": "./plugins/workflow",
-      "description": "Skills for Cornerstone setup, project setup, PR delivery, backlog sequencing, and Simplified Technical English writing."
+      "description": "Skills for Cornerstone setup, project setup, ticket and PR delivery, and Simplified Technical English writing."
     }
   ]
 }

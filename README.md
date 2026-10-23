@@ -146,9 +146,7 @@ writes the planner, tester, and reviewer roles, so the plugin has no skill for t
 | --- | --- |
 | `cornerstone-setup` | Set up a repo for Cornerstone. It runs `project-setup`, writes `.cornerstone/config.yaml`, and runs `stone render` and `stone check`. |
 | `project-setup` | Set up a repo for agents: `constitution/` (with personas and job stories), and `AGENTS.md`. It asks only for facts the repo does not have. |
-| `ticket-delivery` | Collect the tester, reviewer, and check evidence for each acceptance criterion. Then open the PR with `dev-pr`. |
-| `dev-pr` | Branch, commit, rebase, validate, and open a PR into the integration branch, with the evidence sections. |
-| `backlog-sequencer` | Sync a `status:blocked` label from "Depends on #N" text. Suggest priority labels. |
+| `ticket-delivery` | Collect the tester, reviewer, and check evidence for each acceptance criterion. Then branch, commit, rebase, and open the PR into the integration branch, with the evidence sections. |
 | `ste-writing` | Write with Simplified Technical English rules, and add diagrams. |
 
 `cornerstone-setup` needs the `stone` CLI and a clone of this repo. The other skills need only `git`
@@ -168,7 +166,7 @@ and `gh`.
    /plugin install workflow@brawblan
    ```
 
-3. Restart Claude Code. The skills have the `workflow:` prefix, for example `/workflow:dev-pr`.
+3. Restart Claude Code. The skills have the `workflow:` prefix, for example `/workflow:ticket-delivery`.
 
 To get updates, run `/plugin marketplace update brawblan`. You can also turn on auto-update for
 the marketplace in the `/plugin` menu.

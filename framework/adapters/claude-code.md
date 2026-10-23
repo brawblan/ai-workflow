@@ -233,7 +233,5 @@ check on the main branch and on the integration branch (D33).
 | --- | --- | --- |
 | `project-setup` | full-project, Shape | Becomes the Shape step of `cornerstone-setup`. Stays usable alone. |
 | `sdd-plan`, `sdd-build` | Plan, Build | Removed in plugin 0.5.0 (D18). The planner, implementer, and tester role files do this work. |
-| `ticket-delivery` | Verify, Deliver | Done in plugin 0.4.0: it collects the tester, reviewer, and check output as evidence. It does not self-verify. |
-| `dev-pr` | Deliver | Done in plugin 0.4.0: the PR evidence sections (K14) and the role trailers. |
-| `backlog-sequencer` | Intake | No change. |
+| `ticket-delivery` | Verify, Deliver | Done in plugin 0.4.0: it collects the tester, reviewer, and check output as evidence. It does not self-verify. Since plugin 0.7.0 it also branches, commits, and opens the PR with the evidence sections (K14) and the role trailers. It replaces `dev-pr`. |
 | `ste-writing` | Writing standard ([writing.md](../writing.md)) | Load it in each role that writes human-facing text. Add the blind A/B eval. K17 covers the measurable rules. |

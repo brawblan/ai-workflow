@@ -107,7 +107,7 @@ Report:
 3. The manual steps that the generator cannot do: make the `cornerstone-checks` job a required
    status check (G3), and require a PR review (G4).
 
-Offer to open a PR with the `dev-pr` skill.
+Offer to open a PR with the `ticket-delivery` skill.
 
 ## Upgrade an existing setup
 
