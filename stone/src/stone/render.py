@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from stone import framework_check, results, specialists, triggers
+from stone import framework_check, results, specialists, specs, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -195,6 +195,9 @@ def one_folder(value: Any, key: str = "plans") -> str:
             raise RenderError(f"{CONFIG}: 'paths.{key}' must be one folder, not {len(value)}.")
         value = value[0]
     folder = str(value or FOLDER_DEFAULTS[key]).strip()
+    problem = specs.ticket_folder_problem(key, folder)
+    if problem:
+        raise RenderError(f"{CONFIG}: {problem}")
     return folder if folder.endswith("/") else folder + "/"
 
 
@@ -236,11 +239,15 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
                               "lists." if specialists.listed(config) else ""),
         "k6_tail": " The paths are:" if no_k6 else " Check K6 fails the commit in CI:",
         "k6_checks_commit": "" if no_k6 else " Check K6 checks the commit."})
-    values["paths_plans"] = one_folder(_get(config, "paths.plans"))
+    plans = one_folder(_get(config, "paths.plans"))
+    reports = one_folder(_get(config, "paths.reports"), "reports")
+    # '{id}' (#146): the role text names the ticket folder, and the hook matches each ticket folder.
+    values["paths_plans"] = plans.replace(specs.TICKET_ID, "<ticket-id>")
+    values["paths_plans_all"] = plans.replace(specs.TICKET_ID, "*")
     values["paths_specs"] = one_folder(_get(config, "paths.specs"), "specs")
-    values["paths_reports"] = one_folder(_get(config, "paths.reports"), "reports")
-    values["plans_json"] = json.dumps([values["paths_plans"]])
-    values["reports_json"] = json.dumps([values["paths_reports"]])
+    values["paths_reports"] = reports.replace(specs.TICKET_ID, "<ticket-id>")
+    values["plans_json"] = json.dumps([plans.replace(specs.TICKET_ID, "*")])
+    values["reports_json"] = json.dumps([reports.replace(specs.TICKET_ID, "*")])
     values["harness_json"] = json.dumps(ALWAYS_PROTECTED)
     tests = list(_get(config, "paths.tests") or [])
     checks = list(_get(config, "paths.checks") or [])
@@ -635,7 +642,7 @@ def ignore_patterns(config: dict[str, Any], components: list[Component]) -> list
             top = path.split("/")[0]
             patterns.add(top + "/" if "/" in path else path)
     for key in ("plans", "specs", "reports"):
-        patterns.add(one_folder(_get(config, f"paths.{key}"), key))
+        patterns.add(specs.base_folder(one_folder(_get(config, f"paths.{key}"), key)))
     return sorted(patterns)
 
 

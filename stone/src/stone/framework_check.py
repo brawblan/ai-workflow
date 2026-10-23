@@ -278,7 +278,7 @@ FOLDER_DEFAULTS = {"plans": "docs/plans/", "reports": "docs/reports/"}
 
 def _folder_prefix(value: Any) -> str:
     """Return the folder of a path or glob, with no './' and no trailing '/'."""
-    text = re.split(r"[*?\[]", str(value).strip())[0]  # a glob counts up to its first wildcard
+    text = re.split(r"[*?\[{]", str(value).strip())[0]  # a glob or '{id}' counts up to its first mark
     if text != str(value).strip():
         text = text.rpartition("/")[0]
     return text.removeprefix("./").rstrip("/")
@@ -286,6 +286,19 @@ def _folder_prefix(value: Any) -> str:
 
 def _paths(value: Any) -> list[str]:
     return [str(item) for item in (value if isinstance(value, list) else [value]) if item]
+
+
+def ticket_folder_problems(config: dict[str, Any]) -> list[str]:
+    """Return the problems of a `paths.plans` or `paths.reports` value with '{id}' (#146)."""
+    paths = config.get("paths") if isinstance(config.get("paths"), dict) else {}
+    problems = []
+    for key in FOLDER_DEFAULTS:
+        value = paths.get(key)
+        if isinstance(value, list) and len(value) == 1:
+            value = value[0]  # render accepts a list of one folder too
+        if specs.ticket_folder_problem(key, value):
+            problems.append(specs.ticket_folder_problem(key, value))
+    return problems
 
 
 def protected_path_problems(config: dict[str, Any]) -> list[str]:
@@ -407,7 +420,8 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     adoption = config.get("adoption", "all")
     if adoption not in ADOPTION_MODES:
         add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
-    for problem in (protected_path_problems(config) + commit_problems(root, config)
+    for problem in (ticket_folder_problems(config) + protected_path_problems(config)
+                    + commit_problems(root, config)
                     + ticket_problems(config) + specialists.problems(config)):
         add(problem)
     for waiver in config.get("waivers", []):

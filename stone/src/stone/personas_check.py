@@ -119,12 +119,12 @@ def _check_jobs(persona: Persona, pid: str, job_ids: set[str], label: str) -> li
     return findings
 
 
-def plans_folder(root: Path) -> Path | None:
-    """Return the plans folder, or None if the config path is not valid (K19 reports it)."""
+def plan_files(root: Path) -> list[Path]:
+    """Return the plan files, or none if the config path is not valid (K19 reports it)."""
     try:
-        return specs.config_path(root, "plans")
+        return specs.plan_files(root, ".md")
     except specs.SpecError:
-        return None
+        return []
 
 
 def check_plans(root: Path, persona_ids: set[str] | None, job_ids: set[str]) -> list[Finding]:
@@ -133,8 +133,7 @@ def check_plans(root: Path, persona_ids: set[str] | None, job_ids: set[str]) -> 
     `persona_ids` is None when the personas file does not exist.
     """
     findings: list[Finding] = []
-    folder = plans_folder(root)
-    for path in sorted(folder.glob("*.md")) if folder else []:
+    for path in plan_files(root):
         label = path.relative_to(root.resolve()).as_posix()
         in_code = False
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
