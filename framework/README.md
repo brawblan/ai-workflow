@@ -2,7 +2,7 @@
 
 The principles are the cornerstone. Each profile, adapter, and generated file aligns to them.
 
-Status: version 1.1.0 (2026-10-22). Evidence: [docs/research/dossier.md](../docs/research/dossier.md).
+Status: version 1.2.0 (2026-10-22). Evidence: [docs/research/dossier.md](../docs/research/dossier.md).
 
 This framework describes how an agent and a human deliver software together. The core is
 tool-neutral. Adapters turn the core into files for one harness (see [adapters/](adapters/contract.md)). A
