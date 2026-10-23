@@ -4,9 +4,11 @@ versions:
   - version: 1.2.0
     kind: minor
     released: null
-    summary: The claude-5 profile uses Sonnet for the implementer and the tester, and sets an effort for each role. The role files tell the role to run the checks once, to stop after 2 failed fixes, and to do one ticket in a session. Check K20 fails a PR with a blocking specialist finding.
+    summary: The claude-5 profile uses Sonnet for the implementer and the tester, and sets an effort for each role. The role files tell the role to run the checks once, to stop after 2 failed fixes, and to do one ticket in a session. Check K20 fails a PR with a blocking specialist finding. paths.plans and paths.reports accept {id}, for one folder for each ticket.
     config:
-      added: []
+      added:
+        - {key: paths.plans, default: docs/plans/, note: "Accepts {id} as the last folder level: one folder for each ticket (D67)."}
+        - {key: paths.reports, default: docs/reports/, note: "Accepts {id} as the last folder level, as paths.plans does (D67)."}
       renamed: []
       removed: []
     files:
@@ -20,6 +22,7 @@ versions:
       - "With a specialists section: add the lines Ticket and Personas to each PR body, and commit each findings report in the PR (D66)."
       - "To keep a role on a stronger model, set it in the model profile of the repo. Render again."
       - "Check the when.paths values of each specialist. They use the rules of paths.tests (D65). A value that starts with ./ no longer matches."
+      - "To give each ticket its own folder, set paths.plans or paths.reports to a value that ends with {id}/, for example .stone/plans/{id}/. Move the old files into ticket folders. Run stone render (D67)."
   - version: 1.1.0
     kind: minor
     released: 2026-10-22

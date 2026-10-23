@@ -155,15 +155,19 @@ def changed_files(root: Path, base: str) -> list[str]:
     raise SpecialistError(f"git cannot diff against '{base}'. Give a base that exists.")
 
 
-def reports_folder(config: dict[str, Any]) -> str:
-    """Return `paths.reports` as a folder that ends with '/'. The default is docs/reports/."""
+def reports_folder(config: dict[str, Any], ticket: str = "<ticket-id>") -> str:
+    """Return `paths.reports` as a folder that ends with '/'. The default is docs/reports/.
+
+    '{id}' in the value (#146) becomes the ticket.
+    """
     value = (config.get("paths") or {}).get("reports") or "docs/reports/"
     value = str(value[0] if isinstance(value, list) and value else value)
+    value = value.replace("{id}", ticket)
     return value if value.endswith("/") else value + "/"
 
 
 def report_path(root: Path, config: dict[str, Any], ticket: str, name: str) -> Path:
-    return root / f"{reports_folder(config)}{ticket}.{name}.md"
+    return root / f"{reports_folder(config, ticket)}{ticket}.{name}.md"
 
 
 @dataclass

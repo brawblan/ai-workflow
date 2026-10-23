@@ -38,7 +38,7 @@ approves the plan before the build starts (G2).
    - One `## ADDED|MODIFIED|REMOVED <capability>.R<n>: <title>` section for each requirement.
    - ADDED and MODIFIED give the full text and one or more `### Scenario: <name>` blocks, each
      with a `- WHEN` line and a `- THEN` line. REMOVED needs only the reason.
-   - For ADDED, use a number that no delta in `$paths_plans` used before.
+   - For ADDED, use a number that no delta in `$paths_plans_all` used before.
    - Do not edit `$paths_specs`. `stone spec apply` writes it at delivery.
    - Do not write `apply_order`. `stone spec apply` sets it at delivery.
    In the acceptance criteria coverage, name the requirement ID of each criterion.
