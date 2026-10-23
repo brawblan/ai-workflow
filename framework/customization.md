@@ -64,9 +64,10 @@ limits:
   function_lines: 60
   cyclomatic: 10
   mutation_score_changed_code: 0.6
-ci:                                # optional. Env of the All checks step in the G3 job (#163)
+ci:                                # optional. Settings of the G3 job (#163, #164)
   env: {NAME: value}               # plain values. A name matches ^[A-Z_][A-Z0-9_]*$.
   secrets: [STRIPE_SECRET_KEY]     # names of repo secrets. The step gets ${{ secrets.NAME }}.
+  branches: [dev]                  # K6, K7, and K14 run only on a PR into these branches (#164)
   setup:                           # steps before `Install` (#162)
     node: "22"                     # adds actions/setup-node with this version and cache: npm
     steps:                         # then these steps, in order. Each `uses` needs a commit SHA.
@@ -187,6 +188,24 @@ Use it when only some people or some tickets use Cornerstone ([D58](README.md#de
 - The role files of the implementer and the tester tell the role to add the marker to a PR.
 - Anyone can remove the marker, and an unmarked PR gets no check. Turn on branch protection with a
   required human review for the base branch, so that review controls the PRs that G3 skips.
+
+### Gate steps by base branch (`ci.branches`)
+
+Use it when a repo promotes code with PRs between long-lived branches, for example `dev` to
+`staging` to `main` ([D74](README.md#decisions)).
+
+- K6, K7, and K14 are for ticket PRs. With `ci.branches`, these steps run only when the base
+  branch of the PR is in the list. In a PR into another branch, they show as skipped.
+- Each other step runs on each PR: K15, the repo commands, `commands.all_checks`, and K20.
+  So a promotion PR still runs the lint, the tests, and the E2E tests.
+- The workflow still starts on each PR, so the required status check always reports.
+- The list must have `branches.integration`. `stone check` and `stone render` fail if it does not.
+- Without `ci.branches`, K6, K7, and K14 run on each PR, as before.
+- With `adoption: opt-in`, a step runs only for a marked PR into a listed branch.
+
+A PR into an unlisted branch has no K6, K7, or K14. This includes a hotfix PR into `main`. A
+person gates it (G5). Turn on branch protection with a required human review for each unlisted
+base branch. If ticket PRs also go into a branch, add that branch to the list.
 
 ### Tickets as files (`tickets`)
 
