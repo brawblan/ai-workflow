@@ -8,7 +8,7 @@ hide:
 
 **Agent-assisted software delivery, where checks decide that work is done.**
 
-Version 1.2.0. All 10 profiles are supported, and each generated check blocks.
+Version 1.3.0. All 10 profiles are supported, and each generated check blocks.
 
 Cornerstone says how a human and an agent deliver software together. It sets who does each stage,
 which gates stop the work, and which checks decide that work is done. The core names no tool.
