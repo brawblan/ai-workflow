@@ -74,3 +74,14 @@ installed `stone`.
 8. Now move this repo to the new version. Set `framework_version` in `.cornerstone/config.yaml`, and
    run `stone upgrade --apply`. Commit the generated files alone. Open this PR into `dev`. Do this
    after the tag exists, because the G3 workflow installs `stone` from the tag.
+
+## A docs change between releases
+
+The site shows what is on `main`. A docs change in `dev` reaches the site at the next release. To
+publish it before then, deploy the site by hand ([D75](README.md#decisions)):
+
+1. Make sure that `dev` has no unreleased code. Run `git log --oneline origin/main..origin/dev`.
+   If a commit changes code, wait for the next release.
+2. Open a PR from `dev` into `main`. Do not set a version or push a tag.
+3. The owner merges the PR with a merge commit.
+4. Run `gh workflow run pages.yml --ref main`. The deploy job runs only from `main`.
