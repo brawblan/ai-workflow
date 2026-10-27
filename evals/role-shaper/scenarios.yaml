@@ -1,0 +1,83 @@
+# Eval of role.shaper (lifecycle.md, "Eval design"). Run: stone eval role.shaper --trials 3
+# All scenarios use one fixture: a small notes app with file tickets (D60). The `change` of each
+# scenario adds only its ticket, tickets/<id>.md, so that no other ticket shows the form of the
+# Definition of Ready section. The author is not in the session, so the questions go to the final
+# text of the run. grade.py reads that text from STONE_EVAL_REPORT. The hook limits the file tools
+# of the shaper to the ticket files in both variants.
+
+component: role.shaper
+role: shaper
+task: |
+  Shape this ticket, so that it meets the Definition of Ready. The ticket is the file
+  tickets/<ticket-id>.md. The author is not in this session. Put each question for the author in
+  your final message.
+
+scenarios:
+  - id: S1
+    title: The ticket is ready
+    fixture: fixtures/notes
+    change: fixtures/NOTE-1.diff
+    prompt: |
+      Ticket NOTE-1.
+    expect:
+      - {check: unchanged, paths: [tickets/, src/]}
+      - {check: grader, name: says_ready}
+
+  - id: S2
+    title: Non-goals, the test oracle, and the personas are missing
+    fixture: fixtures/notes
+    change: fixtures/NOTE-2.diff
+    prompt: |
+      Ticket NOTE-2.
+    expect:
+      - {check: only_changed, paths: [tickets/NOTE-2.md]}
+      - {check: grader, name: not_invented, path: tickets/NOTE-2.md,
+         fields: ["non-goals?|out of scope", "test oracle|oracle"]}
+      - {check: grader, name: asks_with_options, kind: contract,
+         topics: ["non-goal|out of scope", "oracle|verif|know (that )?(it|the \\w+) works", "persona"]}
+
+  - id: S3
+    title: Two criteria are vague
+    fixture: fixtures/notes
+    change: fixtures/NOTE-3.diff
+    prompt: |
+      Ticket NOTE-3.
+    expect:
+      - {check: only_changed, paths: [tickets/NOTE-3.md]}
+      - {check: matches, path: "@report", pattern: "\\bfast\\b|speed|latency|performance"}
+      - {check: matches, path: "@report", pattern: "relevan"}
+      # A time limit that the author did not give is an invented requirement.
+      - {check: grader, name: no_new_match, path: tickets/NOTE-3.md,
+         pattern: "\\d\\s*(ms|milliseconds?|seconds?|s)\\b"}
+      - {check: grader, name: asks_with_options, kind: contract,
+         topics: ["\\bfast\\b|speed|latency|performance", "relevan"]}
+
+  - id: S4
+    title: The author gave the answers
+    fixture: fixtures/notes
+    change: fixtures/NOTE-4.diff
+    prompt: |
+      Ticket NOTE-4. The author answered the open questions before this session:
+      - Non-goals: no undo, and no delete of more than one note at a time.
+      - Test oracle: a unit test adds three notes, deletes note 2, and compares Notes.list().
+        A second test expects IndexError for note 9.
+      - Personas: writer.
+    expect:
+      - {check: only_changed, paths: [tickets/NOTE-4.md]}
+      - {check: matches, path: tickets/NOTE-4.md, pattern: "\\bundo\\b"}
+      - {check: matches, path: tickets/NOTE-4.md, pattern: "three notes|note 2\\b"}
+      - {check: grader, name: dor_form, path: tickets/NOTE-4.md, personas: [writer],
+         kind: contract}
+
+  - id: S5
+    title: The persona is not in the personas file
+    fixture: fixtures/notes
+    change: fixtures/NOTE-5.diff
+    prompt: |
+      Ticket NOTE-5.
+    expect:
+      - {check: only_changed, paths: [tickets/NOTE-5.md]}
+      - {check: matches, path: "@report",
+         pattern: "admin[^\\n]*(\\bno|n.t\\b|unknown|missing|exist|only)|(\\bno|n.t\\b|unknown|missing|exist)[^\\n]*admin"}
+      - {check: grader, name: not_invented, path: tickets/NOTE-5.md, fields: ["personas?"]}
+      - {check: grader, name: asks_with_options, kind: contract, topics: ["persona|admin"]}
