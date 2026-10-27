@@ -1,10 +1,12 @@
-# The docs site: build it on each PR (the check `build` is required), and deploy it to GitHub Pages only on a release tag.
+# The docs site: build it on each PR (the check `build` is required), and deploy it to GitHub Pages on a release tag.
+# A manual run on main also deploys it, for a docs change between releases (D75).
 name: pages
 
 on:
   pull_request:
   push:
     tags: ['v*']
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -32,13 +34,15 @@ jobs:
       - name: Build
         run: mkdocs build --strict
 
-      - if: github.event_name == 'push'
+      - if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: website/build
 
   deploy:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')) ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     needs: build
     runs-on: ubuntu-latest
     permissions:
