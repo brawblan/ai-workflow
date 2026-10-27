@@ -72,6 +72,9 @@ tool-neutral, and `stone check` fails on a vendor name in it.
 - A release is a PR from `dev` into `main`. Merge it, then tag the merge commit `vX.Y.Z`. The tag
   deploys the docs site. A push to `dev` or `main` does not. Steps:
   [versioning.md](framework/versioning.md#release-checklist).
+- A docs change between releases: if `dev` has no unreleased code, merge `dev` into `main` with no
+  tag, then run the `pages` workflow by hand on `main`. Steps:
+  [versioning.md](framework/versioning.md#a-docs-change-between-releases).
 - Commit messages: `type(scope): summary` (for example `feat(stone): ...`, `docs(framework): ...`).
   Explain why in the body.
 - Role trailers: a commit that changes a protected path (`.cornerstone/`, `.claude/`, `.github/workflows/`,
