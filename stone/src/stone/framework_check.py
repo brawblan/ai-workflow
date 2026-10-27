@@ -27,7 +27,11 @@ REQUIRED_KEYS = ["id", "name", "version", "purpose", "triggers", "stages", "role
                  "plan_form", "mode", "gates", "checks", "limits", "outputs"]
 MATRIX_VALUE = {"—": "skip", "yes": "required", "if needed": "if-needed"}
 VENDOR_NAMES = ["claude", "codex", "cursor", "copilot", "gemini", "openspec", "kiro",
-                "anthropic", "openai"]
+                "anthropic", "openai", "spec kit", "speckit", "bmad", "agentic code"]
+# Code of stone must not hard-code a harness folder (P12, D76). The adapter gives it. These two files
+# keep `.claude/` in a message or a default. A later change can move them to the adapter.
+HARNESS_FOLDER = ".claude/"
+HARNESS_FOLDER_ALLOWED = {"framework_check.py", "writing_check.py"}
 EVAL_OPTIONAL_KINDS = {"check", "doc", "specialist"}  # lifecycle.md: a check is its own test, so its eval can be ""
 
 
@@ -210,6 +214,20 @@ def check_neutral(framework: Path) -> list[Finding]:
                 findings.append(Finding(str(path), number, CHECK,
                                         f"The core names '{match.group(1)}' (P12). "
                                         "Move this detail to an adapter."))
+    return findings
+
+
+def check_neutral_code(code: Path) -> list[Finding]:
+    """P12 for code: a Python file of stone outside the allowed list must not name a harness folder."""
+    findings: list[Finding] = []
+    for path in sorted(code.rglob("*.py")) if code.is_dir() else []:  # only the repo that holds stone
+        if path.name in HARNESS_FOLDER_ALLOWED:
+            continue
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+            if HARNESS_FOLDER in line:
+                findings.append(Finding(str(path), number, CHECK,
+                                        f"The code names the harness folder '{HARNESS_FOLDER}' (P12). "
+                                        "Read it from the adapter."))
     return findings
 
 
@@ -593,6 +611,7 @@ def run(root: Path, framework: Path | None = None, links: str = "default") -> li
                         "No framework folder. Run stone from the repo root, or pass --framework.")]
     docs = link_scope(root, framework, links)
     return (check_profiles(framework) + check_links(root, docs) + check_neutral(framework)
+            + check_neutral_code(root / "stone" / "src" / "stone")
             + check_config(root, framework) + check_components(root, framework)
             + check_upgrades(root, framework) + check_version(root)
             + personas_check.run(root) + specs.check(root))
