@@ -22,12 +22,12 @@ Runs are local. Run `stone eval <component-id>`. The command writes a result fil
 ## Coverage
 
 A full render for all 10 profiles writes 22 components. This table lists each one. Facts as of
-2026-10-19.
+2026-10-27.
 
-- Measured by a model run: 5 components (`role.shaper`, `role.planner`, `role.tester`,
-  `hook.protect-paths`, `hook.settings`). The hook pair has two runs. The run of 2026-10-21 passes every check (see below).
+- Measured by a model run: 6 components (`role.shaper`, `role.planner`, `role.tester`,
+  `role.reviewer`, `hook.protect-paths`, `hook.settings`). The hook pair has two runs. The run of 2026-10-21 passes every check (see below).
 - Measured by tests only: `check.k6`. A check is its own test (D43).
-- Not measured: 16 components. Each has an eval plan in the adapter component list. The eval
+- Not measured: 15 components. Each has an eval plan in the adapter component list. The eval
   folder does not exist yet.
 - Every run used `claude-opus-5-5`, except one `role.tester` run on `claude-sonnet-5-5` (2026-10-22). No other model is measured (dossier G5).
 - k = 3 for each run. A rate is the share of passed checks. "With" has the component. "Without" does
@@ -39,7 +39,7 @@ A full render for all 10 profiles writes 22 components. This table lists each on
 | `role.planner` | [role-planner](./role-planner/) | 2026-10-18, `claude-opus-5-5`. P1 to P5, latest run of each scenario. Outcome 1.00 with, 0.80 without (P2 fails without). Contract 1.00 with, 0.40 without. | Measured |
 | `role.implementer` | none | no run | 2027-04-18 (proposed) |
 | `role.tester` | [role-tester](./role-tester/) | T1, T3, T4: 2026-10-18. T2: 2026-10-19, after D42. Outcome 1.00 with and without in all four. Contract 1.00 with. Contract 0.00 without. The run of 2026-10-22 on `claude-sonnet-5-5` (with only, k = 3): outcome 1.00 and contract 1.00 in all four, 12 of 12 runs pass. The T2 result of 2026-10-18 is from before D42 (see the note below). | Measured |
-| `role.reviewer` | none | no run | 2027-04-18 (proposed) |
+| `role.reviewer` | [role-reviewer](./role-reviewer/) | 2026-10-27, `claude-opus-5-5`. R1 to R4. Outcome 1.00 with and without. Contract 1.00 with, 0.00 without. pass^k is 1 in all four with the role. See the note below. | Measured |
 | `role.investigator` | none | no run | 2027-04-18 (proposed) |
 | `hook.protect-paths` | [hook-protect-paths](./hook-protect-paths/) | 2026-10-21, `claude-opus-5-5`, after D48. H1 to H5. Every check passes in 30 of 30 runs, in both variants. Outcome 1.00 with and without. pass^k is 1 in all rows. The run of 2026-10-19 passed `bash_write_lands` in 4 of 30 runs (see the note below). | Measured. Review D39 by 2027-04-18. |
 | `hook.settings` | [hook-protect-paths](./hook-protect-paths/) | The same run as `hook.protect-paths`. It has no result of its own. | Measured with the hook. |
@@ -89,6 +89,13 @@ Notes on the results:
   rates do not change with the fixed grader. Without the role, the model changes a ready ticket,
   writes its own non-goals and a time limit, and replaces an unknown persona. With the role, a run
   costs about one third. Limit: `not_invented` reads only the field labels, not a "Scope" label.
+- **`role.reviewer`.** Without the role, the model finds the same defect, scope drift, and
+  missing test, and it gives no false finding on the clean change. So the role adds the form,
+  not the detection, on this model. Without the role, no report gives a confidence or open risks,
+  and 5 of 9 findings have no severity, or no file and line. With the role, a run costs about one
+  half. The first grade failed the R2 contract in all 3 runs with the role. The grader split a
+  finding at its "Evidence" item. After the fix, the kept workspaces were graded again. Limit:
+  the scenarios are small, and each has one clear gap.
 - **Contract column of the hook eval.** The scenarios have no `contract` check. The table shows
   1.00 for an empty set. Read it as "not applicable".
 - **Latest run only.** The sections below show the latest run of each component, as D36 says. A

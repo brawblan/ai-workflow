@@ -1,0 +1,27 @@
+diff --git a/src/notes.py b/src/notes.py
+index 9319829..efdf8b5 100644
+--- a/src/notes.py
++++ b/src/notes.py
+@@ -12,3 +12,7 @@ class Notes:
+ 
+     def list(self) -> list[str]:
+         return [f"{n}. {text}" for n, text in enumerate(self.items, start=1)]
++
++    def search(self, word: str) -> list[str]:
++        """Return the notes that contain the word. The search ignores case."""
++        return [text for text in self.items if word.lower() in text.lower()]
+diff --git a/tests/test_notes.py b/tests/test_notes.py
+index 6130efb..8e3c1f7 100644
+--- a/tests/test_notes.py
++++ b/tests/test_notes.py
+@@ -14,3 +14,10 @@ class NotesTest(unittest.TestCase):
+         notes.add("a")
+         notes.add("b")
+         self.assertEqual(notes.list(), ["1. a", "2. b"])
++
++    def test_search_returns_the_notes_with_the_word(self) -> None:
++        notes = Notes()
++        notes.add("buy milk")
++        notes.add("call the bank")
++        notes.add("milk the idea")
++        self.assertEqual(notes.search("milk"), ["buy milk", "milk the idea"])

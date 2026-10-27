@@ -1,0 +1,14 @@
+framework_version: 0.5.0
+harness: claude-code
+model_profile: claude-5
+profiles: [single-ticket]
+branches: {integration: main, main: main}
+commands:
+  install: "true"
+  test_unit: python -m unittest discover -s tests -t .
+  all_checks: python -m unittest discover -s tests -t .
+paths:
+  source: [src/]
+  tests: [tests/]
+  checks: [.github/workflows/, .cornerstone/checks/]
+owners: {default: eval}

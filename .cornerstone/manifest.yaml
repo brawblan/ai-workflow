@@ -116,7 +116,8 @@ components:
   source: framework
   owner: brawblan
   eval: evals/role-reviewer/
-  models_tested: []
+  models_tested:
+  - claude-opus-5-5
   added: '2026-10-17'
   review_by: '2027-04-17'
   files:
