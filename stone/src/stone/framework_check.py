@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from stone import __version__, personas_check, results, specialists, specs, upgrade
+from stone import __version__, ci_setup, personas_check, results, specialists, specs, upgrade
 from stone.findings import Finding
 from stone.markdown import link_file, relative_links, split_frontmatter, table_rows
 
@@ -223,6 +223,24 @@ def branch_name_problems(config: dict[str, Any]) -> list[str]:
             for key, value in branches.items() if value is not None and not isinstance(value, str)]
 
 
+def ci_branch_problems(config: dict[str, Any]) -> list[str]:
+    """Test `ci.branches` (#164): a list of branch names that has `branches.integration`."""
+    ci = config.get("ci")
+    if not isinstance(ci, dict) or ci.get("branches") is None:
+        return []
+    names = ci["branches"]
+    if not isinstance(names, list) or not names or not all(
+            isinstance(name, str) and name.strip() for name in names):
+        return ["'ci.branches' must be a list of base branch names as YAML strings, "
+                'for example ci: {branches: [dev]}. Remove the key to run K6, K7, K14, and K20 '
+                'on each PR.']
+    integration = (config.get("branches") or {}).get("integration")
+    if isinstance(integration, str) and integration not in names:
+        return [f"'ci.branches' does not list branches.integration '{integration}'. Add it, "
+                "or the ticket PRs skip K6, K7, K14, and K20."]
+    return []
+
+
 def path_compiler(harness: Path) -> Any:
     """Return compile_path from the component with `provides: path_match`, or None if none.
 
@@ -348,6 +366,39 @@ def commit_problems(root: Path, config: dict[str, Any]) -> list[str]:
     return problems
 
 
+CI_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
+
+
+def ci_env_problems(config: dict[str, Any]) -> list[str]:
+    """Return the problems of `ci.env` and `ci.secrets`, the env of the All checks step (#163).
+
+    `ci_setup.section_problems` checks the `ci` section itself: a value that is not a map, or
+    an unknown key.
+    """
+    section = config.get("ci")
+    if not isinstance(section, dict):
+        return []
+    problems = []
+    env = section.get("env") or {}
+    secrets = section.get("secrets") or []
+    if not isinstance(env, dict):
+        problems.append("'ci.env' must be a map of NAME: value.")
+        env = {}
+    if not isinstance(secrets, list):
+        problems.append("'ci.secrets' must be a list of names.")
+        secrets = []
+    names = [("ci.env", str(name)) for name in env] + [("ci.secrets", str(name)) for name in secrets]
+    for key, name in names:
+        if not CI_NAME.match(name):
+            problems.append(f"'{key}' has the name '{name}'. A name matches ^[A-Z_][A-Z0-9_]*$.")
+    for name in sorted({str(n) for n in env} & {str(n) for n in secrets}):
+        problems.append(f"The name '{name}' is in ci.env and in ci.secrets. Keep it in one.")
+    for name, value in env.items():
+        if isinstance(value, (dict, list)) or "${{" in str(value):
+            problems.append(f"'ci.env.{name}' must be a plain value. Pass a secret with ci.secrets.")
+    return problems
+
+
 def ticket_problems(config: dict[str, Any]) -> list[str]:
     """Return the problems of the `tickets` section of the repo config (#137)."""
     section = config.get("tickets")
@@ -420,9 +471,12 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     adoption = config.get("adoption", "all")
     if adoption not in ADOPTION_MODES:
         add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
+    for problem in ci_branch_problems(config):
+        add(problem)
     for problem in (ticket_folder_problems(config) + protected_path_problems(config)
                     + commit_problems(root, config)
-                    + ticket_problems(config) + specialists.problems(config)):
+                    + ticket_problems(config) + ci_env_problems(config) + specialists.problems(config)
+                    + ci_setup.problems(config)):
         add(problem)
     for waiver in config.get("waivers", []):
         if waiver.get("gate") in {"G3", "G5"}:

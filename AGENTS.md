@@ -74,6 +74,10 @@ tool-neutral, and `stone check` fails on a vendor name in it.
   [versioning.md](framework/versioning.md#release-checklist).
 - Commit messages: `type(scope): summary` (for example `feat(stone): ...`, `docs(framework): ...`).
   Explain why in the body.
+- Role trailers: a commit that changes a protected path (`.cornerstone/`, `.claude/`, `.github/workflows/`,
+  `stone/tests/`) gets `Role: human` and is a commit of its own. K6 fails
+  `Role: implementer` on these paths. Do not rewrite a pushed commit to fix a trailer. Put
+  `Role: generator` on a commit that holds only `stone render` or `stone upgrade` output.
 - PR body: use the nine sections of the `ticket-delivery` skill, each under its own heading. K14 tests the
   last four. If a section does not apply, write `None` and the reason.
 

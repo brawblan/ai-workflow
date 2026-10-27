@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from stone import framework_check, results, specialists, specs, triggers
+from stone import ci_setup, framework_check, results, specialists, specs, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -65,7 +65,7 @@ Add `Reproduction:` for a bug and `Time box:` for a spike or an audit, if the pr
 ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 DEFAULT_PR_LINES = 600  # D4, customization.md
-BLOCKS = ["check_steps", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
+BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
 
 class RenderError(Exception):
@@ -201,6 +201,16 @@ def one_folder(value: Any, key: str = "plans") -> str:
     return folder if folder.endswith("/") else folder + "/"
 
 
+def all_checks_env(config: dict[str, Any]) -> str:
+    """Return the `env:` lines of the All checks step (#163). A secret is passed by name only."""
+    ci = config.get("ci") or {}
+    env = {name: json.dumps(str(value)) for name, value in (ci.get("env") or {}).items()}
+    env.update({name: "${{ secrets." + name + " }}" for name in ci.get("secrets") or []})
+    if not env:
+        return ""
+    return "        env:\n" + "\n".join(f"          {name}: {value}" for name, value in env.items())
+
+
 def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     """Return the repo facts that templates can use. TODO values are left out on purpose."""
     # The framework tag. The G3 workflow installs stone from it.
@@ -212,7 +222,7 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
         # A list becomes inline code items. A single path stays plain, so a template can extend it.
         values[f"paths_{key}"] = (", ".join(f"`{item}`" for item in value)
                                   if isinstance(value, list) else str(value))
-    problems = framework_check.branch_name_problems(config)
+    problems = framework_check.branch_name_problems(config) + framework_check.ci_branch_problems(config)
     if problems:
         raise RenderError(f"{CONFIG}: {problems[0]}")
     for key, value in (config.get("branches") or {}).items():
@@ -223,15 +233,19 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     for key, value in (config.get("limits") or {}).items():
         if value is not None and str(value).strip():  # an empty limit has no value
             values[f"limit_{key}"] = str(value)
+    if ci_setup.problems(config):
+        raise RenderError(f"{CONFIG}: {ci_setup.problems(config)[0]}")
     opt_in = config.get("adoption", "all") == "opt-in"
     no_k6 = commit_settings(config)["trailers"] == "none"
     values.update(ticket_values(config))
     values.update({
         "adoption_json": json.dumps("opt-in" if opt_in else "all"),
         "marker_if": MARKER_IF if opt_in else "",
+        "gate_if": gate_condition(config, opt_in),
         "marker_step": (MARKER_STEP.replace("PROFILE_IDS", "|".join(config.get("profiles") or []))
                         if opt_in else ""),
         "pr_types": PR_TYPES if opt_in else "",
+        "ci_setup": ci_setup.block(config, MARKER_IF if opt_in else ""),
         "marker_rule": (" If you open or edit a PR, add the line `Profile: <id>` to the PR body, "
                         "or the label `cornerstone`. The G3 workflow skips a PR with neither."
                         if opt_in else ""),
@@ -239,6 +253,10 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
                               "lists." if specialists.listed(config) else ""),
         "k6_tail": " The paths are:" if no_k6 else " Check K6 fails the commit in CI:",
         "k6_checks_commit": "" if no_k6 else " Check K6 checks the commit."})
+    problems = framework_check.ci_env_problems(config)
+    if problems:
+        raise RenderError(f"{CONFIG}: {problems[0]}")
+    values["all_checks_env"] = all_checks_env(config)
     plans = one_folder(_get(config, "paths.plans"))
     reports = one_folder(_get(config, "paths.reports"), "reports")
     # '{id}' (#146): the role text names the ticket folder, and the hook matches each ticket folder.
@@ -442,6 +460,17 @@ def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict
         text = substitute(harness, step["template"], step_values, {}, config)
         blocks.append("\n" + text.rstrip("\n"))
     return "\n".join(blocks)
+
+
+def gate_condition(config: dict[str, Any], opt_in: bool) -> str:
+    """Return the `if:` line of the K6, K7, K14, and K20 steps (#164). Empty: they always run."""
+    parts = ["steps.marker.outputs.cornerstone == 'true'"] if opt_in else []
+    # A GitHub expression string uses single quotes. Two single quotes stand for one.
+    bases = " || ".join("github.base_ref == '{}'".format(name.replace("'", "''"))
+                        for name in _get(config, "ci.branches") or [])
+    if bases:
+        parts.append(f"({bases})" if parts and " || " in bases else bases)
+    return f"        if: {' && '.join(parts)}" if parts else ""
 
 
 def step_name(component_id: str) -> str:
