@@ -31,6 +31,8 @@ tools:   # the same lists as the role files, plus the commands that the role run
   tester: [Read, Grep, Glob, Edit, Write, "Bash(python -m unittest*)", "Bash(git diff*)",
            "Bash(git log*)", "Bash(git show*)", "Bash(git add*)", "Bash(git commit*)",
            "Bash(git status*)"]
+  reviewer: [Read, Grep, Glob, "Bash(python -m unittest*)", "Bash(git diff*)", "Bash(git log*)",
+             "Bash(git show*)", "Bash(git status*)"]   # read-only: the reviewer changes no file
   # The hook.protect-paths eval (D39): the shell write forms of its scenarios. Confirmed on
   # 2026-10-19 and 2026-10-21: sed -i, a redirect, tee, cp, and python3 -c ran under acceptEdits
   # (30 of 30 runs on 2026-10-21, with no file tool). A command with a second part (`; echo ...`)
