@@ -11,6 +11,11 @@
 # `<id>.<profile>` (D31). `parts` are fragments that render puts in the template at a `$name` line.
 # `values` are template values of the entry. A value that another trigger entry sets is "" here.
 # eval: the planned eval folder (lifecycle.md).
+# protected_dirs: the folders of the harness that hold its settings, role files, and hook entry. The hook
+# and K6 protect them for every role, with `.cornerstone/` (D76). The core names no harness folder (P12).
+
+protected_dirs:
+  - .claude/
 
 components:
   - id: role.shaper

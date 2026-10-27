@@ -62,7 +62,7 @@ Personas: <IDs>, or none
 ```
 
 Add `Reproduction:` for a bug and `Time box:` for a spike or an audit, if the profile needs them."""
-ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
+CORE_PROTECTED = [".cornerstone/"]  # the hook and the check; the adapter adds its own folders (P12, D76)
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 DEFAULT_PR_LINES = 600  # D4, customization.md
 BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
@@ -211,7 +211,8 @@ def all_checks_env(config: dict[str, Any]) -> str:
     return "        env:\n" + "\n".join(f"          {name}: {value}" for name, value in env.items())
 
 
-def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
+def template_values(config: dict[str, Any], model: str,
+                    harness_dirs: list[str] | None = None) -> dict[str, str]:
     """Return the repo facts that templates can use. TODO values are left out on purpose."""
     # The framework tag. The G3 workflow installs stone from it.
     values = {"model": model, "framework_version": str(config.get("framework_version", ""))}
@@ -266,12 +267,13 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     values["paths_reports"] = reports.replace(specs.TICKET_ID, "<ticket-id>")
     values["plans_json"] = json.dumps([plans.replace(specs.TICKET_ID, "*")])
     values["reports_json"] = json.dumps([reports.replace(specs.TICKET_ID, "*")])
-    values["harness_json"] = json.dumps(ALWAYS_PROTECTED)
+    always = list(harness_dirs or []) + CORE_PROTECTED  # harness folders hold its settings (D76)
+    values["harness_json"] = json.dumps(always)
     tests = list(_get(config, "paths.tests") or [])
     checks = list(_get(config, "paths.checks") or [])
     if tests and checks:
         values["tests_json"] = json.dumps(tests)
-        protected = tests + checks + ALWAYS_PROTECTED + [values["paths_specs"]]
+        protected = tests + checks + always + [values["paths_specs"]]
         values["protected_json"] = json.dumps(sorted(set(protected)))
     return {key: value for key, value in values.items() if "TODO(" not in value}
 
@@ -332,7 +334,9 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     if not registry_path.exists():
         raise RenderError(f"The harness '{config['harness']}' has no components.yaml. "
                           "Render supports only adapters with templates.")
-    registry = yaml.safe_load(registry_path.read_text(encoding="utf-8"))["components"]
+    registry_doc = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+    registry = registry_doc["components"]
+    harness_dirs = [str(item) for item in registry_doc.get("protected_dirs") or []]
     model_profile = yaml.safe_load(
         (harness / "models" / f"{config['model_profile']}.yaml").read_text(encoding="utf-8"))
     if model_profile.get("status") != "active":
@@ -359,7 +363,7 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     steps: dict[str, str | None] = {step_name(entry["id"]): None
                                     for entry in registry if entry.get("ci_step")}
     limits_json = json.dumps(size_limits(config, profiles), sort_keys=True)
-    base_values = {**template_values(config, ""), **model_values,
+    base_values = {**template_values(config, "", harness_dirs), **model_values,
                    "size_limits_json": limits_json}
     for entry in registry:
         if entry.get("ci_step") and needed(entry, profiles) and entry["id"] not in off:
@@ -374,7 +378,7 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         if local and entry["kind"] == "ci-job":
             continue  # delivery: local writes no workflow file
         model = defaults["role_models"].get(entry.get("role", ""), "")
-        values = {**template_values(config, model), **model_values,
+        values = {**template_values(config, model, harness_dirs), **model_values,
                   "size_limits_json": limits_json,
                   **{name: step for name, step in steps.items() if step is not None}}
         effort = (defaults.get("effort") or {}).get(entry.get("role", ""), "")
