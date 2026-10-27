@@ -24,10 +24,10 @@ Runs are local. Run `stone eval <component-id>`. The command writes a result fil
 A full render for all 10 profiles writes 22 components. This table lists each one. Facts as of
 2026-10-19.
 
-- Measured by a model run: 4 components (`role.planner`, `role.tester`, `hook.protect-paths`,
-  `hook.settings`). The hook pair has two runs. The run of 2026-10-21 passes every check (see below).
+- Measured by a model run: 5 components (`role.shaper`, `role.planner`, `role.tester`,
+  `hook.protect-paths`, `hook.settings`). The hook pair has two runs. The run of 2026-10-21 passes every check (see below).
 - Measured by tests only: `check.k6`. A check is its own test (D43).
-- Not measured: 17 components. Each has an eval plan in the adapter component list. The eval
+- Not measured: 16 components. Each has an eval plan in the adapter component list. The eval
   folder does not exist yet.
 - Every run used `claude-opus-5-5`, except one `role.tester` run on `claude-sonnet-5-5` (2026-10-22). No other model is measured (dossier G5).
 - k = 3 for each run. A rate is the share of passed checks. "With" has the component. "Without" does
@@ -35,7 +35,7 @@ A full render for all 10 profiles writes 22 components. This table lists each on
 
 | Component | Eval folder | Last result | Planned date |
 | --- | --- | --- | --- |
-| `role.shaper` | none | no run | 2027-04-18 (proposed) |
+| `role.shaper` | [role-shaper](./role-shaper/) | 2026-10-27, `claude-opus-5-5`. S1 to S5, latest run of each scenario. Outcome 1.00 with, 0.40 without. pass^k is 1 in all five with the role. See the note below. | Measured |
 | `role.planner` | [role-planner](./role-planner/) | 2026-10-18, `claude-opus-5-5`. P1 to P5, latest run of each scenario. Outcome 1.00 with, 0.80 without (P2 fails without). Contract 1.00 with, 0.40 without. | Measured |
 | `role.implementer` | none | no run | 2027-04-18 (proposed) |
 | `role.tester` | [role-tester](./role-tester/) | T1, T3, T4: 2026-10-18. T2: 2026-10-19, after D42. Outcome 1.00 with and without in all four. Contract 1.00 with. Contract 0.00 without. The run of 2026-10-22 on `claude-sonnet-5-5` (with only, k = 3): outcome 1.00 and contract 1.00 in all four, 12 of 12 runs pass. The T2 result of 2026-10-18 is from before D42 (see the note below). | Measured |
@@ -84,6 +84,11 @@ Notes on the results:
   the pass rate is about 0.90. The eval does not show how often a model writes a protected path
   with a shell command when nothing lifts its role rule. In the first run, that happened in 4 of
   30 runs. A refusal is a model-dependent control, so K6 stays the control.
+- **`role.shaper`.** S1 and S2 are from the second run of 2026-10-27. After the first run, three
+  grader errors and one vague ticket (NOTE-1) were fixed. S3 to S5 are from the first run. Their
+  rates do not change with the fixed grader. Without the role, the model changes a ready ticket,
+  writes its own non-goals and a time limit, and replaces an unknown persona. With the role, a run
+  costs about one third. Limit: `not_invented` reads only the field labels, not a "Scope" label.
 - **Contract column of the hook eval.** The scenarios have no `contract` check. The table shows
   1.00 for an empty set. Read it as "not applicable".
 - **Latest run only.** The sections below show the latest run of each component, as D36 says. A
