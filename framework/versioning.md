@@ -61,7 +61,8 @@ installed `stone`.
 1. On a branch from `dev`, run `python -m unittest discover -s stone/tests`, `stone check`, and
    `stone check-writing --diff origin/dev`.
 2. In `upgrades.yaml`, set `released` of the newest entry to the date of the release.
-3. Set the same version in `stone/pyproject.toml` and in `stone/src/stone/__init__.py`.
+3. Set the same version in `stone/pyproject.toml` and in `stone/src/stone/__init__.py`. Also set it in
+   the line `Version X.Y.Z.` of `README.md` and of `website/content/index.md`. A unit test compares them.
 4. If a skill changed, raise the version in the `plugin.json` file of the plugin.
 5. Merge the changes of steps 2 to 4 into `dev` with a PR. Then open a release PR from `dev` into `main`. Wait for the checks
    `stone`, `checks`, and `build`.
@@ -73,3 +74,14 @@ installed `stone`.
 8. Now move this repo to the new version. Set `framework_version` in `.cornerstone/config.yaml`, and
    run `stone upgrade --apply`. Commit the generated files alone. Open this PR into `dev`. Do this
    after the tag exists, because the G3 workflow installs `stone` from the tag.
+
+## A docs change between releases
+
+The site shows what is on `main`. A docs change in `dev` reaches the site at the next release. To
+publish it before then, deploy the site by hand ([D75](README.md#decisions)):
+
+1. Make sure that `dev` has no unreleased code. Run `git log --oneline origin/main..origin/dev`.
+   If a commit changes code, wait for the next release.
+2. Open a PR from `dev` into `main`. Do not set a version or push a tag.
+3. The owner merges the PR with a merge commit.
+4. Run `gh workflow run pages.yml --ref main`. The deploy job runs only from `main`.
