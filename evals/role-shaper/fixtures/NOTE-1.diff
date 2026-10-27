@@ -1,0 +1,16 @@
+diff --git a/tickets/NOTE-1.md b/tickets/NOTE-1.md
+new file mode 100644
+index 0000000..d07f863
+--- /dev/null
++++ b/tickets/NOTE-1.md
+@@ -0,0 +1,10 @@
++# NOTE-1: Show the word count of each note
++
++## Definition of Ready
++Problem: A writer cannot see how long a note is in the list.
++Acceptance criteria:
++- Notes.list() adds " [N]" to the end of each line. N is len(text.split()).
++- For the notes "buy milk" and "", Notes.list() returns ["1. buy milk [2]", "2.  [0]"].
++Non-goals: No count of characters. No change to Notes.add().
++Test oracle: A unit test adds "buy milk" and "" and compares Notes.list() with the list above.
++Personas: writer

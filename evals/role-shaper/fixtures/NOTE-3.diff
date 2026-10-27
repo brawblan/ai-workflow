@@ -1,0 +1,17 @@
+diff --git a/tickets/NOTE-3.md b/tickets/NOTE-3.md
+new file mode 100644
+index 0000000..93a2646
+--- /dev/null
++++ b/tickets/NOTE-3.md
+@@ -0,0 +1,11 @@
++# NOTE-3: Search the notes
++
++## Definition of Ready
++Problem: A writer with many notes cannot find an old note.
++Acceptance criteria:
++- Notes.search(word) returns the notes that contain the word.
++- The search is fast.
++- The results are relevant.
++Non-goals: No search in other files. No fuzzy match.
++Test oracle: A unit test adds three notes and compares the result of Notes.search() with a list.
++Personas: writer

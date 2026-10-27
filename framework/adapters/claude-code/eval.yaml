@@ -25,6 +25,7 @@ env:   # the hook reads the role from agent_type (set by --agent), and STONE_ROL
   without: {STONE_ROLE: $role}
 
 tools:   # the same lists as the role files, plus the commands that the role runs
+  shaper: [Read, Grep, Glob, Write, Edit]   # a file ticket (D60); the hook limits the edits
   planner: [Read, Grep, Glob, Write]
   writer: [Read, Grep, Glob]   # the guidance.writing eval (D69): read-only
   tester: [Read, Grep, Glob, Edit, Write, "Bash(python -m unittest*)", "Bash(git diff*)",

@@ -1,0 +1,15 @@
+diff --git a/tickets/NOTE-5.md b/tickets/NOTE-5.md
+new file mode 100644
+index 0000000..1bea1a2
+--- /dev/null
++++ b/tickets/NOTE-5.md
+@@ -0,0 +1,9 @@
++# NOTE-5: Limit the length of a note
++
++## Definition of Ready
++Problem: A very long note makes the list hard to read.
++Acceptance criteria:
++- Notes.add() raises ValueError for a text of more than 500 characters.
++Non-goals: No limit on the number of notes.
++Test oracle: A unit test adds a text of 501 characters and expects ValueError.
++Personas: admin
