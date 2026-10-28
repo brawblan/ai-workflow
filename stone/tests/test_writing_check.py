@@ -99,6 +99,49 @@ class CheckTextTest(unittest.TestCase):
         self.assertEqual(lines, [3])
 
 
+class DottedTokenWordCountTest(unittest.TestCase):
+    """Rule 8 counts a version number or a file name as one word (issue #112)."""
+
+    def test_version_number_is_one_word(self) -> None:
+        # 24 plain words + 1.4.0 = 25 words, the description limit.
+        self.assertEqual(found(" ".join(["word"] * 24) + " 1.4.0."), [])
+        self.assertEqual(found(" ".join(["word"] * 24) + " 0.6.3."), [])
+
+    def test_file_name_is_one_word(self) -> None:
+        self.assertEqual(found(" ".join(["word"] * 24) + " versioning.md."), [])
+
+    def test_dotted_tokens_still_count_as_words(self) -> None:
+        # 24 plain words + 2 dotted tokens = 26 words.
+        text = " ".join(["word"] * 24) + " 1.4.0 versioning.md."
+        self.assertEqual(found(text), ["Rule 8|error"])
+
+    def test_pr_196_regression_sentence_has_no_finding(self) -> None:
+        text = ("Reason: a stricter check for a repo that did not change its config is a major "
+                "change (versioning.md), and 1.4.0 is a minor release.")
+        self.assertEqual(found(text), [])
+
+    def test_final_dot_is_not_part_of_a_word(self) -> None:
+        # 25 words, then the final dot: the dot must not add a word.
+        self.assertEqual(found(" ".join(["word"] * 25) + "."), [])
+
+    def test_two_sentences_stay_two_sentences(self) -> None:
+        # Each sentence has 20 words. Joined as one, they would break the limit.
+        sentence = "Word " + " ".join(["word"] * 18) + " end."
+        self.assertEqual(found(sentence + " " + sentence), [])
+
+    def test_dot_before_space_or_end_is_not_kept(self) -> None:
+        # In a procedure (limit 20): 20 words pass, 21 fail.
+        self.assertEqual(found("1. " + " ".join(["run"] * 19) + " end."), [])
+        self.assertEqual(found("1. " + " ".join(["run"] * 20) + " end."), ["Rule 8|error"])
+
+    def test_plain_26_words_still_fail(self) -> None:
+        self.assertEqual(found(" ".join(["word"] * 26) + "."), ["Rule 8|error"])
+
+    def test_dotted_tokens_in_a_procedure_count_as_one_word_each(self) -> None:
+        text = "1. Open versioning.md and set 1.4.0 in the file " + " ".join(["now"] * 8) + "."
+        self.assertEqual(found(text), [])
+
+
 class ChangedLinesTest(unittest.TestCase):
     """`--diff BASE` tests the lines that changed since the merge base, in the working tree."""
 

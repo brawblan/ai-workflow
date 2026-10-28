@@ -22,7 +22,8 @@ DEFAULT_EXCLUDE = ["*SKILL.md", "*/skills/*", "AGENTS.md", "*/AGENTS.md", "CLAUD
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+(?=[A-Z0-9\"'(\[])")
 # A job story ID (K18) is a name, like a code name. It is not a word of the sentence.
 JOB_STORY_ID = re.compile(r"^[a-z][a-z0-9-]*\.J\d+:\s*")
-WORD = re.compile(r"[A-Za-z0-9][A-Za-z0-9'’/_-]*")
+# A dot between two letters or digits stays in the word: `1.4.0` and `versioning.md` are one word.
+WORD = re.compile(r"[A-Za-z0-9](?:[A-Za-z0-9'’/_-]|\.(?=[A-Za-z0-9]))*")
 PROGRESSIVE = re.compile(r"\b(?:am|is|are|was|were|be|been)\s+([a-z]+ing)\b", re.I)
 NOT_VERBS = {"thing", "string", "nothing", "something", "anything", "everything", "during",
              "morning", "evening", "ring", "king", "spring", "ceiling", "missing"}
