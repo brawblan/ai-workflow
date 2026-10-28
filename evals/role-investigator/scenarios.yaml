@@ -67,7 +67,7 @@ scenarios:
     expect:
       - {check: only_changed, paths: [docs/reports/]}
       - {check: grader, name: finding, paths: [docs/reports/],
-         all: ["(not|cannot|can't|unable to|could not|does not|did not|fails? to) (be )?reproduc|no (defect|bug)|not a (defect|bug)|works as (expected|intended)"]}
+         all: ["(not|n't|cannot|unable to|fails? to) (be )?reproduc|(ir|non-?)reproducible|no (defect|bug)|not a (defect|bug)|works as (expected|intended)"]}
       - {check: file_exists, path: docs/reports/BUG-33.md, kind: contract}
       - {check: matches, path: docs/reports/BUG-33.md, pattern: "confiden", kind: contract}
       - {check: matches, path: docs/reports/BUG-33.md, pattern: "recommend", kind: contract}
