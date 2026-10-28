@@ -1,0 +1,13 @@
+diff --git a/tests/test_notes.py b/tests/test_notes.py
+index 6130efb..eb938cd 100644
+--- a/tests/test_notes.py
++++ b/tests/test_notes.py
+@@ -14,3 +14,8 @@ class NotesTest(unittest.TestCase):
+         notes.add("a")
+         notes.add("b")
+         self.assertEqual(notes.list(), ["1. a", "2. b"])
++
++    def test_add_keeps_the_text_as_given(self) -> None:
++        notes = Notes()
++        notes.add("  a  ")
++        self.assertEqual(notes.list(), ["1.   a  "])

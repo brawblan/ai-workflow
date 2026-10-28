@@ -1,0 +1,13 @@
+diff --git a/src/notes.py b/src/notes.py
+index 9319829..ba02db7 100644
+--- a/src/notes.py
++++ b/src/notes.py
+@@ -12,3 +12,8 @@ class Notes:
+ 
+     def list(self) -> list[str]:
+         return [f"{n}. {text}" for n, text in enumerate(self.items, start=1)]
++
++    def find(self, word: str) -> list[str]:
++        """Return the notes that contain the word."""
++        # TODO: ignore case
++        return [text for text in self.items if word in text]
