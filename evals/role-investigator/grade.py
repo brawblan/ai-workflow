@@ -23,6 +23,10 @@ SEVERITY = re.compile(r"\b(critical|blocker|blocking|high|major|medium|moderate|
                       r"severity|P[0-3]|sev\s*\d)\b", re.I)
 LOCATION = re.compile(r"\.py\S*:\d+|\.py\W{0,4}(lines?|L)\s*\d+|\blines?\s+\d+|#L\d+|\bL\d+\b",
                       re.I)
+# A file and line, such as src/notes.py:20. A table row can give the severity of a finding that a
+# section above names, at the same file and line.
+FILE_LINE = re.compile(r"[\w./-]+\.py:\d+")
+RATING = re.compile(r"^\W*confiden", re.I)  # "Confidence: high" rates the report, not a finding
 
 
 def _sections(text: str) -> list[str]:
@@ -61,13 +65,17 @@ def finding(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
 
 
 def finding_form(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
-    """A section of the file `path` that matches `topic` gives a severity and a file and line."""
+    """A section of the file `path` that matches `topic` gives a severity and a file and line, or
+    another section gives a severity at the same file and line."""
     if not (workspace / args["path"]).is_file():
         return False, f"no file {args['path']}"
     hits = _matching(workspace, args, [args["topic"]])
     if not hits:
         return False, "no section names the topic"
     good = [s for s in hits if SEVERITY.search(s) and LOCATION.search(s)]
+    places = {m for s in hits for m in FILE_LINE.findall(s)}
+    good += [s for s in _matching(workspace, args, [SEVERITY.pattern])
+             if places & set(FILE_LINE.findall(s)) and not RATING.match(s)]
     if good:
         return True, "severity and location: " + " ".join(good[0].split())[:160]
     return False, (f"{len(hits)} section(s) name the topic, none with a severity and a "
