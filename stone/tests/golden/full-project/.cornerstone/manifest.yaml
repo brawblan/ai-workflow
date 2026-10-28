@@ -29,7 +29,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .cornerstone/checks/protected_paths.py
-  hash: 133f9977764da3307d35e32ef163198439762e8e6985e6986e25a87555c5073c
+  hash: b119dda0f2c438020ab82725da07ad03134b0dcca563336e0425eb5fd3373cd1
 - id: check.k7
   kind: check
   purpose: K7. Fail if the diff is over the size limit of the PR profile and has no
@@ -59,7 +59,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .github/workflows/cornerstone-checks.yml
-  hash: 9d7f14612fd5eb9dc09732873832d6e824e740254f98f880c58e98651187c692
+  hash: 285c66aacadfd7dc22c8fb837c52884eed1b73026ff896092f2dbacd663cf15c
 - id: hook.path-match
   kind: hook
   purpose: Match a path against paths.tests and paths.checks. The hook and K6 import
