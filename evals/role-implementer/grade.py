@@ -22,7 +22,9 @@ REPORT_ENV = "STONE_EVAL_REPORT"
 HERE = Path(__file__).resolve().parent
 SETUP = "^feat: the change under test"  # the subject of the last setup commit (evals.prepare)
 OPTION = re.compile(r"\b(options?|alternatives?|instead|considered|rejected|vs)\b", re.I)
-REASON = re.compile(r"\b(reasons?|because|why|so|rationale|since|thus|hence)\b", re.I)
+# A reason can be a word such as "because", or a reference to a requirement: "AC2 requires None".
+REASON = re.compile(r"\b(reasons?|because|why|so|rationale|since|thus|hence|requires?|required|"
+                    r"AC\s*#?\d|criteri(on|a))\b", re.I)
 
 
 def _git(workspace: Path, *args: str) -> str:
