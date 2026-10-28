@@ -30,6 +30,17 @@ jobs:
       - name: stone check
         run: stone check --format github
 
+      # R1 and R2 block (D78). R2 needs the base branch, so it runs on a PR only.
+      - name: R1 action pins
+        if: github.event_name != 'pull_request'
+        run: stone check-rules --format github
+
+      - name: R1 action pins and R2 plugin version bump
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        run: stone check-rules --base "origin/${BASE_REF}" --format github
+
       # K17 blocks (D45, framework/writing.md).
       - name: K17 on changed lines
         if: github.event_name == 'pull_request'

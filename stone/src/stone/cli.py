@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
-from stone import (__version__, evals, evidence_check, framework_check, gate, render, specialists,
-                   specs, upgrade, writing_check)
+from stone import (__version__, evals, evidence_check, framework_check, gate, render, repo_rules,
+                   specialists, specs, upgrade, writing_check)
 from stone.findings import report
 
 
@@ -92,6 +93,16 @@ def _parser() -> argparse.ArgumentParser:
                          help="warn: report only (the first 2 weeks). block: fail on errors.")
     writing.add_argument("--format", choices=["text", "github"], default="text")
 
+    rules = commands.add_parser(
+        "check-rules", help="R1 and R2: test the action pins and the plugin version bump (D78).")
+    rules.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    rules.add_argument("--base", help="The base branch. Gives R2: a skill change needs a new "
+                                      "plugin version. Without it, only R1 runs.")
+    rules.add_argument("--skills", default=repo_rules.SKILLS, help="The skills folder, for R2.")
+    rules.add_argument("--plugin-file", default=repo_rules.PLUGIN_FILE,
+                       help="The plugin file with the version, for R2.")
+    rules.add_argument("--format", choices=["text", "github"], default="text")
+
     evidence = commands.add_parser("check-evidence",
                                    help="K14: fail if a required PR section is missing or empty.")
     evidence.add_argument("body", help="The PR body file. Use '-' to read standard input.")
@@ -144,6 +155,8 @@ def main(argv: list[str] | None = None) -> int:
         return _spec(args.root, args.spec_command, getattr(args, "plan", ""))
     if args.command == "check-evidence":
         return _check_evidence(args.body, args.section, args.mode, args.format)
+    if args.command == "check-rules":
+        return _check_rules(args)
     if args.command == "eval":
         return _eval(args)
 
@@ -158,6 +171,17 @@ def main(argv: list[str] | None = None) -> int:
     blocking = report(findings, args.format, warn_only=args.mode == "warn")
     errors = sum(1 for f in findings if f.severity == "error")
     print(f"K17: {errors} error(s), {len(findings) - errors} warning(s), mode {args.mode}.")
+    return 1 if blocking else 0
+
+
+def _check_rules(args: argparse.Namespace) -> int:
+    try:
+        findings = repo_rules.run(args.root, args.base, args.skills, args.plugin_file)
+    except subprocess.CalledProcessError as error:
+        print(f"check-rules: git failed: {(error.stderr or '').strip()}")
+        return 2
+    blocking = report(findings, args.format)
+    print(f"R1, R2: {blocking} error(s).")
     return 1 if blocking else 0
 
 

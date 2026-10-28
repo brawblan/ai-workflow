@@ -12,3 +12,9 @@ Rules for a PR that changes `framework/`. `AGENTS.md` points here.
 - Give each new component (rule, skill, role, hook, check) an eval plan and a review date (P5).
 - If a PR adds, renames, or removes a config key, or changes a generated file, add it to the newest
   entry of `framework/upgrades.yaml`. See [versioning.md](versioning.md).
+
+## Checks for this repo only
+
+`stone check-rules` tests rules that `AGENTS.md` states for this repo: R1 (action pins) and R2
+(plugin version bump). `stone render` does not write them for a target repo (D78). To add a rule
+check, add it to `stone/src/stone/repo_rules.py`, and replay it on the merged PRs (D45).
