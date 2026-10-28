@@ -46,7 +46,7 @@ Two parts, by the P6 order (check before skill):
 | 1. Dictionary terms | A term from a "Do not use" column appears | fail |
 | 2. Simple tenses | A progressive verb form ("is running") appears | warning only (adjectives such as "is missing" also match) |
 | 5. Vague words | A word from the vague-word list appears | fail |
-| 8. Sentence length | A procedure sentence has more than 20 words, or a description sentence more than 25. K17 does not count a job story ID (`<id>.J<n>:`) as words. A version number (`1.4.0`) or a file name (`versioning.md`) is one word | fail |
+| 8. Sentence length | A procedure sentence has more than 20 words, or a description sentence more than 25. K17 does not count a job story ID (`<id>.J<n>:`) as words. A dot between two letters or digits stays in the word, so a version number (`1.4.0`) or a file name (`versioning.md`) is one word | fail |
 | 11. Active voice | A procedure step looks passive (a form of "be" plus a past participle) | warning only |
 | 13. Paragraph length | A paragraph has more than 6 sentences | fail |
 

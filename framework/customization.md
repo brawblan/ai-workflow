@@ -222,15 +222,20 @@ check on the local machine, and CI skips the check.
 
 ### Bot PRs (Dependabot, Renovate)
 
-A bot PR has no K14 sections, so K14 fails. A large lock file change can also fail K7. There is
-no config key to skip these checks for a bot ([D79](README.md#decisions)). A person passes them
-by hand:
+With `adoption: all` (the default), a bot PR has no K14 sections, so K14 fails. A large lock
+file change can also fail K7. There is no config key to skip these checks for a bot
+([D79](README.md#decisions)). A person passes them by hand:
 
 1. Edit the PR body. Add the four K14 sections: Evidence, Decision log, Review findings, and
    Confidence.
 2. If the diff is over the size limit, add a `Waiver (P10)` section with the reason.
 3. Start a new run. Push a commit, or close and open the PR again. An edit of the PR body or a
    re-run of the job does not read the new body.
+
+A bot can write its PR body again, for example when it rebases the PR. Then do these steps again.
+
+With `adoption: opt-in`, a bot PR has no marker, so K6, K7, and K14 skip it. An edit of the body
+starts a new run there.
 
 A bot commit has no `Role:` trailer, so K6 counts it as an implementer commit. A bot change of a
 protected path, for example an action update in the workflow folder, fails K6. Issue #201

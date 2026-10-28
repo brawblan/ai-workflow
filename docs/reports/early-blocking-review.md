@@ -39,7 +39,8 @@ A run link is `https://github.com/brawblan/ai-workflow/actions/runs/<run>`.
 | #173 | K17 body | True | 1 sentence of 35 words | 40021312204, 2 attempts |
 | #196 | K17 body | False positive | The sentence has 24 words. K17 counted `1.4.0` as 3 words and `versioning.md` as 2, so it reported 27. | 40617842342 |
 
-The word counts above use the fixed count. K17 on changed lines had no failure.
+The word counts above use the fixed count. The replay used the first version of each PR body, from
+the edit history of the PR. K17 on changed lines had no failure.
 
 ## Count by check
 
@@ -62,7 +63,7 @@ findings.
 
 ## Notes
 
-- A re-run of a job and an edit of the PR body do not read a new PR body. The author must push, or
+- In this repo, a re-run of a job and an edit of the PR body do not read a new PR body. The author must push, or
   close and open the PR again. #131 and #173 show this.
 - Each release PR (#173, #183) was over the size limit and needed a waiver. This is the documented
   K7 behavior. `ci.branches` (D74) skips K7 on a PR into `main`, if the owner wants that.
