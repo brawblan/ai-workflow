@@ -96,7 +96,9 @@ A team can move from one developer to all contributors in three steps.
 To go from step 1 to step 2, remove `delivery: local`, add `adoption: opt-in`, render, and commit
 the result. In step 2, a marked PR gets all checks. An unmarked PR gets none of them, so review is
 the only control for it. Turn on branch protection with a required human review for the base
-branch. The marker is a line `Profile: <id>` with a profile of your config, or the label
+branch. If the repo cannot use branch rules, a person reviews and approves each PR before the
+merge, and the repo writes this rule in `AGENTS.md`. This control depends on a person. CI does not
+enforce it. The marker is a line `Profile: <id>` with a profile of your config, or the label
 `cornerstone`. A human who commits with `Actor: human` and no `Role:` is not an
 implementer commit for K6.
 

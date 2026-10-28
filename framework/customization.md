@@ -207,6 +207,19 @@ A PR into an unlisted branch has no K6, K7, K14, or K20. This includes a hotfix 
 person gates it (G5). Turn on branch protection with a required human review for each unlisted
 base branch. If ticket PRs also go into a branch, add that branch to the list.
 
+If the repo cannot use branch rules (for example, a private repo on a GitHub plan without branch
+rules), use this fallback ([D81](README.md#decisions)):
+
+- A person reviews and approves each PR into an unlisted branch before the merge.
+- The repo writes this rule in its `AGENTS.md`.
+- This control depends on a person. CI does not enforce it, and `stone` does not check it. A
+  person can skip it by mistake.
+
+A repo-local hook or script that runs K6, K7, or K14 must use the same rule. It must skip these
+checks for a base branch that is not in `ci.branches`. Cornerstone does not write such a hook, so
+the hook does not read `ci.branches`. Without the skip, a push for a promotion branch fails the
+check on the local machine, and CI skips the check.
+
 ### Tickets as files (`tickets`)
 
 With `tickets.source: file`, the ticket is a file, not a GitHub issue ([D60](README.md#decisions)).
