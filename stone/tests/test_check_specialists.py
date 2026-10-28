@@ -276,7 +276,7 @@ class RenderK20Test(unittest.TestCase):
         self.assertEqual(len(found), 1)
         step = found[0]
         self.assertIn("check-specialists - ", step["run"])
-        self.assertIn("--mode warn", step["run"])
+        self.assertIn("--mode block", step["run"])
         self.assertIn("PR_BODY", step["env"])
         self.assertIn("PR_LABELS", step["env"])
 
@@ -330,10 +330,39 @@ class GateK20Test(unittest.TestCase):
         self.assertIn("check-specialists", step.command)
         self.assertIn(str(body.resolve()), step.command)
         self.assertEqual(step.command[step.command.index("--labels") + 1], "docs,a11y")
-        self.assertEqual(step.command[step.command.index("--mode") + 1], "warn")
+        self.assertEqual(step.command[step.command.index("--mode") + 1], "block")
 
     def test_no_step_without_specialists(self) -> None:
         self.assertNotIn(STEP, [s.name for s in self.plan("")])
+
+
+class GateK20BlockTest(K20Base):
+    def gate_step(self, body: str) -> tuple[gate.Step, str]:
+        with contextlib.redirect_stderr(io.StringIO()):
+            render.render(self.root, FRAMEWORK)
+        path = self.root / "body.md"
+        path.write_text(body, encoding="utf-8")
+        config = gate.load_config(self.root)
+        steps = gate.plan(self.root, config, "origin/dev", path, [])
+        step = next(s for s in steps if s.name == STEP)
+        gate.run_step(self.root, step)
+        return step, gate.evidence(steps, "origin/dev", "abc", dt.date(2026, 1, 1))
+
+    def test_gate_blocks_high_finding(self) -> None:
+        self.report("security", "Severity: high\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "report")
+        step, text = self.gate_step("Ticket: 139\n")
+        self.assertEqual(step.result, "FAIL")
+        self.assertIn(f"| {STEP} | FAIL |", text)
+
+    def test_gate_waiver_passes_with_notice(self) -> None:
+        self.report("security", "Severity: high\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "report")
+        step, _ = self.gate_step("Ticket: 139\n\n" + WAIVER_TEXT)
+        self.assertEqual(step.result, "pass")
+        self.assertIn("Waived (K20)", step.output)
 
 
 if __name__ == "__main__":

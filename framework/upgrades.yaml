@@ -1,6 +1,18 @@
 # The record of each release. `stone upgrade` reads it, and `stone check` validates it.
 # Newest first. Rules and the form: framework/versioning.md.
 versions:
+  - version: 1.4.0
+    kind: minor
+    released: null
+    summary: Check K20 blocks by default. A repo with specialists now fails G3 on a blocking specialist finding (D80).
+    config:
+      added: []
+      renamed: []
+      removed: []
+    files:
+      - {path: .github/workflows/cornerstone-checks.yml, change: changed, note: "The K20 step runs with --mode block, only if the repo config has specialists (D80)."}
+    steps:
+      - "Run stone render. If the repo config has specialists, G3 now fails on a blocking specialist finding. To pass, fix the finding, or add a Waiver (K20) section with text to the PR body."
   - version: 1.3.0
     kind: minor
     released: 2026-10-27

@@ -316,7 +316,6 @@ A repo can connect its own review agents or skills to the roles ([D59](README.md
 
   A `missing` report of another specialist is a warning. Commit each report in the PR, or K20
   cannot see it. A heading with `waiver (K20)` and text under it passes, with a notice.
-  K20 is a warning until 2026-11-05.
 
 ### Local delivery (`delivery: local`)
 
