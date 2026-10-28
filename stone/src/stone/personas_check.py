@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from stone import specs
-from stone.findings import Finding
+from stone.findings import Finding, Severity
 
 CHECK = "K18"
 PERSONAS_FILE = Path("constitution") / "personas.md"
@@ -21,6 +21,8 @@ ITEM_LINE = re.compile(r"^\s+- (.+)$")
 JOB = re.compile(r"^(?P<id>\S+):\s*When I .+, I want to .+, so that .+$")
 COMMENT = re.compile(r"<!--.*?-->", re.S)
 PERSONAS_LINE = re.compile(r"^[\s>*_-]*Personas:[*_]*\s*(?P<ids>.*)$")
+MID_LINE = re.compile(r"(?<![\w`])Personas:[*_]*\s*(?P<ids>.*)$")
+INLINE_CODE = re.compile(r"`[^`]*`")
 JOB_REF = re.compile(r"\b[a-z][a-z0-9-]*\.J\d+\b")
 
 
@@ -136,13 +138,16 @@ def check_plans(root: Path, persona_ids: set[str] | None, job_ids: set[str]) -> 
     for path in plan_files(root):
         label = path.relative_to(root.resolve()).as_posix()
         in_code = False
-        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        text = path.read_text(encoding="utf-8")
+        visible = COMMENT.sub(lambda match: "\n" * match.group().count("\n"), text).splitlines()
+        for number, line in enumerate(text.splitlines(), 1):
             if line.lstrip().startswith("```"):
                 in_code = not in_code
                 continue
             if in_code:
                 continue
-            for name, kind in _references(line):
+            mid_line = visible[number - 1] if number <= len(visible) else ""
+            for name, kind, severity in _references(line, mid_line):
                 if persona_ids is None:
                     message = (f"The plan names the {kind} '{name}', but {PERSONAS_FILE} does "
                                "not exist. Write the personas file first.")
@@ -151,23 +156,33 @@ def check_plans(root: Path, persona_ids: set[str] | None, job_ids: set[str]) -> 
                 else:
                     message = (f"The {kind} '{name}' is not in {PERSONAS_FILE}. Fix the ID, or "
                                "add it to the personas file.")
-                findings.append(Finding(label, number, CHECK, message))
+                findings.append(Finding(label, number, CHECK, message, severity))
     return findings
 
 
-def _references(line: str) -> list[tuple[str, str]]:
-    found = [(job, "job story") for job in JOB_REF.findall(line)]
+def _references(line: str, visible: str) -> list[tuple[str, str, Severity]]:
+    """Return (name, kind, severity). A label in the middle of a line gives a warning (D77).
+
+    `visible` is the line with HTML comments removed. The middle-of-line search also skips
+    inline code.
+    """
+    found: list[tuple[str, str, Severity]] = [
+        (job, "job story", "error") for job in JOB_REF.findall(line)]
     match = PERSONAS_LINE.match(line)
+    severity: Severity = "error"
+    if not match:
+        match = MID_LINE.search(INLINE_CODE.sub("", visible))
+        severity = "warning"
     if match:
         for token in re.split(r"[,\s]+", match.group("ids")):
             token = token.strip("`*_.;")
             if token and token.lower() != "none" and not JOB_REF.fullmatch(token):
-                found.append((token, "persona"))
+                found.append((token, "persona", severity))
     return found
 
 
 def run(root: Path) -> list[Finding]:
-    """K18. Each finding is an error. The warning period ended early (D53)."""
+    """K18. Each finding is an error (D53), except a persona in a mid-line label (D77)."""
     path = root / PERSONAS_FILE
     if not path.exists():
         return check_plans(root, None, set())
