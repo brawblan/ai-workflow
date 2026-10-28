@@ -14,7 +14,7 @@ gates:
   G3: required
   G4: human
   G5: if-needed
-checks: [K1, K2, K3, K6, K7, K9, K13, K14, K17, K18, K20]
+checks: [K1, K2, K3, K6, K7, K9, K13, K14, K17, K18, K20, K21]
 limits:
   pr_changed_lines: 600
 outputs: [pr]
@@ -35,7 +35,7 @@ outputs: [pr]
 
 ## Flow
 
-1. Read the ticket. Run the G1 check for the Definition of Ready fields.
+1. Read the ticket. Run the G1 check for the Definition of Ready fields (K21, `stone check-ready`).
 2. If a field is missing, run the shaper with the ticket author. Stop until the fields are complete.
 3. Start the implementer in a fresh session. Give it the ticket only.
 4. The implementer changes the code and writes the decision log.

@@ -253,8 +253,8 @@ This fits a tracker such as Jira, and a local-only setup.
 - The implementer, tester, and reviewer files, and `ticket-delivery`, read the ticket from that
   path. They do not use the issue CLI.
 - The shaper writes the Definition of Ready fields in the section `## Definition of Ready` of the
-  file, one `Field: value` line for each field. A G1 check ([#115](https://github.com/brawblan/ai-workflow/issues/115))
-  can read this form.
+  file, one `Field: value` line for each field. Check K21 (`stone check-ready`) reads this form
+  ([D82](README.md#decisions)).
 
 ### Commits (`commits`)
 

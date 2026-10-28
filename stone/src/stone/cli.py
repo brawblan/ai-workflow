@@ -7,8 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from stone import (__version__, evals, evidence_check, framework_check, gate, render, repo_rules,
-                   specialists, specs, upgrade, writing_check)
+from stone import (__version__, evals, evidence_check, framework_check, gate, ready_check, render,
+                   repo_rules, specialists, specs, upgrade, writing_check)
 from stone.findings import report
 
 
@@ -113,6 +113,18 @@ def _parser() -> argparse.ArgumentParser:
                           help="warn: report only (the first 2 weeks). block: fail on findings.")
     evidence.add_argument("--format", choices=["text", "github"], default="text")
 
+    ready = commands.add_parser("check-ready",
+                                help="K21: report a Definition of Ready field that is missing or "
+                                     "empty.")
+    ready.add_argument("ticket", help="The ticket file or issue body. Use '-' to read standard "
+                                      "input.")
+    ready.add_argument("--profile", choices=sorted(ready_check.PROFILE_FIELDS),
+                       help="The profile of the ticket. Default: the 'Profile: <id>' line of the "
+                            "ticket.")
+    ready.add_argument("--mode", choices=["warn", "block"], default="warn",
+                       help="warn: report only (D82). block: fail on findings.")
+    ready.add_argument("--format", choices=["text", "github"], default="text")
+
     run = commands.add_parser("eval", help="Run the eval of one component, with it and without it.")
     run.add_argument("component", help="The component ID, for example role.tester.")
     run.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
@@ -155,6 +167,8 @@ def main(argv: list[str] | None = None) -> int:
         return _spec(args.root, args.spec_command, getattr(args, "plan", ""))
     if args.command == "check-evidence":
         return _check_evidence(args.body, args.section, args.mode, args.format)
+    if args.command == "check-ready":
+        return _check_ready(args.ticket, args.profile, args.mode, args.format)
     if args.command == "check-rules":
         return _check_rules(args)
     if args.command == "eval":
@@ -269,6 +283,27 @@ def _check_evidence(body: str, sections: list[str] | None, mode: str, fmt: str) 
     findings = evidence_check.check_text(text, "<stdin>" if body == "-" else body, sections)
     blocking = report(findings, fmt, warn_only=mode == "warn")
     print(f"K14: {len(findings)} finding(s), mode {mode}.")
+    return 1 if blocking else 0
+
+
+def _check_ready(ticket: str, profile: str | None, mode: str, fmt: str) -> int:
+    if ticket == "-":
+        text = sys.stdin.read()
+    else:
+        try:
+            text = Path(ticket).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            reason = error.reason if isinstance(error, UnicodeDecodeError) else error.strerror
+            print(f"check-ready: cannot read {ticket}: {reason}")
+            return 2
+    profile = profile or ready_check.find_profile(text)
+    if profile not in ready_check.PROFILE_FIELDS:
+        print(f"check-ready: no known profile ({profile or 'none'}). Add a 'Profile: <id>' line "
+              "to the ticket, or use --profile.")
+        return 2
+    findings = ready_check.check_text(text, "<stdin>" if ticket == "-" else ticket, profile)
+    blocking = report(findings, fmt, warn_only=mode == "warn")
+    print(f"K21: {len(findings)} finding(s), profile {profile}, mode {mode}.")
     return 1 if blocking else 0
 
 
