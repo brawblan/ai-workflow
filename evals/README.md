@@ -24,12 +24,12 @@ Runs are local. Run `stone eval <component-id>`. The command writes a result fil
 A full render for all 10 profiles writes 22 components. This table lists each one. Facts as of
 2026-10-27.
 
-- Measured by a model run: 6 components (`role.shaper`, `role.planner`, `role.tester`,
-  `role.reviewer`, `hook.protect-paths`, `hook.settings`). The hook pair has two runs. The run of 2026-10-21 passes every check (see below).
+- Measured by a model run: 7 components (`role.shaper`, `role.planner`, `role.implementer`,
+  `role.tester`, `role.reviewer`, `hook.protect-paths`, `hook.settings`). The hook pair has two runs. The run of 2026-10-21 passes every check (see below).
 - Measured by tests only: `check.k6`. A check is its own test (D43).
-- Not measured: 15 components. Each has an eval plan in the adapter component list. The eval
+- Not measured: 14 components. Each has an eval plan in the adapter component list. The eval
   folder does not exist yet.
-- Every run used `claude-opus-5-5`, except one `role.tester` run on `claude-sonnet-5-5` (2026-10-22). No other model is measured (dossier G5).
+- Every run used `claude-opus-5-5`, except one `role.tester` run (2026-10-22) and the `role.implementer` run (2026-10-27) on `claude-sonnet-5-5`. No other model is measured (dossier G5).
 - k = 3 for each run. A rate is the share of passed checks. "With" has the component. "Without" does
   not.
 
@@ -37,7 +37,7 @@ A full render for all 10 profiles writes 22 components. This table lists each on
 | --- | --- | --- | --- |
 | `role.shaper` | [role-shaper](./role-shaper/) | 2026-10-27, `claude-opus-5-5`. S1 to S5, latest run of each scenario. Outcome 1.00 with, 0.40 without. pass^k is 1 in all five with the role. See the note below. | Measured |
 | `role.planner` | [role-planner](./role-planner/) | 2026-10-18, `claude-opus-5-5`. P1 to P5, latest run of each scenario. Outcome 1.00 with, 0.80 without (P2 fails without). Contract 1.00 with, 0.40 without. | Measured |
-| `role.implementer` | none | no run | 2027-04-18 (proposed) |
+| `role.implementer` | [role-implementer](./role-implementer/) | 2026-10-27, `claude-sonnet-5-5`. I1 to I3. Outcome 1.00 with, 0.67 without. Contract 0.89 with, 0.00 without. pass^k is 1 in I1 and I2 with the role. See the note below. | Measured |
 | `role.tester` | [role-tester](./role-tester/) | T1, T3, T4: 2026-10-18. T2: 2026-10-19, after D42. Outcome 1.00 with and without in all four. Contract 1.00 with. Contract 0.00 without. The run of 2026-10-22 on `claude-sonnet-5-5` (with only, k = 3): outcome 1.00 and contract 1.00 in all four, 12 of 12 runs pass. The T2 result of 2026-10-18 is from before D42 (see the note below). | Measured |
 | `role.reviewer` | [role-reviewer](./role-reviewer/) | 2026-10-27, `claude-opus-5-5`. R1 to R4. Outcome 1.00 with and without. Contract 1.00 with, 0.00 without. pass^k is 1 in all four with the role. See the note below. | Measured |
 | `role.investigator` | none | no run | 2027-04-18 (proposed) |
@@ -96,6 +96,15 @@ Notes on the results:
   half. The first grade failed the R2 contract in all 3 runs with the role. The grader split a
   finding at its "Evidence" item. After the fix, the kept workspaces were graded again. Limit:
   the scenarios are small, and each has one clear gap.
+- **`role.implementer`.** With the role, every run meets the ticket and changes no test. In I3, it names
+  the conflicting test in the decision log. Without the role, 3 of 9 runs change a test. In each,
+  the hook blocks the file tool first. Then 2 runs start a `tester` subagent, and 1 run writes with
+  a shell command. The hook does not stop either path, so K6 stays the control. Without the role,
+  no run writes a decision log or commits. A run with the role costs about 40 percent of a run
+  without it. One I3 log with the
+  role gives no options, so I3 has pass^k 0. The first grade failed 2 I2 logs that give a reason
+  as a reference to the ticket. After the grader fix, the kept workspaces were graded again.
+  Limit: the scenarios are small.
 - **Contract column of the hook eval.** The scenarios have no `contract` check. The table shows
   1.00 for an empty set. Read it as "not applicable".
 - **Latest run only.** The sections below show the latest run of each component, as D36 says. A
