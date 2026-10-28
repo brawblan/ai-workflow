@@ -89,6 +89,14 @@ class InvestigatorCase(unittest.TestCase):
             ("form in other section", False, f"## F\nalpha\n## G\nhigh {LOC}"),
             ("no topic", False, f"## F\nbeta high {LOC}")], in_file=True)
 
+    def test_finding_form_links_severity_by_file_and_line(self) -> None:
+        topic = f"## Cause\nalpha is the cause at {LOC}\n\n"
+        self.expect("finding_form", {"path": "docs/reports/R.md", "topic": "alpha"}, [
+            ("severity row, same file and line", True, topic + "| F1 | `src/notes.py:20` | High |"),
+            ("severity row, other line", False, topic + "| F1 | `src/notes.py:14` | High |"),
+            ("confidence section only", False,
+             topic + "## Confidence\nHigh, src/notes.py:20 is the line.")], in_file=True)
+
     def test_finding_form_reads_only_the_file(self) -> None:
         args = {"path": "docs/reports/R.md", "topic": "alpha"}
         passed, detail = self.grade("finding_form", args, f"## F\nalpha high {LOC}")
