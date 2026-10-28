@@ -118,7 +118,9 @@ Commit with `Role: tester`.
    - A line `Profile: dependency-upgrade`. K7 then uses the limit of this profile: 300 changed lines.
    - The sections Evidence, Decision log, Review findings, and Confidence (K14).
    - The breaking-change list. Mark each change fixed, or "does not apply" with a reason.
-3. Approve the PR. A human must approve it (G4).
+3. Close and reopen the PR, or push a commit. A body edit does not start the checks again, and a
+   re-run of a job reads the old body (D79).
+4. Approve the PR. A human must approve it (G4).
 
 | Failure | Action |
 | --- | --- |
