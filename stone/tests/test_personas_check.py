@@ -190,6 +190,48 @@ class PersonasCheckTest(unittest.TestCase):
         self.plan("SHOP-3", "Personas: shopper\n\n```\nPersonas: ghost\nghost.J1\n```\n")
         self.assertEqual(self.k18(), [])
 
+    # A label in the middle of a line (issue #192)
+
+    def test_k18_mid_line_label_with_unknown_persona_is_one_warning(self) -> None:
+        self.personas(persona())
+        self.plan("SHOP-3", "Intro text. Personas: ghost\n")
+        findings = self.k18()
+        self.assertEqual(len(findings), 1, findings)
+        self.assertEqual(findings[0].check, "K18")
+        self.assertEqual(findings[0].severity, "warning")
+        self.assertIn("ghost", findings[0].message)
+        self.assertEqual(findings[0].line, 1)
+
+    def test_k18_mid_line_label_with_known_persona_gives_no_finding(self) -> None:
+        self.personas(persona())
+        self.plan("SHOP-3", "Intro text. Personas: shopper\n")
+        self.assertEqual(self.k18(), [])
+
+    def test_k18_mid_line_label_in_a_code_block_gives_no_finding(self) -> None:
+        self.personas(persona())
+        self.plan("SHOP-3", "```\nText. Personas: ghost\n```\n")
+        self.assertEqual(self.k18(), [])
+
+    def test_k18_mid_line_label_in_a_one_line_html_comment_gives_no_finding(self) -> None:
+        self.personas(persona())
+        self.plan("SHOP-3", "Text <!-- note. Personas: ghost --> more\n")
+        self.assertEqual(self.k18(), [])
+
+    def test_k18_mid_line_label_in_a_multi_line_html_comment_gives_no_finding(self) -> None:
+        self.personas(persona())
+        self.plan("SHOP-3", "<!--\nsome note. Personas: ghost\nend\n-->\n")
+        self.assertEqual(self.k18(), [])
+
+    def test_k18_mid_line_label_in_inline_code_gives_no_finding(self) -> None:
+        self.personas(persona())
+        self.plan("SHOP-3", "Write `Personas: ghost` in the plan.\n")
+        self.assertEqual(self.k18(), [])
+
+    def test_k18_start_of_line_label_with_unknown_persona_stays_an_error(self) -> None:
+        self.personas(persona())
+        self.plan("SHOP-3", "Personas: ghost\n")
+        self.assert_one_error(self.k18(), "ghost")
+
     def test_k18_plan_names_a_persona_but_the_personas_file_is_missing(self) -> None:
         self.plan("SHOP-3", "Personas: shopper\n")
         self.assert_one_error(self.k18(), "does not exist")
