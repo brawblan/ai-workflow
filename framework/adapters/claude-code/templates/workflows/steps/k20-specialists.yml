@@ -1,4 +1,4 @@
-      # K20 is a warning until 2026-11-05, then it blocks (D66). It reads the "Ticket: <id>" and
+      # K20 blocks since 1.4.0 (D80). It reads the "Ticket: <id>" and
       # "Personas: <ids>" lines of the PR body, and the PR labels. A "Waiver (K20)" section passes.
       - name: $step_name
 $gate_if
@@ -8,4 +8,4 @@ $gate_if
           PR_LABELS: $${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: |
           printf '%s\n' "$${PR_BODY}" | "$${RUNNER_TEMP}/stone/bin/stone" check-specialists - \
-            --base "origin/$${BASE_REF}" --labels "$${PR_LABELS}" --mode warn --format github
+            --base "origin/$${BASE_REF}" --labels "$${PR_LABELS}" --mode block --format github
