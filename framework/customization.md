@@ -238,8 +238,10 @@ With `adoption: opt-in`, a bot PR has no marker, so K6, K7, and K14 skip it. An 
 starts a new run there.
 
 A bot commit has no `Role:` trailer, so K6 counts it as an implementer commit. A bot change of a
-protected path, for example an action update in the workflow folder, fails K6. Issue #201
-tracks this gap.
+protected path, for example an action update in the workflow folder, fails K6. To pass it, add a
+`Waiver (K6)` section with the reason and the owner, and start a new run ([D83](README.md#decisions)).
+The waiver passes only a commit with a bot author on a PR that a bot opened. Each other commit on
+a protected path still fails.
 
 ### Tickets as files (`tickets`)
 

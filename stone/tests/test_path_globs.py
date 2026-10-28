@@ -794,5 +794,174 @@ class InvalidGlobTest(unittest.TestCase):
         self.assertEqual(self.glob_findings(), [])
 
 
+class BotWaiverTest(RenderedRepo):
+    """D83 (issue #201): a `Waiver (K6)` section passes a bot commit on a protected path."""
+
+    TESTS = ["tests/"]
+    PROTECTED_FILE = ".github/workflows/ci.yml"
+    WAIVER = "## Waiver (K6)\n\nA dependency bot updates an action SHA. A person reviews it.\n"
+
+    def bot_commit(self, author: str, path: str | None = None, message: str = "bump") -> str:
+        path = path or self.PROTECTED_FILE
+        (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / path).write_text(f"{author} {message} {abs(hash((author, path, message)))}\n",
+                                      encoding="utf-8")
+        self.git("add", path)
+        env = {**os.environ, **GIT_ENV, "GIT_AUTHOR_NAME": author,
+               "GIT_COMMITTER_NAME": author}
+        subprocess.run(["git", "commit", "-qm", message], cwd=self.root, check=True,
+                       capture_output=True, env=env)
+        return self.git("rev-parse", "HEAD").strip()
+
+    def k6_run(self, base: str, body: str | None, pr_author: str | None,
+               via_stdin: bool = True) -> subprocess.CompletedProcess:
+        args = [sys.executable, "-B", K6, base]
+        stdin = None
+        if body is not None:
+            args += ["--body", "-"] if via_stdin else ["--body", str(self.root / "body.txt")]
+            if via_stdin:
+                stdin = body
+            else:
+                (self.root / "body.txt").write_text(body, encoding="utf-8")
+        if pr_author is not None:
+            args += ["--pr-author", pr_author]
+        return subprocess.run(args, cwd=self.root, input=stdin, capture_output=True, text=True)
+
+    def single_bot_commit(self, body: str | None, pr_author: str | None,
+                          author: str = "dependabot[bot]",
+                          via_stdin: bool = True) -> subprocess.CompletedProcess:
+        with self.new_branch(f"bot-{abs(hash((body, pr_author, author, via_stdin)))}") as base:
+            self.bot_commit(author)
+            return self.k6_run(base, body, pr_author, via_stdin)
+
+    def assert_passes(self, run: subprocess.CompletedProcess) -> None:
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("K6: notice: bot commit", run.stdout)
+        self.assertIn("K6: 0 finding(s).", run.stdout)
+
+    def assert_fails(self, run: subprocess.CompletedProcess) -> None:
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn(f"changes {self.PROTECTED_FILE}, a protected path", run.stdout)
+        self.assertNotIn("notice", run.stdout)
+
+    def test_d83_bot_commit_with_waiver_and_bot_pr_author_passes_with_a_notice(self) -> None:
+        self.assert_passes(self.single_bot_commit(self.WAIVER, "dependabot[bot]"))
+
+    def test_d83_waiver_from_a_file_passes(self) -> None:
+        self.assert_passes(self.single_bot_commit(self.WAIVER, "dependabot[bot]",
+                                                  via_stdin=False))
+
+    def test_d83_waiver_variants_that_pass(self) -> None:
+        for body in ("Intro\n\n### Waiver (K6)\nreason here\n\n## Other\nx\n",
+                     "**Waiver (K6)**\nreason here\n", "## waiver (k6): bot SHA bump\nreason\n",
+                     "## Waiver (K6)\r\nreason here\r\n"):
+            with self.subTest(body=body):
+                self.assert_passes(self.single_bot_commit(body, "renovate[bot]"))
+
+    def test_d83_bot_commit_without_a_waiver_fails(self) -> None:
+        for body in (None, "", "## Summary\nA bump.\n"):
+            with self.subTest(body=body):
+                self.assert_fails(self.single_bot_commit(body, "dependabot[bot]"))
+
+    def test_d83_empty_waiver_fails(self) -> None:
+        for text in ("", "None", "none.", "TBD", "N/A", "TODO", "-", "**None**", "  \n\n"):
+            with self.subTest(text=text):
+                body = f"## Waiver (K6)\n{text}\n\n## Next\ntext\n"
+                self.assert_fails(self.single_bot_commit(body, "dependabot[bot]"))
+        self.assert_fails(self.single_bot_commit("## Waiver (K6)", "dependabot[bot]"))
+
+    def test_d83_waiver_only_inside_a_fenced_block_fails(self) -> None:
+        for fence in ("```", "~~~"):
+            with self.subTest(fence=fence):
+                body = f"Example:\n{fence}\n## Waiver (K6)\nreason\n{fence}\n"
+                self.assert_fails(self.single_bot_commit(body, "dependabot[bot]"))
+
+    def test_d83_waiver_as_a_list_item_fails(self) -> None:
+        for body in ("- Waiver (K6): a bot bump\n", "* **Waiver (K6)** reason\n",
+                     "1. Waiver (K6)\nreason\n"):
+            with self.subTest(body=body):
+                self.assert_fails(self.single_bot_commit(body, "dependabot[bot]"))
+
+    def test_d83_waiver_text_under_a_different_heading_fails(self) -> None:
+        body = "## Waiver (K6)\n\n## Summary\nWords under another heading.\n"
+        self.assert_fails(self.single_bot_commit(body, "dependabot[bot]"))
+
+    def test_d83_human_pr_author_with_waiver_fails(self) -> None:
+        for author in ("octocat", "", "bot", "dependabot", "[bot]x"):
+            with self.subTest(author=author):
+                self.assert_fails(self.single_bot_commit(self.WAIVER, author))
+        self.assert_fails(self.single_bot_commit(self.WAIVER, None))
+
+    def test_d83_bot_commit_author_with_human_pr_author_fails(self) -> None:
+        """An agent can write any commit author name, but it cannot open a PR as a bot."""
+        self.assert_fails(self.single_bot_commit(self.WAIVER, "octocat", "evil[bot]"))
+
+    def test_d83_human_commit_author_with_bot_pr_author_fails(self) -> None:
+        self.assert_fails(self.single_bot_commit(self.WAIVER, "dependabot[bot]", "octocat"))
+
+    def test_d83_bot_and_human_commits_in_one_pr(self) -> None:
+        with self.new_branch("mixed") as base:
+            bot = self.bot_commit("dependabot[bot]", ".github/workflows/a.yml")
+            human = self.bot_commit("octocat", ".github/workflows/b.yml")
+            run = self.k6_run(base, self.WAIVER, "dependabot[bot]")
+        self.assertEqual(run.returncode, 1, run.stdout)
+        self.assertIn(f"commit {human[:12]} (Role: implementer) changes .github/workflows/b.yml",
+                      run.stdout)
+        self.assertNotIn(f"commit {bot[:12]} (Role", run.stdout)
+        self.assertIn(f"notice: bot commit {bot[:12]}", run.stdout)
+        self.assertIn("K6: 1 finding(s).", run.stdout)
+
+    def test_d83_waiver_passes_only_protected_path_commits_that_are_bot(self) -> None:
+        with self.new_branch("unprotected") as base:
+            self.bot_commit("dependabot[bot]", "src/a.py")
+            run = self.k6_run(base, self.WAIVER, "dependabot[bot]")
+        self.assertEqual(run.returncode, 0, run.stdout)
+        self.assertNotIn("notice", run.stdout)
+
+    def test_d83_body_from_stdin_is_read(self) -> None:
+        with self.new_branch("stdin") as base:
+            self.bot_commit("dependabot[bot]")
+            without = self.k6_run(base, None, "dependabot[bot]")
+            with_body = self.k6_run(base, self.WAIVER, "dependabot[bot]")
+        self.assert_fails(without)
+        self.assert_passes(with_body)
+
+    def test_d83_old_usage_with_only_a_base_still_works(self) -> None:
+        with self.new_branch("old-usage") as base:
+            self.commit({"src/ok.py": "x\n"}, "change code")
+            self.assertEqual(self.k6(base).returncode, 0)
+            self.commit({self.PROTECTED_FILE: "y\n"}, "change ci")
+            run = self.k6(base)
+        self.assertEqual(run.returncode, 1)
+        self.assertIn(f"changes {self.PROTECTED_FILE}, a protected path", run.stdout)
+
+    def test_d83_commit_with_a_role_trailer_is_unchanged(self) -> None:
+        with self.new_branch("role") as base:
+            self.commit({self.PROTECTED_FILE: "z\n"}, "ci\n\nRole: human")
+            run = self.k6_run(base, None, None)
+        self.assertEqual(run.returncode, 0, run.stdout)
+
+    def test_d83_k6_step_passes_event_text_through_env(self) -> None:
+        step = (FRAMEWORK / "adapters/claude-code/templates/workflows/steps/k6.yml").read_text(
+            encoding="utf-8")
+        workflow = (self.root / ".github/workflows/cornerstone-checks.yml").read_text(
+            encoding="utf-8")
+        for text in (step, workflow):
+            self.assertIn("{{ github.event.pull_request.body }}", text)
+            self.assertIn("{{ github.event.pull_request.user.login }}", text)
+        data = yaml.safe_load(workflow)
+        steps = [s for job in data["jobs"].values() for s in job["steps"]
+                 if s.get("name", "").startswith("K6")]
+        self.assertEqual(len(steps), 1)
+        k6_step = steps[0]
+        self.assertIn("github.event.pull_request.body", k6_step["env"]["PR_BODY"])
+        self.assertIn("github.event.pull_request.user.login", k6_step["env"]["PR_AUTHOR"])
+        self.assertNotIn("github.event", k6_step["run"])
+        self.assertNotIn("${{", k6_step["run"])
+        self.assertIn("${PR_BODY}", k6_step["run"])
+        self.assertIn("${PR_AUTHOR}", k6_step["run"])
+        self.assertIn("--body -", k6_step["run"])
+
+
 if __name__ == "__main__":
     unittest.main()

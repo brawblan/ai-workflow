@@ -3,9 +3,13 @@
 
 Check K6: fail if an implementer commit changes a protected path.
 A commit with no "Role:" trailer counts as an implementer commit. Human and agent commits follow
-the same rule. Usage: protected_paths.py <base>
+the same rule. A bot commit on a PR that a bot opened passes with a notice, if the PR body has a
+heading with "waiver (K6)" in its text and text under it (D83). A person writes the waiver.
+Usage: protected_paths.py <base> [--body FILE|-] [--pr-author LOGIN]
 """
 
+import argparse
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -22,6 +26,10 @@ PROTECTED = $protected_json
 TRAILERS = $trailers_json  # "commit": the Role trailer. "notes": also the git note (#121).
 NOTES_REF = "refs/notes/cornerstone"
 ADOPTION = $adoption_json  # "opt-in": a human commit with no Role is not an implementer commit
+BOT = "[bot]"  # the suffix of a bot account login and commit author name
+HEADING = re.compile(r"^ {0,3}(?:#{1,6}\s+(.*?)\s*#*|(?:\*\*|__)([^*_]+?)(?:\*\*|__)\s*:?)\s*$$")
+FENCE = re.compile(r"^\s*(```|~~~)")
+EMPTY = {"", "none", "n/a", "na", "todo", "tbd", "-"}
 
 
 def git(*args: str) -> str:
@@ -42,7 +50,32 @@ def role_of(sha: str) -> str:
     return roles[-1].lower() if roles else "implementer"
 
 
-def main(base: str) -> int:
+def waiver(body: str) -> str:
+    """Return the text of the first "waiver (K6)" heading that has text under it, or ''.
+    The text ends at the next heading. A list item is not a heading, so it is not a waiver."""
+    lines, found, fence = body.splitlines(), [], None
+    for index, line in enumerate(lines):
+        marker = FENCE.match(line)
+        if marker:
+            fence = None if fence == marker.group(1) else fence or marker.group(1)
+        elif not fence and (match := HEADING.match(line)):
+            found.append((index, (match.group(1) or match.group(2)).strip().lower()))
+    for number, (index, name) in enumerate(found):
+        if "waiver (k6)" not in name:
+            continue
+        end = found[number + 1][0] if number + 1 < len(found) else len(lines)
+        text = " ".join(line.strip() for line in lines[index + 1:end]).strip()
+        if text.strip("*_`.: ").lower() not in EMPTY:
+            return text
+    return ""
+
+
+def is_bot_commit(sha: str) -> bool:
+    return git("log", "-1", "--format=%an", sha).strip().lower().endswith(BOT)
+
+
+def main(base: str, body: str = "", pr_author: str = "") -> int:
+    bot_waiver = pr_author.strip().lower().endswith(BOT) and bool(waiver(body))
     failures = 0
     if TRAILERS == "notes":  # a note is not in a clone by default
         subprocess.run(["git", "fetch", "-q", "origin", f"{NOTES_REF}:{NOTES_REF}"],
@@ -52,7 +85,12 @@ def main(base: str) -> int:
         if role != "implementer":
             continue
         files = git("diff-tree", "--no-commit-id", "--name-only", "-r", sha).split("\n")
-        for path in (file for file in files if covers(PROTECTED, file)):
+        protected = [file for file in files if covers(PROTECTED, file)]
+        if protected and bot_waiver and is_bot_commit(sha):
+            print(f"K6: notice: bot commit {sha[:12]} changes {', '.join(protected)}. The "
+                  "'Waiver (K6)' section allows it. The reviewer checks the change.")
+            continue
+        for path in protected:
             failures += 1
             print(f"K6: commit {sha[:12]} (Role: {role}) changes {path}, a protected path. "
                   "Revert the change. A test change belongs in a 'Role: tester' commit. A check "
@@ -62,7 +100,16 @@ def main(base: str) -> int:
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 2:
-        print("Usage: protected_paths.py <base>")
-        sys.exit(2)
-    sys.exit(main(sys.argv[1]))
+    parser = argparse.ArgumentParser(prog="protected_paths.py")
+    parser.add_argument("base")
+    parser.add_argument("--body", help="a file with the PR body, or '-' for standard input")
+    parser.add_argument("--pr-author", default="", help="the login of the PR author")
+    args = parser.parse_args()
+    if args.body == "-":
+        text = sys.stdin.read()
+    elif args.body:
+        with open(args.body, encoding="utf-8") as handle:
+            text = handle.read()
+    else:
+        text = ""
+    sys.exit(main(args.base, text, args.pr_author))
