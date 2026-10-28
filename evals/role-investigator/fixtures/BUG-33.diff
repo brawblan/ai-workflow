@@ -1,0 +1,14 @@
+diff --git a/src/cli.py b/src/cli.py
+new file mode 100644
+index 0000000..63ed557
+--- /dev/null
++++ b/src/cli.py
+@@ -0,0 +1,8 @@
++"""Print the notes, one on each line."""
++
++from src.notes import Notes
++
++
++def show(notes: Notes) -> None:
++    for line in notes.list():
++        print(line)
