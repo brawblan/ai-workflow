@@ -10,7 +10,7 @@ defines where specificity goes and which layer wins.
 | 1 | Framework core | `framework/` in this repo | Principles, gates, profiles |
 | 2 | Adapter and model profile | `framework/adapters/<name>.md`, its templates, and `framework/adapters/<name>/models/` | File paths for one harness. Idioms and role models for one model family. |
 | 3 | Repo config | `.cornerstone/config.yaml` in the target repo | Commands, paths, limits, owners |
-| 4 | Profile override (not built yet, D51) | `.cornerstone/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
+| 4 | Profile override (D84) | `.cornerstone/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
 | 5 | Task | The ticket fields | Acceptance criteria, non-goals, a mode, a waiver |
 
 A later layer wins over an earlier layer, with these limits:
@@ -350,25 +350,41 @@ folders such as `docs/plans/` and `docs/reports/`, and ignore them in git.
 
 ## Profile override (`.cornerstone/profiles/<profile>.yaml`)
 
-> Not built yet (D51, issue #78). `stone render` and `stone check` do not read these files. The
-> file below shows the planned form only. Today, a waiver is a record in the PR body (see the PR
-> size waiver above), and the human decides at G4. `stone check` rejects only a profile that
-> removes G3 or G5.
+A repo can change one selected profile with a file `.cornerstone/profiles/<profile>.yaml`
+([D84](README.md#decisions)). `stone check` validates each file. `stone render` does not apply the
+file yet (issue #78, part 2).
 
 ```yaml
-extends: single-ticket
-mode: hybrid
+extends: single-ticket             # required: the name of the file
+mode: hybrid                       # optional: a mode in modes_allowed
 drivers:                           # optional: change single stages of the preset
   plan: pair
-checks_add: [K8]
+checks_add: [K8]                   # optional: more checks from checks.md
 limits:
-  pr_changed_lines: 250
+  pr_changed_lines: 250            # optional: a looser limit needs a limit waiver
 waivers:
-  - gate: G4
+  - gate: G4                       # exactly one of gate, check, or limit
     reason: <reason>
     owner: <github-username>
     until: 2027-01-31
+    scope: patch-versions          # optional: free text
 ```
+
+`stone check` fails the file in these cases:
+
+- A key is not in the form above, or `extends` is not the name of the file.
+- The profile is not in `profiles` of the repo config.
+- The mode is not in `modes_allowed`. A stage in `drivers` is not a stage of the profile.
+- A driver is not `agent`, `human`, or `pair`. Only `verify` can use `checks`.
+- A check in `checks_add` is not in [checks.md](checks.md).
+- `limits.pr_changed_lines` is larger than the limit of the profile and the repo config, and no
+  active waiver has `limit: pr_changed_lines`.
+- A waiver has no reason, no owner, or no valid `until` date, or its `until` date is in the past.
+- A waiver names G3 or G5. A gate waiver can name only G1, G2, or G4.
+- A check waiver names K6, K7, K14, K16, or K17, or a check that the profile does not run.
+
+A gate waiver, `mode`, and `drivers` are records. The human reads them at the gate. `stone render`
+does not change the branch protection.
 
 ## Task layer (ticket fields)
 
