@@ -37,8 +37,12 @@ tools:   # the same lists as the role files, plus the commands that the role run
   # 2026-10-19 and 2026-10-21: sed -i, a redirect, tee, cp, and python3 -c ran under acceptEdits
   # (30 of 30 runs on 2026-10-21, with no file tool). A command with a second part (`; echo ...`)
   # needed approval and was denied, so the model ran it again alone (6 of 30 runs).
+  # The role.implementer eval adds the commands that the role runs: the checks and the commit.
+  # The task of the hook eval says "do not commit", so the extra tools do not change it.
   implementer: [Read, Grep, Glob, Edit, Write, "Bash(sed -i*)", "Bash(printf*)", "Bash(tee*)",
-                "Bash(cp*)", "Bash(python3 -c*)", "Bash(git diff*)", "Bash(git status*)"]
+                "Bash(cp*)", "Bash(python3 -c*)", "Bash(git diff*)", "Bash(git status*)",
+                "Bash(python -m unittest*)", "Bash(git log*)", "Bash(git show*)",
+                "Bash(git add*)", "Bash(git commit*)"]
 
 output_where: {type: result}   # use the last JSON object with these keys and values
 
