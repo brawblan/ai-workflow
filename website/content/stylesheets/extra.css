@@ -49,3 +49,28 @@
 .md-tabs__item--active .md-tabs__link {
   font-weight: 700;
 }
+
+/* Buttons. The primary button is solid. Hover inverts both buttons. */
+.md-typeset .md-button {
+  text-decoration: none;
+}
+[data-md-color-scheme="default"] .md-typeset .md-button--primary,
+[data-md-color-scheme="default"] .md-typeset .md-button:is(:hover, :focus) {
+  background-color: #000000;
+  border-color: #000000;
+  color: #ffffff;
+}
+[data-md-color-scheme="default"] .md-typeset .md-button--primary:is(:hover, :focus) {
+  background-color: #ffffff;
+  color: #000000;
+}
+[data-md-color-scheme="slate"] .md-typeset .md-button--primary,
+[data-md-color-scheme="slate"] .md-typeset .md-button:is(:hover, :focus) {
+  background-color: #ffffff;
+  border-color: #ffffff;
+  color: #000000;
+}
+[data-md-color-scheme="slate"] .md-typeset .md-button--primary:is(:hover, :focus) {
+  background-color: #000000;
+  color: #ffffff;
+}
