@@ -9,7 +9,8 @@ from typing import Any
 
 import yaml
 
-from stone import __version__, ci_setup, personas_check, results, specialists, specs, upgrade
+from stone import (__version__, ci_setup, overrides, personas_check, results, specialists, specs,
+                   upgrade)
 from stone.findings import Finding
 from stone.markdown import link_file, relative_links, split_frontmatter, table_rows
 
@@ -502,6 +503,25 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     return findings
 
 
+def check_overrides(root: Path, framework: Path,
+                    today: dt.date | None = None) -> list[Finding]:
+    """Validate the profile override files in `.cornerstone/profiles/` (#78)."""
+    found = overrides.load(root)
+    if not found:
+        return []
+    path = root / ".cornerstone" / "config.yaml"
+    config = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}) if path.exists() else {}
+    _, _, check_ids = _known_names(framework)
+    findings: list[Finding] = []
+    for override in found:
+        source = framework / "profiles" / f"{override.profile}.md"
+        profile = split_frontmatter(source.read_text(encoding="utf-8"))[0] if source.exists() else None
+        for problem in overrides.problems(override, config, profile, check_ids,
+                                          overrides.DEFAULT_PR_LINES, today or dt.date.today()):
+            findings.append(Finding(str(override.path.relative_to(root)), 1, CHECK, problem))
+    return findings
+
+
 def _is_date(value: Any) -> bool:
     if isinstance(value, dt.date):
         return True
@@ -612,6 +632,7 @@ def run(root: Path, framework: Path | None = None, links: str = "default") -> li
     docs = link_scope(root, framework, links)
     return (check_profiles(framework) + check_links(root, docs) + check_neutral(framework)
             + check_neutral_code(root / "stone" / "src" / "stone")
-            + check_config(root, framework) + check_components(root, framework)
+            + check_config(root, framework) + check_overrides(root, framework)
+            + check_components(root, framework)
             + check_upgrades(root, framework) + check_version(root)
             + personas_check.run(root) + specs.check(root))

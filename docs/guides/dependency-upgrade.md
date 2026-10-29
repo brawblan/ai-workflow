@@ -132,6 +132,6 @@ Commit with `Role: tester`.
 - The scheduled run cannot find new versions. It has no shell and no registry access.
 - No role starts the implementer, the tester, or the reviewer after the report. You start them.
 - A bot PR has no `Profile:` line and no K14 sections. You add them.
-- The patch-version waiver for G4 is only a record. `stone check` rejects a waiver for G3 or G5, and
-  nothing else reads a G4 waiver. `stone render` does not change the branch protection, and no file
+- The patch-version waiver for G4 is only a record. `stone check` validates it (D84), and nothing
+  else reads a G4 waiver. `stone render` does not change the branch protection, and no file
   that it writes merges a PR. Do not rely on it to skip the review.
