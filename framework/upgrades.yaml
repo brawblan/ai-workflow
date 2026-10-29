@@ -3,8 +3,8 @@
 versions:
   - version: 1.4.0
     kind: minor
-    released: null
-    summary: Check K20 blocks by default. A repo with specialists now fails G3 on a blocking specialist finding (D80). A Waiver (K6) section passes a bot commit on a protected path (D83). stone render applies a profile override file in .cornerstone/profiles/ (D85).
+    released: 2026-10-28
+    summary: Check K20 blocks by default. A repo with specialists now fails G3 on a blocking specialist finding (D80). A Waiver (K6) section passes a bot commit on a protected path (D83). stone render applies a profile override file in .cornerstone/profiles/ (D85). New command stone check-ready (K21) reports a Definition of Ready field that is missing or empty, as a warning (D82). K17 counts a dotted token, such as 1.4.0, as one word (D79).
     config:
       added: []
       renamed: []
