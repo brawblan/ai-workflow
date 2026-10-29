@@ -38,7 +38,7 @@ jobs:
       # stone comes from the framework tag in framework_version. A venv keeps it apart from the repo.
       - name: Install stone
         env:
-          STONE_TAG: v1.3.0
+          STONE_TAG: v1.4.0
         run: |
           python3 -m venv "${RUNNER_TEMP}/stone"
           "${RUNNER_TEMP}/stone/bin/pip" install --quiet \
