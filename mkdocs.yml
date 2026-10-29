@@ -26,15 +26,15 @@ theme:
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default
-      primary: blue grey
-      accent: amber
+      primary: black
+      accent: custom
       toggle:
         icon: material/weather-night
         name: Dark mode
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
-      primary: blue grey
-      accent: amber
+      primary: black
+      accent: custom
       toggle:
         icon: material/weather-sunny
         name: Light mode
@@ -47,6 +47,10 @@ theme:
     - content.code.copy
   icon:
     logo: material/cube-outline
+
+# Black and white only: links and accents use the text color.
+extra_css:
+  - stylesheets/extra.css
 
 markdown_extensions:
   - admonition
