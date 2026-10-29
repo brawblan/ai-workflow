@@ -193,3 +193,17 @@ def _limit_problems(override: Override, config: dict[str, Any], profile: dict[st
         found.append(f"'limits.pr_changed_lines' is {value}, more than the limit {base}. A looser "
                      "limit needs an active waiver with 'limit: pr_changed_lines' (rule 3).")
     return found
+
+
+def apply(profile: dict[str, Any], override: Override, today: dt.date) -> dict[str, Any]:
+    """Return a copy of the profile with the override: more checks, waived checks removed, and
+    the override limit. Call it only on a valid override (see `problems`)."""
+    data = override.data
+    removed = waived(override, "check", today)
+    checks = [check for check in [*profile["checks"], *(data.get("checks_add") or [])]
+              if check not in removed]
+    result = {**profile, "checks": list(dict.fromkeys(checks))}
+    limit = (data.get("limits") or {}).get("pr_changed_lines")
+    if limit is not None:
+        result["limit_override"] = limit  # it wins over the profile and repo limits (D85)
+    return result

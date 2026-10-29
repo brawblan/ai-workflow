@@ -10,7 +10,7 @@ defines where specificity goes and which layer wins.
 | 1 | Framework core | `framework/` in this repo | Principles, gates, profiles |
 | 2 | Adapter and model profile | `framework/adapters/<name>.md`, its templates, and `framework/adapters/<name>/models/` | File paths for one harness. Idioms and role models for one model family. |
 | 3 | Repo config | `.cornerstone/config.yaml` in the target repo | Commands, paths, limits, owners |
-| 4 | Profile override (D84) | `.cornerstone/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
+| 4 | Profile override (D84, D85) | `.cornerstone/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
 | 5 | Task | The ticket fields | Acceptance criteria, non-goals, a mode, a waiver |
 
 A later layer wins over an earlier layer, with these limits:
@@ -351,8 +351,8 @@ folders such as `docs/plans/` and `docs/reports/`, and ignore them in git.
 ## Profile override (`.cornerstone/profiles/<profile>.yaml`)
 
 A repo can change one selected profile with a file `.cornerstone/profiles/<profile>.yaml`
-([D84](README.md#decisions)). `stone check` validates each file. `stone render` does not apply the
-file yet (issue #78, part 2).
+([D84](README.md#decisions)). `stone check` validates each file. `stone render` fails on a file that
+is not valid, and applies a valid file ([D85](README.md#decisions)).
 
 ```yaml
 extends: single-ticket             # required: the name of the file
@@ -383,8 +383,17 @@ waivers:
 - A waiver names G3 or G5. A gate waiver can name only G1, G2, or G4.
 - A check waiver names K6, K7, K14, K16, or K17, or a check that the profile does not run.
 
-A gate waiver, `mode`, and `drivers` are records. The human reads them at the gate. `stone render`
-does not change the branch protection.
+`stone render` applies the file to the selected profile:
+
+| Key | Effect on the rendered files |
+| --- | --- |
+| `checks_add` | The profile runs the check. A check with a step, for example K8, gets its step in the G3 workflow. |
+| A waiver with `check: <K>` | The profile does not run the check until the `until` date. |
+| `limits.pr_changed_lines` | K7 uses this limit for the profile. A larger value needs a waiver with `limit: pr_changed_lines`. |
+| A waiver with `gate:`, `mode`, `drivers` | No effect. They are records, and the human reads them at the gate. Render does not change the branch protection. |
+
+After the `until` date of a waiver, `stone check` and `stone render` fail. Remove the waiver, or set
+a new date with the owner. Then run `stone render` again.
 
 ## Task layer (ticket fields)
 
