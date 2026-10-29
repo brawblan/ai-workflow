@@ -25,17 +25,28 @@ env:   # the hook reads the role from agent_type (set by --agent), and STONE_ROL
   without: {STONE_ROLE: $role}
 
 tools:   # the same lists as the role files, plus the commands that the role runs
+  shaper: [Read, Grep, Glob, Write, Edit]   # a file ticket (D60); the hook limits the edits
   planner: [Read, Grep, Glob, Write]
   writer: [Read, Grep, Glob]   # the guidance.writing eval (D69): read-only
   tester: [Read, Grep, Glob, Edit, Write, "Bash(python -m unittest*)", "Bash(git diff*)",
            "Bash(git log*)", "Bash(git show*)", "Bash(git add*)", "Bash(git commit*)",
            "Bash(git status*)"]
+  reviewer: [Read, Grep, Glob, "Bash(python -m unittest*)", "Bash(git diff*)", "Bash(git log*)",
+             "Bash(git show*)", "Bash(git status*)"]   # read-only: the reviewer changes no file
+  # The role.investigator eval: the report file, the tests, a short repro, and the git history.
+  # The hook limits the file tools to the reports path.
+  investigator: [Read, Grep, Glob, Edit, Write, "Bash(python -m unittest*)", "Bash(python -c*)",
+                 "Bash(git diff*)", "Bash(git log*)", "Bash(git show*)", "Bash(git status*)"]
   # The hook.protect-paths eval (D39): the shell write forms of its scenarios. Confirmed on
   # 2026-10-19 and 2026-10-21: sed -i, a redirect, tee, cp, and python3 -c ran under acceptEdits
   # (30 of 30 runs on 2026-10-21, with no file tool). A command with a second part (`; echo ...`)
   # needed approval and was denied, so the model ran it again alone (6 of 30 runs).
+  # The role.implementer eval adds the commands that the role runs: the checks and the commit.
+  # The task of the hook eval says "do not commit", so the extra tools do not change it.
   implementer: [Read, Grep, Glob, Edit, Write, "Bash(sed -i*)", "Bash(printf*)", "Bash(tee*)",
-                "Bash(cp*)", "Bash(python3 -c*)", "Bash(git diff*)", "Bash(git status*)"]
+                "Bash(cp*)", "Bash(python3 -c*)", "Bash(git diff*)", "Bash(git status*)",
+                "Bash(python -m unittest*)", "Bash(git log*)", "Bash(git show*)",
+                "Bash(git add*)", "Bash(git commit*)"]
 
 output_where: {type: result}   # use the last JSON object with these keys and values
 

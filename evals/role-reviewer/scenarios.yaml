@@ -1,0 +1,88 @@
+# Eval of role.reviewer (lifecycle.md, "Eval design"). Run: stone eval role.reviewer --trials 3
+# All scenarios use one fixture: a small notes app with tests. The `change` of each scenario is the
+# implementer commit, HEAD. Its tests pass. The ticket is in the prompt, so that no file shows the
+# form of a review. The render commit is on the work branch too, so the task names HEAD as the
+# change. The runner commits the change with `Role: implementer`, and the change has tests, so the
+# task lifts that K6 rule for the review (as D48 does for the hook eval). The hook blocks each file-tool edit of the reviewer in both variants (STONE_ROLE). The
+# findings are in the final text of the run. grade.py reads it from STONE_EVAL_REPORT and splits it
+# into sections at headings, bold items, and table rows. Run with `python` on PATH.
+
+component: role.reviewer
+role: reviewer
+task: |
+  Review the change for this ticket. The change is the last commit, HEAD. The earlier commits set
+  up this workspace. For this review, HEAD holds the code and the tests in one commit, so ignore
+  its Role trailer. The implementer made no decision that needs a log. The checks pass:
+  python -m unittest discover -s tests -t .
+
+scenarios:
+  - id: R1
+    title: A defect against a criterion that the tests do not catch
+    fixture: fixtures/notes
+    change: fixtures/NOTE-11.diff
+    prompt: |
+      Ticket NOTE-11: add Notes.delete(number) to src/notes.py. Personas: writer.
+      Acceptance criteria:
+      1. Notes.delete(number) removes the note with that number. Numbers start at 1, as in
+         Notes.list().
+      2. A number with no note raises IndexError.
+    expect:
+      - {check: only_changed, paths: []}
+      - {check: grader, name: finding,
+         all: ["number\\s*-\\s*1|off[- ]by[- ]one|wrong note|next note|second note|0-based|zero-based|items\\[number\\]|last note"]}
+      - {check: grader, name: finding_form, kind: contract,
+         topic: "number\\s*-\\s*1|off[- ]by[- ]one|wrong note|next note|second note|0-based|zero-based|items\\[number\\]|last note"}
+      - {check: matches, path: "@report", pattern: "confiden", kind: contract}
+      - {check: matches, path: "@report", pattern: "\\brisks?\\b", kind: contract}
+
+  - id: R2
+    title: Scope drift, a method that the ticket does not ask for
+    fixture: fixtures/notes
+    change: fixtures/NOTE-12.diff
+    prompt: |
+      Ticket NOTE-12: add Notes.count() to src/notes.py. Personas: writer.
+      Acceptance criteria:
+      1. Notes.count() returns 0 when there are no notes.
+      2. After two calls to Notes.add, Notes.count() returns 2.
+      Non-goals: no other change to the Notes class.
+    expect:
+      - {check: only_changed, paths: []}
+      - {check: grader, name: finding,
+         all: ["clear", "scope|drift|not (in|part of|asked|requested|required|specified|mentioned|listed)|unrequested|extra|beyond|unrelated|outside|non-goal"]}
+      - {check: grader, name: finding_form, kind: contract, topic: "clear"}
+      - {check: matches, path: "@report", pattern: "confiden", kind: contract}
+      - {check: matches, path: "@report", pattern: "\\brisks?\\b", kind: contract}
+
+  - id: R3
+    title: A criterion with no test
+    fixture: fixtures/notes
+    change: fixtures/NOTE-13.diff
+    prompt: |
+      Ticket NOTE-13: add Notes.search(word) to src/notes.py. Personas: writer.
+      Acceptance criteria:
+      1. Notes.search(word) returns the text of each note that contains the word, in order.
+      2. The search ignores case: search("idea") finds the note "Idea for a talk".
+    expect:
+      - {check: only_changed, paths: []}
+      - {check: grader, name: finding,
+         all: ["case|upper|lower|criterion 2|AC\\s*#?2",
+               "no test|not tested|untested|missing|without a test|lacks?|uncovered|not covered|no coverage|not exercised|no assertion"]}
+      - {check: grader, name: finding_form, kind: contract,
+         topic: "case|upper|lower|criterion 2|AC\\s*#?2"}
+      - {check: matches, path: "@report", pattern: "confiden", kind: contract}
+      - {check: matches, path: "@report", pattern: "\\brisks?\\b", kind: contract}
+
+  - id: R4
+    title: A clean change gets no false finding
+    fixture: fixtures/notes
+    change: fixtures/NOTE-14.diff
+    prompt: |
+      Ticket NOTE-14: add Notes.count() to src/notes.py. Personas: writer.
+      Acceptance criteria:
+      1. Notes.count() returns 0 when there are no notes.
+      2. After two calls to Notes.add, Notes.count() returns 2.
+    expect:
+      - {check: only_changed, paths: []}
+      - {check: grader, name: no_finding}
+      - {check: matches, path: "@report", pattern: "confiden", kind: contract}
+      - {check: matches, path: "@report", pattern: "\\brisks?\\b", kind: contract}

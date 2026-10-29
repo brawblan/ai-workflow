@@ -1,0 +1,29 @@
+diff --git a/src/notes.py b/src/notes.py
+index 9319829..5f75f02 100644
+--- a/src/notes.py
++++ b/src/notes.py
+@@ -12,3 +12,7 @@ class Notes:
+ 
+     def list(self) -> list[str]:
+         return [f"{n}. {text}" for n, text in enumerate(self.items, start=1)]
++
++    def count(self) -> int:
++        """Return the number of notes."""
++        return len(self.items)
+diff --git a/tests/test_notes.py b/tests/test_notes.py
+index 6130efb..10246d1 100644
+--- a/tests/test_notes.py
++++ b/tests/test_notes.py
+@@ -14,3 +14,12 @@ class NotesTest(unittest.TestCase):
+         notes.add("a")
+         notes.add("b")
+         self.assertEqual(notes.list(), ["1. a", "2. b"])
++
++    def test_count_is_0_with_no_notes(self) -> None:
++        self.assertEqual(Notes().count(), 0)
++
++    def test_count_after_two_notes(self) -> None:
++        notes = Notes()
++        notes.add("a")
++        notes.add("b")
++        self.assertEqual(notes.count(), 2)

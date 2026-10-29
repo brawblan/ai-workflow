@@ -1,0 +1,14 @@
+diff --git a/src/notes.py b/src/notes.py
+index 9319829..ac7cd97 100644
+--- a/src/notes.py
++++ b/src/notes.py
+@@ -12,3 +12,9 @@ class Notes:
+ 
+     def list(self) -> list[str]:
+         return [f"{n}. {text}" for n, text in enumerate(self.items, start=1)]
++
++    def delete(self, number: int) -> None:
++        """Remove the note with this number, from 1."""
++        if number < 1 or number > len(self.items):
++            raise IndexError(f"no note {number}")
++        del self.items[number]

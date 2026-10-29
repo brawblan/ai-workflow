@@ -1,0 +1,12 @@
+diff --git a/src/notes.py b/src/notes.py
+index 9319829..5f75f02 100644
+--- a/src/notes.py
++++ b/src/notes.py
+@@ -12,3 +12,7 @@ class Notes:
+ 
+     def list(self) -> list[str]:
+         return [f"{n}. {text}" for n, text in enumerate(self.items, start=1)]
++
++    def count(self) -> int:
++        """Return the number of notes."""
++        return len(self.items)

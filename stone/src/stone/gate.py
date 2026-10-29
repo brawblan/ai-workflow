@@ -15,7 +15,7 @@ from stone import specialists
 
 CONFIG = Path(".cornerstone/config.yaml")
 CHECKS = Path(".cornerstone/checks")
-K20_MODE = "warn"  # the same mode as the K20 step of the G3 workflow. Blocks from 2026-11-05 (D66).
+K20_MODE = "block"  # the same mode as the K20 step of the G3 workflow. Blocks since 1.4.0 (D80).
 
 
 class GateError(Exception):

@@ -30,3 +30,14 @@ Progress file format:
   ]
 }
 ```
+
+## Frameworks we do not adopt (D40)
+
+Cornerstone is its own framework (D40). We read these spec-driven tools and borrow ideas from them.
+We do not adopt them.
+
+| Tool | Reason |
+| --- | --- |
+| Spec Kit | No single tool joins a neutral core, harness adapters, gates by profile, and an eval plan. |
+| BMAD | Same reason. |
+| Agentic Code | Same reason. |

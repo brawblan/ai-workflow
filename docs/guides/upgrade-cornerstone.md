@@ -62,6 +62,8 @@ that a new key needs, writes the config diff, and runs the render. Use it when t
 | `drift <path>` | A person changed a generated file. Restore it, or move the change to the config, delete the file, and render again. |
 | `The version X is not in upgrades.yaml` | The framework folder is older than the target. Update your clone, or use `--to` with a listed version. |
 | `framework_version ... is newer` | Your clone or your `stone` is older than the config. Update it. A downgrade is not supported. |
+| A promotion push fails K6, K7, or K14 on the local machine, and CI skips them | A repo-local hook or script runs the check without `ci.branches`. Cornerstone does not write it. Make it skip these checks for a base branch that is not in `ci.branches`. |
+| Branch rules are not available for an unlisted base branch (G5) | A person reviews and approves each PR into that branch before the merge. Write this rule in `AGENTS.md`. This control depends on a person. CI does not enforce it. See [Gate steps by base branch](../../framework/customization.md#gate-steps-by-base-branch-cibranches). |
 | A hand-written component (`source: repo`) | `stone render` keeps it. Check by hand that it still works with the new version. |
 
 ## Not built yet

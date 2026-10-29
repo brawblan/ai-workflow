@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from stone import ci_setup, framework_check, results, specialists, specs, triggers
+from stone import ci_setup, framework_check, overrides, results, specialists, specs, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -62,9 +62,9 @@ Personas: <IDs>, or none
 ```
 
 Add `Reproduction:` for a bug and `Time box:` for a spike or an audit, if the profile needs them."""
-ALWAYS_PROTECTED = [".claude/", ".cornerstone/"]  # the hook, the check, and the harness settings
+CORE_PROTECTED = [".cornerstone/"]  # the hook and the check; the adapter adds its own folders (P12, D76)
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
-DEFAULT_PR_LINES = 600  # D4, customization.md
+DEFAULT_PR_LINES = overrides.DEFAULT_PR_LINES  # D4, customization.md
 BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
 
@@ -182,7 +182,9 @@ def size_limits(config: dict[str, Any], profiles: list[dict[str, Any]]) -> dict[
         raise RenderError(f"{CONFIG}: 'limits.pr_changed_lines' must be a whole number above 0.")
     limits = {}
     for profile in profiles:
-        if "K7" in profile["checks"]:
+        if "K7" in profile["checks"] and "limit_override" in profile:
+            limits[profile["id"]] = profile["limit_override"]  # stone check tested it (D85)
+        elif "K7" in profile["checks"]:
             own = (profile.get("limits") or {}).get("pr_changed_lines", DEFAULT_PR_LINES)
             limits[profile["id"]] = min(own, repo) if repo else own
     return limits
@@ -211,7 +213,8 @@ def all_checks_env(config: dict[str, Any]) -> str:
     return "        env:\n" + "\n".join(f"          {name}: {value}" for name, value in env.items())
 
 
-def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
+def template_values(config: dict[str, Any], model: str,
+                    harness_dirs: list[str] | None = None) -> dict[str, str]:
     """Return the repo facts that templates can use. TODO values are left out on purpose."""
     # The framework tag. The G3 workflow installs stone from it.
     values = {"model": model, "framework_version": str(config.get("framework_version", ""))}
@@ -266,12 +269,13 @@ def template_values(config: dict[str, Any], model: str) -> dict[str, str]:
     values["paths_reports"] = reports.replace(specs.TICKET_ID, "<ticket-id>")
     values["plans_json"] = json.dumps([plans.replace(specs.TICKET_ID, "*")])
     values["reports_json"] = json.dumps([reports.replace(specs.TICKET_ID, "*")])
-    values["harness_json"] = json.dumps(ALWAYS_PROTECTED)
+    always = list(harness_dirs or []) + CORE_PROTECTED  # harness folders hold its settings (D76)
+    values["harness_json"] = json.dumps(always)
     tests = list(_get(config, "paths.tests") or [])
     checks = list(_get(config, "paths.checks") or [])
     if tests and checks:
         values["tests_json"] = json.dumps(tests)
-        protected = tests + checks + ALWAYS_PROTECTED + [values["paths_specs"]]
+        protected = tests + checks + always + [values["paths_specs"]]
         values["protected_json"] = json.dumps(sorted(set(protected)))
     return {key: value for key, value in values.items() if "TODO(" not in value}
 
@@ -326,13 +330,24 @@ def commit_values(config: dict[str, Any], role: str) -> dict[str, str]:
                                     else "Keep the failing test.")}
 
 
-def build_components(framework: Path, config: dict[str, Any]) -> list[Component]:
+def apply_overrides(root: Path, profiles: list[dict[str, Any]],
+                    today: dt.date) -> list[dict[str, Any]]:
+    """Apply the profile override files of the repo (layer 4, D85)."""
+    found = {override.profile: override for override in overrides.load(root)}
+    return [overrides.apply(profile, found[profile["id"]], today) if profile["id"] in found
+            else profile for profile in profiles]
+
+
+def build_components(framework: Path, config: dict[str, Any], root: Path | None = None,
+                     today: dt.date | None = None) -> list[Component]:
     harness = framework / "adapters" / config["harness"]
     registry_path = harness / "components.yaml"
     if not registry_path.exists():
         raise RenderError(f"The harness '{config['harness']}' has no components.yaml. "
                           "Render supports only adapters with templates.")
-    registry = yaml.safe_load(registry_path.read_text(encoding="utf-8"))["components"]
+    registry_doc = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+    registry = registry_doc["components"]
+    harness_dirs = [str(item) for item in registry_doc.get("protected_dirs") or []]
     model_profile = yaml.safe_load(
         (harness / "models" / f"{config['model_profile']}.yaml").read_text(encoding="utf-8"))
     if model_profile.get("status") != "active":
@@ -343,6 +358,8 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         raise RenderError(f"{CONFIG}: {problems[0]}")
     adapter_roles = {entry["role"] for entry in registry if entry["kind"] == "role"}
     profiles = load_profiles(framework, config["profiles"], adapter_roles)
+    if root is not None:
+        profiles = apply_overrides(root, profiles, today or dt.date.today())
     defaults = model_profile["defaults"]
     model_values = {name: str(defaults[name]) for name in MODEL_VALUES
                     if defaults.get(name) not in (None, "")}
@@ -359,7 +376,7 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
     steps: dict[str, str | None] = {step_name(entry["id"]): None
                                     for entry in registry if entry.get("ci_step")}
     limits_json = json.dumps(size_limits(config, profiles), sort_keys=True)
-    base_values = {**template_values(config, ""), **model_values,
+    base_values = {**template_values(config, "", harness_dirs), **model_values,
                    "size_limits_json": limits_json}
     for entry in registry:
         if entry.get("ci_step") and needed(entry, profiles) and entry["id"] not in off:
@@ -374,7 +391,7 @@ def build_components(framework: Path, config: dict[str, Any]) -> list[Component]
         if local and entry["kind"] == "ci-job":
             continue  # delivery: local writes no workflow file
         model = defaults["role_models"].get(entry.get("role", ""), "")
-        values = {**template_values(config, model), **model_values,
+        values = {**template_values(config, model, harness_dirs), **model_values,
                   "size_limits_json": limits_json,
                   **{name: step for name, step in steps.items() if step is not None}}
         effort = (defaults.get("effort") or {}).get(entry.get("role", ""), "")
@@ -608,8 +625,11 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
     framework = framework or root / "framework"
     today = today or dt.date.today()
     config = load_config(root, framework)
+    findings = framework_check.check_overrides(root, framework, today)
+    if findings:
+        raise RenderError(f"{findings[0].path}: {findings[0].message}")
     warn_old_framework(config["framework_version"])
-    components = build_components(framework, config)
+    components = build_components(framework, config, root, today)
     manifest = load_manifest(root)
     old_entries = {entry["id"]: entry for entry in manifest.get("components", [])}
 

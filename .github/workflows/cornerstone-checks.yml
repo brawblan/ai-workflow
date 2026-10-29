@@ -19,7 +19,11 @@ jobs:
       - name: K6 protected paths
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: python3 .cornerstone/checks/protected_paths.py "origin/${BASE_REF}"
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "${PR_BODY}" | python3 .cornerstone/checks/protected_paths.py \
+            "origin/${BASE_REF}" --body - --pr-author "${PR_AUTHOR}"
 
       # K7 blocks (D45). A "Waiver (P10)" section in the PR body passes.
       # The limit comes from the "Profile: <id>" line in the PR body.

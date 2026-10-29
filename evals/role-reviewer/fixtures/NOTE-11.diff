@@ -1,0 +1,35 @@
+diff --git a/src/notes.py b/src/notes.py
+index 9319829..ac7cd97 100644
+--- a/src/notes.py
++++ b/src/notes.py
+@@ -12,3 +12,9 @@ class Notes:
+ 
+     def list(self) -> list[str]:
+         return [f"{n}. {text}" for n, text in enumerate(self.items, start=1)]
++
++    def delete(self, number: int) -> None:
++        """Remove the note with this number, from 1."""
++        if number < 1 or number > len(self.items):
++            raise IndexError(f"no note {number}")
++        del self.items[number]
+diff --git a/tests/test_notes.py b/tests/test_notes.py
+index 6130efb..6362f22 100644
+--- a/tests/test_notes.py
++++ b/tests/test_notes.py
+@@ -14,3 +14,16 @@ class NotesTest(unittest.TestCase):
+         notes.add("a")
+         notes.add("b")
+         self.assertEqual(notes.list(), ["1. a", "2. b"])
++
++    def test_delete_removes_a_note(self) -> None:
++        notes = Notes()
++        notes.add("a")
++        notes.add("b")
++        notes.delete(1)
++        self.assertEqual(len(notes.list()), 1)
++
++    def test_delete_of_a_missing_note_raises(self) -> None:
++        notes = Notes()
++        notes.add("a")
++        with self.assertRaises(IndexError):
++            notes.delete(9)

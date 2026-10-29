@@ -10,7 +10,7 @@ defines where specificity goes and which layer wins.
 | 1 | Framework core | `framework/` in this repo | Principles, gates, profiles |
 | 2 | Adapter and model profile | `framework/adapters/<name>.md`, its templates, and `framework/adapters/<name>/models/` | File paths for one harness. Idioms and role models for one model family. |
 | 3 | Repo config | `.cornerstone/config.yaml` in the target repo | Commands, paths, limits, owners |
-| 4 | Profile override (not built yet, D51) | `.cornerstone/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
+| 4 | Profile override (D84, D85) | `.cornerstone/profiles/<profile>.yaml` in the target repo | Extra checks, a different size limit |
 | 5 | Task | The ticket fields | Acceptance criteria, non-goals, a mode, a waiver |
 
 A later layer wins over an earlier layer, with these limits:
@@ -207,6 +207,42 @@ A PR into an unlisted branch has no K6, K7, K14, or K20. This includes a hotfix 
 person gates it (G5). Turn on branch protection with a required human review for each unlisted
 base branch. If ticket PRs also go into a branch, add that branch to the list.
 
+If the repo cannot use branch rules (for example, a private repo on a GitHub plan without branch
+rules), use this fallback ([D81](README.md#decisions)):
+
+- A person reviews and approves each PR into an unlisted branch before the merge.
+- The repo writes this rule in its `AGENTS.md`.
+- This control depends on a person. CI does not enforce it, and `stone` does not check it. A
+  person can skip it by mistake.
+
+A repo-local hook or script that runs K6, K7, or K14 must use the same rule. It must skip these
+checks for a base branch that is not in `ci.branches`. Cornerstone does not write such a hook, so
+the hook does not read `ci.branches`. Without the skip, a push for a promotion branch fails the
+check on the local machine, and CI skips the check.
+
+### Bot PRs (Dependabot, Renovate)
+
+With `adoption: all` (the default), a bot PR has no K14 sections, so K14 fails. A large lock
+file change can also fail K7. There is no config key to skip these checks for a bot
+([D79](README.md#decisions)). A person passes them by hand:
+
+1. Edit the PR body. Add the four K14 sections: Evidence, Decision log, Review findings, and
+   Confidence.
+2. If the diff is over the size limit, add a `Waiver (P10)` section with the reason.
+3. Start a new run. Push a commit, or close and open the PR again. An edit of the PR body or a
+   re-run of the job does not read the new body.
+
+A bot can write its PR body again, for example when it rebases the PR. Then do these steps again.
+
+With `adoption: opt-in`, a bot PR has no marker, so K6, K7, and K14 skip it. An edit of the body
+starts a new run there.
+
+A bot commit has no `Role:` trailer, so K6 counts it as an implementer commit. A bot change of a
+protected path, for example an action update in the workflow folder, fails K6. To pass it, add a
+`Waiver (K6)` section with the reason and the owner, and start a new run ([D83](README.md#decisions)).
+The waiver passes only a commit with a bot author on a PR that a bot opened. Each other commit on
+a protected path still fails.
+
 ### Tickets as files (`tickets`)
 
 With `tickets.source: file`, the ticket is a file, not a GitHub issue ([D60](README.md#decisions)).
@@ -219,8 +255,8 @@ This fits a tracker such as Jira, and a local-only setup.
 - The implementer, tester, and reviewer files, and `ticket-delivery`, read the ticket from that
   path. They do not use the issue CLI.
 - The shaper writes the Definition of Ready fields in the section `## Definition of Ready` of the
-  file, one `Field: value` line for each field. A G1 check ([#115](https://github.com/brawblan/ai-workflow/issues/115))
-  can read this form.
+  file, one `Field: value` line for each field. Check K21 (`stone check-ready`) reads this form
+  ([D82](README.md#decisions)).
 
 ### Commits (`commits`)
 
@@ -282,7 +318,6 @@ A repo can connect its own review agents or skills to the roles ([D59](README.md
 
   A `missing` report of another specialist is a warning. Commit each report in the PR, or K20
   cannot see it. A heading with `waiver (K20)` and text under it passes, with a notice.
-  K20 is a warning until 2026-11-05.
 
 ### Local delivery (`delivery: local`)
 
@@ -315,25 +350,50 @@ folders such as `docs/plans/` and `docs/reports/`, and ignore them in git.
 
 ## Profile override (`.cornerstone/profiles/<profile>.yaml`)
 
-> Not built yet (D51, issue #78). `stone render` and `stone check` do not read these files. The
-> file below shows the planned form only. Today, a waiver is a record in the PR body (see the PR
-> size waiver above), and the human decides at G4. `stone check` rejects only a profile that
-> removes G3 or G5.
+A repo can change one selected profile with a file `.cornerstone/profiles/<profile>.yaml`
+([D84](README.md#decisions)). `stone check` validates each file. `stone render` fails on a file that
+is not valid, and applies a valid file ([D85](README.md#decisions)).
 
 ```yaml
-extends: single-ticket
-mode: hybrid
+extends: single-ticket             # required: the name of the file
+mode: hybrid                       # optional: a mode in modes_allowed
 drivers:                           # optional: change single stages of the preset
-  plan: pair
-checks_add: [K8]
+  build: pair                      # a stage of the profile
+checks_add: [K8]                   # optional: more checks from checks.md
 limits:
-  pr_changed_lines: 250
+  pr_changed_lines: 250            # optional: a looser limit needs a limit waiver
 waivers:
-  - gate: G4
+  - gate: G4                       # exactly one of gate, check, or limit
     reason: <reason>
     owner: <github-username>
     until: 2027-01-31
+    scope: patch-versions          # optional: free text
 ```
+
+`stone check` fails the file in these cases:
+
+- A key is not in the form above, or `extends` is not the name of the file.
+- The profile is not in `profiles` of the repo config.
+- The mode is not in `modes_allowed`. A stage in `drivers` is not a stage of the profile.
+- A driver is not `agent`, `human`, or `pair`. Only `verify` can use `checks`.
+- A check in `checks_add` is not in [checks.md](checks.md).
+- `limits.pr_changed_lines` is larger than the limit of the profile and the repo config, and no
+  active waiver has `limit: pr_changed_lines`.
+- A waiver has no reason, no owner, or no valid `until` date, or its `until` date is in the past.
+- A waiver names G3 or G5. A gate waiver can name only G1, G2, or G4.
+- A check waiver names K6, K7, K14, K16, or K17, or a check that the profile does not run.
+
+`stone render` applies the file to the selected profile:
+
+| Key | Effect on the rendered files |
+| --- | --- |
+| `checks_add` | The profile runs the check. A check with a step, for example K8, gets its step in the G3 workflow. |
+| A waiver with `check: <K>` | The profile does not run the check until the `until` date. |
+| `limits.pr_changed_lines` | K7 uses this limit for the profile. A larger value needs a waiver with `limit: pr_changed_lines`. |
+| A waiver with `gate:`, `mode`, `drivers` | No effect. They are records, and the human reads them at the gate. Render does not change the branch protection. |
+
+After the `until` date of a waiver, `stone check` and `stone render` fail. Remove the waiver, or set
+a new date with the owner. Then run `stone render` again.
 
 ## Task layer (ticket fields)
 
