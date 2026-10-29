@@ -60,8 +60,7 @@ class OverrideTest(unittest.TestCase):
                 + waiver("gate: G4", extra="    scope: patch-versions\n"))
 
     def test_documented_example_passes(self) -> None:
-        # customization.md shows `plan: pair` for single-ticket, which has no plan stage.
-        self.ok(HEAD + "mode: hybrid\ndrivers:\n  plan: pair\nchecks_add: [K8]\n"
+        self.ok(HEAD + "mode: hybrid\ndrivers:\n  build: pair\nchecks_add: [K8]\n"
                 "limits:\n  pr_changed_lines: 250\n"
                 + waiver("gate: G4", extra="    scope: patch-versions\n"))
 
