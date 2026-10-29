@@ -358,7 +358,7 @@ file yet (issue #78, part 2).
 extends: single-ticket             # required: the name of the file
 mode: hybrid                       # optional: a mode in modes_allowed
 drivers:                           # optional: change single stages of the preset
-  plan: pair
+  build: pair                      # a stage of the profile
 checks_add: [K8]                   # optional: more checks from checks.md
 limits:
   pr_changed_lines: 250            # optional: a looser limit needs a limit waiver
