@@ -763,10 +763,52 @@ class RenderTest(unittest.TestCase):
             with self.subTest(version=version):
                 self.render_log(version)
                 install = self.step("Install stone")
-                self.assertEqual(install["env"]["STONE_TAG"], f"v{version}")
-                self.assertIn("git+https://github.com/brawblan/ai-workflow@${STONE_TAG}"
+                self.assertEqual(install["env"]["STONE_REF"], f"v{version}")
+                self.assertIn("git+https://github.com/brawblan/ai-workflow@${STONE_REF}"
                               "#subdirectory=stone", install["run"])
                 self.assertNotIn("$framework_version", self.workflow_text())
+                self.assertNotIn("$stone_ref", self.workflow_text())
+
+    # The commit pin and the hashes (D92).
+
+    def test_workflow_installs_stone_from_framework_commit(self) -> None:
+        sha = "012f83afcac2e83cdbf17590b1d88638b0a8a290"
+        self.write_config(CONFIG.replace("framework_version: 0.1.0\n",
+                                         f'framework_version: 1.4.0\nframework_commit: "{sha}"\n'))
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            render.render(self.root, FRAMEWORK, today=TODAY)
+        self.assertEqual(self.step("Install stone")["env"]["STONE_REF"], sha)
+        self.assertIn(f"STONE_REF: {sha} # v1.4.0\n", self.workflow_text())
+        self.assertNotIn("framework_commit", log.getvalue())
+
+    def test_render_warns_when_framework_commit_is_not_set(self) -> None:
+        log = self.render_log("1.4.0")
+        self.assertIn("warning: framework_commit is not set", log)
+        self.assertIn("v1.4.0", log)
+
+    def test_no_commit_warning_for_local_delivery(self) -> None:
+        self.write_config(CONFIG + "delivery: local\n")
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            render.render(self.root, FRAMEWORK, today=TODAY)
+        self.assertNotIn("framework_commit", log.getvalue())
+
+    def test_install_stone_pins_each_package_with_a_hash(self) -> None:
+        self.render()
+        run = self.step("Install stone")["run"]
+        self.assertIn("--require-hashes --only-binary :all:", run)
+        self.assertIn("--no-deps --no-build-isolation", run)
+        self.assertRegex(run, r"\nPyYAML==\d+\.\d+\.\d+ \\\n  --hash=sha256:[0-9a-f]{64} ")
+        self.assertRegex(run, r"\nsetuptools==\d+\.\d+\.\d+ \\\n  --hash=sha256:[0-9a-f]{64}\n")
+        self.assertIn("\nEOF\n", run)  # YAML removes the indent, so the here-document ends
+
+    def test_bad_framework_commit_stops_render(self) -> None:
+        for value in ("v1.4.0", "012f83a", "012F83AFCAC2E83CDBF17590B1D88638B0A8A290"):
+            with self.subTest(value=value):
+                self.write_config(CONFIG + f'framework_commit: "{value}"\n')
+                with self.assertRaisesRegex(render.RenderError, "framework_commit"):
+                    self.render()
 
     def test_install_stone_uses_the_package_name_of_the_cli(self) -> None:
         self.render()
