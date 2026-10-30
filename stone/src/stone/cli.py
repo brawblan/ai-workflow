@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, ready_check, render,
-                   repo_rules, specialists, specs, upgrade, writing_check)
+                   repo_rules, specialists, specs, upgrade, workflow_check, writing_check)
 from stone.findings import report
 
 
@@ -121,6 +121,16 @@ def _parser() -> argparse.ArgumentParser:
                       help="warn: report only (1.x). block: fail on findings.")
     deps.add_argument("--format", choices=["text", "github"], default="text")
 
+    workflows = commands.add_parser("check-workflows",
+                                    help="K24: report an unpinned tool in a CI workflow.")
+    workflows.add_argument("body", help="The PR body file. Use '-' to read standard input.")
+    scope = workflows.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--base", help="The base ref. Read the workflows that the PR changes.")
+    scope.add_argument("--all", action="store_true", help="Read each tracked workflow.")
+    workflows.add_argument("--mode", choices=["warn", "block"], default="warn",
+                           help="warn: report only (1.x). block: fail on findings.")
+    workflows.add_argument("--format", choices=["text", "github"], default="text")
+
     ready = commands.add_parser("check-ready",
                                 help="K21: report a Definition of Ready field that is missing or "
                                      "empty.")
@@ -177,6 +187,8 @@ def main(argv: list[str] | None = None) -> int:
         return _check_evidence(args.body, args.section, args.mode, args.format)
     if args.command == "check-dependencies":
         return _check_dependencies(args.body, args.base, args.mode, args.format)
+    if args.command == "check-workflows":
+        return _check_workflows(args.body, None if args.all else args.base, args.mode, args.format)
     if args.command == "check-ready":
         return _check_ready(args.ticket, args.profile, args.mode, args.format)
     if args.command == "check-rules":
@@ -313,6 +325,28 @@ def _check_dependencies(body: str, base: str, mode: str, fmt: str) -> int:
         return 2
     blocking = report(findings, fmt, warn_only=mode == "warn")
     print(f"K23: {len(findings)} finding(s), mode {mode}.")
+    return 1 if blocking else 0
+
+
+def _check_workflows(body: str, base: str | None, mode: str, fmt: str) -> int:
+    if body == "-":
+        text = sys.stdin.read()
+    else:
+        try:
+            text = Path(body).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            reason = error.reason if isinstance(error, UnicodeDecodeError) else error.strerror
+            print(f"check-workflows: cannot read {body}: {reason}")
+            return 2
+    try:
+        findings = workflow_check.check(Path("."), base, text)
+    except RuntimeError as error:
+        print(f"check-workflows: {error}")
+        return 2
+    blocking = report(findings, fmt, warn_only=mode == "warn")
+    if workflow_check.has_waiver(text):
+        print("K24: notice: the PR body has a Waiver (K24) section. A human reviews each finding.")
+    print(f"K24: {len(findings)} finding(s), mode {mode}.")
     return 1 if blocking else 0
 
 

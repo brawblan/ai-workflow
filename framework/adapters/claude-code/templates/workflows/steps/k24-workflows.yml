@@ -1,0 +1,9 @@
+      # K24 warns in 1.x (D93). A changed workflow needs a pin for each action and tool. A Waiver (K24) section passes it.
+      - name: $step_name
+$gate_if
+        env:
+          BASE_REF: $${{ github.base_ref }}
+          PR_BODY: $${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "$${PR_BODY}" | "$${RUNNER_TEMP}/stone/bin/stone" check-workflows - \
+            --base "origin/$${BASE_REF}" --mode warn --format github
