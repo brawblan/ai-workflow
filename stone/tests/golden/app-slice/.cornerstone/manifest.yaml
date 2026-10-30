@@ -44,7 +44,7 @@ components:
   review_by: '2027-04-18'
   files:
   - .github/workflows/cornerstone-checks.yml
-  hash: a8653a906aab465c14683f6dcb26b6b32c54f1324701a241ee4c9965a1fa4c6e
+  hash: cf5ef71d50dce87a24e1f16e274b1d5bfbf58c7e99333977fc6f8e5c601cc0f1
 - id: hook.path-match
   kind: hook
   purpose: Match a path against paths.tests and paths.checks. The hook and K6 import
