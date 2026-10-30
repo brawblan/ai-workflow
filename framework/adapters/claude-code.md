@@ -209,7 +209,7 @@ table shows the state of each pin. Issue #225 closes the gaps.
 | --- | --- | --- | --- |
 | `anthropics/claude-code-action` | Trigger workflows | Commit SHA (v1.0.252) | None |
 | Claude Code CLI | Trigger workflows | The action SHA fixes the version: v1.0.252 installs 2.1.302. | The action gets the CLI through `curl -fsSL https://claude.ai/install.sh \| bash -s -- <version>`. The script is not pinned or hashed. |
-| `stone` | G3 workflow | Git tag `v<framework_version>` | A moved tag changes the installed code. PyYAML is `>=6.0`, with no hash. |
+| `stone` | G3 workflow | The commit SHA in `framework_commit`, else the tag `v<framework_version>` (D92). PyYAML and setuptools have a version and hashes. | A repo with no `framework_commit` still installs from the tag. |
 | Cornerstone plugin | Developer machines | None. The marketplace follows the repo. | A push to the plugin reaches each installed user. |
 | Claude Code CLI and editor extension | Developer machines | None. Auto-update is on by default. | A bad release installs with no review. |
 

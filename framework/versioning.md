@@ -2,7 +2,8 @@
 
 Cornerstone uses version numbers in the form `X.Y.Z`. A release is a git tag `vX.Y.Z` of
 `brawblan/ai-workflow`. A repo sets `framework_version` in its [repo config](customization.md) to
-the tag that it uses. The G3 workflow installs `stone` from that tag.
+the tag that it uses. It sets `framework_commit` to the commit of that tag. The G3 workflow
+installs `stone` from that commit, or from the tag if the key is not set (D92).
 
 ## What a version number means
 
@@ -71,9 +72,10 @@ installed `stone`.
 7. Tag the merge commit `vX.Y.Z`, and push the tag. The tag starts the `pages` workflow, which
    deploys the docs site. A push to `dev` or `main` does not deploy it. Copy the summary, the config
    changes, and the steps of the entry into the notes of the release.
-8. Now move this repo to the new version. Set `framework_version` in `.cornerstone/config.yaml`, and
-   run `stone upgrade --apply`. Commit the generated files alone. Open this PR into `dev`. Do this
-   after the tag exists, because the G3 workflow installs `stone` from the tag.
+8. Now move this repo to the new version. Run `stone upgrade --apply`. It sets `framework_version`
+   and `framework_commit` in `.cornerstone/config.yaml`, and renders. Commit the config change
+   alone, with `Role: human`. Then commit the generated files alone. Open this PR into `dev`. Do
+   this after the tag exists, because `stone upgrade` reads the commit of the tag.
 
 ## A docs change between releases
 

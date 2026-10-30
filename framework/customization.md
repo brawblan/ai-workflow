@@ -27,6 +27,7 @@ A later layer wins over an earlier layer, with these limits:
 
 ```yaml
 framework_version: 1.2.0           # tag of brawblan/ai-workflow. G3 installs stone from it. See versioning.md.
+framework_commit: "<40-hex SHA>"   # optional. The commit of that tag. G3 installs stone from it (see below).
 harness: <harness-adapter-name>    # a file name in framework/adapters/
 model_profile: <model-family>      # a file in framework/adapters/<harness>/models/
 spec_tool: plain                   # plain, or a spec-tool adapter name
@@ -192,6 +193,20 @@ Use it when only some people or some tickets use Cornerstone ([D58](README.md#de
 - The role files of the implementer and the tester tell the role to add the marker to a PR.
 - Anyone can remove the marker, and an unmarked PR gets no check. Turn on branch protection with a
   required human review for the base branch, so that review controls the PRs that G3 skips.
+
+### Framework commit (`framework_commit`)
+
+A tag can move. Then the G3 workflow installs other code in each repo (P9,
+[D92](README.md#decisions)). A commit SHA cannot move.
+
+- `stone upgrade --apply` reads the commit of the tag `v<framework_version>` with `git ls-remote`,
+  and writes it to `framework_commit`. Check in the config diff that the SHA is the commit of the tag.
+- With the key, G3 installs `stone` from the commit. Without it, G3 installs from the tag, and
+  `stone render` gives a warning.
+- If you change `framework_version` by hand, change `framework_commit` in the same commit. Else G3
+  installs the `stone` of the old commit.
+- G3 installs PyYAML and the build tool from a list of hashes in the workflow. pip gets no other
+  package for `stone`.
 
 ### Protect instruction files (`protect_instruction_files`)
 

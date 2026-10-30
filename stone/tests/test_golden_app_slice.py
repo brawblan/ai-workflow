@@ -29,6 +29,7 @@ REVIEW_BY = "2027-04-18"  # TODAY plus 6 months (P5)
 # The profile has K4, K5, K8, and K10. Each of these G3 steps runs a repo command, so the config
 # gives each command. Without a command, render skips the step and warns (D29).
 CONFIG = f"""framework_version: 0.8.0
+framework_commit: "0123456789abcdef0123456789abcdef01234567"
 harness: claude-code
 model_profile: claude-5
 profiles: [{PROFILE}]
