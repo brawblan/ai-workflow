@@ -13,15 +13,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 from path_match_helpers import FRAMEWORK, HOOK, K6, PATH_MATCH
 from stone import framework_check, render
 from test_path_globs import TODAY, RenderedRepo, config
 
-PATTERNS = ["**/AGENTS.md", "**/CLAUDE.md", "**/CLAUDE.local.md"]
+ADAPTER = FRAMEWORK / "adapters" / "claude-code" / "components.yaml"
+# D88: the adapter lists each letter as a class of both cases. Render must copy this list.
+PATTERNS = yaml.safe_load(ADAPTER.read_text(encoding="utf-8"))["instruction_files"]
 COVERED = ["AGENTS.md", "docs/AGENTS.md", "a/b/CLAUDE.local.md", "CLAUDE.md",
-           "a/b/c/CLAUDE.md", "CLAUDE.local.md"]
+           "a/b/c/CLAUDE.md", "CLAUDE.local.md", "agents.md", "docs/Agents.MD",
+           "sub/claude.md", "x/claude.LOCAL.md"]
 NOT_COVERED = ["AGENTS.md.bak", "docs/MY_AGENTS.md", "docs/AGENTS.md.bak", "CLAUDE.md.old",
-               "NOTCLAUDE.md", "docs/readme.md"]
+               "NOTCLAUDE.md", "docs/readme.md", "agentsXmd", "docs/agents.md.bak"]
 
 
 def assigned(text: str, name: str) -> list[str]:
@@ -101,15 +106,40 @@ class KeyOnTest(RenderedInstructionRepo):
         named = self.k6_named_for_an_implementer_commit(["docs/AGENTS.md"])
         self.assertEqual(named, {"docs/AGENTS.md"})
 
+    def test_the_adapter_list_has_the_three_files(self) -> None:
+        self.assertEqual(len(PATTERNS), 3)
+
+    def test_hook_blocks_the_planner_on_docs_agents_md(self) -> None:
+        self.assertEqual(self.hook("docs/AGENTS.md", "planner"), 2)
+
     def test_k6_names_each_instruction_file_only(self) -> None:
-        named = self.k6_named_for_an_implementer_commit(COVERED + NOT_COVERED)
-        self.assertEqual(named, set(COVERED))
+        # A file system that ignores case folds two paths that differ only in case.
+        seen: set[str] = set()
+        paths = [p for p in COVERED if not (p.lower() in seen or seen.add(p.lower()))]
+        named = self.k6_named_for_an_implementer_commit(paths + NOT_COVERED)
+        self.assertEqual(named, set(paths))
+
+    def test_k6_fails_an_implementer_commit_on_sub_claude_md(self) -> None:
+        with self.new_branch("impl-lower-claude") as base:
+            self.commit({"sub/claude.md": "rules\n"}, "feat: x\n\nRole: implementer")
+            run = self.k6(base)
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertEqual(self.named(run.stdout), {"sub/claude.md"})
 
     def test_k6_passes_a_human_commit_on_docs_agents_md(self) -> None:
         with self.new_branch("human-instr") as base:
             self.commit({"docs/AGENTS.md": "rules\n"}, "docs: rules\n\nRole: human")
             run = self.k6(base)
         self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+
+
+class KeyOffHookTest(RenderedInstructionRepo):
+    """The key absent, in a rendered repo: the hook allows an instruction file edit."""
+
+    TESTS = ["tests/"]
+
+    def test_hook_allows_the_implementer_on_docs_agents_md(self) -> None:
+        self.assertEqual(self.hook("docs/AGENTS.md", "implementer"), 0)
 
 
 class KeyOffTest(unittest.TestCase):
