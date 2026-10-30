@@ -65,6 +65,7 @@ Add `Reproduction:` for a bug and `Time box:` for a spike or an audit, if the pr
 CORE_PROTECTED = [".cornerstone/"]  # the hook and the check; the adapter adds its own folders (P12, D76)
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 K23_SINCE = (1, 5, 0)  # the first framework tag with `stone check-dependencies` (D90)
+K24_SINCE = (1, 5, 0)  # the first framework tag with `stone check-workflows` (D93)
 DEFAULT_PR_LINES = overrides.DEFAULT_PR_LINES  # D4, customization.md
 BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
@@ -501,6 +502,8 @@ def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict
             continue
         if step["id"] == "k23" and not framework_at_least(config.get("framework_version"), K23_SINCE):
             continue  # the installed stone has no check-dependencies (D90)
+        if step["id"] == "k24" and not framework_at_least(config.get("framework_version"), K24_SINCE):
+            continue  # the installed stone has no check-workflows (D93)
         step_values = dict(values, step_name=step.get("name", step["id"]))
         command = step.get("command")
         if command:

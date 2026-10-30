@@ -166,6 +166,10 @@ components:
         name: K23 new dependencies
         when: {check: K23}
         template: workflows/steps/k23-dependencies.yml
+      - id: k24
+        name: K24 unpinned tools
+        when: {check: K24}
+        template: workflows/steps/k24-workflows.yml
       - id: k4
         name: K4 integration tests
         when: {check: K4}

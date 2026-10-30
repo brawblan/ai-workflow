@@ -114,7 +114,7 @@ The words MUST, SHOULD, and MAY have the meanings in RFC 2119.
   through auto-update and installed a backdoor.
 - **Evidence:** F1–F5, F19, F20.
 - **Enforce:** Gate G5. Role permission lists. Sandboxes. Branch protection. Review of each change
-  to an instruction file (G4). With `protect_instruction_files`, K6 and K22. K23, a warning in 1.x.
+  to an instruction file (G4). With `protect_instruction_files`, K6 and K22. K23 and K24, warnings in 1.x.
   Version pins for the harness and the framework, set in the adapter.
 
 ## P10. Volume is a cost
