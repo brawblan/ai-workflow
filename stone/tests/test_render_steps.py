@@ -43,7 +43,9 @@ STEPS = {"K4": ("K4 integration tests", "test_integration"),
          "K11": ("K11 property and fuzz tests", "property"),
          "K12": ("K12 differential tests", "differential")}
 K20_STEP = "K20 specialist findings"  # no command key: it renders only with a specialists section (D66)
+K23_STEP = "K23 new dependencies"  # no command key: it renders for each profile with K23 (D90)
 STEP_NAMES = {name for name, _ in STEPS.values()} | {K20_STEP}
+K23_TEXT = re.compile(r"\n      # K23 warns in 1\.x.*\Z", re.DOTALL)
 LIMIT = "limits.mutation_score_changed_code"
 CHECK_WARNING = re.compile(r"\bK(4|5|8|10|11|12)\b|commands\.")
 
@@ -449,7 +451,10 @@ class NoStepOutputTest(FrameworkCopy):
         log = io.StringIO()
         with contextlib.redirect_stderr(log):
             render.render(self.root, FRAMEWORK, today=TODAY)
-        return self.read(WORKFLOW)
+        # K23 has no command key: the step is the only output with no commands. Remove it here.
+        text = self.read(WORKFLOW)
+        self.assertRegex(text, K23_TEXT)
+        return K23_TEXT.sub("\n", text, count=1).rstrip("\n") + "\n"
 
     def test_ac6_single_ticket_workflow_is_byte_identical_to_the_old_one(self) -> None:
         new = self.new_workflow(["single-ticket"])
@@ -469,7 +474,9 @@ class NoStepOutputTest(FrameworkCopy):
 
     def test_ac6_all_checks_is_the_last_step(self) -> None:
         self.new_workflow(["single-ticket"])
-        self.assertEqual(self.step_names()[-1], "All checks")
+        names = [name for name in self.step_names() if name != K23_STEP]
+        self.assertEqual(names[-1], "All checks")
+        self.assertEqual(self.step_names()[-1], K23_STEP)
 
 
 # AC7: valid YAML, the order of components.yaml, and warn mode.
@@ -478,7 +485,7 @@ class AllStepsTest(FrameworkCopy):
     def setUp(self) -> None:
         super().setUp()
         self.add_profile("every-check",
-                         ["K4", "K5", "K6", "K8", "K10", "K11", "K12", "K14", "K20"])
+                         ["K4", "K5", "K6", "K8", "K10", "K11", "K12", "K14", "K20", "K23"])
         self.configure(["every-check"], CHECK_COMMANDS, {"mutation_score_changed_code": 0.6})
         with (self.root / ".cornerstone" / "config.yaml").open("a", encoding="utf-8") as config:
             config.write("specialists:\n  - id: security\n    run: /security-review\n")
@@ -495,7 +502,8 @@ class AllStepsTest(FrameworkCopy):
             self.assertIsInstance(step, dict)
 
     def test_ac7_steps_have_the_order_of_components_yaml(self) -> None:
-        self.assertEqual(self.optional_steps(), registry_step_names())
+        names = [name for name in self.step_names() if name in STEP_NAMES | {K23_STEP}]
+        self.assertEqual(names, registry_step_names())
 
     def test_ac7_k20_is_the_first_optional_step(self) -> None:
         names = self.step_names()
@@ -526,7 +534,7 @@ class AllStepsTest(FrameworkCopy):
         self.setUp()
         self.configure(["single-ticket"])
         self.render()
-        self.assertEqual(before, self.step_names())
+        self.assertEqual(before + [K23_STEP], self.step_names())
 
     def test_ac7_workflow_has_no_placeholder_left(self) -> None:
         text = self.read(WORKFLOW)
