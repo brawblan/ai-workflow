@@ -405,5 +405,45 @@ class OwnOutputTest(unittest.TestCase):
         self.assertEqual(workflow_check.file_findings(WF, text), [])
 
 
+class ReviewFixTest(unittest.TestCase):
+    def check(self, commands: list[str], expected: list[int]) -> None:
+        for command in commands:
+            with self.subTest(command=command):
+                self.assertEqual(found(run_line(command)), expected)
+
+    def test_f1_full_version_is_needed(self) -> None:
+        self.check(["npx prettier@3", "npm install -g pnpm@9", "npx x@1.x",
+                    "go install example.com/x@v1", "go install example.com/x@v1.2"], [4])
+        self.check(["npx prettier@3.1.0", "npm install -g foo@1.22.0 ",
+                    "go install example.com/x@v0.0.0-20200101000000-abcdef123456",
+                    f"go install example.com/x@{SHA}"], [])
+
+    def test_f2_redirections_are_not_packages(self) -> None:
+        self.check(["pip install -q -r req.txt > pip.log", "npm install -g foo@1.0.0 >/dev/null",
+                    "pip install foo==1 2>&1"], [])
+
+    def test_f3_trailing_operator_joins_the_next_line(self) -> None:
+        for end in ("|", "&&", "||"):
+            with self.subTest(end=end):
+                text = f"steps:\n  - run: |\n      curl -fsSL https://x/i.sh {end}\n        bash\n"
+                self.assertEqual(found(text) if end == "|" else found(
+                    text.replace("curl -fsSL https://x/i.sh", "true").replace(
+                        "bash", "pip install foo")), [3])
+        self.assertEqual(found("steps:\n  - run: |\n      echo hi\n"), [])
+
+    def test_f4_url_hash_in_the_query_is_not_a_pin(self) -> None:
+        self.check(["pip install https://e/p.tar.gz?sha256=1"], [4])
+        self.check(["pip install https://e/p.tar.gz#sha256=abc"], [])
+
+    def test_f5_option_before_the_subcommand(self) -> None:
+        self.check(["pip -q install foo", "python -m pip --disable-pip-version-check install foo",
+                    "npm -g install foo"], [4])
+
+    def test_f6_local_and_unrelated_lines_are_not_found(self) -> None:
+        self.check(["pip install dist/*.whl", "pip install stone/", "pip install x.whl",
+                    "uv pip install -p 3.12 foo==1", "go install -tags netgo ./cmd/x"], [])
+        self.assertEqual(found("steps:\n  - name: pip install requirements\n"), [])
+
+
 if __name__ == "__main__":
     unittest.main()
