@@ -150,6 +150,22 @@ def warn_old_framework(version: Any) -> None:
               file=sys.stderr)
 
 
+def stone_ref(config: dict[str, Any]) -> str:
+    """Return the git ref that G3 installs stone from: the commit, else the tag (D92)."""
+    tag = f"v{config.get('framework_version', '')}"
+    commit = config.get("framework_commit")
+    return f"{commit} # {tag}" if commit else tag
+
+
+def warn_no_commit(config: dict[str, Any], components: list[Component]) -> None:
+    """Warn if a CI job installs stone from a tag, because a moved tag changes the code (D92)."""
+    if config.get("framework_commit") or not any(c.kind == "ci-job" for c in components):
+        return
+    print("warning: framework_commit is not set, so G3 installs stone from the tag "
+          f"v{config['framework_version']}. A moved tag changes the code. Run stone upgrade "
+          "--apply, or set framework_commit to the commit of the tag.", file=sys.stderr)
+
+
 def load_profiles(framework: Path, names: list[str],
                   adapter_roles: set[str]) -> list[dict[str, Any]]:
     """Return the selected profiles. Skip a profile with a role that the adapter has no file for."""
@@ -225,8 +241,9 @@ def all_checks_env(config: dict[str, Any]) -> str:
 def template_values(config: dict[str, Any], model: str,
                     harness_dirs: list[str] | None = None) -> dict[str, str]:
     """Return the repo facts that templates can use. TODO values are left out on purpose."""
-    # The framework tag. The G3 workflow installs stone from it.
-    values = {"model": model, "framework_version": str(config.get("framework_version", ""))}
+    # The framework tag. The G3 workflow installs stone from framework_commit, else from the tag (D92).
+    version = str(config.get("framework_version", ""))
+    values = {"model": model, "framework_version": version, "stone_ref": stone_ref(config)}
     for key, value in (config.get("commands") or {}).items():
         if value is not None and str(value).strip():  # an empty command has no value
             values[f"command_{key}"] = str(value)
@@ -652,6 +669,7 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
         raise RenderError(f"{findings[0].path}: {findings[0].message}")
     warn_old_framework(config["framework_version"])
     components = build_components(framework, config, root, today)
+    warn_no_commit(config, components)
     manifest = load_manifest(root)
     old_entries = {entry["id"]: entry for entry in manifest.get("components", [])}
 

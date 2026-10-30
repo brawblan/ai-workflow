@@ -125,8 +125,8 @@ In the GitHub settings of the repo:
 - Do not edit a generated file. Change `.cornerstone/config.yaml`, and run `stone render` again.
 - If `stone render` exits with code 2, a person changed a generated file. Move the change into the
   config, or restore the file.
-- To use a new framework version, update the clone and change `framework_version` in the config.
-  Then render again.
+- To use a new framework version, update the clone and run `stone upgrade --apply`. It sets
+  `framework_version` and `framework_commit`, and renders again.
 - Each open `TODO(` in `.cornerstone/` is a fact that a role can need. Run
   `grep -rn "TODO(" .cornerstone/` to find them.
 

@@ -511,6 +511,10 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     adoption = config.get("adoption", "all")
     if adoption not in ADOPTION_MODES:
         add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
+    commit = config.get("framework_commit")
+    if commit is not None and not re.fullmatch(r"[0-9a-f]{40}", str(commit)):
+        add("The framework_commit value is not valid. Use the full 40-character commit SHA "
+            "of the framework tag, in lowercase.")
     if not isinstance(config.get("protect_instruction_files", False), bool):
         add("The protect_instruction_files value is not valid. Use true or false.")
     for problem in instruction_text_problems(config):

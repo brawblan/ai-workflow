@@ -63,7 +63,8 @@ repo config.
 <!-- stone:end -->
 ```
 
-- The framework version is pinned in the repo config (`framework_version`).
+- The framework version is pinned in the repo config (`framework_version`), with the commit of its
+  tag (`framework_commit`, D92).
 - Secrets: the CLI never reads or writes a secret value. Templates use placeholders such as
   `[HARNESS_TOKEN]`. The adapter names the real secret.
 
