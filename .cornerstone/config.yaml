@@ -4,6 +4,8 @@ harness: claude-code
 model_profile: claude-5
 spec_tool: plain
 protect_instruction_files: true    # K6 and the hook protect AGENTS.md and CLAUDE.md files (D87)
+instruction_text:                  # K22 allows these in an instruction file (D89)
+  hosts: [brawblan.github.io]
 profiles: [single-ticket]
 branches:
   integration: dev
