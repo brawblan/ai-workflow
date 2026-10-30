@@ -208,9 +208,10 @@ instruction file changes what each later session does.
 - With `true`, a profile with K22 also gets check K22 ([D89](README.md#decisions)). K22 reads each
   tracked instruction file. It fails on a package install from a registry, and on a download piped
   to a shell. It also fails on an API base URL or proxy override, a URL to an unknown host, or a
-  hidden Unicode character. An HTML comment gives a warning.
+  hidden Unicode character. An HTML comment gives a warning, but `<!-- ste-ignore -->` does not.
 - `instruction_text.hosts` lists the hosts that a URL can name. A host also allows its
-  subdomains, so list exact hosts. For example, `github.io` allows each user site on it.
+  subdomains, so list exact hosts. For example, `github.io` allows each user site on it. A
+  loopback host, such as `localhost`, always passes.
 - `instruction_text.packages` lists the registry packages that an instruction file can install.
   A local path, such as `./tool` or `-r requirements.txt`, always passes.
 - A PR can add a `Waiver (K22)` heading with the reason under it. K22 then reports each finding as

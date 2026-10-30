@@ -353,8 +353,8 @@ def instruction_text_problems(config: dict[str, Any]) -> list[str]:
             problems.append(f"instruction_text.{key} is not valid. Use a list of names "
                             "with no spaces.")
     hosts = [item for item in text.get("hosts") or [] if isinstance(item, str)]
-    if any("/" in item or "*" in item for item in hosts):
-        problems.append("instruction_text.hosts has a path or a '*'. Use host names only, for "
+    if any(char in item for item in hosts for char in "/*:@?#\\"):
+        problems.append("instruction_text.hosts has a path, a port, or a '*'. Use host names only, for "
                         "example docs.example.com. A host also allows its subdomains.")
     return problems
 

@@ -379,7 +379,8 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     off |= {entry["id"] for entry in registry if entry.get("needs_instruction_files") and not protect}
     text = config.get("instruction_text") if isinstance(config.get("instruction_text"), dict) else {}
     model_values |= {"instruction_files_json": json.dumps(instruction_files),
-                     "instruction_hosts_json": json.dumps(sorted(text.get("hosts") or [])),
+                     "instruction_hosts_json": json.dumps(sorted(str(host).lower().rstrip(".")
+                                                                for host in text.get("hosts") or [])),
                      "instruction_packages_json": json.dumps(sorted(text.get("packages") or []))}
 
     # A component with `ci_step` adds a step to the G3 workflow, only if it is rendered.
