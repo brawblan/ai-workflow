@@ -15,14 +15,16 @@
 # and K6 protect them for every role, with `.cornerstone/` (D76). The core names no harness folder (P12).
 # instruction_files: the files that the harness loads as rules, in any folder. With
 # `protect_instruction_files: true` in the repo config, the hook and K6 protect them too (D87).
+# Each letter is a class of both cases, because a file system that ignores case loads `agents.md`
+# for `AGENTS.md` (D88).
 
 protected_dirs:
   - .claude/
 
 instruction_files:
-  - "**/AGENTS.md"
-  - "**/CLAUDE.md"
-  - "**/CLAUDE.local.md"
+  - "**/[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]"
+  - "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Mm][Dd]"
+  - "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Ll][Oo][Cc][Aa][Ll].[Mm][Dd]"
 
 components:
   - id: role.shaper
