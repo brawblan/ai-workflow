@@ -3,6 +3,7 @@ framework_version: 1.4.0           # this repo renders from its own framework/ f
 harness: claude-code
 model_profile: claude-5
 spec_tool: plain
+protect_instruction_files: true    # K6 and the hook protect AGENTS.md and CLAUDE.md files (D87)
 profiles: [single-ticket]
 branches:
   integration: dev
