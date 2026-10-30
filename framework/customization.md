@@ -33,6 +33,7 @@ spec_tool: plain                   # plain, or a spec-tool adapter name
 profiles: [single-ticket, bug-triage, debugging]
 adoption: all                      # all (default), or opt-in: only marked PRs (see below)
 delivery: ci                       # ci (default), or local: no workflow files (see below)
+protect_instruction_files: false   # true: K6 and the hook protect the instruction files (see below)
 branches:
   integration: dev
   main: main
@@ -188,6 +189,19 @@ Use it when only some people or some tickets use Cornerstone ([D58](README.md#de
 - The role files of the implementer and the tester tell the role to add the marker to a PR.
 - Anyone can remove the marker, and an unmarked PR gets no check. Turn on branch protection with a
   required human review for the base branch, so that review controls the PRs that G3 skips.
+
+### Protect instruction files (`protect_instruction_files`)
+
+An agent loads its instruction files as rules (P9, [D87](README.md#decisions)). A changed
+instruction file changes what each later session does.
+
+- With `true`, the protected paths also hold the instruction files of the harness, in any folder.
+  The adapter names the files. K6 fails an implementer commit that changes one. The hook blocks
+  the implementer, the planner, and the investigator.
+- A change to an instruction file then goes in a commit of its own, with `Role: human`.
+- The default is `false` in 1.x, so a repo keeps the old K6. A later major release can change the
+  default.
+- Run `stone render` after you change the value.
 
 ### Gate steps by base branch (`ci.branches`)
 

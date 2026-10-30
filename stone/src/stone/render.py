@@ -348,6 +348,8 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     registry_doc = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
     registry = registry_doc["components"]
     harness_dirs = [str(item) for item in registry_doc.get("protected_dirs") or []]
+    if config.get("protect_instruction_files") is True:  # opt-in in 1.x (D87)
+        harness_dirs += [str(item) for item in registry_doc.get("instruction_files") or []]
     model_profile = yaml.safe_load(
         (harness / "models" / f"{config['model_profile']}.yaml").read_text(encoding="utf-8"))
     if model_profile.get("status") != "active":
