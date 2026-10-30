@@ -106,11 +106,16 @@ The words MUST, SHOULD, and MAY have the meanings in RFC 2119.
   private data, untrusted input, and an outbound channel at the same time. A human MUST approve each
   destructive action (delete, force push, production data change, deploy). An instruction file is
   code. An agent MUST trust only an instruction file that the repo tracks and that a human reviewed.
+  The harness, its editor extensions, its plugins, and the framework are dependencies. Each one
+  MUST be pinned to an exact version or commit, in CI and on each developer machine. Only a reviewed
+  change can move a pin.
 - **Reason:** Agents have deleted production data. A malicious instruction file made an agent
-  install a rogue package.
-- **Evidence:** F1–F5, F19.
+  install a rogue package. A malicious build of a harness extension reached developer machines
+  through auto-update and installed a backdoor.
+- **Evidence:** F1–F5, F19, F20.
 - **Enforce:** Gate G5. Role permission lists. Sandboxes. Branch protection. Review of each change
   to an instruction file (G4). With `protect_instruction_files`, K6 and K22. K23, a warning in 1.x.
+  Version pins for the harness and the framework, set in the adapter.
 
 ## P10. Volume is a cost
 
