@@ -802,12 +802,12 @@ class RenderTest(unittest.TestCase):
     def test_workflow_parses_and_keeps_the_step_order(self) -> None:
         self.render()
         names = [s["name"] for s in self.workflow_steps() if "name" in s]
-        self.assertEqual(len(names), 7, names)
+        self.assertEqual(len(names), 6, names)
         self.assertTrue(names[0].startswith("K6"), names)
         self.assertTrue(names[1].startswith("K7"), names)
         self.assertEqual(names[2], "Install stone")
         self.assertTrue(names[3].startswith("K14"), names)
-        self.assertEqual(names[4:], ["Install", "All checks", "K23 new dependencies"])
+        self.assertEqual(names[4:], ["Install", "All checks"])
         self.assertEqual(self.step("Install")["run"], "pip install .")
         self.assertEqual(self.step("All checks")["run"], "make check")
 

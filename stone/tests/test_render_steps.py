@@ -43,9 +43,8 @@ STEPS = {"K4": ("K4 integration tests", "test_integration"),
          "K11": ("K11 property and fuzz tests", "property"),
          "K12": ("K12 differential tests", "differential")}
 K20_STEP = "K20 specialist findings"  # no command key: it renders only with a specialists section (D66)
-K23_STEP = "K23 new dependencies"  # no command key: it renders for each profile with K23 (D90)
+K23_STEP = "K23 new dependencies"  # no command key; it renders from framework 1.5.0 (D90)
 STEP_NAMES = {name for name, _ in STEPS.values()} | {K20_STEP}
-K23_TEXT = re.compile(r"\n      # K23 warns in 1\.x.*\Z", re.DOTALL)
 LIMIT = "limits.mutation_score_changed_code"
 CHECK_WARNING = re.compile(r"\bK(4|5|8|10|11|12)\b|commands\.")
 
@@ -451,10 +450,7 @@ class NoStepOutputTest(FrameworkCopy):
         log = io.StringIO()
         with contextlib.redirect_stderr(log):
             render.render(self.root, FRAMEWORK, today=TODAY)
-        # K23 has no command key: the step is the only output with no commands. Remove it here.
-        text = self.read(WORKFLOW)
-        self.assertRegex(text, K23_TEXT)
-        return K23_TEXT.sub("\n", text, count=1).rstrip("\n") + "\n"
+        return self.read(WORKFLOW)
 
     def test_ac6_single_ticket_workflow_is_byte_identical_to_the_old_one(self) -> None:
         new = self.new_workflow(["single-ticket"])
@@ -474,9 +470,52 @@ class NoStepOutputTest(FrameworkCopy):
 
     def test_ac6_all_checks_is_the_last_step(self) -> None:
         self.new_workflow(["single-ticket"])
-        names = [name for name in self.step_names() if name != K23_STEP]
-        self.assertEqual(names[-1], "All checks")
-        self.assertEqual(self.step_names()[-1], K23_STEP)
+        self.assertEqual(self.step_names()[-1], "All checks")
+
+
+# K23 renders only from framework 1.5.0, the first tag with `stone check-dependencies` (D90).
+
+class K23GateTest(FrameworkCopy):
+    STEP = "K23 new dependencies"
+
+    def names_with(self, version: str, profiles: list[str] | None = None,
+                   commands: dict[str, Any] | None = None) -> list[str]:
+        self.configure(profiles or ["single-ticket"], commands)
+        path = self.root / ".cornerstone" / "config.yaml"
+        path.write_text(path.read_text(encoding="utf-8").replace(
+            'framework_version: 0.8.0', f'framework_version: "{version}"').replace(
+            'framework_version: "0.8.0"', f'framework_version: "{version}"'), encoding="utf-8")
+        self.assertIn(f'"{version}"', path.read_text(encoding="utf-8"))
+        self.render()
+        return self.step_names()
+
+    def test_k23_step_renders_from_1_5_0(self) -> None:
+        for version in ("1.5.0", "1.10.0", "2.0.0"):
+            with self.subTest(version=version):
+                self.assertEqual(self.names_with(version)[-1], self.STEP)
+                step = self.step(self.STEP)
+                self.assertIn("check-dependencies", step["run"])
+                self.assertIn("--mode warn", step["run"])
+
+    def test_k23_step_does_not_render_below_1_5_0_or_for_a_bad_version(self) -> None:
+        for version in ("1.4.0", "1.4.99", "0.8.0", "banana", "1.x"):
+            with self.subTest(version=version):
+                self.assertNotIn(self.STEP, self.names_with(version))
+
+    def test_k23_step_follows_all_checks_with_every_check_profile(self) -> None:
+        self.add_profile("with-k23", ["K4", "K5", "K6", "K14", "K23"])
+        names = self.names_with("1.5.0", ["with-k23"], CHECK_COMMANDS)
+        self.assertLess(names.index("All checks"), names.index(self.STEP))
+        self.assertLess(names.index(self.STEP), names.index("K4 integration tests"))
+
+    def test_framework_at_least(self) -> None:
+        since = render.K23_SINCE
+        self.assertEqual(since, (1, 5, 0))
+        for version, expected in (("1.5.0", True), ("1.10.0", True), ("2.0.0", True),
+                                  ("1.4.0", False), ("0.8.0", False), ("banana", False),
+                                  ("", False), (None, False), ("1.5", False)):
+            with self.subTest(version=version):
+                self.assertIs(render.framework_at_least(version, since), expected)
 
 
 # AC7: valid YAML, the order of components.yaml, and warn mode.
@@ -487,6 +526,9 @@ class AllStepsTest(FrameworkCopy):
         self.add_profile("every-check",
                          ["K4", "K5", "K6", "K8", "K10", "K11", "K12", "K14", "K20", "K23"])
         self.configure(["every-check"], CHECK_COMMANDS, {"mutation_score_changed_code": 0.6})
+        config = self.root / ".cornerstone" / "config.yaml"  # K23 needs framework 1.5.0 (D90)
+        config.write_text(config.read_text(encoding="utf-8").replace("0.8.0", "1.5.0"),
+                          encoding="utf-8")
         with (self.root / ".cornerstone" / "config.yaml").open("a", encoding="utf-8") as config:
             config.write("specialists:\n  - id: security\n    run: /security-review\n")
         self.result, self.log = self.render()
@@ -534,7 +576,7 @@ class AllStepsTest(FrameworkCopy):
         self.setUp()
         self.configure(["single-ticket"])
         self.render()
-        self.assertEqual(before + [K23_STEP], self.step_names())
+        self.assertEqual(before, self.step_names())
 
     def test_ac7_workflow_has_no_placeholder_left(self) -> None:
         text = self.read(WORKFLOW)

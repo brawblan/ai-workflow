@@ -95,8 +95,8 @@ class RefactorMigrationGoldenTest(GoldenMixin, unittest.TestCase):
     def test_workflow_has_the_k8_k12_and_k10_steps_in_order(self) -> None:
         names = [step.get("name") for step in self.steps()]
         self.assertEqual(names[names.index("All checks") + 1:],
-                         ["K23 new dependencies", "K8 architecture fitness",
-                          "K12 differential tests", "K10 mutation score"])
+                         ["K8 architecture fitness", "K12 differential tests",
+                          "K10 mutation score"])
 
     def test_k10_step_gets_the_limit(self) -> None:
         step = next(s for s in self.steps() if s.get("name") == "K10 mutation score")

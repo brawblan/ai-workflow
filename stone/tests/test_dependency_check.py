@@ -50,7 +50,7 @@ class RepoCase(unittest.TestCase):
         self.git("checkout", "-q", "-b", "feature")
         self.write(head)
         self.git("add", "-A")
-        self.git("commit", "-q", "-m", "head")
+        self.git("commit", "-q", "--allow-empty", "-m", "head")
 
     def new(self, base: dict[str, str], head: dict[str, str]) -> dict[str, set[str]]:
         self.make(base, head)
@@ -176,6 +176,43 @@ class EdgeTest(RepoCase):
         self.assertEqual(self.new({}, {"notes.txt": "evil\n", "deps.json": pkg(dependencies={"a": "1"})}), {})
 
 
+class ReviewFixTest(RepoCase):
+    def test_r7_renamed_manifest_reports_only_the_new_package(self) -> None:
+        old = "".join(f"package-number-{n}==1.0\n" for n in range(10))
+        self.make({"requirements.txt": old}, {})
+        self.git("mv", "requirements.txt", "requirements-prod.txt")
+        self.write({"requirements-prod.txt": old + "newpkg\n"})
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "rename")
+        self.assertEqual(dependency_check.new_packages(self.root, "main"),
+                         {"requirements-prod.txt": {"newpkg"}})
+
+    def test_r7_rename_with_no_new_package_gives_no_finding(self) -> None:
+        self.make({"requirements.txt": "a\nb\n"}, {})
+        self.git("mv", "requirements.txt", "requirements-prod.txt")
+        self.git("commit", "-q", "-m", "rename")
+        self.assertEqual(dependency_check.new_packages(self.root, "main"), {})
+
+    def test_r7_manifest_in_a_non_ascii_folder_is_found(self) -> None:
+        found = self.new({}, {"d\u00e9p/requirements.txt": "evil\n"})
+        self.assertEqual(found, {"d\u00e9p/requirements.txt": {"evil"}})
+
+    def test_r7_utf16_requirements_file_does_not_crash(self) -> None:
+        self.make({"requirements.txt": "a\n"}, {})
+        (self.root / "requirements.txt").write_bytes("a\nb\n".encode("utf-16"))
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "utf16")
+        dependency_check.check(self.root, "main", body())  # no exception
+
+    def test_r7_body_with_versions_covers_the_packages(self) -> None:
+        text = body("## Dependencies\n\n- left-pad@1.3.0: pads, from npm.\n"
+                    "- @types/node@20: types, from npm.\n")
+        found = self.findings({"package.json": pkg(dependencies={})},
+                              {"package.json": pkg(dependencies={"left-pad": "1",
+                                                                 "@types/node": "20"})}, text)
+        self.assertEqual(found, [])
+
+
 class BodyTest(RepoCase):
     BASE = {"package.json": pkg(dependencies={})}
     HEAD = {"package.json": pkg(dependencies={"left-pad": "1", "@evil/x": "1"})}
@@ -278,6 +315,13 @@ class CliTest(RepoCase):
         code, out = self.run_cli(["check-dependencies", "body.md", "--base", "main"], "")
         self.assertEqual(code, 0)
         self.assertIn("0 finding", out)
+
+    def test_r7_utf16_manifest_exits_0_in_warn_mode(self) -> None:
+        (self.root / "requirements.txt").write_bytes("a\nb\n".encode("utf-16"))
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "utf16")
+        code, _ = self.run_cli(["check-dependencies", "-", "--base", "main"], body())
+        self.assertEqual(code, 0)
 
     def test_r6_bad_base_ref_exits_2(self) -> None:
         code, out = self.run_cli(["check-dependencies", "-", "--base", "no-such-ref"], body())
