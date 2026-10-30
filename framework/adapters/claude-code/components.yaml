@@ -13,9 +13,16 @@
 # eval: the planned eval folder (lifecycle.md).
 # protected_dirs: the folders of the harness that hold its settings, role files, and hook entry. The hook
 # and K6 protect them for every role, with `.cornerstone/` (D76). The core names no harness folder (P12).
+# instruction_files: the files that the harness loads as rules, in any folder. With
+# `protect_instruction_files: true` in the repo config, the hook and K6 protect them too (D87).
 
 protected_dirs:
   - .claude/
+
+instruction_files:
+  - "**/AGENTS.md"
+  - "**/CLAUDE.md"
+  - "**/CLAUDE.local.md"
 
 components:
   - id: role.shaper

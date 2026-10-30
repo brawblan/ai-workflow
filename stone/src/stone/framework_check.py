@@ -490,6 +490,8 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     adoption = config.get("adoption", "all")
     if adoption not in ADOPTION_MODES:
         add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
+    if not isinstance(config.get("protect_instruction_files", False), bool):
+        add("The protect_instruction_files value is not valid. Use true or false.")
     for problem in ci_branch_problems(config):
         add(problem)
     for problem in (ticket_folder_problems(config) + protected_path_problems(config)
