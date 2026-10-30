@@ -14,7 +14,8 @@ versions:
       - {path: .cornerstone/checks/protected_paths.py, change: changed, note: "The K6 message names an instruction file change. With protect_instruction_files true, the protected paths hold the instruction files (D87)."}
       - {path: .cornerstone/hooks/protect-paths.py, change: changed, note: "Only with protect_instruction_files true: the protected paths hold the instruction files (D87)."}
     steps:
-      - "Optional: set protect_instruction_files to true in .cornerstone/config.yaml, then run stone render. Commit the generated files alone, with the trailers Role generator and Actor agent."
+      - "Optional: set protect_instruction_files to true in .cornerstone/config.yaml. Commit the config change alone, with the trailer Role human."
+      - "Then run stone render. Commit the generated files alone, with the trailers Role generator and Actor agent."
   - version: 1.4.0
     kind: minor
     released: 2026-10-28
