@@ -104,10 +104,13 @@ The words MUST, SHOULD, and MAY have the meanings in RFC 2119.
 
 - **Rule:** Each role MUST have the minimum tools and permissions for its job. No role may have
   private data, untrusted input, and an outbound channel at the same time. A human MUST approve each
-  destructive action (delete, force push, production data change, deploy).
-- **Reason:** Agents have deleted production data.
-- **Evidence:** F1–F5.
-- **Enforce:** Gate G5. Role permission lists. Sandboxes. Branch protection.
+  destructive action (delete, force push, production data change, deploy). An instruction file is
+  code. An agent MUST trust only an instruction file that the repo tracks and that a human reviewed.
+- **Reason:** Agents have deleted production data. A malicious instruction file made an agent
+  install a rogue package.
+- **Evidence:** F1–F5, F19.
+- **Enforce:** Gate G5. Role permission lists. Sandboxes. Branch protection. Review of each change
+  to an instruction file (G4).
 
 ## P10. Volume is a cost
 
