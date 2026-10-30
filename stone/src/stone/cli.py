@@ -7,7 +7,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from stone import (__version__, evals, evidence_check, framework_check, gate, ready_check, render,
+from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, ready_check, render,
                    repo_rules, specialists, specs, upgrade, writing_check)
 from stone.findings import report
 
@@ -113,6 +113,14 @@ def _parser() -> argparse.ArgumentParser:
                           help="warn: report only (the first 2 weeks). block: fail on findings.")
     evidence.add_argument("--format", choices=["text", "github"], default="text")
 
+    deps = commands.add_parser("check-dependencies",
+                               help="K23: report a new package that the PR body does not name.")
+    deps.add_argument("body", help="The PR body file. Use '-' to read standard input.")
+    deps.add_argument("--base", required=True, help="The base ref, for example origin/dev.")
+    deps.add_argument("--mode", choices=["warn", "block"], default="warn",
+                      help="warn: report only (1.x). block: fail on findings.")
+    deps.add_argument("--format", choices=["text", "github"], default="text")
+
     ready = commands.add_parser("check-ready",
                                 help="K21: report a Definition of Ready field that is missing or "
                                      "empty.")
@@ -167,6 +175,8 @@ def main(argv: list[str] | None = None) -> int:
         return _spec(args.root, args.spec_command, getattr(args, "plan", ""))
     if args.command == "check-evidence":
         return _check_evidence(args.body, args.section, args.mode, args.format)
+    if args.command == "check-dependencies":
+        return _check_dependencies(args.body, args.base, args.mode, args.format)
     if args.command == "check-ready":
         return _check_ready(args.ticket, args.profile, args.mode, args.format)
     if args.command == "check-rules":
@@ -283,6 +293,26 @@ def _check_evidence(body: str, sections: list[str] | None, mode: str, fmt: str) 
     findings = evidence_check.check_text(text, "<stdin>" if body == "-" else body, sections)
     blocking = report(findings, fmt, warn_only=mode == "warn")
     print(f"K14: {len(findings)} finding(s), mode {mode}.")
+    return 1 if blocking else 0
+
+
+def _check_dependencies(body: str, base: str, mode: str, fmt: str) -> int:
+    if body == "-":
+        text = sys.stdin.read()
+    else:
+        try:
+            text = Path(body).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            reason = error.reason if isinstance(error, UnicodeDecodeError) else error.strerror
+            print(f"check-dependencies: cannot read {body}: {reason}")
+            return 2
+    try:
+        findings = dependency_check.check(Path("."), base, text)
+    except RuntimeError as error:
+        print(f"check-dependencies: {error}")
+        return 2
+    blocking = report(findings, fmt, warn_only=mode == "warn")
+    print(f"K23: {len(findings)} finding(s), mode {mode}.")
     return 1 if blocking else 0
 
 
