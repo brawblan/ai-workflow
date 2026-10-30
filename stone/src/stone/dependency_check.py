@@ -64,24 +64,34 @@ def is_manifest(path: str) -> bool:
 
 
 def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True)
+    return subprocess.run(["git", "-C", str(root), *args], capture_output=True, text=True,
+                          encoding="utf-8", errors="replace")
 
 
-def changed_manifests(root: Path, base: str) -> list[str]:
-    run = _git(root, "diff", "--name-only", "--diff-filter=AM", f"{base}...HEAD")
+def changed_manifests(root: Path, base: str) -> list[tuple[str, str]]:
+    """Return (old path, new path) for each added, changed, or renamed manifest."""
+    run = _git(root, "diff", "-z", "--name-status", "--diff-filter=AMR", f"{base}...HEAD")
     if run.returncode != 0:
         raise RuntimeError(run.stderr.strip() or f"git diff {base}...HEAD failed")
-    return [path for path in run.stdout.splitlines() if is_manifest(path)]
+    fields, pairs = run.stdout.split("\0"), []
+    while len(fields) > 1:
+        status = fields.pop(0)
+        old = fields.pop(0)
+        new = fields.pop(0) if status.startswith("R") else old
+        if is_manifest(new):
+            pairs.append((old, new))
+    return pairs
 
 
 def new_packages(root: Path, base: str) -> dict[str, set[str]]:
     """Return {manifest path: new package names} for each changed manifest."""
     found = {}
-    for path in changed_manifests(root, base):
-        old = _git(root, "show", f"{base}:{path}")
-        before = package_names(path, old.stdout) if old.returncode == 0 else set()
+    for old_path, path in changed_manifests(root, base):
+        old = _git(root, "show", f"{base}:{old_path}")
+        before = package_names(old_path, old.stdout) if old.returncode == 0 else set()
         file = root / path
-        after = package_names(path, file.read_text(encoding="utf-8")) if file.is_file() else set()
+        text = file.read_text(encoding="utf-8", errors="replace") if file.is_file() else ""
+        after = package_names(path, text)
         if after - before:
             found[path] = after - before
     return found
@@ -99,7 +109,8 @@ def dependencies_section(body: str) -> str:
 def check(root: Path, base: str, body: str) -> list[Finding]:
     """Return a K23 finding for each new package that the Dependencies section does not name."""
     section = dependencies_section(body)
-    words = {_normalize(word.strip("./-")) for word in re.findall(r"[@\w./-]+", section)}
+    words = {_normalize(re.sub(r"(?<=.)@[^@/]*$", "", word.strip("./-")))  # left-pad@1.3.0
+             for word in re.findall(r"[@\w./-]+", section)}
     findings = []
     for manifest, names in sorted(new_packages(root, base).items()):
         for name in sorted(names):
