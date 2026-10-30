@@ -1,9 +1,4 @@
-"""K23: report a new package in a manifest that the PR body does not name (framework/checks.md).
-
-The check compares each manifest at the base ref with the work tree. A package is new if the
-base has no package with that name. The PR body needs a `Dependencies` section that names each
-new package with its reason and source (D90).
-"""
+"""K23: report a new package in a manifest that the PR body does not name (D90)."""
 
 from __future__ import annotations
 
@@ -101,7 +96,7 @@ def dependencies_section(body: str) -> str:
     return "\n".join(texts)
 
 
-def check(root: Path, base: str, body: str, path: str = "<body>") -> list[Finding]:
+def check(root: Path, base: str, body: str) -> list[Finding]:
     """Return a K23 finding for each new package that the Dependencies section does not name."""
     section = dependencies_section(body)
     words = {_normalize(word.strip("./-")) for word in re.findall(r"[@\w./-]+", section)}
