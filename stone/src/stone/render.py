@@ -64,6 +64,7 @@ Personas: <IDs>, or none
 Add `Reproduction:` for a bug and `Time box:` for a spike or an audit, if the profile needs them."""
 CORE_PROTECTED = [".cornerstone/"]  # the hook and the check; the adapter adds its own folders (P12, D76)
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
+K23_SINCE = (1, 5, 0)  # the first framework tag with `stone check-dependencies` (D90)
 DEFAULT_PR_LINES = overrides.DEFAULT_PR_LINES  # D4, customization.md
 BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
@@ -127,6 +128,14 @@ def load_config(root: Path, framework: Path) -> dict[str, Any]:
     if findings:
         raise RenderError(f"{findings[0].path}: {findings[0].message}")
     return config
+
+
+def framework_at_least(version: Any, since: tuple[int, ...]) -> bool:
+    """True if the framework tag is `since` or later. A tag that does not parse is not."""
+    try:
+        return tuple(int(part) for part in str(version).split(".")) >= since
+    except ValueError:
+        return False
 
 
 def warn_old_framework(version: Any) -> None:
@@ -473,6 +482,8 @@ def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict
         need = profiles_that_need(step, profiles)
         if not need or (step.get("needs") == "specialists" and not specialists.listed(config)):
             continue
+        if step["id"] == "k23" and not framework_at_least(config.get("framework_version"), K23_SINCE):
+            continue  # the installed stone has no check-dependencies (D90)
         step_values = dict(values, step_name=step.get("name", step["id"]))
         command = step.get("command")
         if command:

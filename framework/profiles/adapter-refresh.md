@@ -14,7 +14,7 @@ gates:
   G3: required
   G4: human
   G5: if-needed
-checks: [K1, K6, K7, K13, K14, K17, K20, K22]
+checks: [K1, K6, K7, K13, K14, K17, K20, K22, K23]
 limits:
   pr_changed_lines: 600
 outputs: [pr]

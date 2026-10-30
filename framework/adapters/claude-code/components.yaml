@@ -156,12 +156,16 @@ components:
     template: workflows/cornerstone-checks.yml
     target: .github/workflows/cornerstone-checks.yml
     eval: evals/ci-job-checks/
-    steps:                                   # the "by profile" checks that run a repo command
+    steps:                                   # the "by profile" checks; most run a repo command
       - id: k20
         name: K20 specialist findings
         when: {check: K20}
         needs: specialists
         template: workflows/steps/k20-specialists.yml
+      - id: k23
+        name: K23 new dependencies
+        when: {check: K23}
+        template: workflows/steps/k23-dependencies.yml
       - id: k4
         name: K4 integration tests
         when: {check: K4}

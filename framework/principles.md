@@ -110,7 +110,7 @@ The words MUST, SHOULD, and MAY have the meanings in RFC 2119.
   install a rogue package.
 - **Evidence:** F1–F5, F19.
 - **Enforce:** Gate G5. Role permission lists. Sandboxes. Branch protection. Review of each change
-  to an instruction file (G4).
+  to an instruction file (G4). With `protect_instruction_files`, K6 and K22. K23, a warning in 1.x.
 
 ## P10. Volume is a cost
 

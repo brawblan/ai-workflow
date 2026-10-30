@@ -14,7 +14,7 @@ gates:
   G3: required                      # required | skip (skip only if no code can merge)
   G4: human                         # human | skip
   G5: if-needed                     # always | if-needed (never skip, see gates.md rule 2)
-checks: [K1, K2, K3, K6, K7, K9, K13, K14, K17, K20, K22]
+checks: [K1, K2, K3, K6, K7, K9, K13, K14, K17, K20, K22, K23]
 limits:
   pr_changed_lines: 600
 outputs: [pr]                       # pr | report | labels | plan

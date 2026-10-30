@@ -4,7 +4,7 @@ versions:
   - version: 1.5.0
     kind: minor
     released: null
-    summary: New optional key protect_instruction_files. With true, K6 and the hook protect the instruction files of the harness in any folder (D87), and check K22 tests their text (D89).
+    summary: New optional key protect_instruction_files. With true, K6 and the hook protect the instruction files of the harness in any folder (D87), and check K22 tests their text (D89). New command stone check-dependencies (K23) warns on a new package that the PR body does not name (D90).
     config:
       added:
         - {key: protect_instruction_files, default: false, note: "true adds the instruction files of the harness to the protected paths of K6 and the hook (D87)."}
@@ -15,6 +15,7 @@ versions:
       - {path: .cornerstone/checks/protected_paths.py, change: changed, note: "The K6 message names an instruction file change. With protect_instruction_files true, the protected paths hold the instruction files (D87)."}
       - {path: .cornerstone/checks/instruction_text.py, change: added, note: "K22. Only with protect_instruction_files true and a profile with K22 (D89)."}
       - {path: .github/workflows/cornerstone-checks.yml, change: changed, note: "A K22 step, only with protect_instruction_files true (D89)."}
+      - {path: .github/workflows/cornerstone-checks.yml, change: changed, note: "A K23 step, as a warning, for each profile with K23 (D90)."}
       - {path: .cornerstone/hooks/protect-paths.py, change: changed, note: "Only with protect_instruction_files true: the protected paths hold the instruction files, in any case (D87, D88)."}
     steps:
       - "Optional: set protect_instruction_files to true in .cornerstone/config.yaml. Commit the config change alone, with the trailer Role human."
