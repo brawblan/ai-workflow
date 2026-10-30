@@ -54,7 +54,8 @@ the trailers for human commits.
 The protected paths are `paths.tests` and `paths.checks` from the repo config, plus `.claude/` and
 `.cornerstone/`. These two folders hold the hook, the check, and the harness settings. With
 `protect_instruction_files: true` (D87), the protected paths also hold `**/AGENTS.md`,
-`**/CLAUDE.md`, and `**/CLAUDE.local.md`. `instruction_files` in `components.yaml` lists them. A value can
+`**/CLAUDE.md`, and `**/CLAUDE.local.md`, in any case (D88). `instruction_files` in `components.yaml`
+lists them, with a class of both cases for each letter. A value can
 be a glob. The hook and K6 import one match module, `.cornerstone/lib/path_match.py`, from the
 template `claude-code/templates/lib/path_match.py` (D62). If the module is missing or broken, the
 hook blocks each edit. `stone specialists` uses the same module for `when.paths` (D65).

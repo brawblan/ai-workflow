@@ -22,7 +22,7 @@ except Exception:
     print("K6: .cornerstone/lib/path_match.py is missing or broken. Run stone render.")
     sys.exit(1)
 
-PROTECTED = [".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "stone/tests/"]
+PROTECTED = ["**/[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]", "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Ll][Oo][Cc][Aa][Ll].[Mm][Dd]", "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Mm][Dd]", ".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "stone/tests/"]
 TRAILERS = "commit"  # "commit": the Role trailer. "notes": also the git note (#121).
 NOTES_REF = "refs/notes/cornerstone"
 ADOPTION = "all"  # "opt-in": a human commit with no Role is not an implementer commit
