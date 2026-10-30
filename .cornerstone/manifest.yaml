@@ -15,7 +15,7 @@ components:
   review_by: '2027-04-30'
   files:
   - .cornerstone/checks/instruction_text.py
-  hash: 905550f55a7cbccd1537e54b06bde3c36d8e05ad85c9f773ede47b06149b1a4d
+  hash: 609916d307097f1869c2b102943ebc0a1622ee60f844c65fed31abf9cd0559c1
 - id: check.k6
   kind: check
   purpose: K6. Fail if an implementer commit changes a protected path.
