@@ -65,3 +65,12 @@ jobs:
 
       - name: All checks
         run: python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/dev
+
+      # K23 warns in 1.x (D90). A new package in a manifest needs a "Dependencies" section that names it.
+      - name: K23 new dependencies
+        env:
+          BASE_REF: ${{ github.base_ref }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "${PR_BODY}" | "${RUNNER_TEMP}/stone/bin/stone" check-dependencies - \
+            --base "origin/${BASE_REF}" --mode warn --format github
