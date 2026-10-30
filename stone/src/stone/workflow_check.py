@@ -24,24 +24,37 @@ RUN_DOWNLOAD = re.compile(
     rf"|[$<]\(\s*{FETCH}\b", re.IGNORECASE)
 # Each form installs or runs a tool. The group "tool" names the rule that tests its arguments.
 COMMAND = re.compile(
-    r"(?:^|[\s;&|(\"'/])(?P<tool>(?:python\d*(?:\.\d+)?\s+-m\s+)?pip(?:3(?:\.\d+)?)?[\"']?\s+install"
+    r"(?:^|[\s;&|(\"'/])(?P<tool>(?:python\d*(?:\.\d+)?\s+-m\s+)?pip(?:3(?:\.\d+)?)?[\"']?(?:\s+-\S+)*\s+install"
     r"|uv\s+pip\s+install|pipx\s+install|npx|pnpm\s+dlx|yarn\s+dlx|bunx"
-    r"|npm\s+(?:install|i|add)|pnpm\s+(?:add|install|i)|yarn\s+global\s+add|go\s+install)"
+    r"|npm(?:\s+-\S+)*\s+(?:install|i|add)|pnpm\s+(?:add|install|i)|yarn\s+global\s+add|go\s+install)"
     r"(?=\s|$)(?P<args>[^\n;&|]*)")
 PIP_VALUE_OPTIONS = {"-r", "--requirement", "-c", "--constraint", "-i", "--index-url",
                      "--extra-index-url", "-f", "--find-links", "-t", "--target", "--prefix",
                      "--root", "--only-binary", "--no-binary", "--platform", "--python-version",
                      "--implementation", "--abi", "--cache-dir", "--src", "--trusted-host",
-                     "--upgrade-strategy", "-C", "--config-settings", "--python"}
+                     "--upgrade-strategy", "-C", "--config-settings", "--python", "-p"}
+GO_VALUE_OPTIONS = {"-tags", "-ldflags", "-gcflags", "-o", "-mod", "-modfile", "-p", "-pkgdir"}
+REDIRECT = re.compile(r"^\d*(?:>>?|<|&>)")
+NODE_VERSION = re.compile(r"^\d+\.\d+\.\d+")
+GO_VERSION = re.compile(r"^v\d+\.\d+\.\d+")
+ARCHIVE = (".whl", ".tar.gz", ".zip")
 LOCAL = (".", "/", "~")
 
 
 def _words(args: str) -> list[str]:
     args = re.split(r"(?:^|\s)#", args, maxsplit=1)[0]  # a shell comment; a '#' in a URL stays
     try:
-        return shlex.split(args)
+        words = shlex.split(args)
     except ValueError:
-        return args.split()
+        words = args.split()
+    kept, skip = [], False
+    for word in words:
+        redirect = REDIRECT.match(word)
+        if skip or redirect:
+            skip = bool(redirect) and word == redirect.group(0)  # '> file' has the target apart
+            continue
+        kept.append(word)
+    return kept
 
 
 def _resolve(text: str, env: dict[str, str]) -> str:
@@ -53,7 +66,7 @@ def _pinned_url(token: str) -> bool:
     """A URL is pinned by a commit SHA after '@' or by a sha256 hash after '#'."""
     url = token.split(" @ ", 1)[-1]
     ref = url.split("#", 1)[0].rsplit("@", 1)
-    return ("://" in ref[0] and len(ref) == 2 and bool(SHA.match(ref[1]))) or "sha256=" in url
+    return ("://" in ref[0] and len(ref) == 2 and bool(SHA.match(ref[1]))) or "sha256=" in url.partition("#")[2]
 
 
 def _pip(words: list[str], env: dict[str, str]) -> list[str]:
@@ -70,7 +83,8 @@ def _pip(words: list[str], env: dict[str, str]) -> list[str]:
         word = _resolve(word, env)
         if word.startswith("-") and word not in ("-e", "--editable"):
             continue
-        if word in ("-e", "--editable") or word.startswith(LOCAL) or "$" in word:
+        if (word in ("-e", "--editable") or word.startswith(LOCAL) or "$" in word
+                or ("/" in word and "://" not in word and "@" not in word) or word.endswith(ARCHIVE)):
             continue  # a local path, or a value that the check cannot read
         if "://" in word:
             if not _pinned_url(word):
@@ -82,12 +96,12 @@ def _pip(words: list[str], env: dict[str, str]) -> list[str]:
 
 def _node_version(word: str) -> bool:
     name, at, version = word[1:].rpartition("@") if word.startswith("@") else word.rpartition("@")
-    return bool(at and name and version[:1].isdigit())
+    return bool(at and name and NODE_VERSION.match(version))
 
 
 def _node(tool: str, words: list[str]) -> list[str]:
     runner = tool in ("npx", "pnpm dlx", "yarn dlx", "bunx")
-    if not runner and not ({"-g", "--global"} & set(words) or tool == "yarn global add"):
+    if not runner and not ({"-g", "--global"} & set(words + tool.split()) or tool == "yarn global add"):
         return []  # a project install takes the versions from the lockfile
     packages, take = [], False
     for word in words:
@@ -106,17 +120,22 @@ def _node(tool: str, words: list[str]) -> list[str]:
 
 
 def _go(words: list[str]) -> list[str]:
-    unpinned = []
-    for word in (word for word in words if not word.startswith(("-",) + LOCAL)):
+    unpinned, skip = [], False
+    for word in words:
+        if skip or word in GO_VALUE_OPTIONS:
+            skip = not skip and word in GO_VALUE_OPTIONS
+            continue
+        if word.startswith(("-",) + LOCAL):
+            continue
         _, at, version = word.rpartition("@")
-        if not at or not (re.match(r"v\d", version) or SHA.match(version)):
+        if not at or not (GO_VERSION.match(version) or SHA.match(version)):
             unpinned.append(word)
     return unpinned
 
 
 def line_findings(line: str, env: dict[str, str]) -> list[str]:
     """Return a message for each unpinned tool in one logical line of a workflow."""
-    if line.lstrip().startswith("#"):
+    if line.lstrip().startswith("#") or re.match(r"^\s*(?:-\s+)?name:", line):
         return []
     messages = []
     uses = USES.match(line)
@@ -151,12 +170,15 @@ def line_findings(line: str, env: dict[str, str]) -> list[str]:
 
 
 def logical_lines(text: str) -> list[tuple[int, str]]:
-    """Return (first line number, text) for each line, with '\\' continuations joined."""
+    """Return (first line number, text) for each line. A '\\', '|', or '&&' at the end joins the next."""
     lines, start, parts = [], 0, []
     for number, line in enumerate(text.splitlines(), start=1):
         start = start or number
         if line.rstrip().endswith("\\"):
             parts.append(line.rstrip()[:-1])
+            continue
+        if line.rstrip().endswith(("|", "&&", "||")) and not re.search(r":\s*[|>][-+]?\s*$", line):
+            parts.append(line.rstrip())  # the shell reads the next line as part of it
             continue
         lines.append((start, " ".join(parts + [line])))
         start, parts = 0, []
