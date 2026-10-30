@@ -34,6 +34,9 @@ profiles: [single-ticket, bug-triage, debugging]
 adoption: all                      # all (default), or opt-in: only marked PRs (see below)
 delivery: ci                       # ci (default), or local: no workflow files (see below)
 protect_instruction_files: false   # true: K6 and the hook protect the instruction files (see below)
+instruction_text:                  # optional. K22 allows these (see below)
+  hosts: [docs.example.com]        # a host also allows its subdomains
+  packages: [prettier]             # registry packages that an instruction file can install
 branches:
   integration: dev
   main: main
@@ -202,6 +205,16 @@ instruction file changes what each later session does.
 - The default is `false` in 1.x, so a repo keeps the old K6. A later major release can change the
   default.
 - Run `stone render` after you change the value.
+- With `true`, a profile with K22 also gets check K22 ([D89](README.md#decisions)). K22 reads each
+  tracked instruction file. It fails on a package install from a registry, and on a download piped
+  to a shell. It also fails on an API base URL or proxy override, a URL to an unknown host, or a
+  hidden Unicode character. An HTML comment gives a warning.
+- `instruction_text.hosts` lists the hosts that a URL can name. A host also allows its
+  subdomains, so list exact hosts. For example, `github.io` allows each user site on it.
+- `instruction_text.packages` lists the registry packages that an instruction file can install.
+  A local path, such as `./tool` or `-r requirements.txt`, always passes.
+- A PR can add a `Waiver (K22)` heading with the reason under it. K22 then reports each finding as
+  a notice. A human reviews the findings at G4.
 
 ### Gate steps by base branch (`ci.branches`)
 

@@ -338,6 +338,27 @@ def ticket_folder_problems(config: dict[str, Any]) -> list[str]:
     return problems
 
 
+def instruction_text_problems(config: dict[str, Any]) -> list[str]:
+    """Return the problems of the `instruction_text` map of K22 (D89)."""
+    text = config.get("instruction_text")
+    if text is None:
+        return []
+    if not isinstance(text, dict) or set(text) - {"hosts", "packages"}:
+        return ["The instruction_text value is not valid. Use a map with hosts and packages."]
+    problems = []
+    for key in ("hosts", "packages"):
+        items = text.get(key, [])
+        if not isinstance(items, list) or not all(isinstance(item, str) and item.strip()
+                                                  and " " not in item for item in items):
+            problems.append(f"instruction_text.{key} is not valid. Use a list of names "
+                            "with no spaces.")
+    hosts = [item for item in text.get("hosts") or [] if isinstance(item, str)]
+    if any("/" in item or "*" in item for item in hosts):
+        problems.append("instruction_text.hosts has a path or a '*'. Use host names only, for "
+                        "example docs.example.com. A host also allows its subdomains.")
+    return problems
+
+
 def protected_path_problems(config: dict[str, Any]) -> list[str]:
     """Return a problem for each plans or reports folder that overlaps a protected path.
 
@@ -492,6 +513,8 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
         add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
     if not isinstance(config.get("protect_instruction_files", False), bool):
         add("The protect_instruction_files value is not valid. Use true or false.")
+    for problem in instruction_text_problems(config):
+        add(problem)
     for problem in ci_branch_problems(config):
         add(problem)
     for problem in (ticket_folder_problems(config) + protected_path_problems(config)
