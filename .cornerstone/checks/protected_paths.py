@@ -93,8 +93,9 @@ def main(base: str, body: str = "", pr_author: str = "") -> int:
         for path in protected:
             failures += 1
             print(f"K6: commit {sha[:12]} (Role: {role}) changes {path}, a protected path. "
-                  "Revert the change. A test change belongs in a 'Role: tester' commit. A check "
-                  "or CI change belongs in a human commit with its own 'Role:' trailer.")
+                  "Revert the change. A test change belongs in a 'Role: tester' commit. A check, "
+                  "CI, or instruction file change belongs in a human commit with its own "
+                  "'Role:' trailer.")
     print(f"K6: {failures} finding(s).")
     return 1 if failures else 0
 
