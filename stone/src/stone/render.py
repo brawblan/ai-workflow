@@ -348,8 +348,10 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     registry_doc = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
     registry = registry_doc["components"]
     harness_dirs = [str(item) for item in registry_doc.get("protected_dirs") or []]
-    if config.get("protect_instruction_files") is True:  # opt-in in 1.x (D87)
-        harness_dirs += [str(item) for item in registry_doc.get("instruction_files") or []]
+    instruction_files = [str(item) for item in registry_doc.get("instruction_files") or []]
+    protect = config.get("protect_instruction_files") is True  # opt-in in 1.x (D87)
+    if protect:
+        harness_dirs += instruction_files
     model_profile = yaml.safe_load(
         (harness / "models" / f"{config['model_profile']}.yaml").read_text(encoding="utf-8"))
     if model_profile.get("status") != "active":
@@ -373,6 +375,13 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
         print("warning: commits.trailers is none. K6 cannot run, so it is not rendered. "
               "Nothing checks that an implementer commit leaves the protected paths.",
               file=sys.stderr)
+    # K22 reads the instruction files, so it renders only with the key on (D89).
+    off |= {entry["id"] for entry in registry if entry.get("needs_instruction_files") and not protect}
+    text = config.get("instruction_text") if isinstance(config.get("instruction_text"), dict) else {}
+    model_values |= {"instruction_files_json": json.dumps(instruction_files),
+                     "instruction_hosts_json": json.dumps(sorted(str(host).lower().rstrip(".")
+                                                                for host in text.get("hosts") or [])),
+                     "instruction_packages_json": json.dumps(sorted(text.get("packages") or []))}
 
     # A component with `ci_step` adds a step to the G3 workflow, only if it is rendered.
     steps: dict[str, str | None] = {step_name(entry["id"]): None

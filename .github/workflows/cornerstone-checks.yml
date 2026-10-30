@@ -52,6 +52,14 @@ jobs:
           printf '%s\n' "${PR_BODY}" \
             | "${RUNNER_TEMP}/stone/bin/stone" check-evidence - --mode block --format github
 
+      # K22 blocks (D89). A Waiver (K22) section in the PR body passes the findings, with a notice.
+      - name: K22 instruction text
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "${PR_BODY}" | python3 .cornerstone/checks/instruction_text.py \
+            --body - --format github
+
       - name: Install
         run: pip install ./stone
 

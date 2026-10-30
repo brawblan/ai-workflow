@@ -1,5 +1,21 @@
 framework_version: 1.4.0
 components:
+- id: check.k22
+  kind: check
+  purpose: K22. Fail if a tracked instruction file has an install, a pipe to a shell,
+    an override, an unknown host, or hidden text.
+  principle:
+  - P6
+  - P9
+  source: framework
+  owner: brawblan
+  eval: ''
+  models_tested: []
+  added: '2026-10-30'
+  review_by: '2027-04-30'
+  files:
+  - .cornerstone/checks/instruction_text.py
+  hash: 609916d307097f1869c2b102943ebc0a1622ee60f844c65fed31abf9cd0559c1
 - id: check.k6
   kind: check
   purpose: K6. Fail if an implementer commit changes a protected path.
@@ -44,7 +60,7 @@ components:
   review_by: '2027-04-17'
   files:
   - .github/workflows/cornerstone-checks.yml
-  hash: 0aefe58295aaedefe360a83bf7dbec3a7c0f76586392541f8c0c252260f0878a
+  hash: f02c5ed85747d1d226a45be5af6b3e0b278ec846903658a2cc490ac29438832f
 - id: hook.path-match
   kind: hook
   purpose: Match a path against paths.tests and paths.checks. The hook and K6 import
