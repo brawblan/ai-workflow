@@ -250,19 +250,38 @@ def changed_lines(diff: str) -> dict[str, set[int]]:
     return found
 
 
+def old_paths(diff: str) -> dict[str, str]:
+    """Return the old path of each file that a `git diff` moved, by its new path."""
+    found: dict[str, str] = {}
+    old = ""
+    for line in diff.splitlines():
+        if line.startswith("--- "):
+            old = line[6:] if line.startswith("--- a/") else ""
+        elif line.startswith("+++ b/") and old and old != line[6:]:
+            found[line[6:]] = old
+    return found
+
+
 def complexity_limits(root: Path) -> tuple[dict[str, int], tuple[str, ...]]:
     """Return the K9 limits and the source folders from the repo config, or the defaults."""
     path = root / CONFIG
-    config = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}) if path.exists() else {}
-    limits = {**DEFAULT_LIMITS, **{key: value for key, value in (config.get("limits") or {}).items()
-                                   if key in DEFAULT_LIMITS}}
-    source = tuple((config.get("paths") or {}).get("source") or DEFAULT_SOURCE)
-    return limits, source
+    config = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else None
+    config = config if isinstance(config, dict) else {}
+    given = config.get("limits") if isinstance(config.get("limits"), dict) else {}
+    limits = {key: given[key] if isinstance(given.get(key), int) else value
+              for key, value in DEFAULT_LIMITS.items()}
+    paths = config.get("paths") if isinstance(config.get("paths"), dict) else {}
+    source = paths.get("source") or DEFAULT_SOURCE
+    return limits, (source,) if isinstance(source, str) else tuple(source)
 
 
-def function_metrics(text: str) -> dict[str, tuple[range, int]]:
-    """Return the lines and the cyclomatic complexity of each function, by its qualified name."""
-    found: dict[str, tuple[range, int]] = {}
+def function_metrics(text: str) -> dict[str, list[tuple[range, int]]]:
+    """Return the lines and the cyclomatic complexity of each function, by its qualified name.
+
+    A name can have more than one function, for example a property and its setter. The list
+    keeps them in the order of the file.
+    """
+    found: dict[str, list[tuple[range, int]]] = {}
     pending: list[tuple[ast.AST, str]] = [(ast.parse(text), "")]
     while pending:
         parent, prefix = pending.pop()
@@ -272,7 +291,7 @@ def function_metrics(text: str) -> dict[str, tuple[range, int]]:
                 name = f"{prefix}{node.name}."
             if isinstance(node, _FUNCTIONS):
                 span = range(node.lineno, (node.end_lineno or node.lineno) + 1)
-                found.setdefault(name[:-1], (span, cyclomatic(node)))
+                found.setdefault(name[:-1], []).append((span, cyclomatic(node)))
             pending.append((node, name))
     return found
 
@@ -291,21 +310,35 @@ def limit_problem(name: str, key: str, value: int, old_value: int | None, limit:
     return f"'{name}' has {what}, more than the limit {limit}{was}"
 
 
+def _old_metrics(old_text: str | None) -> dict[str, list[tuple[range, int]]]:
+    try:
+        return function_metrics(old_text) if old_text else {}
+    except SyntaxError:
+        return {}  # The old file does not parse, so each function counts as new.
+
+
+def _in_file_order(metrics: dict[str, list[tuple[range, int]]]
+                   ) -> list[tuple[range, int, str, int]]:
+    """Return (lines, complexity, name, index for the name) of each function, by first line."""
+    functions = [(span, score, name, index) for name, found in metrics.items()
+                 for index, (span, score) in enumerate(found)]
+    return sorted(functions, key=lambda function: function[0].start)
+
+
 def function_problems(text: str, lines: set[int], limits: dict[str, int],
                       old_text: str | None = None) -> list[tuple[int, str]]:
     """Return (line, problem) for each function that has a changed line and breaks a limit.
 
-    `old_text` is the file at the merge base. A function that is not in it counts as new.
+    `old_text` is the file at the merge base. A function that is not in it counts as new. If a
+    name has more than one function, the first new one pairs with the first old one, and so on.
     """
-    try:
-        old = function_metrics(old_text) if old_text else {}
-    except SyntaxError:
-        old = {}  # The old file does not parse, so each function counts as new.
+    old = _old_metrics(old_text)
     found: list[tuple[int, str]] = []
-    for name, (span, score) in sorted(function_metrics(text).items(), key=lambda i: i[1][0].start):
+    for span, score, name, index in _in_file_order(function_metrics(text)):
         if not lines.intersection(span):
             continue
-        before = old.get(name)
+        olds = old.get(name, [])
+        before = olds[index] if index < len(olds) else None
         for key, value, old_value in (
                 ("cyclomatic", score, before[1] if before else None),
                 ("function_lines", len(span), len(before[0]) if before else None)):
@@ -324,14 +357,18 @@ def check_complexity(root: Path, base: str) -> list[Finding]:
     """
     limits, source = complexity_limits(root)
     merge_base = _git(root, "merge-base", base, "HEAD").strip()
-    diff = _git(root, "diff", "-U0", "--no-color", merge_base, "HEAD", "--", *source)
+    diff = _git(root, "-c", "core.quotePath=false", "diff", "-U0", "--no-color", "--no-ext-diff",
+                "--find-renames", "--src-prefix=a/", "--dst-prefix=b/", merge_base, "HEAD", "--",
+                *source)
+    moved = old_paths(diff)
     findings: list[Finding] = []
     for path, lines in sorted(changed_lines(diff).items()):
         text = _git_show(root, "HEAD", path) if path.endswith(".py") else None
         if text is None:
             continue
         try:
-            problems = function_problems(text, lines, limits, _git_show(root, merge_base, path))
+            old_text = _git_show(root, merge_base, moved.get(path, path))
+            problems = function_problems(text, lines, limits, old_text)
         except SyntaxError as error:
             problems = [(error.lineno or 1, f"The file does not parse ({error.msg})")]
         findings += [Finding(path, number, COMPLEXITY_CHECK,
