@@ -24,7 +24,7 @@ PLUGIN_FILE = "plugins/cornerstone/.claude-plugin/plugin.json"
 _USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<value>[^#\n]*?)\s*(?:#.*)?$")
 _ACTION_PIN = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 _IMAGE_PIN = re.compile(r"^docker://\S+@sha256:[0-9a-f]{64}$")
-_RUN = re.compile(r"^(?P<indent>\s*)(?:-\s+)?run:(?:\s+(?P<value>.*?))?\s*$")
+_RUN = re.compile(r"^(?P<indent>\s*(?:-\s+)?)run:(?:\s+(?P<value>.*?))?\s*$")
 _BLOCK = re.compile(r"^[|>][+-]?[0-9]?(?:\s+#.*)?$")
 _EVENT_TEXT = re.compile(r"\$\{\{[^}]*?\b(?P<name>github\.(?:event\.[\w.*-]+|head_ref))")
 
