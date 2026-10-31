@@ -27,7 +27,7 @@ from typing import Any
 
 import yaml
 
-from stone import render, results, specs, trigger_eval
+from stone import render, results, specs, trigger_eval, triggers
 from stone.markdown import split_frontmatter
 
 VARIANTS = ("with", "without")
@@ -184,6 +184,9 @@ def find_component(framework: Path, harness: str, component_id: str,
                               .read_text(encoding="utf-8"))["components"]
     for entry in registry:
         if entry["id"] == component_id:
+            if "trigger" in entry:
+                raise EvalError(f"{component_id} is one workflow for each profile. Add the "
+                                f"profile to the id, for example {component_id}.single-ticket.")
             if not entry.get("eval"):
                 raise EvalError(f"{component_id} has no eval folder. A check is its own test.")
             return entry
@@ -437,7 +440,11 @@ def _trigger_post(run: Run, ws: Workspace, workflow: dict[str, Any], structured:
     """Run the post job on the structured report. The report checks read that report."""
     ws.report = trigger_eval.structured_report(structured)
     runner_temp = ws.path.parent / "runner-temp"
-    result = trigger_eval.post(workflow, ws.report, runner_temp, str(scenario.get("number", 1)))
+    try:
+        result = trigger_eval.post(workflow, ws.report, runner_temp,
+                                   str(scenario.get("number", 1)))
+    except (trigger_eval.TriggerEvalError, subprocess.TimeoutExpired, OSError) as error:
+        result = {"posted": "", "calls": [], "error": str(error)}
     ws.posted = result["posted"]
     ws.gh_calls = "\n".join(result["calls"])
     if result["error"] and not run.error:
@@ -637,12 +644,29 @@ def summary(component: str, model: str, runs: list[Run]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _first_role(framework: Path, profile_id: str) -> str:
-    """The role that the trigger of the profile starts (D31)."""
-    path = framework / "profiles" / f"{profile_id}.md"
+def _first_role(framework: Path, entry: dict[str, Any]) -> str:
+    """The role that the trigger of the profile starts (D31). The profile must use the trigger."""
+    path = framework / "profiles" / f"{entry['profile']}.md"
     if not path.is_file():
-        raise EvalError(f"The profile '{profile_id}' does not exist. Use a profile id.")
-    return split_frontmatter(path.read_text(encoding="utf-8"))[0]["roles"][0]
+        raise EvalError(f"The profile '{entry['profile']}' does not exist. Use a profile id.")
+    profile = split_frontmatter(path.read_text(encoding="utf-8"))[0]
+    kinds = {triggers.parse(str(text))[0] for text in profile.get("triggers") or []}
+    if entry["trigger"] not in kinds:
+        raise EvalError(f"The profile '{entry['profile']}' has no {entry['trigger']} trigger. "
+                        "Use a profile that has it.")
+    return profile["roles"][0]
+
+
+def _select(scenarios: list[dict[str, Any]], ids: list[str] | None,
+            profile_id: str) -> list[dict[str, Any]]:
+    """The scenarios to run: the ids, if given, and for a trigger only those of its profile."""
+    chosen = [s for s in scenarios if (not ids or s["id"] in ids)
+              and profile_id in (s.get("profiles") or [profile_id])]
+    if ids and len(chosen) != len(set(ids)):
+        unknown = sorted(set(ids) - {s["id"] for s in chosen})
+        raise EvalError(f"No scenario has the id {unknown} for this component. Use an id in "
+                        "scenarios.yaml.")
+    return chosen
 
 
 def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
@@ -657,13 +681,8 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     folder = root / entry["eval"]
     profile_id = entry.get("profile", "")
     data = load_scenarios(folder, role_required=not profile_id)
-    if profile_id:
-        data["role"] = _first_role(framework, profile_id)
-    scenarios = [s for s in data["scenarios"] if (not scenario_ids or s["id"] in scenario_ids)
-                 and profile_id in (s.get("profiles") or [profile_id])]
-    if scenario_ids and len(scenarios) != len(set(scenario_ids)):
-        unknown = sorted(set(scenario_ids) - {s["id"] for s in scenarios})
-        raise EvalError(f"No scenario has the id {unknown}. Use an id in scenarios.yaml.")
+    data["role"] = _first_role(framework, entry) if profile_id else data["role"]
+    scenarios = _select(data["scenarios"], scenario_ids, profile_id)
     harness = framework / "adapters" / config["harness"]
     loaded = load_run_config(run_config or harness / "eval.yaml")
     profile = yaml.safe_load((harness / "models" / f"{config['model_profile']}.yaml")
