@@ -763,8 +763,9 @@ def not_ignored(root: Path, patterns: list[str]) -> list[str]:
     excludes file count. If git cannot answer (no repo, no git), return all the patterns.
     """
     try:
-        out = subprocess.run(["git", "check-ignore", "--no-index", "-z", "--", *patterns],
-                             cwd=root, capture_output=True, text=True, check=False)
+        out = subprocess.run(["git", "check-ignore", "--no-index", "--stdin", "-z"], cwd=root,
+                             input="\0".join(patterns), capture_output=True, text=True,
+                             check=False)
     except OSError:
         out = None
     if out is None or out.returncode not in (0, 1):  # 1: git ignores none of them
