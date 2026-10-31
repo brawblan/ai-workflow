@@ -4,7 +4,7 @@ check.
 Usage: grade.py <name> --workspace <path> --args <json>. The last line of the output is JSON:
 {"pass": true|false, "detail": "..."}. The report is in STONE_EVAL_REPORT: the `report` field of
 the structured output for `with`, the final text for `without`. The posted text is in
-STONE_EVAL_POSTED, and each call of the fake forge CLI is in STONE_EVAL_GH_CALLS (D100).
+STONE_EVAL_POSTED, and each call of the fake forge CLI is in STONE_EVAL_GH_CALLS (D101).
 """
 
 from __future__ import annotations
