@@ -1,4 +1,4 @@
-"""Tests for stone.repo_rules (R1 pins, R2 version bump) and `stone check-rules` (D78)."""
+"""Tests for stone.repo_rules (R1 pins, R2 version bump, R4 commit format) and `stone check-rules` (D78, D97)."""
 
 from __future__ import annotations
 
@@ -241,6 +241,175 @@ class VersionBumpTests(GitRepoCase):
         self.assertEqual(self.r2(), [])
 
 
+GOOD = "feat(stone): add a thing"
+
+
+class SubjectProblemTests(unittest.TestCase):
+    def test_r4_each_allowed_type_passes(self) -> None:
+        for kind in ["build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "revert",
+                     "style", "test"]:
+            with self.subTest(kind=kind):
+                self.assertIsNone(repo_rules.subject_problem(f"{kind}(stone): summary"))
+                self.assertIsNone(repo_rules.subject_problem(f"{kind}: summary"))
+
+    def test_r4_scope_is_optional(self) -> None:
+        self.assertIsNone(repo_rules.subject_problem("fix: summary"))
+        self.assertIsNone(repo_rules.subject_problem("fix(a-b_c/d): summary"))
+
+    def test_r4_breaking_marker_passes(self) -> None:
+        self.assertIsNone(repo_rules.subject_problem("feat!: summary"))
+        self.assertIsNone(repo_rules.subject_problem("feat(stone)!: summary"))
+
+    def test_r4_git_revert_subject_passes(self) -> None:
+        self.assertIsNone(repo_rules.subject_problem('Revert "feat(stone): add a thing"'))
+
+    def test_r4_git_reapply_subject_passes(self) -> None:
+        self.assertIsNone(repo_rules.subject_problem('Reapply "feat(stone): x"'))
+
+    def test_r4_revert_without_closing_quote_fails(self) -> None:
+        self.assertIsNotNone(repo_rules.subject_problem('Revert "anything'))
+        self.assertIsNotNone(repo_rules.subject_problem('Reapply "anything'))
+
+    def test_r4_scope_with_comma_and_space_fails(self) -> None:
+        self.assertIsNotNone(repo_rules.subject_problem("docs(tips, framework): x"))
+
+    def test_r4_failing_subjects(self) -> None:
+        for subject in [
+            "feat:summary",
+            "feat(stone):summary",
+            "Feat: summary",
+            "FIX(stone): summary",
+            "fixup! feat(stone): summary",
+            "squash! feat(stone): summary",
+            "WIP",
+            "wip: summary",
+            "feat(my scope): summary",
+            "feat(): summary",
+            "",
+            "feat:",
+            "feat: ",
+            "feat(stone):",
+            "just a summary",
+            "Revert without quotes",
+        ]:
+            with self.subTest(subject=subject):
+                self.assertIsNotNone(repo_rules.subject_problem(subject))
+
+    def test_r4_unknown_type_is_named(self) -> None:
+        problem = repo_rules.subject_problem("feature(stone): summary")
+        self.assertIsNotNone(problem)
+        self.assertIn("feature", problem)
+
+
+class CommitFormatTests(GitRepoCase):
+    def r4(self) -> list:
+        return repo_rules.check_commit_format(self.root, "main")
+
+    def head_sha(self, rev: str = "HEAD") -> str:
+        return _git(self.root, "rev-parse", rev).strip()
+
+    def change(self, name: str, subject: str) -> None:
+        _write(self.root, name, "x\n")
+        self.commit(subject)
+
+    def test_r4_good_commits_pass(self) -> None:
+        self.change("a.txt", GOOD)
+        self.change("b.txt", "fix: another")
+        self.assertEqual(self.r4(), [])
+
+    def test_r4_no_commits_on_branch(self) -> None:
+        self.assertEqual(self.r4(), [])
+
+    def test_r4_bad_commit_fails_with_sha_path_and_line(self) -> None:
+        self.change("a.txt", "added a thing")
+        found = self.r4()
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].check, "R4")
+        self.assertEqual(found[0].path, f"commit {self.head_sha()[:12]}")
+        self.assertEqual(len(found[0].path), len("commit ") + 12)
+        self.assertEqual(found[0].line, 1)
+        self.assertIn("added a thing", found[0].message)
+
+    def test_r4_two_bad_commits_give_two_findings(self) -> None:
+        self.change("a.txt", "bad one")
+        first = self.head_sha()
+        self.change("b.txt", GOOD)
+        self.change("c.txt", "Bad two")
+        second = self.head_sha()
+        paths = sorted(f.path for f in self.r4())
+        self.assertEqual(paths, sorted([f"commit {first[:12]}", f"commit {second[:12]}"]))
+
+    def test_r4_only_the_bad_commit_is_named(self) -> None:
+        self.change("a.txt", GOOD)
+        self.change("b.txt", "oops")
+        bad = self.head_sha()
+        self.change("c.txt", GOOD)
+        found = self.r4()
+        self.assertEqual([f.path for f in found], [f"commit {bad[:12]}"])
+
+    def test_r4_merge_commit_with_git_subject_is_not_tested(self) -> None:
+        self.change("a.txt", GOOD)
+        _git(self.root, "checkout", "-q", "main")
+        self.change("m.txt", "chore: main moves")
+        _git(self.root, "checkout", "-q", "feature")
+        _git(self.root, "merge", "-q", "--no-ff", "-m", "Merge branch 'main' into feature", "main")
+        self.assertEqual(_git(self.root, "log", "-1", "--format=%P").count(" "), 1)
+        self.assertEqual(self.r4(), [])
+
+    def test_r4_bad_commit_on_branch_still_found_after_merge(self) -> None:
+        self.change("a.txt", "bad")
+        bad = self.head_sha()
+        _git(self.root, "checkout", "-q", "main")
+        self.change("m.txt", "chore: main moves")
+        _git(self.root, "checkout", "-q", "feature")
+        _git(self.root, "merge", "-q", "--no-ff", "-m", "Merge branch 'main' into feature", "main")
+        self.assertEqual([f.path for f in self.r4()], [f"commit {bad[:12]}"])
+
+    def test_r4_bad_commit_on_base_after_merge_base_is_not_tested(self) -> None:
+        self.change("a.txt", GOOD)
+        _git(self.root, "checkout", "-q", "main")
+        self.change("m.txt", "bad base commit")
+        _git(self.root, "checkout", "-q", "feature")
+        self.assertEqual(self.r4(), [])
+
+    def test_r4_bad_commit_on_base_after_merge_is_not_tested(self) -> None:
+        self.change("a.txt", GOOD)
+        _git(self.root, "checkout", "-q", "main")
+        self.change("m.txt", "bad base commit")
+        _git(self.root, "checkout", "-q", "feature")
+        _git(self.root, "merge", "-q", "--no-ff", "-m", "Merge branch 'main' into feature", "main")
+        self.assertEqual(self.r4(), [])
+
+    def test_r4_bad_commit_before_merge_base_is_not_tested(self) -> None:
+        # The "base" commit in setUp has a bad subject and is before the merge base.
+        _git(self.root, "checkout", "-q", "main")
+        _git(self.root, "commit", "-q", "--amend", "-m", "bad old commit")
+        _git(self.root, "checkout", "-q", "-B", "feature")
+        self.change("a.txt", GOOD)
+        self.assertEqual(self.r4(), [])
+
+    def test_r4_detached_pull_request_merge_ref_tests_only_feature_commits(self) -> None:
+        self.change("a.txt", "bad")
+        bad = self.head_sha()
+        _git(self.root, "checkout", "-q", "main")
+        self.change("m.txt", "bad base commit")
+        _git(self.root, "checkout", "-q", "--detach")
+        _git(self.root, "merge", "-q", "--no-ff", "-m", "Merge feature into main", "feature")
+        self.assertEqual(_git(self.root, "branch", "--show-current").strip(), "")
+        self.assertEqual([f.path for f in self.r4()], [f"commit {bad[:12]}"])
+
+    def test_r4_git_revert_commit_passes(self) -> None:
+        self.change("a.txt", GOOD)
+        _git(self.root, "revert", "--no-edit", "HEAD")
+        self.assertTrue(_git(self.root, "log", "-1", "--format=%s").startswith('Revert "'))
+        self.assertEqual(self.r4(), [])
+
+    def test_r4_run_needs_base(self) -> None:
+        self.change("a.txt", "bad")
+        self.assertEqual([f.check for f in repo_rules.run(self.root, None)], [])
+        self.assertEqual([f.check for f in repo_rules.run(self.root, "main")], ["R4"])
+
+
 class CliTests(GitRepoCase):
     def run_cli(self, *args: str) -> tuple[int, str]:
         out = io.StringIO()
@@ -266,7 +435,7 @@ class CliTests(GitRepoCase):
 
     def test_base_adds_r2(self) -> None:
         _write(self.root, SKILL, "two\n")
-        self.commit("skill")
+        self.commit("feat(skill): change")
         code, out = self.run_cli("--base", "main")
         self.assertEqual(code, 1)
         self.assertIn("R2", out)
@@ -274,7 +443,7 @@ class CliTests(GitRepoCase):
     def test_base_clean_returns_0(self) -> None:
         _write(self.root, SKILL, "two\n")
         self.set_version("1.0.1")
-        self.commit("skill")
+        self.commit("feat(skill): change")
         self.assertEqual(self.run_cli("--base", "main")[0], 0)
 
     def test_without_base_r2_does_not_run(self) -> None:
@@ -282,7 +451,8 @@ class CliTests(GitRepoCase):
         self.commit("skill")
         code, out = self.run_cli()
         self.assertEqual(code, 0)
-        self.assertNotIn("R2", out.replace("R1, R2:", ""))
+        self.assertNotIn("R2", out)
+        self.assertEqual(out.strip(), "check-rules: 0 error(s).")
 
     def test_bad_base_returns_2(self) -> None:
         self.assertEqual(self.run_cli("--base", "no-such-branch")[0], 2)
@@ -295,10 +465,41 @@ class CliTests(GitRepoCase):
         _git(self.root, "checkout", "-q", "feature")
         _git(self.root, "rebase", "-q", "main")
         _write(self.root, "other/skills/s.md", "b\n")
-        self.commit("change")
+        self.commit("fix(other): change")
         code, _ = self.run_cli("--base", "main", "--skills", "other/skills/",
                                "--plugin-file", "other/plugin.json")
         self.assertEqual(code, 1)
+
+    def test_r4_without_base_bad_commit_does_not_fail(self) -> None:
+        _write(self.root, "a.txt", "x\n")
+        self.commit("bad subject")
+        code, out = self.run_cli()
+        self.assertEqual(code, 0)
+        self.assertNotIn("R4", out)
+
+    def test_r4_with_base_bad_commit_returns_1(self) -> None:
+        _write(self.root, "a.txt", "x\n")
+        self.commit("bad subject")
+        code, out = self.run_cli("--base", "main")
+        self.assertEqual(code, 1)
+        self.assertIn("R4", out)
+        self.assertIn("check-rules: 1 error(s).", out)
+
+    def test_r4_with_base_good_commit_returns_0(self) -> None:
+        _write(self.root, "a.txt", "x\n")
+        self.commit(GOOD)
+        code, out = self.run_cli("--base", "main")
+        self.assertEqual(code, 0)
+        self.assertIn("check-rules: 0 error(s).", out)
+
+    def test_summary_line_counts_errors(self) -> None:
+        _workflow(self.root, "- uses: a/b@v1")
+        _write(self.root, "a.txt", "x\n")
+        self.commit("bad subject")
+        code, out = self.run_cli("--base", "main")
+        self.assertEqual(code, 1)
+        self.assertIn("check-rules: 2 error(s).", out)
+        self.assertNotIn("R1, R2:", out)
 
 
 if __name__ == "__main__":

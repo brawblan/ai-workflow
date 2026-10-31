@@ -1,4 +1,5 @@
-"""Checks for rules that this repo states in prose (P6, D78). Part 1: action pins and version bump.
+"""Checks for rules that this repo states in prose (P6, D78, D97): action pins, version bump, and
+commit message format.
 
 These checks are for the repo of the framework. `stone render` does not write them for a target repo.
 """
@@ -14,6 +15,9 @@ from stone.findings import Finding
 
 PIN_CHECK = "R1"
 BUMP_CHECK = "R2"
+COMMIT_CHECK = "R4"
+COMMIT_TYPES = ("build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "revert", "style",
+                "test")
 WORKFLOWS = ".github/workflows"
 SKILLS = "plugins/cornerstone/skills/"
 PLUGIN_FILE = "plugins/cornerstone/.claude-plugin/plugin.json"
@@ -21,6 +25,8 @@ PLUGIN_FILE = "plugins/cornerstone/.claude-plugin/plugin.json"
 _USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<value>[^#\n]*?)\s*(?:#.*)?$")
 _ACTION_PIN = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 _IMAGE_PIN = re.compile(r"^docker://\S+@sha256:[0-9a-f]{64}$")
+_GIT_SUBJECT = re.compile(r'^(?:Revert|Reapply) ".*"$')
+_SUBJECT = re.compile(r"^(?P<type>[a-z]+)(?:\((?P<scope>[^()\s]+)\))?!?: \S")
 
 
 def _unquote(value: str) -> str:
@@ -95,6 +101,41 @@ def check_version_bump(root: Path, base: str, skills: str = SKILLS,
     return []
 
 
+def subject_problem(subject: str) -> str | None:
+    """Return why `subject` is not `type(scope): summary`, or None. The scope is optional.
+
+    A subject that `git revert` writes (`Revert "..."` or `Reapply "..."`) passes.
+    """
+    if _GIT_SUBJECT.match(subject):
+        return None
+    match = _SUBJECT.match(subject)
+    if not match:
+        return "It does not have the form 'type(scope): summary'"
+    if match.group("type") not in COMMIT_TYPES:
+        return f"The type '{match.group('type')}' is not one of: {', '.join(COMMIT_TYPES)}"
+    return None
+
+
+def check_commit_format(root: Path, base: str) -> list[Finding]:
+    """R4: the subject of each commit from the merge base to HEAD is `type(scope): summary`.
+
+    A merge commit is not tested, because git writes its subject.
+    """
+    merge_base = _git(root, "merge-base", base, "HEAD").strip()
+    log = _git(root, "log", "--no-merges", "--format=%H%x1f%s%x1e", f"{merge_base}..HEAD")
+    findings: list[Finding] = []
+    for entry in log.split("\x1e"):
+        sha, _, subject = entry.strip().partition("\x1f")
+        problem = subject_problem(subject) if sha else None
+        if problem:
+            findings.append(Finding(
+                f"commit {sha[:12]}", 1, COMMIT_CHECK,
+                f"{problem}: '{subject}'. Reword the commit, for example 'fix(stone): "
+                "<summary>'. On a branch that other people use, ask first: AGENTS.md forbids a "
+                "force-push of a shared branch."))
+    return findings
+
+
 def _git_show(root: Path, rev: str, path: str) -> str | None:
     result = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=root, capture_output=True,
                             text=True)
@@ -106,4 +147,5 @@ def run(root: Path, base: str | None, skills: str = SKILLS,
     findings = check_pins(root)
     if base:
         findings += check_version_bump(root, base, skills, plugin_file)
+        findings += check_commit_format(root, base)
     return findings
