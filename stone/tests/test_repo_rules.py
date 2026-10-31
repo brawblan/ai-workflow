@@ -1034,6 +1034,54 @@ class ComplexityCheckTests(GitRepoCase):
         self.assertNotIn("K9", [f.check for f in repo_rules.run(self.root, None)])
 
 
+class SkipComplexityTests(GitRepoCase):
+    """D103: --skip-k9 skips K9 and keeps R2 and R4."""
+
+    def run_cli(self, *args: str) -> tuple[int, str]:
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            code = cli.main(["check-rules", "--root", str(self.root), *args])
+        return code, out.getvalue()
+
+    def test_run_without_complexity_skips_k9(self) -> None:
+        _write(self.root, "src/a.py", _branchy(11))
+        self.commit("feat: a")
+        self.assertEqual([f.check for f in repo_rules.run(self.root, "main")], ["K9"])
+        self.assertEqual(repo_rules.run(self.root, "main", complexity=False), [])
+
+    def test_run_without_complexity_keeps_r2(self) -> None:
+        _write(self.root, SKILL, "two\n")
+        self.commit("feat(skill): change")
+        found = repo_rules.run(self.root, "main", complexity=False)
+        self.assertEqual([f.check for f in found], ["R2"])
+
+    def test_cli_skip_k9_returns_0(self) -> None:
+        _write(self.root, "src/a.py", _branchy(11))
+        self.commit("feat: a")
+        code, out = self.run_cli("--base", "main")
+        self.assertEqual(code, 1)
+        self.assertIn("K9", out)
+        code, out = self.run_cli("--base", "main", "--skip-k9")
+        self.assertEqual(code, 0)
+        self.assertNotIn("K9", out)
+
+    def test_cli_skip_k9_keeps_r4(self) -> None:
+        _write(self.root, "src/a.py", "x = 1\n")
+        self.commit("bad subject")
+        code, out = self.run_cli("--base", "main", "--skip-k9")
+        self.assertEqual(code, 1)
+        self.assertIn("R4", out)
+
+
+class StoneWorkflowTests(unittest.TestCase):
+    """D103: the stone workflow skips K9 only on a PR into main."""
+
+    def test_rules_step_skips_k9_for_main_only(self) -> None:
+        text = (REPO_ROOT / ".github/workflows/stone.yml").read_text()
+        self.assertIn('if [ "$BASE_REF" = "main" ]; then skip=(--skip-k9); fi', text)
+        self.assertIn('stone check-rules --base "origin/${BASE_REF}" "${skip[@]}"', text)
+
+
 class OldPathsTests(unittest.TestCase):
     def test_k9_old_paths_rename(self) -> None:
         diff = ("diff --git a/src/a.py b/src/b.py\nsimilarity index 90%\n"
