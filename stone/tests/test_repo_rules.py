@@ -379,6 +379,80 @@ class EventTextTests(unittest.TestCase):
     def test_r3_no_folders(self) -> None:
         self.assertEqual(repo_rules.check_event_text(self.root), [])
 
+    def r3(self, run_text: str) -> list:
+        _run_workflow(self.root, run_text)
+        return repo_rules.check_event_text(self.root)
+
+    def test_r3_expression_forms_fail_once_each(self) -> None:
+        for expr in [
+            "${{ format('{0}', github.event.pull_request.title) }}",
+            "${{ toJSON(github.event) }}",
+            "${{ github.event['pull_request']['title'] }}",
+            "${{ GitHub.Event.pull_request.title }}",
+            "${{ github['event'].pull_request.title }}",
+        ]:
+            with self.subTest(expr=expr):
+                found = self.r3(f"      - run: echo {expr}\n")
+                self.assertEqual([(f.check, f.line) for f in found], [("R3", 4)])
+
+    def test_r3_one_expression_with_two_fields_gives_one_finding(self) -> None:
+        expr = "github.event.a || github.event.b"
+        found = self.r3(f"      - run: echo ${{{{ {expr} }}}}\n")
+        self.assertEqual(len(found), 1)
+        self.assertIn(expr, found[0].message)
+
+    def test_r3_value_on_next_line_fails(self) -> None:
+        found = self.r3(f"      - run:\n          echo {EVENT}\n")
+        self.assertEqual([f.line for f in found], [5])
+
+    def test_r3_plain_value_on_two_lines_fails_on_line_2(self) -> None:
+        found = self.r3(f"      - run: echo a\n          {EVENT}\n")
+        self.assertEqual([f.line for f in found], [5])
+
+    def test_r3_double_quoted_value_on_two_lines_fails(self) -> None:
+        found = self.r3(f'      - run: "echo a\n          {EVENT}"\n')
+        self.assertEqual([f.line for f in found], [5])
+
+    def test_r3_block_with_indent_indicator_fails(self) -> None:
+        for indicator in ["|2-", "|2", ">2+", "|+2", "|-"]:
+            with self.subTest(indicator=indicator):
+                found = self.r3(f"      - run: {indicator}\n          echo {EVENT}\n")
+                self.assertEqual([f.line for f in found], [5])
+
+    def test_r3_steps_context_with_github_event_name_part_passes(self) -> None:
+        self.assertEqual(self.r3("      - run: echo ${{ steps.github.event.x }}\n"), [])
+
+    def test_r3_defaults_run_mapping_passes(self) -> None:
+        text = ("defaults:\n  run:\n    shell: bash\n"
+                f"    working-directory: {EVENT}\n")
+        _write(self.root, ".github/workflows/ci.yml", text)
+        self.assertEqual(repo_rules.check_event_text(self.root), [])
+
+    def test_r3_run_comment_on_non_dash_key_passes(self) -> None:
+        text = f"defaults:\n  run: # note\n    shell: {EVENT}\n"
+        _write(self.root, ".github/workflows/ci.yml", text)
+        self.assertEqual(repo_rules.check_event_text(self.root), [])
+
+    def test_r3_crlf_valid_file_passes(self) -> None:
+        text = ("jobs:\r\n  j:\r\n    steps:\r\n      - env:\r\n          T: " + EVENT +
+                "\r\n        run: |\r\n          echo \"$T\"\r\n      - run: echo ok\r\n")
+        (self.root / ".github/workflows").mkdir(parents=True)
+        (self.root / ".github/workflows/ci.yml").write_bytes(text.encode())
+        self.assertEqual(repo_rules.check_event_text(self.root), [])
+
+    def test_r3_crlf_bad_file_fails(self) -> None:
+        text = "jobs:\r\n  j:\r\n    steps:\r\n      - run: echo " + EVENT + "\r\n"
+        (self.root / ".github/workflows").mkdir(parents=True)
+        (self.root / ".github/workflows/ci.yml").write_bytes(text.encode())
+        self.assertEqual(len(repo_rules.check_event_text(self.root)), 1)
+
+    def test_r3_quoted_inline_value_without_event_text_passes(self) -> None:
+        self.assertEqual(self.r3('      - run: "echo ${{ github.sha }}"\n'), [])
+        self.assertEqual(self.r3("      - run: 'echo hi'\n"), [])
+
+    def test_r3_event_text_outside_expression_passes(self) -> None:
+        self.assertEqual(self.r3("      - run: echo github.event.x\n"), [])
+
     def test_run_without_base_includes_r3_and_not_r2(self) -> None:
         _run_workflow(self.root, f"      - run: echo {EVENT}\n")
         found = repo_rules.run(self.root, None)
