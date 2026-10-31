@@ -1,4 +1,4 @@
-# The eval runner replaces `profiles` with the profile of the trigger under test (D100).
+# The eval runner replaces `profiles` with the profile of the trigger under test (D101).
 framework_version: 0.5.0
 harness: claude-code
 model_profile: claude-5

@@ -1,4 +1,4 @@
-# Eval of the label trigger (D100). Run: stone eval trigger.label.single-ticket --trials 3
+# Eval of the label trigger (D101). Run: stone eval trigger.label.single-ticket --trials 3
 # `with` runs the first role of the profile with the prompt and the role arguments of the rendered
 # workflow. Then the runner runs the post job with a fake forge CLI. `without` is the same role run
 # by hand on the same event file, with the prompt below. The fixture has no ticket files, so the
