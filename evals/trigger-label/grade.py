@@ -25,8 +25,11 @@ MISSING = re.compile(r"\bmissing\b|\babsent\b|\bnot (given|provided|stated|defin
 READY = re.compile(r"\bready\b|\bmeets\b|\bcomplete\b", re.I)
 CLAIMS_READY = re.compile(r"\b(is|as|marked|looks) (now )?ready\b", re.I)
 NEGATION = re.compile(r"\bnot\b|n.t\b|\bno\b", re.I)
-NONE_MISSING = re.compile(r"\b(no|none of the) (\w+ )?(fields?|items?) (is |are )?missing|"
-                          r"\bnothing is missing|\bnone (is |are )?missing", re.I)
+# A line that says that nothing is missing: "No Definition of Ready field is missing", "Missing
+# fields: none", "not a missing field" (found in the run of 2026-10-31).
+NONE_MISSING = re.compile(r"\b(no|none of the|nothing)\b[^.\n]{0,40}\bmissing\b|"
+                          r"\bnone (is |are )?missing|\bmissing( fields?)?\W+none\b|"
+                          r"\bnot a missing\b", re.I)
 ASKS = re.compile(r"\?\s*\**\s*$|\bquestions? (for|to) the author\b", re.I)
 
 
