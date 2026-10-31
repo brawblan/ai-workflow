@@ -35,6 +35,7 @@ HARNESS_FOLDER = ".claude/"
 HARNESS_FOLDER_ALLOWED = {"framework_check.py", "writing_check.py"}
 EVAL_OPTIONAL_KINDS = {"check", "doc", "specialist"}  # lifecycle.md: a check is its own test, so its eval can be ""
 CHECK_ID_PREFIX = "check."  # D99: a check rendered as a CI job (check.k16) is still a check
+EVAL_OPTIONAL_IDS = {"ci-job.checks"}  # D102: the job of the checks has no model in it
 
 
 def _first_column(rows: list[list[str]]) -> list[str]:
@@ -563,9 +564,11 @@ def _is_date(value: Any) -> bool:
 
 
 def _eval_optional(entry: dict[str, Any]) -> bool:
-    """True if the component can have an empty eval: its kind, or its id, names a check (D43, D99)."""
-    return (entry.get("kind") in EVAL_OPTIONAL_KINDS
-            or str(entry.get("id", "")).startswith(CHECK_ID_PREFIX))
+    """True if the component can have an empty eval: its kind, or its id, names a check (D43, D99),
+    or the id is the job of the checks (D102)."""
+    entry_id = str(entry.get("id", ""))
+    return (entry.get("kind") in EVAL_OPTIONAL_KINDS or entry_id.startswith(CHECK_ID_PREFIX)
+            or entry_id in EVAL_OPTIONAL_IDS)
 
 
 def component_problems(entry: dict[str, Any], is_manifest: bool,

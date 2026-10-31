@@ -30,8 +30,9 @@ A full render for all 10 profiles writes 22 components. This table lists each on
   `trigger.issue-opened.bug-triage`). The hook pair has two runs. The run of 2026-10-21 passes every check (see below).
 - Measured by tests only: `check.k6`, `check.k7`, `check.k15`, `check.k16`. A check is its own
   test (D43, D99).
-- Not measured: 6 components. Each has an eval plan in the adapter component list. The eval
-  folder does not exist yet.
+- Covered by a written reason: 6 components (D102). Four label and schedule triggers and
+  `trigger.dependency-pr.dependency-upgrade` share the template or the parts of a measured trigger.
+  `ci-job.checks` has no model in it.
 - Every run used `claude-opus-5-5`, except one `role.tester` run (2026-10-22) and the `role.implementer` run (2026-10-27) on `claude-sonnet-5-5`. No other model is measured (dossier G5).
 - k = 3 for each run. A rate is the share of passed checks. "With" has the component. "Without" does
   not.
@@ -50,20 +51,20 @@ A full render for all 10 profiles writes 22 components. This table lists each on
 | `check.k7` | none (a check is its own test) | Unit tests, 20 test methods (D99). The replay of D45 on 62 merged PRs found no false positive. | Not applicable |
 | `check.k15` | none (a check is its own test) | Unit tests, 43 test methods (D99). | Not applicable |
 | `check.k16` | none (a check is its own test) | Unit tests, 85 test methods (D99). | Not applicable |
-| `ci-job.checks` | none | no run | 2027-04-18 (proposed) |
+| `ci-job.checks` | none (no model in the job) | The unit tests of each check, the golden tests of the job, and the job on each PR of this repo (D102). | Not applicable |
 | `trigger.label.app-slice` | [trigger-label](./trigger-label/) | 2026-10-31, `claude-opus-5-5`. The label scenarios L1 to L3. Outcome 1.00 with, 0.89 without (one L1 report without the trigger says that the ready ticket is not ready). Contract 1.00 with, 0.00 without. pass^k is 1 in all three with the trigger. | Measured |
-| `trigger.label.debugging` | none | no run | 2027-04-18 (proposed) |
+| `trigger.label.debugging` | none (written reason) | No run. The template or the parts are measured with another profile (D102). | Run the eval of the trigger kind when the profile steps change |
 | `trigger.label.single-ticket` | [trigger-label](./trigger-label/) | 2026-10-31, `claude-opus-5-5`. L1 to L3. Outcome 1.00 with and without. Contract 1.00 with, 0.00 without. pass^k is 1 in all three with the trigger. See the note below. | Measured |
-| `trigger.schedule.adapter-refresh` | none | no run | 2027-04-18 (proposed) |
+| `trigger.schedule.adapter-refresh` | none (written reason) | No run. The template or the parts are measured with another profile (D102). | Run the eval of the trigger kind when the profile steps change |
 | `trigger.schedule.bug-triage` | [trigger-schedule](./trigger-schedule/) | B1: 2026-10-31 (first run). B2: 2026-10-31 (second run). `claude-opus-5-5`. Outcome 1.00 with and without. Contract 1.00 with, 0.00 without. pass^k is 1 in both with the trigger. See the note below. | Measured |
-| `trigger.schedule.code-audit` | none | no run | 2027-04-18 (proposed) |
-| `trigger.schedule.dependency-upgrade` | none | no run | 2027-04-18 (proposed) |
+| `trigger.schedule.code-audit` | none (written reason) | No run. The template or the parts are measured with another profile (D102). | Run the eval of the trigger kind when the profile steps change |
+| `trigger.schedule.dependency-upgrade` | none (written reason) | No run. The template or the parts are measured with another profile (D102). | Run the eval of the trigger kind when the profile steps change |
 | `trigger.issue-opened.bug-triage` | [trigger-issue-opened](./trigger-issue-opened/) | 2026-10-31, `claude-opus-5-5`. O1, O2. Outcome 1.00 with and without. Contract 1.00 with, 0.00 without. pass^k is 1 in both with the trigger. See the note below. | Measured |
-| `trigger.dependency-pr.dependency-upgrade` | none | no run | 2027-04-18 (proposed) |
+| `trigger.dependency-pr.dependency-upgrade` | none (written reason) | No run. The template or the parts are measured with another profile (D102). | Run the eval of the trigger kind when the profile steps change |
 
-Each role in the adapter component list has an eval folder and a result (#110). For the other
-components, the date 2027-04-18 is a proposal. It matches the review date of D39 and D40. A trigger component is one workflow for
-each profile. Its eval plan is shared by all profiles that use the trigger.
+Each role in the adapter component list has an eval folder and a result (#110). Each component
+has a result, a test, or a written reason (#198). A trigger component is one workflow for
+each profile. Its eval folder is shared by all profiles that use the trigger (D101).
 
 Notes on the results:
 
