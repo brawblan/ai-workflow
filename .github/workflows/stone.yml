@@ -34,12 +34,12 @@ jobs:
       - name: stone check
         run: stone check --format github
 
-      # R1 and R2 block (D78). R2 needs the base branch, so it runs on a PR only.
-      - name: R1 action pins
+      # R1 to R4 block (D78, D97, D98). R2 and R4 need the base branch, so they run on a PR only.
+      - name: R1 action pins and R3 event text
         if: github.event_name != 'pull_request'
         run: stone check-rules --format github
 
-      - name: R1 action pins and R2 plugin version bump
+      - name: R1 to R4 repo rules
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
