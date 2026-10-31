@@ -12,6 +12,23 @@ from stone import (__version__, dependency_check, evals, evidence_check, framewo
 from stone.findings import report
 
 
+def _add_check_rules(commands: argparse._SubParsersAction) -> None:
+    """Add the check-rules command: R1 to R4 and K9 (D78, D97, D98, D100, D103)."""
+    rules = commands.add_parser(
+        "check-rules", help="R1 to R4, K9: test the action pins, the plugin version, the event text "
+             "in 'run', the commit format, and the complexity caps (D78, D97, D98, D100).")
+    rules.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    rules.add_argument("--base", help="The base branch. Gives R2 (the plugin version bump), R4 "
+                                      "(the commit format), and K9 (the caps of changed "
+                                      "functions). Without it, only R1 and R3 run.")
+    rules.add_argument("--skills", default=repo_rules.SKILLS, help="The skills folder, for R2.")
+    rules.add_argument("--plugin-file", default=repo_rules.PLUGIN_FILE,
+                       help="The plugin file with the version, for R2.")
+    rules.add_argument("--skip-k9", action="store_true",
+                       help="Do not run K9. For a release PR into main (D103).")
+    rules.add_argument("--format", choices=["text", "github"], default="text")
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="stone", description="Cornerstone CLI.")
     parser.add_argument("--version", action="version", version=f"stone {__version__}")
@@ -96,19 +113,7 @@ def _parser() -> argparse.ArgumentParser:
                          help="warn: report only (the first 2 weeks). block: fail on errors.")
     writing.add_argument("--format", choices=["text", "github"], default="text")
 
-    rules = commands.add_parser(
-        "check-rules", help="R1 to R4, K9: test the action pins, the plugin version, the event text "
-             "in 'run', the commit format, and the complexity caps (D78, D97, D98, D100).")
-    rules.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
-    rules.add_argument("--base", help="The base branch. Gives R2 (the plugin version bump), R4 "
-                                      "(the commit format), and K9 (the caps of changed "
-                                      "functions). Without it, only R1 and R3 run.")
-    rules.add_argument("--skills", default=repo_rules.SKILLS, help="The skills folder, for R2.")
-    rules.add_argument("--plugin-file", default=repo_rules.PLUGIN_FILE,
-                       help="The plugin file with the version, for R2.")
-    rules.add_argument("--skip-k9", action="store_true",
-                       help="Do not run K9. For a release PR into main (D103).")
-    rules.add_argument("--format", choices=["text", "github"], default="text")
+    _add_check_rules(commands)
 
     evidence = commands.add_parser("check-evidence",
                                    help="K14: fail if a required PR section is missing or empty.")
