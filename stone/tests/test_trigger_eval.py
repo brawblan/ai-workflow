@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -28,7 +29,7 @@ with open(os.environ["FAKE_LOG"], "a") as log:
     log.write(json.dumps(sys.argv[1:]) + "\\n")
 out = {"type": "result", "result": "plain text report", "total_cost_usd": 0.01, "num_turns": 2,
        "usage": {"input_tokens": 3, "output_tokens": 4}}
-if "--json-schema" in sys.argv:
+if "--json-schema" in sys.argv and not os.environ.get("FAKE_NO_STRUCT"):
     out["structured_output"] = {"report": "Line one @alice\\nSee </div> now"}
 print(json.dumps(out))
 """
@@ -133,6 +134,57 @@ class Post(unittest.TestCase):
     def test_empty_report_posts_nothing(self) -> None:
         result, _ = self.run_post("single-ticket", "cornerstone-single-ticket-label.yml", "")
         self.assertEqual((result["calls"], result["posted"]), ([], ""))
+
+
+class ClosedPostEnv(unittest.TestCase):
+    def setUp(self) -> None:
+        self.tmp = Path(tempfile.mkdtemp(prefix="trigger-eval-env-"))
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    def caller(self) -> dict[str, str]:
+        rc = self.tmp / "rc.sh"
+        rc.write_text("touch " + str(self.tmp / "bashenv-ran") + "\n", encoding="utf-8")
+        real = self.tmp / "realbin"
+        real.mkdir()
+        (real / "gh").write_text(f"#!/bin/sh\ntouch {self.tmp}/real-gh-ran\n", encoding="utf-8")
+        (real / "gh").chmod(0o755)
+        return {"GITHUB_TOKEN": "real", "CLAUDE_CODE_OAUTH_TOKEN": "real", "BASH_ENV": str(rc),
+                "BASH_FUNC_gh%%": "() { touch " + str(self.tmp / "func-ran") + "; }",
+                "PATH": f"{real}{os.pathsep}{os.environ['PATH']}"}
+
+    def test_step_env_is_closed(self) -> None:
+        temp = self.tmp / "rt"
+        with mock.patch.dict(os.environ, self.caller()):
+            env = trigger_eval.step_env(temp, temp / "log", {"GH_TOKEN": "step", "X": "y"})
+        for name in ("CLAUDE_CODE_OAUTH_TOKEN", "BASH_ENV"):
+            self.assertNotIn(name, env)
+        self.assertFalse([k for k in env if k.startswith("BASH_FUNC_")])
+        self.assertEqual((env["GH_TOKEN"], env["GITHUB_TOKEN"]),
+                         (trigger_eval.FAKE_TOKEN, trigger_eval.FAKE_TOKEN))
+        self.assertEqual(env["X"], "y")
+        config = Path(env["GH_CONFIG_DIR"])
+        self.assertEqual((config.parent, list(config.iterdir())), (temp, []))
+        self.assertEqual(env["PATH"].split(os.pathsep)[0], str(temp / "bin"))
+        self.assertNotIn(str(self.tmp / "realbin"), env["PATH"].split(os.pathsep))
+
+    def test_real_gh_function_and_bash_env_do_not_run(self) -> None:
+        root, flow = rendered("single-ticket", "cornerstone-single-ticket-label.yml")
+        self.addCleanup(shutil.rmtree, root, True)
+        temp = root / "rt"
+        temp.mkdir()
+        with mock.patch.dict(os.environ, self.caller()):
+            result = trigger_eval.post(flow, "report", temp, "7")
+        self.assertEqual(result["error"], "")
+        self.assertEqual(len(result["calls"]), 1)
+        self.assertEqual([p.name for p in self.tmp.iterdir() if p.name.endswith("-ran")], [])
+
+    def test_failed_post_step_names_the_step(self) -> None:
+        flow = {"jobs": {"post": {"steps": [{"name": "Boom", "run": "exit 3"}]}}}
+        temp = self.tmp / "rt"
+        temp.mkdir()
+        result = trigger_eval.post(flow, "report", temp, "1")
+        self.assertIn("Boom", result["error"])
+        self.assertEqual(result["posted"], "")
 
 
 class Framed(unittest.TestCase):
@@ -258,6 +310,55 @@ class EndToEnd(unittest.TestCase):
         self.assertNotIn("L2", {r.scenario for r in runs})
         with self.assertRaises(evals.EvalError):
             self.run_eval("trigger.label.nope")
+
+    def graded(self, **env: str) -> tuple[list, list]:
+        seen: list = []
+
+        def grab(folder, scenario, ws):
+            seen.append((ws.posted, ws.gh_calls))
+            return []
+        with mock.patch.dict(os.environ, env), mock.patch.object(evals, "grade", side_effect=grab):
+            runs, _ = self.run_eval()
+        return runs, seen
+
+    def test_post_error_is_a_failed_run_not_a_traceback(self) -> None:
+        for error in (subprocess.TimeoutExpired("bash", 60), trigger_eval.TriggerEvalError("bad")):
+            with mock.patch.object(trigger_eval, "post", side_effect=error):
+                runs, _ = self.graded()
+            with_run = next(r for r in runs if r.variant == "with")
+            self.assertTrue(with_run.error.startswith("the post job failed"), with_run.error)
+
+    def test_no_structured_output_posts_nothing(self) -> None:
+        runs, seen = self.graded(FAKE_NO_STRUCT="1")
+        self.assertEqual(seen[0], ("", ""))
+
+    def test_scenario_number_reaches_gh(self) -> None:
+        text = SCENARIOS.replace("    event: event.json\n    prompt: \"Read", "    event: event.json\n"
+                                 "    number: 42\n    prompt: \"Read", 1)
+        (self.root / "evals" / "trigger-label" / "scenarios.yaml").write_text(text, encoding="utf-8")
+        _, seen = self.graded()
+        self.assertTrue(seen[0][1].startswith("issue comment 42 "), seen[0])
+
+    def test_missing_trigger_without_is_a_setup_failure(self) -> None:
+        run = yaml.safe_load(self.run_yaml.read_text(encoding="utf-8"))
+        del run["trigger"]["without"]
+        self.run_yaml.write_text(yaml.safe_dump(run), encoding="utf-8")
+        runs, _ = self.graded()
+        without = next(r for r in runs if r.variant == "without")
+        self.assertTrue(without.error.startswith("the setup failed:"), without.error)
+
+    def test_profile_without_the_trigger_and_bare_id_stop_early(self) -> None:
+        with self.assertRaises(evals.EvalError):
+            self.run_eval("trigger.label.bug-triage")
+        with self.assertRaises(evals.EvalError) as ctx:
+            self.run_eval("trigger.label")
+        self.assertIn("profile", str(ctx.exception))
+        self.assertFalse(self.log.exists())
+
+    def test_model_replaces_the_model_in_the_with_argv(self) -> None:
+        self.graded()
+        argv = json.loads(self.log.read_text().splitlines()[0])
+        self.assertEqual(argv[argv.index("--model") + 1], "m1")
 
 
 if __name__ == "__main__":
