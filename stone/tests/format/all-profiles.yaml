@@ -1,4 +1,4 @@
-framework_version: 1.4.0
+framework_version: 1.5.0
 harness: claude-code
 model_profile: claude-5
 spec_tool: plain
@@ -35,5 +35,7 @@ specialists:
       labels: [a11y]
     blocks: false
     eval: evals/accessibility/
+  - id: perf
+    run: claude -p "Run the perf review" --model "x"
 owners:
   default: octocat

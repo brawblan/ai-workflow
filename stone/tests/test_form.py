@@ -34,9 +34,16 @@ class DumpYamlTest(unittest.TestCase):
     def test_date_string_uses_double_quotes(self) -> None:
         self.assertEqual(form.dump_yaml({"d": "2026-10-30"}), 'd: "2026-10-30"\n')
 
-    def test_no_single_quotes_are_written(self) -> None:
+    def test_value_that_needs_quotes_gets_double_quotes(self) -> None:
         text = form.dump_yaml({"a": "yes", "b": "1.10", "c": "x: y", "d": "- z"})
         self.assertNotIn("'", text)
+        self.assertIn('a: "yes"', text)
+
+    def test_value_with_a_double_quote_gets_single_quotes(self) -> None:
+        value = 'Specialist review \'perf\': claude -p "x"'
+        text = form.dump_yaml({"k": value})
+        self.assertEqual(text, "k: 'Specialist review ''perf'': claude -p \"x\"'\n")
+        self.assertEqual(yaml.safe_load(text), {"k": value})
 
     def test_long_value_stays_on_one_line(self) -> None:
         value = " ".join(["word"] * 60)
@@ -84,6 +91,10 @@ class SameFormTest(unittest.TestCase):
         self.assertFalse(form.same_form("a.yaml", "k: a\n", "k: b\n"))
         self.assertFalse(form.same_form("a.yaml", "k: [a]\n", "k: [a, b]\n"))
 
+    def test_yaml_type_change_matters(self) -> None:
+        self.assertFalse(form.same_form("a.yaml", "x: 0\n", "x: false\n"))
+        self.assertFalse(form.same_form("a.yaml", "x: 1\n", "x: 1.0\n"))
+
     def test_invalid_yaml_is_false(self) -> None:
         self.assertFalse(form.same_form("a.yaml", "k: [a\n", "k: a\n"))
         self.assertFalse(form.same_form("a.yaml", "k: a\n", "k: [a\n"))
@@ -105,6 +116,12 @@ class SameFormTest(unittest.TestCase):
         narrow = "| A | B |\n| --- | --- |\n| x | y |\n"
         wide = "| A     | B   |\n| ----- | --- |\n| x     | y   |\n"
         self.assertTrue(form.same_form("a.md", narrow, wide))
+
+    def test_markdown_list_nesting_matters(self) -> None:
+        self.assertFalse(form.same_form("a.md", "- a\n  - b\n", "- a\n- b\n"))
+
+    def test_markdown_trailing_whitespace_does_not_matter(self) -> None:
+        self.assertTrue(form.same_form("a.md", "- a  \n  - b\t\n", "- a\n  - b\n"))
 
     def test_markdown_word_change_matters(self) -> None:
         self.assertFalse(form.same_form("a.md", "some words\n", "some other words\n"))
@@ -173,12 +190,33 @@ class RenderFormTest(unittest.TestCase):
     def test_reformatted_manifest_is_not_rewritten(self) -> None:
         self.render()
         path = self.root / ".cornerstone/manifest.yaml"
-        path.write_text(yaml.safe_dump(yaml.safe_load(path.read_text()), sort_keys=False),
+        path.write_text(yaml.safe_dump(yaml.safe_load(path.read_text()), sort_keys=False, indent=4),
                         encoding="utf-8")
         before = path.read_text(encoding="utf-8")
         result = self.render()
         self.assertNotIn(".cornerstone/manifest.yaml", result.wrote)
         self.assertEqual(path.read_text(encoding="utf-8"), before)
+
+    def test_old_form_manifest_is_rewritten_in_the_new_form(self) -> None:
+        self.render()
+        path = self.root / ".cornerstone/manifest.yaml"
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        old = yaml.safe_dump(data, sort_keys=False, allow_unicode=True)
+        path.write_text(old, encoding="utf-8")
+        result = self.render()
+        self.assertIn(".cornerstone/manifest.yaml", result.wrote)
+        self.assertEqual(path.read_text(encoding="utf-8"), form.dump_yaml(data))
+
+    def test_formatter_reindented_manifest_is_not_rewritten(self) -> None:
+        self.render()
+        path = self.root / ".cornerstone/manifest.yaml"
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+        other = yaml.safe_dump(data, sort_keys=False, allow_unicode=True, indent=4, width=60)
+        self.assertNotEqual(other, yaml.safe_dump(data, sort_keys=False, allow_unicode=True))
+        path.write_text(other, encoding="utf-8")
+        result = self.render()
+        self.assertNotIn(".cornerstone/manifest.yaml", result.wrote)
+        self.assertEqual(path.read_text(encoding="utf-8"), other)
 
     def test_changed_manifest_value_is_rewritten(self) -> None:
         self.render()

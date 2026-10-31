@@ -55,8 +55,16 @@ class SplitCommandsTest(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertEqual(gate.split_commands(command), [command])
 
-    def test_assignment_before_a_command_splits(self) -> None:
-        self.assertEqual(gate.split_commands("A=1 a && b"), ["A=1 a", "b"])
+    def test_state_dependent_commands_do_not_split(self) -> None:
+        for command in ('A="x y" && echo "$A"', "A=1 B=2 && echo $A", "A=1 npm test && b",
+                        'eval "$(pyenv init -)" && pytest', "nvm use 20 && npm test",
+                        "[[ -f a && -f b ]] && make", "test -f a && make"):
+            with self.subTest(command=command):
+                self.assertEqual(gate.split_commands(command), [command])
+
+    def test_plain_commands_with_arguments_split(self) -> None:
+        self.assertEqual(gate.split_commands("npm run lint && npm test"),
+                         ["npm run lint", "npm test"])
 
 
 class PlanTest(unittest.TestCase):
@@ -73,12 +81,12 @@ class PlanTest(unittest.TestCase):
         return [step.name for step in steps if step.name.startswith("All checks")], err.getvalue()
 
     def test_split_gives_one_step_per_command(self) -> None:
-        names, err = self.plan("lint && test", True)
-        self.assertEqual(names, ["All checks: `lint`", "All checks: `test`"])
+        names, err = self.plan("make lint && make test", True)
+        self.assertEqual(names, ["All checks: `make lint`", "All checks: `make test`"])
         self.assertEqual(err, "")
 
     def test_default_is_one_step(self) -> None:
-        names, err = self.plan("lint && test", False)
+        names, err = self.plan("make lint && make test", False)
         self.assertEqual(names, ["All checks"])
         self.assertEqual(err, "")
 
@@ -87,7 +95,7 @@ class PlanTest(unittest.TestCase):
             with self.subTest(command=command):
                 names, err = self.plan(command, True)
                 self.assertEqual(names, ["All checks"])
-                self.assertIn("warning", err)
+                self.assertIn("does not split into commands that '&&' joins", err)
 
 
 class GateRunTest(unittest.TestCase):

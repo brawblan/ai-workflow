@@ -1,4 +1,5 @@
-framework_version: 1.4.0
+framework_version: 1.5.0
+framework_commit: "0123456789abcdef0123456789abcdef01234567"
 harness: claude-code
 model_profile: claude-5
 spec_tool: plain
@@ -66,5 +67,7 @@ specialists:
     eval: evals/accessibility/
   - id: security
     run: /security-review
+  - id: perf
+    run: claude -p "Run the perf review" --model "x"
 owners:
   default: octocat

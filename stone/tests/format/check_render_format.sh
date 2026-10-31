@@ -13,14 +13,15 @@ for config in "$HERE"/*.yaml; do
   name="$(basename "$config")"
   tmp="$(mktemp -d)"
   echo "== $name"
+  # set -e does not apply inside an `if ( ... )` subshell, so each step ends with `|| exit 1`.
   if (
-    cd "$tmp"
-    git init -q
-    mkdir .cornerstone
-    cp "$config" .cornerstone/config.yaml
-    stone render --root "$tmp" --framework "$REPO/framework"
-    printf '%s\n' ".cornerstone/config.yaml" > .prettierignore
-    npx --yes "$PRETTIER" --check .
+    cd "$tmp" || exit 1
+    git init -q || exit 1
+    mkdir .cornerstone || exit 1
+    cp "$config" .cornerstone/config.yaml || exit 1
+    stone render --root "$tmp" --framework "$REPO/framework" || exit 1
+    printf '%s\n' ".cornerstone/config.yaml" > .prettierignore || exit 1
+    npx --yes "$PRETTIER" --check . || exit 1
   ); then
     echo "ok: $name"
   else
