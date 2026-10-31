@@ -92,7 +92,10 @@ class GoldenSpikeTest(unittest.TestCase):
             with self.subTest(component=component["id"]):
                 self.assertEqual(str(component["added"]), TODAY.isoformat())
                 self.assertEqual(str(component["review_by"]), REVIEW_BY)
-                self.assertTrue(component["eval"])
+                if component["id"].startswith("check."):
+                    self.assertEqual(component["eval"], "")  # D99: the unit tests are the eval
+                else:
+                    self.assertTrue(component["eval"])
 
     def test_golden_spike_fixtures_hold_the_manifest(self) -> None:
         if updating():

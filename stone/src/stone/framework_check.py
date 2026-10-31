@@ -34,6 +34,7 @@ VENDOR_NAMES = ["claude", "codex", "cursor", "copilot", "gemini", "openspec", "k
 HARNESS_FOLDER = ".claude/"
 HARNESS_FOLDER_ALLOWED = {"framework_check.py", "writing_check.py"}
 EVAL_OPTIONAL_KINDS = {"check", "doc", "specialist"}  # lifecycle.md: a check is its own test, so its eval can be ""
+CHECK_ID_PREFIX = "check."  # D99: a check rendered as a CI job (check.k16) is still a check
 
 
 def _first_column(rows: list[list[str]]) -> list[str]:
@@ -561,6 +562,12 @@ def _is_date(value: Any) -> bool:
     return True
 
 
+def _eval_optional(entry: dict[str, Any]) -> bool:
+    """True if the component can have an empty eval: its kind, or its id, names a check (D43, D99)."""
+    return (entry.get("kind") in EVAL_OPTIONAL_KINDS
+            or str(entry.get("id", "")).startswith(CHECK_ID_PREFIX))
+
+
 def component_problems(entry: dict[str, Any], is_manifest: bool,
                        tested: dict[str, list[str]] | None = None) -> list[str]:
     """P5 (D43, D50): name each missing item of one component entry.
@@ -572,7 +579,7 @@ def component_problems(entry: dict[str, Any], is_manifest: bool,
     problems = []
     if "eval" not in entry:
         problems.append("has no 'eval' key (P5). Add the eval folder, or \"\" for a check.")
-    elif not str(entry["eval"] or "").strip() and entry.get("kind") not in EVAL_OPTIONAL_KINDS:
+    elif not str(entry["eval"] or "").strip() and not _eval_optional(entry):
         problems.append("has no eval plan (P5). Set 'eval' to its eval folder, for example "
                         f"evals/{str(entry.get('id', '')).replace('.', '-')}/.")
     if not is_manifest:

@@ -89,7 +89,7 @@ class RenderK7Test(unittest.TestCase):
         self.assertIn(K7, result.wrote)
         manifest = yaml.safe_load((self.root / render.MANIFEST).read_text(encoding="utf-8"))
         entry = next(c for c in manifest["components"] if c["id"] == "check.k7")
-        self.assertEqual((entry["eval"], entry["review_by"]), ("evals/check-k7/", "2027-04-18"))
+        self.assertEqual((entry["eval"], entry["review_by"]), ("", "2027-04-18"))
 
     def test_ac1_profiles_without_k7_do_not_get_the_check(self) -> None:
         for name in ("bug-triage", "code-audit", "spike"):
