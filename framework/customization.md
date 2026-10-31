@@ -377,8 +377,15 @@ With `--split-checks`, `stone gate` runs each command of `commands.all_checks` t
 gives each command its own row (D96). A failure does not stop the next command, so the table shows
 the result of each one. The gate warns and runs the value as one command in these cases:
 
-- The value has another shell operator: `||`, `;`, `|`, `&`, `(`, a backtick, or `#`.
-- The value has a command that changes the shell state, such as `cd`, `export`, or `NAME=value`.
+- The value has no `&&`, or an empty command before or after a `&&`.
+- The value has another shell operator outside quotes: `||`, `;`, `|`, `&`, `(`, `)`, a backtick,
+  `#`, or a new line. Or it has a quote with no end.
+- A command starts with `NAME=value`.
+- A command starts with a word that changes the shell state or tests a condition. The words are
+  in `SHELL_STATE` in `stone/src/stone/gate.py`, for example `cd`, `export`, `eval`, `nvm`, and `[[`.
+
+The gate cannot find each command that changes the shell state, such as a shell function. If a
+command needs the state of the command before it, do not use the option.
 
 Without the option, the value runs as one command.
 

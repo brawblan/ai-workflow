@@ -18,14 +18,17 @@ SEPARATOR_CELL = re.compile(r"^:?-{3,}:?$")
 
 
 class _Dumper(yaml.SafeDumper):
-    """Indent each list under its key, and quote with '"' when a value needs quotes."""
+    """Indent each list under its key. A value that needs quotes gets '"', or "'" if it has a '"'."""
 
     def increase_indent(self, flow: bool = False, indentless: bool = False) -> None:
         return super().increase_indent(flow, False)
 
     def choose_scalar_style(self) -> str:
         style = super().choose_scalar_style()
-        return '"' if style == "'" else style
+        value = self.event.value
+        if style == "'" and '"' not in value:
+            return '"'
+        return style
 
 
 def dump_yaml(data: Any) -> str:
@@ -47,10 +50,20 @@ def table(rows: list[list[str]]) -> list[str]:
     return [line(rows[0]), line(["-" * width for width in widths]), *map(line, rows[1:])]
 
 
+def _typed(data: Any) -> Any:
+    """Return the data with the type of each value, so that 0 and false are not equal."""
+    if isinstance(data, dict):
+        return {key: _typed(value) for key, value in data.items()}
+    if isinstance(data, list):
+        return [_typed(value) for value in data]
+    return (type(data).__name__, data)
+
+
 def _markdown_lines(text: str) -> list[str]:
     lines = []
     for raw in text.splitlines():
-        line = " ".join(raw.split())
+        indent = raw[:len(raw) - len(raw.lstrip())]
+        line = indent + " ".join(raw.split())
         if line.startswith("|"):
             cells = [cell.strip() for cell in line.strip("|").split("|")]
             line = "|".join("---" if SEPARATOR_CELL.match(cell) else cell for cell in cells)
@@ -65,9 +78,9 @@ def same_form(path: str, first: str, second: str) -> bool:
         return True
     try:
         if path.endswith((".yaml", ".yml")):
-            return yaml.safe_load(first) == yaml.safe_load(second)
+            return _typed(yaml.safe_load(first)) == _typed(yaml.safe_load(second))
         if path.endswith(".json"):
-            return json.loads(first) == json.loads(second)
+            return _typed(json.loads(first)) == _typed(json.loads(second))
     except (yaml.YAMLError, ValueError):
         return False
     if path.endswith(".md"):

@@ -17,8 +17,10 @@ from stone import specialists
 CONFIG = Path(".cornerstone/config.yaml")
 CHECKS = Path(".cornerstone/checks")
 K20_MODE = "block"  # the same mode as the K20 step of the G3 workflow. Blocks since 1.4.0 (D80).
-SHELL_STATE = {"cd", "pushd", "popd", "export", "source", ".", "set", "unset", "alias"}
-ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=\S*$")
+SHELL_STATE = {"cd", "pushd", "popd", "export", "source", ".", "set", "unset", "alias", "eval", "exec",
+               "nvm", "ulimit", "umask", "trap", "shopt", "declare", "typeset", "local", "readonly",
+               "[[", "[", "test"}
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")  # NAME=value, alone or before a command
 TOKEN = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"|\\.|&&|[|;&()`#\n]|[^'\"\\&|;()`#\n]+")
 OPERATOR = re.compile(r"[|;&()`#\n]")
 
@@ -79,8 +81,8 @@ def check_steps(all_checks: str, split: bool) -> list[Step]:
     commands = split_commands(all_checks) if split else [all_checks]
     if len(commands) == 1:
         if split:
-            print("warning: commands.all_checks has a shell operator other than '&&', or a command "
-                  "such as cd. It runs as one command.", file=sys.stderr)
+            print("warning: commands.all_checks does not split into commands that '&&' joins. "
+                  "It runs as one command.", file=sys.stderr)
         return [Step("All checks", all_checks)]
     return [Step(f"All checks: `{command}`", command) for command in commands]
 

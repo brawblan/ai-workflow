@@ -23,7 +23,7 @@ versions:
       - {path: .cornerstone/manifest.yaml, change: changed, note: "Lists are indented under their key, quotes are double, and a long value stays on one line. A formatter accepts it (D96)."}
       - {path: .cornerstone/specialists.md, change: changed, note: "The table columns are aligned, and a blank line follows the first comment (D96)."}
       - {path: .claude/agents/planner.md, change: changed, note: "The requirement ID line of the spec delta step is a list item (D96)."}
-      - {path: .github/workflows/cornerstone-*.yml, change: changed, note: "The trigger workflows quote the cron line and the action inputs with double quotes (D96)."}
+      - {path: ".github/workflows/cornerstone-<profile>-<trigger>.yml", change: changed, note: "The trigger workflows quote the cron line and the action inputs with double quotes (D96)."}
     steps:
       - "Optional: set protect_instruction_files to true in .cornerstone/config.yaml. Commit the config change alone, with the trailer Role human."
       - "Then run stone render. Commit the generated files alone, with the trailers Role generator and Actor agent."

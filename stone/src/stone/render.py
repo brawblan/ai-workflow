@@ -723,8 +723,9 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
                     "components": sorted(entries, key=lambda entry: entry["id"])}
     manifest_text = form.dump_yaml(new_manifest)
     manifest_path = root / MANIFEST
-    if not manifest_path.exists() or not form.same_form(
-            str(MANIFEST), manifest_path.read_text(encoding="utf-8"), manifest_text):
+    disk_text = manifest_path.read_text(encoding="utf-8") if manifest_path.exists() else ""
+    old_form = yaml.safe_dump(new_manifest, sort_keys=False, allow_unicode=True)  # before 1.5.0
+    if disk_text in ("", old_form) or not form.same_form(str(MANIFEST), disk_text, manifest_text):
         to_write[str(MANIFEST)] = manifest_text
         result.wrote.append(str(MANIFEST))
     else:
