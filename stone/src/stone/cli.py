@@ -106,6 +106,8 @@ def _parser() -> argparse.ArgumentParser:
     rules.add_argument("--skills", default=repo_rules.SKILLS, help="The skills folder, for R2.")
     rules.add_argument("--plugin-file", default=repo_rules.PLUGIN_FILE,
                        help="The plugin file with the version, for R2.")
+    rules.add_argument("--skip-k9", action="store_true",
+                       help="Do not run K9. For a release PR into main (D103).")
     rules.add_argument("--format", choices=["text", "github"], default="text")
 
     evidence = commands.add_parser("check-evidence",
@@ -217,7 +219,8 @@ def main(argv: list[str] | None = None) -> int:
 
 def _check_rules(args: argparse.Namespace) -> int:
     try:
-        findings = repo_rules.run(args.root, args.base, args.skills, args.plugin_file)
+        findings = repo_rules.run(args.root, args.base, args.skills, args.plugin_file,
+                                  complexity=not args.skip_k9)
     except subprocess.CalledProcessError as error:
         print(f"check-rules: git failed: {(error.stderr or '').strip()}")
         return 2

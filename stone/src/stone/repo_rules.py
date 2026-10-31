@@ -384,10 +384,12 @@ def _git_show(root: Path, rev: str, path: str) -> str | None:
 
 
 def run(root: Path, base: str | None, skills: str = SKILLS,
-        plugin_file: str = PLUGIN_FILE) -> list[Finding]:
+        plugin_file: str = PLUGIN_FILE, complexity: bool = True) -> list[Finding]:
+    """Run R1 and R3. With `base`, also run R2, R4, and K9. `complexity` false skips K9 (D103)."""
     findings = check_pins(root) + check_event_text(root)
     if base:
         findings += check_version_bump(root, base, skills, plugin_file)
         findings += check_commit_format(root, base)
-        findings += check_complexity(root, base)
+        if complexity:
+            findings += check_complexity(root, base)
     return findings
