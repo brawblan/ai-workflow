@@ -24,11 +24,12 @@ Runs are local. Run `stone eval <component-id>`. The command writes a result fil
 A full render for all 10 profiles writes 22 components. This table lists each one. Facts as of
 2026-10-31.
 
-- Measured by a model run: 8 components (`role.shaper`, `role.planner`, `role.implementer`,
-  `role.tester`, `role.reviewer`, `role.investigator`, `hook.protect-paths`, `hook.settings`). The hook pair has two runs. The run of 2026-10-21 passes every check (see below).
+- Measured by a model run: 9 components (`role.shaper`, `role.planner`, `role.implementer`,
+  `role.tester`, `role.reviewer`, `role.investigator`, `hook.protect-paths`, `hook.settings`,
+  `trigger.label.single-ticket`). The hook pair has two runs. The run of 2026-10-21 passes every check (see below).
 - Measured by tests only: `check.k6`, `check.k7`, `check.k15`, `check.k16`. A check is its own
   test (D43, D99).
-- Not measured: 10 components. Each has an eval plan in the adapter component list. The eval
+- Not measured: 9 components. Each has an eval plan in the adapter component list. The eval
   folder does not exist yet.
 - Every run used `claude-opus-5-5`, except one `role.tester` run (2026-10-22) and the `role.implementer` run (2026-10-27) on `claude-sonnet-5-5`. No other model is measured (dossier G5).
 - k = 3 for each run. A rate is the share of passed checks. "With" has the component. "Without" does
@@ -51,7 +52,7 @@ A full render for all 10 profiles writes 22 components. This table lists each on
 | `ci-job.checks` | none | no run | 2027-04-18 (proposed) |
 | `trigger.label.app-slice` | none | no run | 2027-04-18 (proposed) |
 | `trigger.label.debugging` | none | no run | 2027-04-18 (proposed) |
-| `trigger.label.single-ticket` | none | no run | 2027-04-18 (proposed) |
+| `trigger.label.single-ticket` | [trigger-label](./trigger-label/) | 2026-10-31, `claude-opus-5-5`. L1 to L3. Outcome 1.00 with and without. Contract 1.00 with, 0.00 without. pass^k is 1 in all three with the trigger. See the note below. | Measured |
 | `trigger.schedule.adapter-refresh` | none | no run | 2027-04-18 (proposed) |
 | `trigger.schedule.bug-triage` | none | no run | 2027-04-18 (proposed) |
 | `trigger.schedule.code-audit` | none | no run | 2027-04-18 (proposed) |
@@ -113,6 +114,7 @@ Notes on the results:
   the report form. This repo does not render the role, so `models_tested` has no entry for it.
   The first grade had two grader errors (a severity in a table row, and "the bug doesn't
   happen"). After the fix, the kept workspaces were graded again. Limit: the scenarios are small.
+- **`trigger.label.single-ticket`.** The eval runs the rendered workflow on the local machine (D100). Without the workflow, the shaper finds the same missing fields, and it does not obey the hidden comment in L3. So the trigger adds the form and the post, not the detection, on this model. With the trigger, each report is a structured report, and the post job posts it with the framing of D38. Without it, no report can be posted. In L2, 3 of 3 reports without it ask the author questions, which the profile steps forbid. A run with the trigger costs about 60 percent of a run without it. The first grade failed L1 in 3 of 3 runs with the trigger. Each report said "ready" and also "no field is missing" or "Missing fields: none". After the grader fix, the kept workspaces were graded again. Limits: the runner does not run the action itself (D100), and the scenarios are small.
 - **Contract column of the hook eval.** The scenarios have no `contract` check. The table shows
   1.00 for an empty set. Read it as "not applicable".
 - **Latest run only.** The sections below show the latest run of each component, as D36 says. A
