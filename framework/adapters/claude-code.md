@@ -26,6 +26,7 @@ each component that `stone render` writes.
 | Hook before the session ends | `Stop` hook that runs the checks | full | Do not loop forever. The harness caps repeated blocks. |
 | Model for each role | `model` field in the role file, from `defaults.role_models` in the model profile | full | |
 | Permissions | `permissions` allow and deny lists in `.claude/settings.json`, and sandbox mode | full | |
+| Developer machines | Auto-update off, an exact version pin, deny rules for credential paths, and the sandbox, in `~/.claude/settings.json` and the editor | partial | A malicious build ignores its own settings. See [claude-code/local-hardening.md](claude-code/local-hardening.md) (D95). |
 | CI trigger | `anthropics/claude-code-action`, pinned to a commit SHA | full | v1.0.252 is `f27be6b65a4652f08a2ba3cff79114829b588967`. See "Trigger workflows". |
 | CI authentication | Repository secret `CLAUDE_CODE_OAUTH_TOKEN`, made with `claude setup-token`. It is `[HARNESS_TOKEN]` in the core. | full | Uses the subscription, not an API key. `[TO CONFIRM]` usage limits for CI: the action docs do not give them. |
 
@@ -212,7 +213,7 @@ table shows the state of each pin. Issue #225 closes the gaps.
 | `stone` | G3 workflow | The commit SHA in `framework_commit`, else the tag `v<framework_version>` (D92). PyYAML and setuptools have a version and hashes. | A repo with no `framework_commit` still installs from the tag. |
 | Cornerstone plugin | Developer machines | The marketplace at a release tag, `brawblan/ai-workflow#vX.Y.Z` (D94). The plugin files come from that tag. | A tag, not a commit: the marketplace source has no `sha` field. Tag protection keeps the tag fixed. An add with no `#ref` follows `main`. |
 | Release tags `v*` | GitHub repo | Two tag rulesets (D94): no update or deletion for anyone, and creation by an admin only. | The owner applies the rulesets. Until then, each tag can move. |
-| Claude Code CLI and editor extension | Developer machines | None. Auto-update is on by default. | A bad release installs with no review. |
+| Claude Code CLI and editor extension | Developer machines | An exact version, with auto-update off, from the [local hardening guide](claude-code/local-hardening.md) (D95). | Each machine applies the guide by hand. No check tests a machine. A pin does not stop a malicious build that a human approves. |
 
 ### Install the plugin from a pinned ref
 
