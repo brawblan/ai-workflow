@@ -27,6 +27,10 @@ jobs:
       - name: Unit tests
         run: python stone/tests/run_parallel.py
 
+      # D96: the render output passes Prettier with its default options. The runner has Node.
+      - name: Prettier on the render output
+        run: bash stone/tests/format/check_render_format.sh
+
       - name: stone check
         run: stone check --format github
 
