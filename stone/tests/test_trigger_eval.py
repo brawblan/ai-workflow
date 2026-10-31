@@ -1,4 +1,4 @@
-"""Tests for the trigger part of `stone eval` (D100, issue #198).
+"""Tests for the trigger part of `stone eval` (D101, issue #198).
 
 They cover the id of a trigger component, the arguments of the role run, the post job with a fake
 `gh`, the framing check, the scenario loader, and a full run with a fake harness. No model runs.
