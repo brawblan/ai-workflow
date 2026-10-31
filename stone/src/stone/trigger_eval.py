@@ -1,4 +1,4 @@
-"""The trigger part of `stone eval`: run a rendered trigger workflow on the local machine (D100).
+"""The trigger part of `stone eval`: run a rendered trigger workflow on the local machine (D101).
 
 A trigger component id is the registry id and the profile: `trigger.label.single-ticket`. The
 variant `with` runs the role with the arguments of the rendered workflow (the prompt with the

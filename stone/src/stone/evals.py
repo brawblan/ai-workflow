@@ -35,7 +35,7 @@ KINDS = {"outcome", "contract"}
 REPORT = "@report"  # a check path that means the final text of the run
 REPORT_ENV = "STONE_EVAL_REPORT"  # grade.py reads the final text of the run here
 POSTED = "@posted"  # a check path that means the text that the post job of a trigger posted
-POSTED_ENV = "STONE_EVAL_POSTED"  # grade.py reads the posted text here (D100)
+POSTED_ENV = "STONE_EVAL_POSTED"  # grade.py reads the posted text here (D101)
 GH_CALLS_ENV = "STONE_EVAL_GH_CALLS"  # and each call of the forge CLI, one on each line
 RUNS = Path(".cornerstone/eval-runs")
 RESULTS = results.RESULTS
@@ -78,7 +78,7 @@ class Run:
 
 def load_scenarios(folder: Path, role_required: bool = True) -> dict[str, Any]:
     """Read and validate `scenarios.yaml`. Raise EvalError with each problem. A trigger eval
-    needs no `role`: the role is the first role of the profile (D100)."""
+    needs no `role`: the role is the first role of the profile (D101)."""
     path = folder / "scenarios.yaml"
     if not path.exists():
         raise EvalError(f"{path}: no file. Write the scenarios first (lifecycle.md).")
@@ -190,7 +190,7 @@ def find_component(framework: Path, harness: str, component_id: str,
             if not entry.get("eval"):
                 raise EvalError(f"{component_id} has no eval folder. A check is its own test.")
             return entry
-    trigger = trigger_eval.split_id(component_id, registry)  # trigger.label.single-ticket (D100)
+    trigger = trigger_eval.split_id(component_id, registry)  # trigger.label.single-ticket (D101)
     if trigger:
         return trigger
     guidance = find_guidance(root, component_id) if root else None
@@ -419,7 +419,7 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
 
 def _trigger_argv(folder: Path, scenario: dict[str, Any], variant: str, workspace: Workspace,
                   values: dict[str, Any], opts: dict[str, Any]) -> tuple[list[str], dict | None]:
-    """Return the command of a trigger run and, for `with`, the rendered workflow (D100)."""
+    """Return the command of a trigger run and, for `with`, the rendered workflow (D101)."""
     config = opts["run_config"].get("trigger") or {}
     if not isinstance(config.get(variant), list):
         raise trigger_eval.TriggerEvalError(f"the harness run file has no 'trigger.{variant}'.")

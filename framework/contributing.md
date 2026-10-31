@@ -17,6 +17,7 @@ Rules for a PR that changes `framework/`. `AGENTS.md` points here.
 
 `stone check-rules` tests rules that `AGENTS.md` states for this repo. R1 tests the action pins.
 R2 tests the plugin version bump. R3 tests that event text goes to a step through `env`. R4 tests
-the commit message format. `stone render` does not write them for a target repo (D78, D97, D98).
+the commit message format. K9 tests the complexity caps of each changed function. `stone render`
+does not write them for a target repo (D78, D97, D98, D100).
 
 To add a rule check, add it to `stone/src/stone/repo_rules.py`, and replay it on the merged PRs (D45).

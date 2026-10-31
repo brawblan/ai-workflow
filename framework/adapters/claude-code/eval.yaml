@@ -20,7 +20,7 @@ run:
              --permission-mode, default, --setting-sources, project, --max-budget-usd, $budget,
              --allowedTools, $tools, --, $prompt]
 
-# A trigger eval (D100). `with` runs the role with the claude_args and the prompt of the rendered
+# A trigger eval (D101). `with` runs the role with the claude_args and the prompt of the rendered
 # workflow, as the action does. $claude_args becomes those words. `without` is the same role run by
 # hand: the same event file, the prompt of the scenario, no schema, and only the Read tool.
 trigger:
