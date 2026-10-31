@@ -1,0 +1,39 @@
+framework_version: 1.4.0
+harness: claude-code
+model_profile: claude-5
+spec_tool: plain
+protect_instruction_files: true
+profiles:
+  - single-ticket
+  - full-project
+  - app-slice
+  - bug-triage
+  - code-audit
+  - debugging
+  - dependency-upgrade
+  - refactor-migration
+  - spike
+  - adapter-refresh
+branches:
+  integration: dev
+  main: main
+commands:
+  install: pip install .
+  test_unit: python -m unittest
+  all_checks: make check
+paths:
+  source: [src/]
+  tests: [tests/]
+  checks: [.github/workflows/, .cornerstone/checks/]
+  plans: docs/plans/
+specialists:
+  - id: accessibility
+    run: claude --agent accessibility-lead
+    when:
+      paths: ["**/components/**"]
+      personas_with: [screen reader]
+      labels: [a11y]
+    blocks: false
+    eval: evals/accessibility/
+owners:
+  default: octocat
