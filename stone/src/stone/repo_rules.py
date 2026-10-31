@@ -25,6 +25,7 @@ PLUGIN_FILE = "plugins/cornerstone/.claude-plugin/plugin.json"
 _USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<value>[^#\n]*?)\s*(?:#.*)?$")
 _ACTION_PIN = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 _IMAGE_PIN = re.compile(r"^docker://\S+@sha256:[0-9a-f]{64}$")
+_GIT_SUBJECT = re.compile(r'^(?:Revert|Reapply) ".*"$')
 _SUBJECT = re.compile(r"^(?P<type>[a-z]+)(?:\((?P<scope>[^()\s]+)\))?!?: \S")
 
 
@@ -103,9 +104,9 @@ def check_version_bump(root: Path, base: str, skills: str = SKILLS,
 def subject_problem(subject: str) -> str | None:
     """Return why `subject` is not `type(scope): summary`, or None. The scope is optional.
 
-    A subject that `git revert` writes (`Revert "..."`) passes.
+    A subject that `git revert` writes (`Revert "..."` or `Reapply "..."`) passes.
     """
-    if subject.startswith('Revert "'):
+    if _GIT_SUBJECT.match(subject):
         return None
     match = _SUBJECT.match(subject)
     if not match:
