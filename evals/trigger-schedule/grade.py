@@ -25,7 +25,9 @@ WINDOW = 400  # the characters before a "duplicate" word that can name the issue
 # "Not run" is the same answer as "not tried" (the run of 2026-10-31).
 FORM = {"reproduced": re.compile(r"\breproduc\w*\W{0,6}(yes|no|not (tried|run|attempted))\b",
                                  re.I),
-        "duplicate": re.compile(r"\bduplicate( of)?\W{0,6}(#?\d+|none)\b", re.I),
+        # "Unknown" with a reason is an answer: the run cannot search the issues (2026-10-31).
+        "duplicate": re.compile(r"\bduplicate( of)?\W{0,6}(#?\d+|none|unknown|not (searched|checked))\b",
+                                re.I),
         "severity": re.compile(r"\bseverity\W+(?:\w+\W+){0,3}?"
                                r"(critical|high|medium|low|minor|major|[sp][0-4])\b", re.I)}
 
