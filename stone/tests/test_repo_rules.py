@@ -331,10 +331,6 @@ class EventTextTests(unittest.TestCase):
                                  "        run: echo \"$TITLE\"\n")
         self.assertEqual(repo_rules.check_event_text(self.root), [])
 
-    # DEFECT in run_lines: for "- run: |", key_indent is the column of the dash, not of "run".
-    # A sibling key ("env:") at the column of "run" is then read as block text. D96 says the block
-    # is each line indented more than the "run:" key. Remove expectedFailure when this is fixed.
-    @unittest.expectedFailure
     def test_r3_env_after_run_block_passes(self) -> None:
         _run_workflow(self.root, "      - run: |\n          echo \"$TITLE\"\n"
                                  f"        env:\n          TITLE: {EVENT}\n")
