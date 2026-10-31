@@ -22,12 +22,13 @@ Runs are local. Run `stone eval <component-id>`. The command writes a result fil
 ## Coverage
 
 A full render for all 10 profiles writes 22 components. This table lists each one. Facts as of
-2026-10-27.
+2026-10-31.
 
 - Measured by a model run: 8 components (`role.shaper`, `role.planner`, `role.implementer`,
   `role.tester`, `role.reviewer`, `role.investigator`, `hook.protect-paths`, `hook.settings`). The hook pair has two runs. The run of 2026-10-21 passes every check (see below).
-- Measured by tests only: `check.k6`. A check is its own test (D43).
-- Not measured: 13 components. Each has an eval plan in the adapter component list. The eval
+- Measured by tests only: `check.k6`, `check.k7`, `check.k15`, `check.k16`. A check is its own
+  test (D43, D99).
+- Not measured: 10 components. Each has an eval plan in the adapter component list. The eval
   folder does not exist yet.
 - Every run used `claude-opus-5-5`, except one `role.tester` run (2026-10-22) and the `role.implementer` run (2026-10-27) on `claude-sonnet-5-5`. No other model is measured (dossier G5).
 - k = 3 for each run. A rate is the share of passed checks. "With" has the component. "Without" does
@@ -44,9 +45,9 @@ A full render for all 10 profiles writes 22 components. This table lists each on
 | `hook.protect-paths` | [hook-protect-paths](./hook-protect-paths/) | 2026-10-21, `claude-opus-5-5`, after D48. H1 to H5. Every check passes in 30 of 30 runs, in both variants. Outcome 1.00 with and without. pass^k is 1 in all rows. The run of 2026-10-19 passed `bash_write_lands` in 4 of 30 runs (see the note below). | Measured. Review D39 by 2027-04-18. |
 | `hook.settings` | [hook-protect-paths](./hook-protect-paths/) | The same run as `hook.protect-paths`. It has no result of its own. | Measured with the hook. |
 | `check.k6` | none (a check is its own test) | Unit tests. The `k6_fails` check of the hook eval also runs K6: 30 of 30 runs fail the commit, as D39 expects. | Not applicable |
-| `check.k7` | none | no run | 2027-04-18 (proposed) |
-| `check.k15` | none | no run | 2027-04-18 (proposed) |
-| `check.k16` | none | no run | 2027-04-18 (proposed) |
+| `check.k7` | none (a check is its own test) | Unit tests, 20 test methods (D99). The replay of D45 on 62 merged PRs found no false positive. | Not applicable |
+| `check.k15` | none (a check is its own test) | Unit tests, 43 test methods (D99). | Not applicable |
+| `check.k16` | none (a check is its own test) | Unit tests, 85 test methods (D99). | Not applicable |
 | `ci-job.checks` | none | no run | 2027-04-18 (proposed) |
 | `trigger.label.app-slice` | none | no run | 2027-04-18 (proposed) |
 | `trigger.label.debugging` | none | no run | 2027-04-18 (proposed) |

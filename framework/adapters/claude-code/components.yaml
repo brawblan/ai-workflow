@@ -125,7 +125,7 @@ components:
     when: {check: K7}
     template: checks/change_size.py
     target: .cornerstone/checks/change_size.py
-    eval: evals/check-k7/
+    eval: ""                                 # D99: the unit tests are the eval
 
   - id: check.k15
     kind: check
@@ -135,7 +135,7 @@ components:
     template: checks/instruction_size.py
     target: .cornerstone/checks/instruction_size.py
     ci_step: workflows/steps/instruction-size.yml
-    eval: evals/check-k15/
+    eval: ""                                 # D99: the unit tests are the eval
 
   - id: check.k22
     kind: check
@@ -251,4 +251,4 @@ components:
     when: {check: K16}
     template: workflows/cornerstone-k16.yml
     target: .github/workflows/cornerstone-k16.yml
-    eval: evals/check-k16/
+    eval: ""                                 # D99: the unit tests are the eval
