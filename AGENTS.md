@@ -28,7 +28,7 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | Unit tests, in parallel (about 3 times faster). Add `-q` to show only failures and the summary | `python stone/tests/run_parallel.py` |
 | Validate the framework | `stone check` |
 | Writing check (K17) on your changes | `stone check-writing --diff origin/dev` |
-| Action pins and plugin version bump (R1, R2, D78) | `stone check-rules --base origin/dev` |
+| Action pins, plugin version bump, event text in `env`, and commit message format (R1 to R4, D78, D97, D98) | `stone check-rules --base origin/dev` |
 | Validate the plugin | `claude plugin validate .` |
 | Preview the docs site | `pip install -r website/requirements.txt && mkdocs serve` |
 | Try a skill before you push | `claude --plugin-dir plugins/cornerstone` |
