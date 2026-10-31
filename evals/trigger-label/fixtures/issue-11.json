@@ -1,0 +1,14 @@
+{
+  "number": 11,
+  "title": "Search notes by a word",
+  "labels": [
+    {
+      "id": "LA_1",
+      "name": "agent-ready",
+      "description": "",
+      "color": "0e8a16"
+    }
+  ],
+  "comments": [],
+  "body": "## Problem\nA writer cannot find an old note. They must read the full list.\n\n## Acceptance criteria\n1. `Notes.search(word)` returns each note that contains the word, in the order of `list()`.\n2. The search ignores case: `search(\"Idea\")` finds \"an idea\".\n3. A word that no note contains gives an empty list.\n\n## Non-goals\n- No search in more than one word.\n- No index or database.\n\n## Test oracle\nA unit test adds the notes \"an idea\", \"milk\", and \"Idea two\". It expects `search(\"idea\")` to return `[\"1. an idea\", \"3. Idea two\"]`, and `search(\"tea\")` to return `[]`.\n\nPersonas: writer\n"
+}
