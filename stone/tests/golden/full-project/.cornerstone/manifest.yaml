@@ -8,7 +8,7 @@ components:
       - P6
     source: framework
     owner: octocat
-    eval: evals/check-k15/
+    eval: ""
     models_tested: []
     added: "2026-10-18"
     review_by: "2027-04-18"
@@ -37,7 +37,7 @@ components:
       - P10
     source: framework
     owner: octocat
-    eval: evals/check-k7/
+    eval: ""
     models_tested: []
     added: "2026-10-18"
     review_by: "2027-04-18"

@@ -124,7 +124,7 @@ class K16WhenTest(K16Base):
         self.assertIn("check.k16", entries)
         entry = entries["check.k16"]
         self.assertEqual(entry["kind"], "ci-job")
-        self.assertEqual(entry["eval"], "evals/check-k16/")
+        self.assertEqual(entry["eval"], "")  # D99: the unit tests are the eval
         self.assertEqual(str(entry["review_by"]), REVIEW_BY)
         self.assertEqual(str(entry["added"]), TODAY.isoformat())
         self.assertEqual(entry["files"], [K16])

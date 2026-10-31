@@ -70,6 +70,15 @@ class CheckComponentsTest(unittest.TestCase):
         self.write_list('components:\n  - id: check.k6\n    kind: check\n    eval: ""\n')
         self.assertEqual(self.messages(), [])
 
+    def test_ci_job_with_a_check_id_and_empty_eval_passes(self) -> None:
+        # D99: K16 renders a workflow, so its kind is ci-job. It is still a check.
+        self.write_list('components:\n  - id: check.k16\n    kind: ci-job\n    eval: ""\n')
+        self.assertEqual(self.messages(), [])
+
+    def test_ci_job_with_another_id_and_empty_eval_fails(self) -> None:
+        self.write_list('components:\n  - id: trigger.label\n    kind: ci-job\n    eval: ""\n')
+        self.assertIn("'trigger.label' has no eval plan", self.messages()[0])
+
     def test_role_with_empty_eval_fails(self) -> None:
         self.write_list('components:\n  - id: role.tester\n    kind: role\n    eval: ""\n')
         messages = self.messages()

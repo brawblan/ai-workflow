@@ -422,7 +422,7 @@ class K15ManifestTest(K15Base):
         entry = self.manifest_entry("check.k15")
         self.assertIsNotNone(entry, self.read(MANIFEST))
         self.assertEqual(entry["kind"], "check")
-        self.assertEqual(entry["eval"], "evals/check-k15/")
+        self.assertEqual(entry["eval"], "")  # D99: the unit tests are the eval
         self.assertEqual(entry["files"], [K15])
 
     def test_ac4_review_by_is_6_months_after_added(self) -> None:
