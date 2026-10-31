@@ -72,7 +72,8 @@ contributors must see no change.
    Do not put them in `.cornerstone/` or `.claude/`: the hook blocks the roles there, and
    `stone check` fails.
 3. Run `stone render`. It writes no workflow file. It prints the lines to add to
-   `.git/info/exclude`. Add them. A file that git already tracks stays tracked.
+   `.git/info/exclude` that git does not ignore yet. Add them. A file that git already tracks stays
+   tracked.
 4. Before you open the PR, run `stone gate --base origin/main`. Put its output in the Evidence
    section.
 
