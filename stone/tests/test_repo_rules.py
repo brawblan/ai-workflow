@@ -1034,5 +1034,177 @@ class ComplexityCheckTests(GitRepoCase):
         self.assertNotIn("K9", [f.check for f in repo_rules.run(self.root, None)])
 
 
+class OldPathsTests(unittest.TestCase):
+    def test_k9_old_paths_rename(self) -> None:
+        diff = ("diff --git a/src/a.py b/src/b.py\nsimilarity index 90%\n"
+                "rename from src/a.py\nrename to src/b.py\n"
+                "--- a/src/a.py\n+++ b/src/b.py\n@@ -1 +1 @@\n-x\n+y\n")
+        self.assertEqual(repo_rules.old_paths(diff), {"src/b.py": "src/a.py"})
+
+    def test_k9_old_paths_unmoved_file_has_no_entry(self) -> None:
+        diff = "--- a/src/a.py\n+++ b/src/a.py\n@@ -1 +1 @@\n-x\n+y\n"
+        self.assertEqual(repo_rules.old_paths(diff), {})
+
+    def test_k9_old_paths_new_file_has_no_entry(self) -> None:
+        diff = "--- /dev/null\n+++ b/src/a.py\n@@ -0,0 +1 @@\n+y\n"
+        self.assertEqual(repo_rules.old_paths(diff), {})
+
+    def test_k9_old_paths_empty(self) -> None:
+        self.assertEqual(repo_rules.old_paths(""), {})
+
+
+class ComplexityLimitsRobustnessTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.root = Path(self._tmp.name)
+
+    def test_k9_string_source_becomes_one_tuple(self) -> None:
+        _write(self.root, ".cornerstone/config.yaml", "paths:\n  source: lib/\n")
+        self.assertEqual(repo_rules.complexity_limits(self.root)[1], ("lib/",))
+
+    def test_k9_string_limit_uses_default(self) -> None:
+        _write(self.root, ".cornerstone/config.yaml",
+               "limits:\n  cyclomatic: \"10\"\n  function_lines: 20\n")
+        self.assertEqual(repo_rules.complexity_limits(self.root)[0],
+                         {"cyclomatic": 10, "function_lines": 20})
+
+    def test_k9_list_config_uses_defaults(self) -> None:
+        _write(self.root, ".cornerstone/config.yaml", "- a\n- b\n")
+        self.assertEqual(repo_rules.complexity_limits(self.root),
+                         ({"cyclomatic": 10, "function_lines": 60}, ("src/",)))
+
+    def test_k9_non_dict_limits_and_paths_use_defaults(self) -> None:
+        _write(self.root, ".cornerstone/config.yaml", "limits: 5\npaths: [a]\n")
+        self.assertEqual(repo_rules.complexity_limits(self.root),
+                         ({"cyclomatic": 10, "function_lines": 60}, ("src/",)))
+
+
+NOLIM = {**LIM, "function_lines": 99}
+
+
+class SameNameTests(unittest.TestCase):
+    def test_k9_setter_over_limit_found_once(self) -> None:
+        text = ("class C:\n"
+                "    @property\n"
+                "    def v(self):\n"
+                "        return 1\n"
+                "\n"
+                "    @v.setter\n"
+                "    def v(self, x):\n"
+                + "".join(f"        if x == {i}:\n            pass\n" for i in range(3)))
+        lines = set(range(7, len(text.splitlines()) + 1))
+        out = repo_rules.function_problems(text, lines, NOLIM)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0][0], 7)
+        self.assertIn("'C.v'", out[0][1])
+
+    def test_k9_setter_not_worse_than_old_passes(self) -> None:
+        text = ("class C:\n    @property\n    def v(self):\n        return 1\n\n"
+                "    @v.setter\n    def v(self, x):\n"
+                + "".join(f"        if x == {i}:\n            pass\n" for i in range(3)))
+        new = text + "        return None\n"
+        self.assertEqual(repo_rules.function_problems(
+            new, {len(new.splitlines())}, NOLIM, text), [])
+
+    def test_k9_conditional_second_def_over_limit_found(self) -> None:
+        text = ("if cond:\n    def g():\n        return 1\nelse:\n"
+                + "".join(f"    {line}\n" for line in _branchy(3, "g").splitlines()))
+        out = repo_rules.function_problems(text, set(range(1, len(text.splitlines()) + 1)),
+                                           NOLIM)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0][0], 5)
+        self.assertIn("'g'", out[0][1])
+
+
+class FunctionLengthTests(unittest.TestCase):
+    def test_k9_decorators_not_counted(self) -> None:
+        text = "@a\n@b\ndef f():\n" + "    pass\n" * 7  # def line + 7 = 8 lines
+        self.assertEqual(repo_rules.function_problems(text, {4}, LIM), [])
+
+    def test_k9_docstring_and_comment_lines_counted(self) -> None:
+        text = ('def f():\n    """Doc.\n\n    More.\n    """\n    # note\n'
+                "    pass\n    pass\n    pass\n")  # 9 lines
+        out = repo_rules.function_problems(text, {7}, LIM)
+        self.assertEqual(len(out), 1)
+        self.assertIn("9 lines", out[0][1])
+
+    def test_k9_function_lines_increase_on_old_over_limit_fails(self) -> None:
+        old = "def f():\n" + "    pass\n" * 9  # 10 lines
+        new = old + "    pass\n"  # 11 lines
+        out = repo_rules.function_problems(new, {11}, LIM, old)
+        self.assertEqual(len(out), 1)
+        self.assertIn("(it was 10)", out[0][1])
+
+    def test_k9_function_lines_same_on_old_over_limit_passes(self) -> None:
+        old = "def f():\n" + "    pass\n" * 9
+        new = old.replace("pass", "return", 1)
+        self.assertEqual(repo_rules.function_problems(new, {2}, LIM, old), [])
+
+
+class MergeBaseTextTests(GitRepoCase):
+    """check_complexity must pass the text at the merge base on to the pairing."""
+
+    def k9(self) -> list:
+        return repo_rules.check_complexity(self.root, "main")
+
+    def start_from(self, path: str, text: str) -> None:
+        """Commit `text` at `path`, make it the new `main`, and branch again."""
+        _write(self.root, path, text)
+        self.commit("feat: old")
+        _git(self.root, "checkout", "-q", "-B", "main", "HEAD")
+        _git(self.root, "checkout", "-q", "-b", "feature2")
+
+    def test_k9_old_over_limit_unchanged_complexity_passes(self) -> None:
+        self.start_from("src/a.py", _branchy(11))
+        _write(self.root, "src/a.py", _branchy(11).replace("return x", "return x + 1"))
+        self.commit("fix: line")
+        self.assertEqual(self.k9(), [])
+
+    def test_k9_old_over_limit_made_worse_fails(self) -> None:
+        self.start_from("src/a.py", _branchy(11))
+        _write(self.root, "src/a.py", _branchy(12))
+        self.commit("fix: worse")
+        out = self.k9()
+        self.assertEqual(len(out), 1)
+        self.assertIn("(it was 12)", out[0].message)
+
+    def test_k9_moved_file_old_over_limit_not_worse_passes(self) -> None:
+        self.start_from("src/a.py", _branchy(11))
+        _git(self.root, "mv", "src/a.py", "src/b.py")
+        _write(self.root, "src/b.py", _branchy(11).replace("return x", "return x + 1"))
+        self.commit("refactor: move")
+        self.assertEqual(self.k9(), [])
+
+    def test_k9_moved_file_made_worse_fails(self) -> None:
+        self.start_from("src/a.py", _branchy(11))
+        _git(self.root, "mv", "src/a.py", "src/b.py")
+        _write(self.root, "src/b.py", _branchy(12))
+        self.commit("refactor: move and worsen")
+        out = self.k9()
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0].path, "src/b.py")
+        self.assertIn("(it was 12)", out[0].message)
+
+    def test_k9_noprefix_config_still_finds_worse_function(self) -> None:
+        _git(self.root, "config", "diff.noprefix", "true")
+        self.start_from("src/a.py", _branchy(11))
+        _write(self.root, "src/a.py", _branchy(12))
+        self.commit("fix: worse")
+        out = self.k9()
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0].path, "src/a.py")
+
+    def test_k9_setter_old_over_limit_not_worse_passes(self) -> None:
+        text = ("class C:\n    @property\n    def v(self):\n        return 1\n\n"
+                "    @v.setter\n    def v(self, x):\n"
+                + "".join(f"        if x == {i}:\n            pass\n" for i in range(11)))
+        self.start_from("src/a.py", text)
+        _write(self.root, "src/a.py", text.replace("if x == 0", "if x == 100"))
+        self.commit("fix: setter")
+        out = self.k9()
+        self.assertEqual(out, [])
+
+
 if __name__ == "__main__":
     unittest.main()
