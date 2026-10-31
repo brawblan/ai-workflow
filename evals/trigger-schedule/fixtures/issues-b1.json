@@ -1,0 +1,37 @@
+[
+  {
+    "number": 23,
+    "title": "Add a dark mode",
+    "body": "I would like a dark color theme for the app.",
+    "labels": [],
+    "createdAt": "2026-10-30T09:00:00Z"
+  },
+  {
+    "number": 22,
+    "title": "The wrong note is gone after a delete",
+    "body": "I had three notes and ran delete 2. Note 2 is still there, but note 3 is gone.",
+    "labels": [
+      {
+        "id": "LA_2",
+        "name": "bug",
+        "description": "",
+        "color": "d73a4a"
+      }
+    ],
+    "createdAt": "2026-10-29T09:00:00Z"
+  },
+  {
+    "number": 21,
+    "title": "Delete removes the wrong note",
+    "body": "Steps: add \"a\", add \"b\", delete note 1.\nExpected: only \"b\" is left.\nActual: only \"a\" is left.",
+    "labels": [
+      {
+        "id": "LA_2",
+        "name": "bug",
+        "description": "",
+        "color": "d73a4a"
+      }
+    ],
+    "createdAt": "2026-10-28T09:00:00Z"
+  }
+]
