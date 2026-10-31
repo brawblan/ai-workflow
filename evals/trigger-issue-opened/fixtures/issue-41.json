@@ -1,0 +1,7 @@
+{
+  "number": 41,
+  "title": "Delete removes the wrong note",
+  "labels": [],
+  "comments": [],
+  "body": "Steps: add \"milk\", add \"eggs\", add \"tea\", then delete note 2.\nExpected: \"milk\" and \"tea\" are left.\nActual: \"milk\" and \"eggs\" are left."
+}
