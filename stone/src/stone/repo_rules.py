@@ -1,15 +1,18 @@
-"""Checks for rules that this repo states in prose (P6, D78, D97, D98): action pins, version bump,
-event text in `run`, and commit message format.
+"""Checks for rules that this repo states in prose (P6, D78, D97, D98, D100): action pins, version
+bump, event text in `run`, commit message format, and complexity caps (K9).
 
 These checks are for the repo of the framework. `stone render` does not write them for a target repo.
 """
 
 from __future__ import annotations
 
+import ast
 import json
 import re
 import subprocess
 from pathlib import Path
+
+import yaml
 
 from stone.findings import Finding
 
@@ -17,6 +20,14 @@ PIN_CHECK = "R1"
 BUMP_CHECK = "R2"
 ENV_CHECK = "R3"
 COMMIT_CHECK = "R4"
+COMPLEXITY_CHECK = "K9"
+CONFIG = ".cornerstone/config.yaml"
+DEFAULT_LIMITS = {"cyclomatic": 10, "function_lines": 60}
+DEFAULT_SOURCE = ("src/",)
+_FUNCTIONS = (ast.FunctionDef, ast.AsyncFunctionDef)
+_BRANCHES = (ast.If, ast.IfExp, ast.For, ast.AsyncFor, ast.While, ast.ExceptHandler,
+             ast.match_case)
+_HUNK = re.compile(r"^@@ -\S+ \+(?P<start>\d+)(?:,(?P<count>\d+))? @@")
 COMMIT_TYPES = ("build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "revert", "style",
                 "test")
 WORKFLOWS = ".github/workflows"
@@ -201,6 +212,171 @@ def check_commit_format(root: Path, base: str) -> list[Finding]:
     return findings
 
 
+def cyclomatic(function: ast.AST) -> int:
+    """Return the cyclomatic complexity of `function`: 1, plus 1 for each decision point.
+
+    A decision point is an `if` or `elif`, a conditional expression, a `for` or `while`, an
+    `except`, a `case`, the `for` and each `if` of a comprehension, and each `and` or `or` after
+    the first operand. A nested function or class is not counted here: it has its own count.
+    """
+    count = 1
+    pending = list(ast.iter_child_nodes(function))
+    while pending:
+        node = pending.pop()
+        if isinstance(node, (*_FUNCTIONS, ast.ClassDef)):
+            continue
+        if isinstance(node, _BRANCHES):
+            count += 1
+        elif isinstance(node, ast.comprehension):
+            count += 1 + len(node.ifs)
+        elif isinstance(node, ast.BoolOp):
+            count += len(node.values) - 1
+        pending.extend(ast.iter_child_nodes(node))
+    return count
+
+
+def changed_lines(diff: str) -> dict[str, set[int]]:
+    """Return the new-file line numbers that each file of a `git diff -U0` adds or changes."""
+    found: dict[str, set[int]] = {}
+    path = ""
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            path = line[6:] if line.startswith("+++ b/") else ""
+            continue
+        match = _HUNK.match(line)
+        if path and match:
+            start, count = int(match.group("start")), int(match.group("count") or 1)
+            found.setdefault(path, set()).update(range(start, start + count))
+    return found
+
+
+def old_paths(diff: str) -> dict[str, str]:
+    """Return the old path of each file that a `git diff` moved, by its new path."""
+    found: dict[str, str] = {}
+    old = ""
+    for line in diff.splitlines():
+        if line.startswith("--- "):
+            old = line[6:] if line.startswith("--- a/") else ""
+        elif line.startswith("+++ b/") and old and old != line[6:]:
+            found[line[6:]] = old
+    return found
+
+
+def complexity_limits(root: Path) -> tuple[dict[str, int], tuple[str, ...]]:
+    """Return the K9 limits and the source folders from the repo config, or the defaults."""
+    path = root / CONFIG
+    config = yaml.safe_load(path.read_text(encoding="utf-8")) if path.exists() else None
+    config = config if isinstance(config, dict) else {}
+    given = config.get("limits") if isinstance(config.get("limits"), dict) else {}
+    limits = {key: given[key] if isinstance(given.get(key), int) else value
+              for key, value in DEFAULT_LIMITS.items()}
+    paths = config.get("paths") if isinstance(config.get("paths"), dict) else {}
+    source = paths.get("source") or DEFAULT_SOURCE
+    return limits, (source,) if isinstance(source, str) else tuple(source)
+
+
+def function_metrics(text: str) -> dict[str, list[tuple[range, int]]]:
+    """Return the lines and the cyclomatic complexity of each function, by its qualified name.
+
+    A name can have more than one function, for example a property and its setter. The list
+    keeps them in the order of the file.
+    """
+    found: dict[str, list[tuple[range, int]]] = {}
+    pending: list[tuple[ast.AST, str]] = [(ast.parse(text), "")]
+    while pending:
+        parent, prefix = pending.pop()
+        for node in ast.iter_child_nodes(parent):
+            name = prefix
+            if isinstance(node, (*_FUNCTIONS, ast.ClassDef)):
+                name = f"{prefix}{node.name}."
+            if isinstance(node, _FUNCTIONS):
+                span = range(node.lineno, (node.end_lineno or node.lineno) + 1)
+                found.setdefault(name[:-1], []).append((span, cyclomatic(node)))
+            pending.append((node, name))
+    return found
+
+
+def limit_problem(name: str, key: str, value: int, old_value: int | None, limit: int) -> str | None:
+    """Return why `value` of function `name` breaks the limit `key`, or None.
+
+    If the function was over the limit at the merge base (`old_value`), and the value did not
+    increase, it passes: the change did not add complexity (D100).
+    """
+    was_over = old_value is not None and old_value > limit
+    if value <= limit or (was_over and value <= (old_value or 0)):
+        return None
+    what = f"a cyclomatic complexity of {value}" if key == "cyclomatic" else f"{value} lines"
+    was = f" (it was {old_value})" if was_over else ""
+    return f"'{name}' has {what}, more than the limit {limit}{was}"
+
+
+def _old_metrics(old_text: str | None) -> dict[str, list[tuple[range, int]]]:
+    try:
+        return function_metrics(old_text) if old_text else {}
+    except SyntaxError:
+        return {}  # The old file does not parse, so each function counts as new.
+
+
+def _in_file_order(metrics: dict[str, list[tuple[range, int]]]
+                   ) -> list[tuple[range, int, str, int]]:
+    """Return (lines, complexity, name, index for the name) of each function, by first line."""
+    functions = [(span, score, name, index) for name, found in metrics.items()
+                 for index, (span, score) in enumerate(found)]
+    return sorted(functions, key=lambda function: function[0].start)
+
+
+def function_problems(text: str, lines: set[int], limits: dict[str, int],
+                      old_text: str | None = None) -> list[tuple[int, str]]:
+    """Return (line, problem) for each function that has a changed line and breaks a limit.
+
+    `old_text` is the file at the merge base. A function that is not in it counts as new. If a
+    name has more than one function, the first new one pairs with the first old one, and so on.
+    """
+    old = _old_metrics(old_text)
+    found: list[tuple[int, str]] = []
+    for span, score, name, index in _in_file_order(function_metrics(text)):
+        if not lines.intersection(span):
+            continue
+        olds = old.get(name, [])
+        before = olds[index] if index < len(olds) else None
+        for key, value, old_value in (
+                ("cyclomatic", score, before[1] if before else None),
+                ("function_lines", len(span), len(before[0]) if before else None)):
+            problem = limit_problem(name, key, value, old_value, limits[key])
+            if problem:
+                found.append((span.start, problem))
+    return found
+
+
+def check_complexity(root: Path, base: str) -> list[Finding]:
+    """K9: a function that the diff adds or changes must be in the complexity caps (D100).
+
+    Only Python files under `paths.source` of the repo config are tested. A function that the
+    diff does not touch is not tested. A function that was over a limit at the merge base passes
+    if the change does not increase the value.
+    """
+    limits, source = complexity_limits(root)
+    merge_base = _git(root, "merge-base", base, "HEAD").strip()
+    diff = _git(root, "-c", "core.quotePath=false", "diff", "-U0", "--no-color", "--no-ext-diff",
+                "--find-renames", "--src-prefix=a/", "--dst-prefix=b/", merge_base, "HEAD", "--",
+                *source)
+    moved = old_paths(diff)
+    findings: list[Finding] = []
+    for path, lines in sorted(changed_lines(diff).items()):
+        text = _git_show(root, "HEAD", path) if path.endswith(".py") else None
+        if text is None:
+            continue
+        try:
+            old_text = _git_show(root, merge_base, moved.get(path, path))
+            problems = function_problems(text, lines, limits, old_text)
+        except SyntaxError as error:
+            problems = [(error.lineno or 1, f"The file does not parse ({error.msg})")]
+        findings += [Finding(path, number, COMPLEXITY_CHECK,
+                             f"{problem}. Split the function.")
+                     for number, problem in problems]
+    return findings
+
+
 def _git_show(root: Path, rev: str, path: str) -> str | None:
     result = subprocess.run(["git", "show", f"{rev}:{path}"], cwd=root, capture_output=True,
                             text=True)
@@ -213,4 +389,5 @@ def run(root: Path, base: str | None, skills: str = SKILLS,
     if base:
         findings += check_version_bump(root, base, skills, plugin_file)
         findings += check_commit_format(root, base)
+        findings += check_complexity(root, base)
     return findings
