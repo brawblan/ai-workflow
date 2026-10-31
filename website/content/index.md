@@ -112,10 +112,11 @@ selects the gates that apply. See the [workflow model](framework/workflow-model.
     pip install ./ai-workflow/stone
     ```
 
-2. Install the plugin in Claude Code:
+2. Install the plugin in Claude Code. Use the newest release tag for `vX.Y.Z`, so that the tag pins
+   the plugin ([how to move the pin](framework/adapters/claude-code.md#install-the-plugin-from-a-pinned-ref)):
 
     ```text
-    /plugin marketplace add brawblan/ai-workflow
+    /plugin marketplace add brawblan/ai-workflow#vX.Y.Z
     /plugin install cornerstone@brawblan
     ```
 

@@ -69,13 +69,30 @@ installed `stone`.
    `stone`, `checks`, and `build`.
 6. The owner merges the release PR with a merge commit. Do not squash it: `dev` and `main` must keep
    the same history.
-7. Tag the merge commit `vX.Y.Z`, and push the tag. The tag starts the `pages` workflow, which
+7. Check that the tag rules are active (see "Protect the release tags" below). Then tag the merge
+   commit `vX.Y.Z`, and push the tag. The tag starts the `pages` workflow, which
    deploys the docs site. A push to `dev` or `main` does not deploy it. Copy the summary, the config
    changes, and the steps of the entry into the notes of the release.
 8. Now move this repo to the new version. Run `stone upgrade --apply`. It sets `framework_version`
    and `framework_commit` in `.cornerstone/config.yaml`, and renders. Commit the config change
    alone, with `Role: human`. Then commit the generated files alone. Open this PR into `dev`. Do
    this after the tag exists, because `stone upgrade` reads the commit of the tag.
+
+### Protect the release tags
+
+`stone upgrade` reads the commit of a release tag (D92). A plugin install can pin a release tag too
+(D94). Thus a moved tag changes the code that each repo and each machine runs (P9). The git host must
+enforce these rules for each `v*` tag:
+
+| Action | Who can do it |
+| --- | --- |
+| Create a tag | The owner only |
+| Update or move a tag | No person, also not the owner |
+| Delete a tag | No person, also not the owner |
+
+Set up the rules once, and read them back before each release. The host commands are in the
+adapter doc ([D94](README.md#decisions)). If a release is bad, do not move or delete its tag.
+Release a new patch version.
 
 ## A docs change between releases
 

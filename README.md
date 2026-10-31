@@ -154,10 +154,11 @@ and `gh`.
 
 ## Install the plugin for Claude Code
 
-1. In Claude Code, add the marketplace:
+1. In Claude Code, add the marketplace at a release tag. Use the newest tag from
+   [Releases](https://github.com/brawblan/ai-workflow/releases) for `vX.Y.Z`:
 
    ```
-   /plugin marketplace add brawblan/ai-workflow
+   /plugin marketplace add brawblan/ai-workflow#vX.Y.Z
    ```
 
 2. Install the plugin:
@@ -168,8 +169,9 @@ and `gh`.
 
 3. Restart Claude Code. The skills have the `cornerstone:` prefix, for example `/cornerstone:ticket-delivery`.
 
-To get updates, run `/plugin marketplace update brawblan`. You can also turn on auto-update for
-the marketplace in the `/plugin` menu.
+The tag pins the plugin (P9). Keep auto-update off for this marketplace. To update, move the tag
+in a reviewed change. The steps are in the
+[adapter doc](framework/adapters/claude-code.md#install-the-plugin-from-a-pinned-ref).
 
 ## Use the skills with other agents
 
