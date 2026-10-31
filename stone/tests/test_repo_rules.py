@@ -263,6 +263,16 @@ class SubjectProblemTests(unittest.TestCase):
     def test_r4_git_revert_subject_passes(self) -> None:
         self.assertIsNone(repo_rules.subject_problem('Revert "feat(stone): add a thing"'))
 
+    def test_r4_git_reapply_subject_passes(self) -> None:
+        self.assertIsNone(repo_rules.subject_problem('Reapply "feat(stone): x"'))
+
+    def test_r4_revert_without_closing_quote_fails(self) -> None:
+        self.assertIsNotNone(repo_rules.subject_problem('Revert "anything'))
+        self.assertIsNotNone(repo_rules.subject_problem('Reapply "anything'))
+
+    def test_r4_scope_with_comma_and_space_fails(self) -> None:
+        self.assertIsNotNone(repo_rules.subject_problem("docs(tips, framework): x"))
+
     def test_r4_failing_subjects(self) -> None:
         for subject in [
             "feat:summary",
@@ -377,6 +387,16 @@ class CommitFormatTests(GitRepoCase):
         _git(self.root, "checkout", "-q", "-B", "feature")
         self.change("a.txt", GOOD)
         self.assertEqual(self.r4(), [])
+
+    def test_r4_detached_pull_request_merge_ref_tests_only_feature_commits(self) -> None:
+        self.change("a.txt", "bad")
+        bad = self.head_sha()
+        _git(self.root, "checkout", "-q", "main")
+        self.change("m.txt", "bad base commit")
+        _git(self.root, "checkout", "-q", "--detach")
+        _git(self.root, "merge", "-q", "--no-ff", "-m", "Merge feature into main", "feature")
+        self.assertEqual(_git(self.root, "branch", "--show-current").strip(), "")
+        self.assertEqual([f.path for f in self.r4()], [f"commit {bad[:12]}"])
 
     def test_r4_git_revert_commit_passes(self) -> None:
         self.change("a.txt", GOOD)
