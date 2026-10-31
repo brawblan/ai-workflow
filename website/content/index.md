@@ -8,7 +8,7 @@ hide:
 
 **Agent-assisted software delivery, where checks decide that work is done.**
 
-Version 1.4.0. All 10 profiles are supported, and each generated check blocks.
+Version 1.5.0. All 10 profiles are supported, and each generated check blocks.
 
 Cornerstone says how a human and an agent deliver software together. It sets who does each stage,
 which gates stop the work, and which checks decide that work is done. The core names no tool.
@@ -112,10 +112,11 @@ selects the gates that apply. See the [workflow model](framework/workflow-model.
     pip install ./ai-workflow/stone
     ```
 
-2. Install the plugin in Claude Code:
+2. Install the plugin in Claude Code. Use the newest release tag for `vX.Y.Z`, so that the tag pins
+   the plugin ([how to move the pin](framework/adapters/claude-code.md#install-the-plugin-from-a-pinned-ref)):
 
     ```text
-    /plugin marketplace add brawblan/ai-workflow
+    /plugin marketplace add brawblan/ai-workflow#vX.Y.Z
     /plugin install cornerstone@brawblan
     ```
 

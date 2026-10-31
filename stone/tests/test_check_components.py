@@ -70,6 +70,37 @@ class CheckComponentsTest(unittest.TestCase):
         self.write_list('components:\n  - id: check.k6\n    kind: check\n    eval: ""\n')
         self.assertEqual(self.messages(), [])
 
+    def test_ci_job_with_a_check_id_and_empty_eval_passes(self) -> None:
+        # D99: K16 renders a workflow, so its kind is ci-job. It is still a check.
+        self.write_list('components:\n  - id: check.k16\n    kind: ci-job\n    eval: ""\n')
+        self.assertEqual(self.messages(), [])
+
+    def test_ci_job_with_another_id_and_empty_eval_fails(self) -> None:
+        self.write_list('components:\n  - id: trigger.label\n    kind: ci-job\n    eval: ""\n')
+        self.assertIn("'trigger.label' has no eval plan", self.messages()[0])
+
+    def test_ci_job_checks_with_empty_eval_passes_in_the_list(self) -> None:
+        # D102: the job of the checks has no model in it, so its eval can be empty.
+        self.write_list('components:\n  - id: ci-job.checks\n    kind: ci-job\n    eval: ""\n')
+        self.assertEqual(self.messages(), [])
+
+    def test_ci_job_checks_with_empty_eval_passes_in_the_manifest(self) -> None:
+        self.write_manifest("components:\n- id: ci-job.checks\n  kind: ci-job\n"
+                            "  owner: brawblan\n  eval: ''\n  review_by: '2027-01-01'\n")
+        self.assertEqual(self.messages(), [])
+
+    def test_other_ci_job_id_with_empty_eval_still_fails_d102(self) -> None:
+        self.write_list("components:\n  - id: trigger.label.single-ticket\n"
+                        '    kind: ci-job\n    eval: ""\n')
+        self.assertIn("'trigger.label.single-ticket' has no eval plan", self.messages()[0])
+
+    def test_real_adapter_list_has_an_empty_eval_for_ci_job_checks(self) -> None:
+        path = (Path(__file__).resolve().parents[2] / "framework" / "adapters" / "claude-code"
+                / "components.yaml")
+        entries = yaml.safe_load(path.read_text(encoding="utf-8"))["components"]
+        entry = next(item for item in entries if item["id"] == "ci-job.checks")
+        self.assertEqual(entry["eval"], "")
+
     def test_role_with_empty_eval_fails(self) -> None:
         self.write_list('components:\n  - id: role.tester\n    kind: role\n    eval: ""\n')
         messages = self.messages()

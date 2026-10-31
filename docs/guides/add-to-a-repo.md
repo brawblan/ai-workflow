@@ -72,7 +72,8 @@ contributors must see no change.
    Do not put them in `.cornerstone/` or `.claude/`: the hook blocks the roles there, and
    `stone check` fails.
 3. Run `stone render`. It writes no workflow file. It prints the lines to add to
-   `.git/info/exclude`. Add them. A file that git already tracks stays tracked.
+   `.git/info/exclude` that git does not ignore yet. Add them. A file that git already tracks stays
+   tracked.
 4. Before you open the PR, run `stone gate --base origin/main`. Put its output in the Evidence
    section.
 
@@ -125,8 +126,8 @@ In the GitHub settings of the repo:
 - Do not edit a generated file. Change `.cornerstone/config.yaml`, and run `stone render` again.
 - If `stone render` exits with code 2, a person changed a generated file. Move the change into the
   config, or restore the file.
-- To use a new framework version, update the clone and change `framework_version` in the config.
-  Then render again.
+- To use a new framework version, update the clone and run `stone upgrade --apply`. It sets
+  `framework_version` and `framework_commit`, and renders again.
 - Each open `TODO(` in `.cornerstone/` is a fact that a role can need. Run
   `grep -rn "TODO(" .cornerstone/` to find them.
 

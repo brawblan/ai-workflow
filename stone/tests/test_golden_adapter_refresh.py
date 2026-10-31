@@ -74,6 +74,8 @@ def profile_needs(component: dict, profile: dict) -> bool:
     """Apply the rule in the header comment of components.yaml to one component."""
     if component["kind"] == "role":
         return component["role"] in profile["roles"]
+    if component.get("needs_instruction_files"):
+        return False  # K22 renders only with protect_instruction_files: true, and CONFIG has no key (D89)
     when = component.get("when") or {}
     if "gate" in when:
         return profile["gates"].get(when["gate"], "skip") != "skip"

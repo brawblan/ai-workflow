@@ -26,6 +26,7 @@ each component that `stone render` writes.
 | Hook before the session ends | `Stop` hook that runs the checks | full | Do not loop forever. The harness caps repeated blocks. |
 | Model for each role | `model` field in the role file, from `defaults.role_models` in the model profile | full | |
 | Permissions | `permissions` allow and deny lists in `.claude/settings.json`, and sandbox mode | full | |
+| Developer machines | Auto-update off, an exact version pin, deny rules for credential paths, and the sandbox, in `~/.claude/settings.json` and the editor | partial | A malicious build ignores its own settings. See [claude-code/local-hardening.md](claude-code/local-hardening.md) (D95). |
 | CI trigger | `anthropics/claude-code-action`, pinned to a commit SHA | full | v1.0.252 is `f27be6b65a4652f08a2ba3cff79114829b588967`. See "Trigger workflows". |
 | CI authentication | Repository secret `CLAUDE_CODE_OAUTH_TOKEN`, made with `claude setup-token`. It is `[HARNESS_TOKEN]` in the core. | full | Uses the subscription, not an API key. `[TO CONFIRM]` usage limits for CI: the action docs do not give them. |
 
@@ -52,7 +53,11 @@ The CI check is the source of truth. The hook gives faster feedback. A git commi
 the trailers for human commits.
 
 The protected paths are `paths.tests` and `paths.checks` from the repo config, plus `.claude/` and
-`.cornerstone/`. These two folders hold the hook, the check, and the harness settings. A value can
+`.cornerstone/`. These two folders hold the hook, the check, and the harness settings. With
+`protect_instruction_files: true` (D87), the protected paths also hold `**/AGENTS.md`,
+`**/CLAUDE.md`, and `**/CLAUDE.local.md`, in any case (D88). `instruction_files` in `components.yaml`
+lists them, with a class of both cases for each letter. With the key on, K22
+(`.cornerstone/checks/instruction_text.py`) also tests the text of each tracked instruction file (D89). A value can
 be a glob. The hook and K6 import one match module, `.cornerstone/lib/path_match.py`, from the
 template `claude-code/templates/lib/path_match.py` (D62). If the module is missing or broken, the
 hook blocks each edit. `stone specialists` uses the same module for `when.paths` (D65).
@@ -160,8 +165,8 @@ The action checks that the actor has write access for issue events. For `schedul
 
 | Trigger | Action input | Why |
 | --- | --- | --- |
-| `ci:issue-opened` | `allowed_non_write_users: '*'` | Any user can report a bug. The action then scrubs secrets from the environment of each command. The role has no shell, so the read path limit (D32) protects the secret, not the scrub. |
-| `ci:dependency-pr` | `allowed_bots: 'dependabot[bot],renovate[bot]'` | The bot opens the PR. The job `if` accepts only these two authors. |
+| `ci:issue-opened` | `allowed_non_write_users: "*"` | Any user can report a bug. The action then scrubs secrets from the environment of each command. The role has no shell, so the read path limit (D32) protects the secret, not the scrub. |
+| `ci:dependency-pr` | `allowed_bots: "dependabot[bot],renovate[bot]"` | The bot opens the PR. The job `if` accepts only these two authors. |
 
 ### Prompt-injection limits
 
@@ -195,6 +200,116 @@ Limits that stay:
   block the files outside the checkout, but the risk is not zero (dossier F10, F12).
 - GitHub redacts a secret in a job output only as plain text. An encoded secret (for example
   base64) is not redacted. Do not add an unscoped `Read`, `Grep`, or `Glob` rule.
+
+## Version pins
+
+P9 says to pin the harness, its extensions, its plugins, and the framework (D91, dossier F20). This
+table shows the state of each pin. Issue #225 closes the gaps.
+
+| Dependency | Where it runs | Pin now | Gap |
+| --- | --- | --- | --- |
+| `anthropics/claude-code-action` | Trigger workflows | Commit SHA (v1.0.252) | None |
+| Claude Code CLI | Trigger workflows | The action SHA fixes the version: v1.0.252 installs 2.1.302. | The action gets the CLI through `curl -fsSL https://claude.ai/install.sh \| bash -s -- <version>`. The script is not pinned or hashed. |
+| `stone` | G3 workflow | The commit SHA in `framework_commit`, else the tag `v<framework_version>` (D92). PyYAML and setuptools have a version and hashes. | A repo with no `framework_commit` still installs from the tag. |
+| Cornerstone plugin | Developer machines | The marketplace at a release tag, `brawblan/ai-workflow#vX.Y.Z` (D94). The plugin files come from that tag. | A tag, not a commit: the marketplace source has no `sha` field. Tag protection keeps the tag fixed. An add with no `#ref` follows `main`. |
+| Release tags `v*` | GitHub repo | Two tag rulesets (D94): no update or deletion for anyone, and creation by an admin only. | The owner applies the rulesets. Until then, each tag can move. |
+| Claude Code CLI and editor extension | Developer machines | An exact version, with auto-update off, from the [local hardening guide](claude-code/local-hardening.md) (D95). | Each machine applies the guide by hand. No check tests a machine. A pin does not stop a malicious build that a human approves. |
+
+### Install the plugin from a pinned ref
+
+The `cornerstone` entry in `.claude-plugin/marketplace.json` has a relative-path source. Thus the
+plugin files come from the clone of the marketplace, at the ref of the marketplace. A pin of the
+marketplace to a release tag also pins the plugin (dossier F21).
+
+| Step | Command |
+| --- | --- |
+| Add the marketplace at a release tag | `/plugin marketplace add brawblan/ai-workflow#vX.Y.Z` |
+| Install the plugin | `/plugin install cornerstone@brawblan` |
+| Check the pin | `claude plugin marketplace list --json` shows `"ref": "vX.Y.Z"` for `brawblan`. |
+
+For a team repo, put the pin in `.claude/settings.json`, so that a change to it is a reviewed diff.
+`claude plugin marketplace add brawblan/ai-workflow#vX.Y.Z --scope project` writes the declaration.
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "brawblan": {
+      "source": { "source": "github", "repo": "brawblan/ai-workflow", "ref": "vX.Y.Z" }
+    }
+  },
+  "enabledPlugins": { "cornerstone@brawblan": true }
+}
+```
+
+To move the pin:
+
+1. Read the plugin diff between the two tags: `git diff vX.Y.Z vA.B.C -- plugins/cornerstone`.
+2. Change `ref` in the settings file in a PR. A human reviews it.
+3. After the merge, run `/plugin marketplace update brawblan` and restart Claude Code.
+
+Do not move the pin with a second `marketplace add`: it prints `already on disk` and keeps the old
+source. Do not use `marketplace remove` either. It uninstalls the plugin and deletes its data. For a
+user-scope add, change `ref` in `~/.claude/settings.json`.
+
+| Choice | Gain | Cost |
+| --- | --- | --- |
+| Auto-update on (the `/plugin` menu, or `autoUpdate` in managed settings) | Fixes arrive with no action. | A bad push, or a moved ref, arrives with no review. |
+| Auto-update off, marketplace at a tag (default for this repo) | Each change waits for a reviewed pin move (P9). | A security fix also waits for the pin move. |
+
+Background auto-update is off for this marketplace by default. Keep it off. An update gets the
+newest commit of the pinned ref, so a moved tag reaches each user. The tag rulesets below stop that.
+A user gets a new copy only when `version` in `plugin.json` changes.
+
+Facts to test:
+
+- `[TO CONFIRM]` if `ref` takes a commit SHA. The docs say "branch or tag". Checked:
+  https://code.claude.com/docs/en/plugins/marketplace-reference.md
+- `[TO CONFIRM]` that `marketplace update` checks out the new ref after a change of `ref` in a
+  settings file. Checked: https://code.claude.com/docs/en/plugins/cli-reference.md
+- `[TO CONFIRM]` that a user-scope add writes `extraKnownMarketplaces` in `~/.claude/settings.json`.
+  The docs say only "user settings". Checked: https://code.claude.com/docs/en/plugins/create-marketplace.md
+
+### Protect the release tags
+
+`stone upgrade` reads the commit of a release tag (D92), and the plugin pin follows a tag. Thus no
+person may update or delete a `v*` tag. Only a repo admin may create one. Two tag rulesets do this
+(dossier F22). A bypass actor bypasses each rule of its ruleset, so the rules with no bypass are in
+a ruleset of their own.
+
+| Ruleset | Rules | Bypass |
+| --- | --- | --- |
+| `release-tags-fixed` | `update`, `deletion`, `non_fast_forward` | None |
+| `release-tags-create` | `creation` | Repository role admin |
+
+The owner applies them once. It is a repo settings change, not a reviewed PR:
+
+```bash
+gh api -X POST repos/brawblan/ai-workflow/rulesets --input - <<'EOF'
+{"name": "release-tags-fixed", "target": "tag", "enforcement": "active", "bypass_actors": [],
+ "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
+ "rules": [{"type": "update", "parameters": {"update_allows_fetch_and_merge": false}},
+           {"type": "deletion"}, {"type": "non_fast_forward"}]}
+EOF
+gh api -X POST repos/brawblan/ai-workflow/rulesets --input - <<'EOF'
+{"name": "release-tags-create", "target": "tag", "enforcement": "active",
+ "bypass_actors": [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}],
+ "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
+ "rules": [{"type": "creation"}]}
+EOF
+```
+
+To check them, read them back. Both must show `enforcement: active` and the include `refs/tags/v*`:
+
+```bash
+gh api repos/brawblan/ai-workflow/rulesets --jq '.[] | select(.target == "tag") | {id, name, enforcement}'
+gh api repos/brawblan/ai-workflow/rulesets/<id> --jq '{rules: [.rules[].type], include: .conditions.ref_name.include, bypass: .bypass_actors}'
+```
+
+Do not test the rules with a push to an existing tag. If a ruleset is missing, that push moves the
+tag. If a release is bad, do not move its tag. Release a new patch version.
+
+- `[TO CONFIRM]` that `actor_id` 5 is the admin repository role. The docs do not list the IDs.
+  Checked: https://docs.github.com/en/rest/repos/rules?apiVersion=2022-11-28
 
 ## Modes
 

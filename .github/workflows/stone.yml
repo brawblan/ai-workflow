@@ -27,19 +27,27 @@ jobs:
       - name: Unit tests
         run: python stone/tests/run_parallel.py
 
+      # D96: the render output passes Prettier with its default options. The runner has Node.
+      - name: Prettier on the render output
+        run: bash stone/tests/format/check_render_format.sh
+
       - name: stone check
         run: stone check --format github
 
-      # R1 and R2 block (D78). R2 needs the base branch, so it runs on a PR only.
-      - name: R1 action pins
+      # R1 to R4 and K9 block (D78, D97, D98, D100). R2, R4, and K9 need the base branch, so they
+      # run on a PR only. K9 does not run on a release PR into main (D103).
+      - name: R1 action pins and R3 event text
         if: github.event_name != 'pull_request'
         run: stone check-rules --format github
 
-      - name: R1 action pins and R2 plugin version bump
+      - name: R1 to R4 repo rules
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: stone check-rules --base "origin/${BASE_REF}" --format github
+        run: |
+          skip=()
+          if [ "$BASE_REF" = "main" ]; then skip=(--skip-k9); fi
+          stone check-rules --base "origin/${BASE_REF}" "${skip[@]}" --format github
 
       # K17 blocks (D45, framework/writing.md).
       - name: K17 on changed lines

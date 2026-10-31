@@ -1,0 +1,14 @@
+{
+  "number": 12,
+  "title": "Search notes by a word",
+  "labels": [
+    {
+      "id": "LA_1",
+      "name": "agent-ready",
+      "description": "",
+      "color": "0e8a16"
+    }
+  ],
+  "comments": [],
+  "body": "## Problem\nA writer cannot find an old note. They must read the full list.\n\n## Acceptance criteria\n1. `Notes.search(word)` returns each note that contains the word, in the order of `list()`.\n2. The search ignores case.\n\nPersonas: writer\n"
+}

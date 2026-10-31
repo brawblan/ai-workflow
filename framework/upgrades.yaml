@@ -1,6 +1,33 @@
 # The record of each release. `stone upgrade` reads it, and `stone check` validates it.
 # Newest first. Rules and the form: framework/versioning.md.
 versions:
+  - version: 1.5.0
+    kind: minor
+    released: 2026-10-31
+    summary: New optional key protect_instruction_files. With true, K6 and the hook protect the instruction files of the harness in any folder (D87), and check K22 tests their text (D89). New command stone check-dependencies (K23) warns on a new package that the PR body does not name (D90). New optional key framework_commit. G3 installs stone from that commit, and PyYAML from a list of hashes (D92). New command stone check-workflows (K24) warns on an unpinned tool in a changed workflow (D93). Generated YAML and Markdown pass a formatter check with default options, the drift check ignores a change of form only, and the new option stone gate --split-checks gives each command of all_checks its own row (D96). stone eval can run a trigger workflow, with a fake forge CLI for the post job (D101).
+    config:
+      added:
+        - {key: protect_instruction_files, default: false, note: "true adds the instruction files of the harness to the protected paths of K6 and the hook (D87)."}
+        - {key: instruction_text, default: none, note: "hosts and packages that K22 allows in an instruction file (D89)."}
+        - {key: framework_commit, default: none, note: "the commit SHA of the tag v<framework_version>. stone upgrade --apply sets it. G3 installs stone from it (D92)."}
+      renamed: []
+      removed: []
+    files:
+      - {path: .cornerstone/checks/protected_paths.py, change: changed, note: "The K6 message names an instruction file change. With protect_instruction_files true, the protected paths hold the instruction files (D87)."}
+      - {path: .cornerstone/checks/instruction_text.py, change: added, note: "K22. Only with protect_instruction_files true and a profile with K22 (D89)."}
+      - {path: .github/workflows/cornerstone-checks.yml, change: changed, note: "A K22 step, only with protect_instruction_files true (D89)."}
+      - {path: .github/workflows/cornerstone-checks.yml, change: changed, note: "A K23 step, as a warning, for each profile with K23 (D90)."}
+      - {path: .github/workflows/cornerstone-checks.yml, change: changed, note: "A K24 step, as a warning, for each profile with K24 (D93)."}
+      - {path: .github/workflows/cornerstone-checks.yml, change: changed, note: "The Install stone step installs from framework_commit, else from the tag. PyYAML and setuptools come from a list of hashes (D92)."}
+      - {path: .cornerstone/hooks/protect-paths.py, change: changed, note: "Only with protect_instruction_files true: the protected paths hold the instruction files, in any case (D87, D88)."}
+      - {path: .cornerstone/manifest.yaml, change: changed, note: "Lists are indented under their key, quotes are double, and a long value stays on one line. A formatter accepts it (D96)."}
+      - {path: .cornerstone/specialists.md, change: changed, note: "The table columns are aligned, and a blank line follows the first comment (D96)."}
+      - {path: .claude/agents/planner.md, change: changed, note: "The requirement ID line of the spec delta step is a list item (D96)."}
+      - {path: ".github/workflows/cornerstone-<profile>-<trigger>.yml", change: changed, note: "The trigger workflows quote the cron line and the action inputs with double quotes (D96)."}
+    steps:
+      - "Optional: set protect_instruction_files to true in .cornerstone/config.yaml. Commit the config change alone, with the trailer Role human."
+      - "Then run stone render. Commit the generated files alone, with the trailers Role generator and Actor agent."
+      - "stone upgrade --apply sets framework_commit. Check in the config diff that it is the commit of the tag v1.5.0."
   - version: 1.4.0
     kind: minor
     released: 2026-10-28

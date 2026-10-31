@@ -7,9 +7,26 @@ import subprocess
 import sys
 from pathlib import Path
 
-from stone import (__version__, evals, evidence_check, framework_check, gate, ready_check, render,
-                   repo_rules, specialists, specs, upgrade, writing_check)
+from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, ready_check, render,
+                   repo_rules, specialists, specs, upgrade, workflow_check, writing_check)
 from stone.findings import report
+
+
+def _add_check_rules(commands: argparse._SubParsersAction) -> None:
+    """Add the check-rules command: R1 to R4 and K9 (D78, D97, D98, D100, D103)."""
+    rules = commands.add_parser(
+        "check-rules", help="R1 to R4, K9: test the action pins, the plugin version, the event text "
+             "in 'run', the commit format, and the complexity caps (D78, D97, D98, D100).")
+    rules.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    rules.add_argument("--base", help="The base branch. Gives R2 (the plugin version bump), R4 "
+                                      "(the commit format), and K9 (the caps of changed "
+                                      "functions). Without it, only R1 and R3 run.")
+    rules.add_argument("--skills", default=repo_rules.SKILLS, help="The skills folder, for R2.")
+    rules.add_argument("--plugin-file", default=repo_rules.PLUGIN_FILE,
+                       help="The plugin file with the version, for R2.")
+    rules.add_argument("--skip-k9", action="store_true",
+                       help="Do not run K9. For a release PR into main (D103).")
+    rules.add_argument("--format", choices=["text", "github"], default="text")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -39,6 +56,9 @@ def _parser() -> argparse.ArgumentParser:
                        help="A file with the PR body, for the K7 profile line and waiver, and "
                             "for K20.")
     local.add_argument("--labels", default="", help="The PR labels, with commas. For K20.")
+    local.add_argument("--split-checks", action="store_true",
+                       help="Run each command of commands.all_checks that '&&' joins, and give "
+                            "each its own row. A failure does not stop the next command.")
 
     special = commands.add_parser(
         "specialists", help="Find the specialist reviews that a change needs, and their reports.")
@@ -93,15 +113,7 @@ def _parser() -> argparse.ArgumentParser:
                          help="warn: report only (the first 2 weeks). block: fail on errors.")
     writing.add_argument("--format", choices=["text", "github"], default="text")
 
-    rules = commands.add_parser(
-        "check-rules", help="R1 and R2: test the action pins and the plugin version bump (D78).")
-    rules.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
-    rules.add_argument("--base", help="The base branch. Gives R2: a skill change needs a new "
-                                      "plugin version. Without it, only R1 runs.")
-    rules.add_argument("--skills", default=repo_rules.SKILLS, help="The skills folder, for R2.")
-    rules.add_argument("--plugin-file", default=repo_rules.PLUGIN_FILE,
-                       help="The plugin file with the version, for R2.")
-    rules.add_argument("--format", choices=["text", "github"], default="text")
+    _add_check_rules(commands)
 
     evidence = commands.add_parser("check-evidence",
                                    help="K14: fail if a required PR section is missing or empty.")
@@ -112,6 +124,24 @@ def _parser() -> argparse.ArgumentParser:
     evidence.add_argument("--mode", choices=["warn", "block"], default="warn",
                           help="warn: report only (the first 2 weeks). block: fail on findings.")
     evidence.add_argument("--format", choices=["text", "github"], default="text")
+
+    deps = commands.add_parser("check-dependencies",
+                               help="K23: report a new package that the PR body does not name.")
+    deps.add_argument("body", help="The PR body file. Use '-' to read standard input.")
+    deps.add_argument("--base", required=True, help="The base ref, for example origin/dev.")
+    deps.add_argument("--mode", choices=["warn", "block"], default="warn",
+                      help="warn: report only (1.x). block: fail on findings.")
+    deps.add_argument("--format", choices=["text", "github"], default="text")
+
+    workflows = commands.add_parser("check-workflows",
+                                    help="K24: report an unpinned tool in a CI workflow.")
+    workflows.add_argument("body", help="The PR body file. Use '-' to read standard input.")
+    scope = workflows.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--base", help="The base ref. Read the workflows that the PR changes.")
+    scope.add_argument("--all", action="store_true", help="Read each tracked workflow.")
+    workflows.add_argument("--mode", choices=["warn", "block"], default="warn",
+                           help="warn: report only (1.x). block: fail on findings.")
+    workflows.add_argument("--format", choices=["text", "github"], default="text")
 
     ready = commands.add_parser("check-ready",
                                 help="K21: report a Definition of Ready field that is missing or "
@@ -156,7 +186,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "render":
         return _render(args.root, args.framework, args.dry_run)
     if args.command == "gate":
-        return _gate(args.root, args.base, args.body, _split(args.labels))
+        return _gate(args.root, args.base, args.body, _split(args.labels), args.split_checks)
     if args.command == "upgrade":
         return _upgrade(args)
     if args.command == "specialists":
@@ -167,6 +197,10 @@ def main(argv: list[str] | None = None) -> int:
         return _spec(args.root, args.spec_command, getattr(args, "plan", ""))
     if args.command == "check-evidence":
         return _check_evidence(args.body, args.section, args.mode, args.format)
+    if args.command == "check-dependencies":
+        return _check_dependencies(args.body, args.base, args.mode, args.format)
+    if args.command == "check-workflows":
+        return _check_workflows(args.body, None if args.all else args.base, args.mode, args.format)
     if args.command == "check-ready":
         return _check_ready(args.ticket, args.profile, args.mode, args.format)
     if args.command == "check-rules":
@@ -190,18 +224,20 @@ def main(argv: list[str] | None = None) -> int:
 
 def _check_rules(args: argparse.Namespace) -> int:
     try:
-        findings = repo_rules.run(args.root, args.base, args.skills, args.plugin_file)
+        findings = repo_rules.run(args.root, args.base, args.skills, args.plugin_file,
+                                  complexity=not args.skip_k9)
     except subprocess.CalledProcessError as error:
         print(f"check-rules: git failed: {(error.stderr or '').strip()}")
         return 2
     blocking = report(findings, args.format)
-    print(f"R1, R2: {blocking} error(s).")
+    print(f"check-rules: {blocking} error(s).")
     return 1 if blocking else 0
 
 
-def _gate(root: Path, base: str | None, body: Path | None, labels: list[str]) -> int:
+def _gate(root: Path, base: str | None, body: Path | None, labels: list[str],
+          split_checks: bool = False) -> int:
     try:
-        steps, text = gate.run(root, base, body, labels=labels)
+        steps, text = gate.run(root, base, body, labels=labels, split_checks=split_checks)
     except gate.GateError as error:
         print(f"stone gate: {error}")
         return 2
@@ -283,6 +319,48 @@ def _check_evidence(body: str, sections: list[str] | None, mode: str, fmt: str) 
     findings = evidence_check.check_text(text, "<stdin>" if body == "-" else body, sections)
     blocking = report(findings, fmt, warn_only=mode == "warn")
     print(f"K14: {len(findings)} finding(s), mode {mode}.")
+    return 1 if blocking else 0
+
+
+def _check_dependencies(body: str, base: str, mode: str, fmt: str) -> int:
+    if body == "-":
+        text = sys.stdin.read()
+    else:
+        try:
+            text = Path(body).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            reason = error.reason if isinstance(error, UnicodeDecodeError) else error.strerror
+            print(f"check-dependencies: cannot read {body}: {reason}")
+            return 2
+    try:
+        findings = dependency_check.check(Path("."), base, text)
+    except RuntimeError as error:
+        print(f"check-dependencies: {error}")
+        return 2
+    blocking = report(findings, fmt, warn_only=mode == "warn")
+    print(f"K23: {len(findings)} finding(s), mode {mode}.")
+    return 1 if blocking else 0
+
+
+def _check_workflows(body: str, base: str | None, mode: str, fmt: str) -> int:
+    if body == "-":
+        text = sys.stdin.read()
+    else:
+        try:
+            text = Path(body).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            reason = error.reason if isinstance(error, UnicodeDecodeError) else error.strerror
+            print(f"check-workflows: cannot read {body}: {reason}")
+            return 2
+    try:
+        findings = workflow_check.check(Path("."), base, text)
+    except RuntimeError as error:
+        print(f"check-workflows: {error}")
+        return 2
+    blocking = report(findings, fmt, warn_only=mode == "warn")
+    if workflow_check.has_waiver(text):
+        print("K24: notice: the PR body has a Waiver (K24) section. A human reviews each finding.")
+    print(f"K24: {len(findings)} finding(s), mode {mode}.")
     return 1 if blocking else 0
 
 

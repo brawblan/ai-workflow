@@ -36,7 +36,9 @@ For what a patch, minor, or major version means, see [Versioning](../../framewor
    stone upgrade --framework <clone>/framework --apply
    ```
 
-   It sets `framework_version` and runs `stone render`. It stops if an action is still open.
+   It sets `framework_version` and runs `stone render`. It stops if an action is still open. It
+   also sets `framework_commit` to the commit of the tag, with `git ls-remote`, so it needs network
+   access. Check the SHA in the config diff.
 4. Do the manual steps of the plan.
 5. Run `stone check --framework <clone>/framework` and your `commands.all_checks`.
 6. Commit the generated files alone, with the trailers `Role: generator` and `Actor: agent`. Commit
@@ -64,6 +66,7 @@ that a new key needs, writes the config diff, and runs the render. Use it when t
 | `framework_version ... is newer` | Your clone or your `stone` is older than the config. Update it. A downgrade is not supported. |
 | A promotion push fails K6, K7, or K14 on the local machine, and CI skips them | A repo-local hook or script runs the check without `ci.branches`. Cornerstone does not write it. Make it skip these checks for a base branch that is not in `ci.branches`. |
 | Branch rules are not available for an unlisted base branch (G5) | A person reviews and approves each PR into that branch before the merge. Write this rule in `AGENTS.md`. This control depends on a person. CI does not enforce it. See [Gate steps by base branch](../../framework/customization.md#gate-steps-by-base-branch-cibranches). |
+| `git ls-remote could not read the tag` | With `framework_commit` in the config, the upgrade stops before a write. Get network access, and run it again. With no key, the upgrade continues, and G3 installs from the tag. |
 | A hand-written component (`source: repo`) | `stone render` keeps it. Check by hand that it still works with the new version. |
 
 ## Not built yet

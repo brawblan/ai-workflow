@@ -27,12 +27,17 @@ A later layer wins over an earlier layer, with these limits:
 
 ```yaml
 framework_version: 1.2.0           # tag of brawblan/ai-workflow. G3 installs stone from it. See versioning.md.
+framework_commit: "<40-hex SHA>"   # optional. The commit of that tag. G3 installs stone from it (see below).
 harness: <harness-adapter-name>    # a file name in framework/adapters/
 model_profile: <model-family>      # a file in framework/adapters/<harness>/models/
 spec_tool: plain                   # plain, or a spec-tool adapter name
 profiles: [single-ticket, bug-triage, debugging]
 adoption: all                      # all (default), or opt-in: only marked PRs (see below)
 delivery: ci                       # ci (default), or local: no workflow files (see below)
+protect_instruction_files: false   # true: K6 and the hook protect the instruction files (see below)
+instruction_text:                  # optional. K22 allows these (see below)
+  hosts: [docs.example.com]        # a host also allows its subdomains
+  packages: [prettier]             # registry packages that an instruction file can install
 branches:
   integration: dev
   main: main
@@ -189,6 +194,44 @@ Use it when only some people or some tickets use Cornerstone ([D58](README.md#de
 - Anyone can remove the marker, and an unmarked PR gets no check. Turn on branch protection with a
   required human review for the base branch, so that review controls the PRs that G3 skips.
 
+### Framework commit (`framework_commit`)
+
+A tag can move. Then the G3 workflow installs other code in each repo (P9,
+[D92](README.md#decisions)). A commit SHA cannot move.
+
+- `stone upgrade --apply` reads the commit of the tag `v<framework_version>` with `git ls-remote`,
+  and writes it to `framework_commit`. Check in the config diff that the SHA is the commit of the tag.
+- With the key, G3 installs `stone` from the commit. Without it, G3 installs from the tag, and
+  `stone render` gives a warning.
+- If you change `framework_version` by hand, change `framework_commit` in the same commit. Else G3
+  installs the `stone` of the old commit.
+- G3 installs PyYAML and the build tool from a list of hashes in the workflow. pip gets no other
+  package for `stone`.
+
+### Protect instruction files (`protect_instruction_files`)
+
+An agent loads its instruction files as rules (P9, [D87](README.md#decisions)). A changed
+instruction file changes what each later session does.
+
+- With `true`, the protected paths also hold the instruction files of the harness, in any folder.
+  The adapter names the files. K6 fails an implementer commit that changes one. The hook blocks
+  the implementer, the planner, and the investigator.
+- A change to an instruction file then goes in a commit of its own, with `Role: human`.
+- The default is `false` in 1.x, so a repo keeps the old K6. A later major release can change the
+  default.
+- Run `stone render` after you change the value.
+- With `true`, a profile with K22 also gets check K22 ([D89](README.md#decisions)). K22 reads each
+  tracked instruction file. It fails on a package install from a registry, and on a download piped
+  to a shell. It also fails on an API base URL or proxy override, a URL to an unknown host, or a
+  hidden Unicode character. An HTML comment gives a warning, but `<!-- ste-ignore -->` does not.
+- `instruction_text.hosts` lists the hosts that a URL can name. A host also allows its
+  subdomains, so list exact hosts. For example, `github.io` allows each user site on it. A
+  loopback host, such as `localhost`, always passes.
+- `instruction_text.packages` lists the registry packages that an instruction file can install.
+  A local path, such as `./tool` or `-r requirements.txt`, always passes.
+- A PR can add a `Waiver (K22)` heading with the reason under it. K22 then reports each finding as
+  a notice. A human reviews the findings at G4.
+
 ### Gate steps by base branch (`ci.branches`)
 
 Use it when a repo promotes code with PRs between long-lived branches, for example `dev` to
@@ -323,10 +366,28 @@ A repo can connect its own review agents or skills to the roles ([D59](README.md
 
 Use it when one developer runs the roles in a shared repo before the team agrees to the workflow.
 `stone render` then writes no file in `.github/workflows/`. It prints a warning that G3 is local
-only, and the lines to add to `.git/info/exclude`. It writes nothing outside the rendered set.
+only, and the lines to add to `.git/info/exclude`. It asks `git check-ignore` and lists only the
+paths that git does not ignore. If git cannot answer, it lists all of them. It writes nothing outside
+the rendered set.
 `stone gate` runs K6, K7, and `commands.all_checks` on the machine, and prints a table for the
 Evidence section of the PR. See [D56](README.md#decisions). With `specialists`, it also runs K20.
 K20 needs `--body`, and `--labels` gives the PR labels.
+
+With `--split-checks`, `stone gate` runs each command of `commands.all_checks` that `&&` joins, and
+gives each command its own row (D96). A failure does not stop the next command, so the table shows
+the result of each one. The gate warns and runs the value as one command in these cases:
+
+- The value has no `&&`, or an empty command before or after a `&&`.
+- The value has another shell operator outside quotes: `||`, `;`, `|`, `&`, `(`, `)`, a backtick,
+  `#`, or a new line. Or it has a quote with no end.
+- A command starts with `NAME=value`.
+- A command starts with a word that changes the shell state or tests a condition. The words are
+  in `SHELL_STATE` in `stone/src/stone/gate.py`, for example `cd`, `export`, `eval`, `nvm`, and `[[`.
+
+The gate cannot find each command that changes the shell state, such as a shell function. If a
+command needs the state of the command before it, do not use the option.
+
+Without the option, the value runs as one command.
 
 `{id}` in `paths.plans` or `paths.reports` gives each ticket its own folder (D67):
 

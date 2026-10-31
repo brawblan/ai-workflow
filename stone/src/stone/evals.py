@@ -27,12 +27,16 @@ from typing import Any
 
 import yaml
 
-from stone import render, results, specs
+from stone import render, results, specs, trigger_eval, triggers
+from stone.markdown import split_frontmatter
 
 VARIANTS = ("with", "without")
 KINDS = {"outcome", "contract"}
 REPORT = "@report"  # a check path that means the final text of the run
 REPORT_ENV = "STONE_EVAL_REPORT"  # grade.py reads the final text of the run here
+POSTED = "@posted"  # a check path that means the text that the post job of a trigger posted
+POSTED_ENV = "STONE_EVAL_POSTED"  # grade.py reads the posted text here (D101)
+GH_CALLS_ENV = "STONE_EVAL_GH_CALLS"  # and each call of the forge CLI, one on each line
 RUNS = Path(".cornerstone/eval-runs")
 RESULTS = results.RESULTS
 WORK_BRANCH = "feature/eval-work"
@@ -51,6 +55,8 @@ class Workspace:
     path: Path
     setup: str  # the commit after the setup: the agent's changes come after it
     report: str = ""
+    posted: str = ""  # a trigger eval: the body that the post job gave to gh
+    gh_calls: str = ""  # a trigger eval: the arguments of each gh call
 
 
 @dataclass
@@ -70,8 +76,25 @@ class Run:
 # Loading -----------------------------------------------------------------------------------
 
 
-def load_scenarios(folder: Path) -> dict[str, Any]:
-    """Read and validate `scenarios.yaml`. Raise EvalError with each problem."""
+TOP_KEYS = {True: ("component", "role", "scenarios"), False: ("component", "scenarios")}
+SCENARIO_KEYS = {True: ("id", "fixture", "prompt", "expect"),  # a trigger scenario needs an event
+                 False: ("id", "fixture", "prompt", "expect", "event")}
+
+
+def _scenario_problems(scenario: dict[str, Any], folder: Path, role_required: bool) -> list[str]:
+    """The missing keys, the missing files, and the check problems of one scenario."""
+    problems = [f"no '{key}'" for key in SCENARIO_KEYS[role_required] if not scenario.get(key)]
+    problems += [f"the {name} '{scenario[name]}' does not exist"
+                 for name in ("fixture", "change", "event")
+                 if scenario.get(name) and not (folder / scenario[name]).exists()]
+    for item in scenario.get("expect") or []:
+        problems += _check_problems(item, folder)
+    return problems
+
+
+def load_scenarios(folder: Path, role_required: bool = True) -> dict[str, Any]:
+    """Read and validate `scenarios.yaml`. Raise EvalError with each problem. A trigger eval
+    needs no `role`: the role is the first role of the profile (D101)."""
     path = folder / "scenarios.yaml"
     if not path.exists():
         raise EvalError(f"{path}: no file. Write the scenarios first (lifecycle.md).")
@@ -82,7 +105,7 @@ def load_scenarios(folder: Path) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise EvalError(f"{path}: the file must be a mapping with 'component', 'role', and "
                         "'scenarios'. Fix the file.")
-    problems = [f"no '{key}'" for key in ("component", "role", "scenarios") if not data.get(key)]
+    problems = [f"no '{key}'" for key in TOP_KEYS[role_required] if not data.get(key)]
     scenarios = data.get("scenarios") or []
     if not isinstance(scenarios, list):
         problems.append("'scenarios' must be a list")
@@ -97,15 +120,9 @@ def load_scenarios(folder: Path) -> dict[str, Any]:
             problems.append(f"{scenario.get('id') or f'#{number}'}: 'expect' must be a list")
             continue
         sid = scenario.get("id") or f"#{number}"
-        problems += [f"{sid}: no '{key}'" for key in ("id", "fixture", "prompt", "expect")
-                     if not scenario.get(key)]
         problems += [f"{sid}: the id is used again"] if sid in seen else []
         seen.add(sid)
-        for name in ("fixture", "change"):
-            if scenario.get(name) and not (folder / scenario[name]).exists():
-                problems.append(f"{sid}: the {name} '{scenario[name]}' does not exist")
-        for item in scenario.get("expect") or []:
-            problems += [f"{sid}: {p}" for p in _check_problems(item, folder)]
+        problems += [f"{sid}: {p}" for p in _scenario_problems(scenario, folder, role_required)]
     if problems:
         raise EvalError(f"{path}: " + "; ".join(problems) + ". Fix the file.")
     return data
@@ -176,9 +193,15 @@ def find_component(framework: Path, harness: str, component_id: str,
                               .read_text(encoding="utf-8"))["components"]
     for entry in registry:
         if entry["id"] == component_id:
+            if "trigger" in entry:
+                raise EvalError(f"{component_id} is one workflow for each profile. Add the "
+                                f"profile to the id, for example {component_id}.single-ticket.")
             if not entry.get("eval"):
                 raise EvalError(f"{component_id} has no eval folder. A check is its own test.")
             return entry
+    trigger = trigger_eval.split_id(component_id, registry)  # trigger.label.single-ticket (D101)
+    if trigger:
+        return trigger
     guidance = find_guidance(root, component_id) if root else None
     if guidance:
         return guidance
@@ -252,12 +275,23 @@ def unregister(path: Path, target: str) -> None:
     path.write_text(json.dumps(_prune(data, target), indent=2) + "\n", encoding="utf-8")
 
 
+def _select_profile(path: Path, profile: str) -> None:
+    """A trigger eval: the repo config of the workspace selects only the profile under test."""
+    if not profile:
+        return
+    config = yaml.safe_load((path / render.CONFIG).read_text(encoding="utf-8"))
+    config["profiles"] = [profile]
+    (path / render.CONFIG).write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+
 def prepare(folder: Path, scenario: dict[str, Any], framework: Path, role_file: str,
-            variant: str, files: list[dict[str, Any]] | None = None) -> Workspace:
+            variant: str, files: list[dict[str, Any]] | None = None,
+            profile: str = "") -> Workspace:
     """Make the workspace: the fixture, the rendered files, the files of a guidance variant, and
-    the change of the scenario."""
+    the change of the scenario. A trigger eval selects only its `profile` in the repo config."""
     path = Path(tempfile.mkdtemp(prefix=f"stone-eval-{scenario['id']}-")) / "repo"
     shutil.copytree(folder / scenario["fixture"], path)
+    _select_profile(path, profile)
     _git(path, "init", "-q", "-b", "main")
     _commit(path, "chore: fixture base")
     _git(path, "checkout", "-q", "-b", WORK_BRANCH)  # an agent does not commit to the default
@@ -340,30 +374,46 @@ def _harness(argv: list[str], cwd: Path, env: dict[str, str],
     return code, out.decode(errors="replace"), err.decode(errors="replace")
 
 
+def _setup(folder: Path, data: dict[str, Any], scenario: dict[str, Any], variant: str,
+           opts: dict[str, Any]) -> tuple[Workspace, list[str], dict[str, str], dict | None]:
+    """Make the workspace and the harness command. Remove the workspace if the command fails."""
+    config = opts["run_config"]
+    workspace = prepare(folder, scenario, opts["framework"], opts["role_file"], variant,
+                        opts["variants"].get(variant), opts.get("profile", ""))
+    try:
+        # Only a role eval removes the role. For another component, both variants load the same
+        # role file, so the hook (or other component) is the only difference (D44).
+        launch = {"role": variant, "guidance": "guidance"}.get(opts["kind"], "with")
+        prompt = "\n\n".join(part for part in (data.get("task"), scenario["prompt"]) if part)
+        values = {"role": data["role"], "model": opts["model"], "budget": opts["budget"],
+                  "prompt": prompt, "tools": (config.get("tools") or {}).get(data["role"], [])}
+        env = {**os.environ, **GIT_ENV,
+               **{k: Template(str(v)).safe_substitute(values)
+                  for k, v in ((config.get("env") or {}).get(launch) or {}).items()}}
+        argv, workflow = build_command(config, launch, values), None
+        if opts.get("profile"):
+            argv, workflow = _trigger_argv(folder, scenario, variant, workspace, values, opts)
+    except (trigger_eval.TriggerEvalError, OSError, yaml.YAMLError):
+        if not opts["keep"]:
+            shutil.rmtree(workspace.path.parent, ignore_errors=True)
+        raise
+    return workspace, argv, env, workflow
+
+
 def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], variant: str,
              trial: int, opts: dict[str, Any]) -> Run:
     run = Run(scenario["id"], variant, trial)
     config = opts["run_config"]
     try:
-        workspace = prepare(folder, scenario, opts["framework"], opts["role_file"], variant,
-                            opts["variants"].get(variant))
-    except (EvalError, render.RenderError, OSError) as error:
+        workspace, argv, env, workflow = _setup(folder, data, scenario, variant, opts)
+    except (EvalError, render.RenderError, trigger_eval.TriggerEvalError, OSError,
+            yaml.YAMLError) as error:
         run.error = f"the setup failed: {error}"  # the harness does not start
         return run
-    # Only a role eval removes the role. For another component, both variants load the same role
-    # file, so the hook (or other component) is the only difference (D44).
-    launch = {"role": variant, "guidance": "guidance"}.get(opts["kind"], "with")
-    prompt = "\n\n".join(part for part in (data.get("task"), scenario["prompt"]) if part)
-    values = {"role": data["role"], "model": opts["model"], "budget": opts["budget"],
-              "prompt": prompt, "tools": (config.get("tools") or {}).get(data["role"], [])}
-    env = {**os.environ, **GIT_ENV,
-           **{k: Template(str(v)).safe_substitute(values)
-              for k, v in ((config.get("env") or {}).get(launch) or {}).items()}}
     start = time.monotonic()
     stdout = stderr = ""
     try:
-        code, stdout, stderr = _harness(build_command(config, launch, values), workspace.path,
-                                        env, opts["timeout"])
+        code, stdout, stderr = _harness(argv, workspace.path, env, opts["timeout"])
         if code is None:
             run.error = f"the harness ran for more than {opts['timeout']} seconds"
         elif code != 0:
@@ -374,6 +424,7 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
         run.usage = parse_output(stdout, config.get("output") or {}, config.get("output_where"))
         run.usage.setdefault("seconds", round(time.monotonic() - start, 1))
         workspace.report = str(run.usage.pop("report", "") or "")
+        _trigger_post(run, workspace, workflow, run.usage.pop("structured_output", None), scenario)
         transcript = opts["runs"] / f"{scenario['id']}-{variant}-{trial}.out"
         transcript.write_text(stdout, encoding="utf-8")
         if stderr:
@@ -384,6 +435,43 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
         if not opts["keep"]:
             shutil.rmtree(workspace.path.parent, ignore_errors=True)
     return run
+
+
+def _trigger_argv(folder: Path, scenario: dict[str, Any], variant: str, workspace: Workspace,
+                  values: dict[str, Any], opts: dict[str, Any]) -> tuple[list[str], dict | None]:
+    """Return the command of a trigger run and, for `with`, the rendered workflow (D101)."""
+    config = opts["run_config"].get("trigger") or {}
+    if not isinstance(config.get(variant), list):
+        raise trigger_eval.TriggerEvalError(f"the harness run file has no 'trigger.{variant}'.")
+    runner_temp = workspace.path.parent / "runner-temp"
+    event = trigger_eval.write_event(runner_temp, folder / str(scenario["event"]))
+    values = {**values, "event_dir": str(event.parent), "tools": config.get("tools") or [],
+              "prompt": Template(values["prompt"]).safe_substitute(event_file=str(event))}
+    if variant == "without":  # the role run by hand: no workflow, no schema, no post job
+        return trigger_eval.build(config[variant], values), None
+    workflow = trigger_eval.load_workflow(workspace.path / opts["role_file"])
+    words, prompt = trigger_eval.role_args(workflow, runner_temp, opts["model"])
+    return trigger_eval.build(config[variant], {**values, "claude_args": words,
+                                                "prompt": prompt}), workflow
+
+
+def _trigger_post(run: Run, ws: Workspace, workflow: dict[str, Any] | None, structured: Any,
+                  scenario: dict[str, Any]) -> None:
+    """Run the post job on the structured report. The report checks read that report. Only a
+    `with` run of a trigger has a workflow (D71)."""
+    if workflow is None:
+        return
+    ws.report = trigger_eval.structured_report(structured)
+    runner_temp = ws.path.parent / "runner-temp"
+    try:
+        result = trigger_eval.post(workflow, ws.report, runner_temp,
+                                   str(scenario.get("number", 1)))
+    except (trigger_eval.TriggerEvalError, subprocess.TimeoutExpired, OSError) as error:
+        result = {"posted": "", "calls": [], "error": str(error)}
+    ws.posted = result["posted"]
+    ws.gh_calls = "\n".join(result["calls"])
+    if result["error"] and not run.error:
+        run.error = f"the post job failed: {result['error']}"
 
 
 # Checks ------------------------------------------------------------------------------------
@@ -409,6 +497,8 @@ def under(path: str, prefixes: list[str]) -> bool:
 def _text(ws: Workspace, path: str) -> str | None:
     if path == REPORT:
         return ws.report
+    if path == POSTED:
+        return ws.posted
     target = ws.path / path
     return target.read_text(encoding="utf-8", errors="replace") if target.is_file() else None
 
@@ -500,7 +590,8 @@ def _grader(ws: Workspace, item: dict[str, Any], folder: Path) -> tuple[bool, st
             [sys.executable, str((folder / "grade.py").resolve()), item["name"],
              "--workspace", str(ws.path), "--args", json.dumps(args)],
             cwd=folder, capture_output=True, text=True, timeout=item.get("timeout", 600),
-            env={**os.environ, **GIT_ENV, REPORT_ENV: ws.report})
+            env={**os.environ, **GIT_ENV, REPORT_ENV: ws.report, POSTED_ENV: ws.posted,
+                 GH_CALLS_ENV: ws.gh_calls})
         data = json.loads(result.stdout.strip().splitlines()[-1])
         return data["pass"] is True, str(data.get("detail", ""))
     except (OSError, subprocess.TimeoutExpired, IndexError, KeyError, TypeError,
@@ -576,6 +667,31 @@ def summary(component: str, model: str, runs: list[Run]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _first_role(framework: Path, entry: dict[str, Any]) -> str:
+    """The role that the trigger of the profile starts (D31). The profile must use the trigger."""
+    path = framework / "profiles" / f"{entry['profile']}.md"
+    if not path.is_file():
+        raise EvalError(f"The profile '{entry['profile']}' does not exist. Use a profile id.")
+    profile = split_frontmatter(path.read_text(encoding="utf-8"))[0]
+    kinds = {triggers.parse(str(text))[0] for text in profile.get("triggers") or []}
+    if entry["trigger"] not in kinds:
+        raise EvalError(f"The profile '{entry['profile']}' has no {entry['trigger']} trigger. "
+                        "Use a profile that has it.")
+    return profile["roles"][0]
+
+
+def _select(scenarios: list[dict[str, Any]], ids: list[str] | None,
+            profile_id: str) -> list[dict[str, Any]]:
+    """The scenarios to run: the ids, if given, and for a trigger only those of its profile."""
+    chosen = [s for s in scenarios if (not ids or s["id"] in ids)
+              and profile_id in (s.get("profiles") or [profile_id])]
+    if ids and len(chosen) != len(set(ids)):
+        unknown = sorted(set(ids) - {s["id"] for s in chosen})
+        raise EvalError(f"No scenario has the id {unknown} for this component. Use an id in "
+                        "scenarios.yaml.")
+    return chosen
+
+
 def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
              scenario_ids: list[str] | None = None, variant: str = "both", trials: int = 1,
              model: str | None = None, budget: str = "5", timeout: int = 1800,
@@ -586,11 +702,10 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     config = render.load_config(root, framework)
     entry = find_component(framework, config["harness"], component_id, root)
     folder = root / entry["eval"]
-    data = load_scenarios(folder)
-    scenarios = [s for s in data["scenarios"] if not scenario_ids or s["id"] in scenario_ids]
-    if scenario_ids and len(scenarios) != len(set(scenario_ids)):
-        unknown = sorted(set(scenario_ids) - {s["id"] for s in scenarios})
-        raise EvalError(f"No scenario has the id {unknown}. Use an id in scenarios.yaml.")
+    profile_id = entry.get("profile", "")
+    data = load_scenarios(folder, role_required=not profile_id)
+    data["role"] = _first_role(framework, entry) if profile_id else data["role"]
+    scenarios = _select(data["scenarios"], scenario_ids, profile_id)
     harness = framework / "adapters" / config["harness"]
     loaded = load_run_config(run_config or harness / "eval.yaml")
     profile = yaml.safe_load((harness / "models" / f"{config['model_profile']}.yaml")
@@ -621,7 +736,8 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     runs_folder.mkdir(parents=True, exist_ok=True)
     opts = {"framework": framework.resolve(), "role_file": entry.get("target", ""), "kind": entry.get("kind", ""),
             "run_config": loaded, "model": model, "budget": budget, "timeout": timeout,
-            "runs": runs_folder, "keep": keep, "variants": data.get("variants") or {}}
+            "runs": runs_folder, "keep": keep, "variants": data.get("variants") or {},
+            "profile": profile_id}
     runs: list[Run] = []
     with (runs_folder / "runs.jsonl").open("w", encoding="utf-8") as handle:
         for scenario in scenarios:

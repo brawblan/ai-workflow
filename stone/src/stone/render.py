@@ -7,6 +7,7 @@ import datetime as dt
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -15,7 +16,7 @@ from typing import Any
 
 import yaml
 
-from stone import ci_setup, framework_check, overrides, results, specialists, specs, triggers
+from stone import ci_setup, form, framework_check, overrides, results, specialists, specs, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -64,6 +65,8 @@ Personas: <IDs>, or none
 Add `Reproduction:` for a bug and `Time box:` for a spike or an audit, if the profile needs them."""
 CORE_PROTECTED = [".cornerstone/"]  # the hook and the check; the adapter adds its own folders (P12, D76)
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
+K23_SINCE = (1, 5, 0)  # the first framework tag with `stone check-dependencies` (D90)
+K24_SINCE = (1, 5, 0)  # the first framework tag with `stone check-workflows` (D93)
 DEFAULT_PR_LINES = overrides.DEFAULT_PR_LINES  # D4, customization.md
 BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
@@ -129,6 +132,14 @@ def load_config(root: Path, framework: Path) -> dict[str, Any]:
     return config
 
 
+def framework_at_least(version: Any, since: tuple[int, ...]) -> bool:
+    """True if the framework tag is `since` or later. A tag that does not parse is not."""
+    try:
+        return tuple(int(part) for part in str(version).split(".")) >= since
+    except ValueError:
+        return False
+
+
 def warn_old_framework(version: Any) -> None:
     """Warn if the framework tag has no `stone check-evidence`. The G3 workflow installs it."""
     try:
@@ -139,6 +150,22 @@ def warn_old_framework(version: Any) -> None:
         print(f"warning: framework_version {version} is not a tag with 'stone check-evidence'. "
               "The K14 step in the G3 workflow fails. Use a full tag, 0.5.0 or later.",
               file=sys.stderr)
+
+
+def stone_ref(config: dict[str, Any]) -> str:
+    """Return the git ref that G3 installs stone from: the commit, else the tag (D92)."""
+    tag = f"v{config.get('framework_version', '')}"
+    commit = config.get("framework_commit")
+    return f"{commit} # {tag}" if commit else tag
+
+
+def warn_no_commit(config: dict[str, Any], components: list[Component]) -> None:
+    """Warn if a CI job installs stone from a tag, because a moved tag changes the code (D92)."""
+    if config.get("framework_commit") or not any(c.kind == "ci-job" for c in components):
+        return
+    print("warning: framework_commit is not set, so G3 installs stone from the tag "
+          f"v{config['framework_version']}. A moved tag changes the code. Run stone upgrade "
+          "--apply, or set framework_commit to the commit of the tag.", file=sys.stderr)
 
 
 def load_profiles(framework: Path, names: list[str],
@@ -216,8 +243,9 @@ def all_checks_env(config: dict[str, Any]) -> str:
 def template_values(config: dict[str, Any], model: str,
                     harness_dirs: list[str] | None = None) -> dict[str, str]:
     """Return the repo facts that templates can use. TODO values are left out on purpose."""
-    # The framework tag. The G3 workflow installs stone from it.
-    values = {"model": model, "framework_version": str(config.get("framework_version", ""))}
+    # The framework tag. The G3 workflow installs stone from framework_commit, else from the tag (D92).
+    version = str(config.get("framework_version", ""))
+    values = {"model": model, "framework_version": version, "stone_ref": stone_ref(config)}
     for key, value in (config.get("commands") or {}).items():
         if value is not None and str(value).strip():  # an empty command has no value
             values[f"command_{key}"] = str(value)
@@ -348,6 +376,10 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     registry_doc = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
     registry = registry_doc["components"]
     harness_dirs = [str(item) for item in registry_doc.get("protected_dirs") or []]
+    instruction_files = [str(item) for item in registry_doc.get("instruction_files") or []]
+    protect = config.get("protect_instruction_files") is True  # opt-in in 1.x (D87)
+    if protect:
+        harness_dirs += instruction_files
     model_profile = yaml.safe_load(
         (harness / "models" / f"{config['model_profile']}.yaml").read_text(encoding="utf-8"))
     if model_profile.get("status") != "active":
@@ -371,6 +403,13 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
         print("warning: commits.trailers is none. K6 cannot run, so it is not rendered. "
               "Nothing checks that an implementer commit leaves the protected paths.",
               file=sys.stderr)
+    # K22 reads the instruction files, so it renders only with the key on (D89).
+    off |= {entry["id"] for entry in registry if entry.get("needs_instruction_files") and not protect}
+    text = config.get("instruction_text") if isinstance(config.get("instruction_text"), dict) else {}
+    model_values |= {"instruction_files_json": json.dumps(instruction_files),
+                     "instruction_hosts_json": json.dumps(sorted(str(host).lower().rstrip(".")
+                                                                for host in text.get("hosts") or [])),
+                     "instruction_packages_json": json.dumps(sorted(text.get("packages") or []))}
 
     # A component with `ci_step` adds a step to the G3 workflow, only if it is rendered.
     steps: dict[str, str | None] = {step_name(entry["id"]): None
@@ -462,6 +501,10 @@ def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict
         need = profiles_that_need(step, profiles)
         if not need or (step.get("needs") == "specialists" and not specialists.listed(config)):
             continue
+        if step["id"] == "k23" and not framework_at_least(config.get("framework_version"), K23_SINCE):
+            continue  # the installed stone has no check-dependencies (D90)
+        if step["id"] == "k24" and not framework_at_least(config.get("framework_version"), K24_SINCE):
+            continue  # the installed stone has no check-workflows (D93)
         step_values = dict(values, step_name=step.get("name", step["id"]))
         command = step.get("command")
         if command:
@@ -551,6 +594,9 @@ def _file_state(disk: dict[str, str], component: Component, old: dict[str, Any] 
     if not disk or (old and len(disk) == len(component.files)
                     and content_hash(disk) == old["hash"]):
         return "wrote"  # new, or unchanged since the last render
+    if disk.keys() == component.files.keys() and all(
+            form.same_form(path, text, component.files[path]) for path, text in disk.items()):
+        return "skipped"  # a person changed the form only, for example with a format on save
     return "drift"  # a person changed, removed, or wrote a generated file
 
 
@@ -630,6 +676,7 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
         raise RenderError(f"{findings[0].path}: {findings[0].message}")
     warn_old_framework(config["framework_version"])
     components = build_components(framework, config, root, today)
+    warn_no_commit(config, components)
     manifest = load_manifest(root)
     old_entries = {entry["id"]: entry for entry in manifest.get("components", [])}
 
@@ -674,9 +721,11 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
 
     new_manifest = {"framework_version": str(config["framework_version"]),
                     "components": sorted(entries, key=lambda entry: entry["id"])}
-    manifest_text = yaml.safe_dump(new_manifest, sort_keys=False, allow_unicode=True)
+    manifest_text = form.dump_yaml(new_manifest)
     manifest_path = root / MANIFEST
-    if not manifest_path.exists() or manifest_path.read_text(encoding="utf-8") != manifest_text:
+    disk_text = manifest_path.read_text(encoding="utf-8") if manifest_path.exists() else ""
+    old_form = yaml.safe_dump(new_manifest, sort_keys=False, allow_unicode=True)  # before 1.5.0
+    if disk_text in ("", old_form) or not form.same_form(str(MANIFEST), disk_text, manifest_text):
         to_write[str(MANIFEST)] = manifest_text
         result.wrote.append(str(MANIFEST))
     else:
@@ -690,8 +739,10 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
     if config.get("delivery", "ci") == "local":
         print("warning: delivery is local. No workflow file was written, so G3 runs on this "
               "machine only. Run 'stone gate' and paste its output in the PR.", file=sys.stderr)
-        print("Add these lines to .git/info/exclude:", file=sys.stderr)
-        for pattern in ignore_patterns(config, components):
+        missing = not_ignored(root, ignore_patterns(config, components))
+        if missing:
+            print("Add these lines to .git/info/exclude:", file=sys.stderr)
+        for pattern in missing:
             print(f"  {pattern}", file=sys.stderr)
     if not dry_run:
         _write(root, to_write)
@@ -708,6 +759,26 @@ def ignore_patterns(config: dict[str, Any], components: list[Component]) -> list
     for key in ("plans", "specs", "reports"):
         patterns.add(specs.base_folder(one_folder(_get(config, f"paths.{key}"), key)))
     return sorted(patterns)
+
+
+def not_ignored(root: Path, patterns: list[str]) -> list[str]:
+    """Return the patterns that git does not ignore in root (#227).
+
+    Ask git, so that anchored entries, parent folders, wildcards, .gitignore, and the global
+    excludes file count. If git cannot answer (no repo, no git), return all the patterns.
+    """
+    try:
+        out = subprocess.run(["git", "check-ignore", "--no-index", "--stdin", "-z"], cwd=root,
+                             input="\0".join(patterns), capture_output=True, text=True,
+                             check=False)
+    except OSError:
+        out = None
+    if out is None or out.returncode not in (0, 1):  # 1: git ignores none of them
+        print("note: git cannot check the ignore rules here, so all the lines show.",
+              file=sys.stderr)
+        return patterns
+    ignored = set(out.stdout.split("\0"))
+    return [pattern for pattern in patterns if pattern not in ignored]
 
 
 def _write(root: Path, files: dict[str, str]) -> None:

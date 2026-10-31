@@ -34,6 +34,8 @@ VENDOR_NAMES = ["claude", "codex", "cursor", "copilot", "gemini", "openspec", "k
 HARNESS_FOLDER = ".claude/"
 HARNESS_FOLDER_ALLOWED = {"framework_check.py", "writing_check.py"}
 EVAL_OPTIONAL_KINDS = {"check", "doc", "specialist"}  # lifecycle.md: a check is its own test, so its eval can be ""
+CHECK_ID_PREFIX = "check."  # D99: a check rendered as a CI job (check.k16) is still a check
+EVAL_OPTIONAL_IDS = {"ci-job.checks"}  # D102: the job of the checks has no model in it
 
 
 def _first_column(rows: list[list[str]]) -> list[str]:
@@ -338,6 +340,27 @@ def ticket_folder_problems(config: dict[str, Any]) -> list[str]:
     return problems
 
 
+def instruction_text_problems(config: dict[str, Any]) -> list[str]:
+    """Return the problems of the `instruction_text` map of K22 (D89)."""
+    text = config.get("instruction_text")
+    if text is None:
+        return []
+    if not isinstance(text, dict) or set(text) - {"hosts", "packages"}:
+        return ["The instruction_text value is not valid. Use a map with hosts and packages."]
+    problems = []
+    for key in ("hosts", "packages"):
+        items = text.get(key, [])
+        if not isinstance(items, list) or not all(isinstance(item, str) and item.strip()
+                                                  and " " not in item for item in items):
+            problems.append(f"instruction_text.{key} is not valid. Use a list of names "
+                            "with no spaces.")
+    hosts = [item for item in text.get("hosts") or [] if isinstance(item, str)]
+    if any(char in item for item in hosts for char in "/*:@?#\\"):
+        problems.append("instruction_text.hosts has a path, a port, or a '*'. Use host names only, for "
+                        "example docs.example.com. A host also allows its subdomains.")
+    return problems
+
+
 def protected_path_problems(config: dict[str, Any]) -> list[str]:
     """Return a problem for each plans or reports folder that overlaps a protected path.
 
@@ -490,6 +513,14 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     adoption = config.get("adoption", "all")
     if adoption not in ADOPTION_MODES:
         add(f"The adoption '{adoption}' is not valid. Use one of {list(ADOPTION_MODES)}.")
+    commit = config.get("framework_commit")
+    if commit is not None and not re.fullmatch(r"[0-9a-f]{40}", str(commit)):
+        add("The framework_commit value is not valid. Use the full 40-character commit SHA "
+            "of the framework tag, in lowercase.")
+    if not isinstance(config.get("protect_instruction_files", False), bool):
+        add("The protect_instruction_files value is not valid. Use true or false.")
+    for problem in instruction_text_problems(config):
+        add(problem)
     for problem in ci_branch_problems(config):
         add(problem)
     for problem in (ticket_folder_problems(config) + protected_path_problems(config)
@@ -532,6 +563,14 @@ def _is_date(value: Any) -> bool:
     return True
 
 
+def _eval_optional(entry: dict[str, Any]) -> bool:
+    """True if the component can have an empty eval: its kind, or its id, names a check (D43, D99),
+    or the id is the job of the checks (D102)."""
+    entry_id = str(entry.get("id", ""))
+    return (entry.get("kind") in EVAL_OPTIONAL_KINDS or entry_id.startswith(CHECK_ID_PREFIX)
+            or entry_id in EVAL_OPTIONAL_IDS)
+
+
 def component_problems(entry: dict[str, Any], is_manifest: bool,
                        tested: dict[str, list[str]] | None = None) -> list[str]:
     """P5 (D43, D50): name each missing item of one component entry.
@@ -543,7 +582,7 @@ def component_problems(entry: dict[str, Any], is_manifest: bool,
     problems = []
     if "eval" not in entry:
         problems.append("has no 'eval' key (P5). Add the eval folder, or \"\" for a check.")
-    elif not str(entry["eval"] or "").strip() and entry.get("kind") not in EVAL_OPTIONAL_KINDS:
+    elif not str(entry["eval"] or "").strip() and not _eval_optional(entry):
         problems.append("has no eval plan (P5). Set 'eval' to its eval folder, for example "
                         f"evals/{str(entry.get('id', '')).replace('.', '-')}/.")
     if not is_manifest:

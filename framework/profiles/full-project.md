@@ -14,7 +14,7 @@ gates:
   G3: required
   G4: human
   G5: always
-checks: [K1, K2, K3, K4, K5, K6, K7, K8, K9, K13, K14, K15, K17, K18, K20]
+checks: [K1, K2, K3, K4, K5, K6, K7, K8, K9, K13, K14, K15, K17, K18, K20, K22, K23, K24]
 limits:
   pr_changed_lines: 600
 outputs: [plan, pr]

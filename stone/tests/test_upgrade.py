@@ -5,6 +5,7 @@ import io
 import shutil
 import tempfile
 import unittest
+import unittest.mock
 from pathlib import Path
 
 import yaml
@@ -12,6 +13,16 @@ import yaml
 import stone
 from stone import cli, framework_check, render, upgrade
 from test_render import CONFIG, FRAMEWORK
+
+SHA = "012f83afcac2e83cdbf17590b1d88638b0a8a290"
+
+
+def fixed_commit(tag: str) -> str:
+    return SHA
+
+
+def no_commit(tag: str) -> str:
+    raise upgrade.UpgradeError(f"The tag {tag} is not in the repo.")
 
 RELEASES = """versions:
   - version: 2.0.0
@@ -170,13 +181,59 @@ class PlanTest(unittest.TestCase):
         (self.root / ".cornerstone" / "config.yaml").write_text(
             text.replace("framework_version: 1.1.0", "framework_version: 1.1.0   # tag"))
         with contextlib.redirect_stderr(io.StringIO()):
-            written = upgrade.apply(self.root, self.framework, "2.0.0")
+            written = upgrade.apply(self.root, self.framework, "2.0.0", resolve=fixed_commit)
         config = (self.root / ".cornerstone" / "config.yaml").read_text()
-        self.assertIn("framework_version: 2.0.0   # tag", config)
+        self.assertIn(f'framework_version: 2.0.0   # tag\nframework_commit: "{SHA}"', config)
         self.assertTrue(written)
         self.assertTrue((self.root / ".claude" / "agents" / "implementer.md").exists())
         manifest = yaml.safe_load((self.root / render.MANIFEST).read_text())
         self.assertEqual(manifest["framework_version"], "2.0.0")
+
+    def test_apply_replaces_an_old_commit(self) -> None:
+        self.config('framework_commit: "' + "a" * 40 + '"  # old\n', version="1.1.0")
+        tags = []
+        with contextlib.redirect_stderr(io.StringIO()):
+            upgrade.apply(self.root, self.framework, "2.0.0",
+                          resolve=lambda tag: tags.append(tag) or SHA)
+        config = (self.root / ".cornerstone" / "config.yaml").read_text()
+        self.assertEqual(tags, ["v2.0.0"])
+        self.assertEqual(config.count("framework_commit:"), 1)
+        self.assertIn(f'framework_commit: "{SHA}"', config)
+        self.assertEqual(yaml.safe_load(config)["framework_commit"], SHA)
+
+    def test_apply_with_no_commit_and_no_key_warns_and_renders(self) -> None:
+        self.config(version="1.1.0")
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log):
+            upgrade.apply(self.root, self.framework, "2.0.0", resolve=no_commit)
+        config = (self.root / ".cornerstone" / "config.yaml").read_text()
+        self.assertIn("framework_version: 2.0.0", config)
+        self.assertNotIn("framework_commit", config)
+        self.assertIn("warning: The tag v2.0.0 is not in the repo.", log.getvalue())
+
+    def test_apply_with_no_commit_and_an_old_key_stops_before_a_write(self) -> None:
+        self.config('framework_commit: "' + "a" * 40 + '"\n', version="1.1.0")
+        before = (self.root / ".cornerstone" / "config.yaml").read_text()
+        with self.assertRaisesRegex(upgrade.UpgradeError, "not in the repo"):
+            with contextlib.redirect_stderr(io.StringIO()):
+                upgrade.apply(self.root, self.framework, "2.0.0", resolve=no_commit)
+        self.assertEqual((self.root / ".cornerstone" / "config.yaml").read_text(), before)
+        self.assertFalse((self.root / render.MANIFEST).exists())
+
+    def test_tag_commit_reads_the_peeled_commit_of_an_annotated_tag(self) -> None:
+        tag_object, commit = "1" * 40, "2" * 40
+        out = f"{tag_object}\trefs/tags/v1.0.0\n{commit}\trefs/tags/v1.0.0^{{}}\n"
+        done = unittest.mock.Mock(stdout=out)
+        with unittest.mock.patch("subprocess.run", return_value=done) as run:
+            self.assertEqual(upgrade.tag_commit("v1.0.0"), commit)
+        self.assertEqual(run.call_args.args[0][:3], ["git", "ls-remote", upgrade.REPO_URL])
+        done.stdout = f"{commit}\trefs/tags/v1.0.0\n"  # a lightweight tag
+        with unittest.mock.patch("subprocess.run", return_value=done):
+            self.assertEqual(upgrade.tag_commit("v1.0.0"), commit)
+        done.stdout = ""
+        with unittest.mock.patch("subprocess.run", return_value=done):
+            with self.assertRaisesRegex(upgrade.UpgradeError, "not in"):
+                upgrade.tag_commit("v1.0.0")
 
     def test_apply_stops_when_a_person_must_act(self) -> None:
         self.config("legacy: 1\n")

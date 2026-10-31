@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import datetime as dt
 import re
+import subprocess
+import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import yaml
 
@@ -16,6 +18,7 @@ CONFIG = Path(".cornerstone/config.yaml")
 KINDS = ("major", "minor", "patch")
 FILE_CHANGES = ("added", "changed", "removed")
 VERSION = re.compile(r"^\d+\.\d+\.\d+$")
+REPO_URL = "https://github.com/brawblan/ai-workflow"  # the G3 workflow installs stone from it
 
 
 class UpgradeError(Exception):
@@ -200,8 +203,34 @@ def render_summary(root: Path, framework: Path, actions: list[str]) -> str:
             f"unchanged, {len(result.drift)} with drift.")
 
 
-def apply(root: Path, framework: Path, target: str | None) -> list[str]:
-    """Set framework_version, then render. Stop if a person must act first."""
+def tag_commit(tag: str) -> str:
+    """Return the commit SHA of a framework tag, from the remote repo. Raise if git cannot find it."""
+    ref, peeled = f"refs/tags/{tag}", f"refs/tags/{tag}^{{}}"  # peeled: an annotated tag's commit
+    try:
+        out = subprocess.run(["git", "ls-remote", REPO_URL, ref, peeled], capture_output=True,
+                             text=True, timeout=60, check=True).stdout
+    except (OSError, subprocess.SubprocessError) as error:
+        raise UpgradeError(f"git ls-remote could not read the tag {tag}: {error}") from None
+    refs = {name: sha for sha, name in (line.split("\t", 1) for line in out.splitlines()
+                                        if "\t" in line)}
+    commit = refs.get(peeled) or refs.get(ref)
+    if not commit:
+        raise UpgradeError(f"The tag {tag} is not in {REPO_URL}.")
+    return commit
+
+
+def _set_commit(text: str, commit: str) -> str:
+    """Set framework_commit in the config text. Add the line after framework_version if it is missing."""
+    line = f'framework_commit: "{commit}"  # the commit of the tag. G3 installs stone from it.'
+    new, count = re.subn(r"^framework_commit:.*$", line, text, count=1, flags=re.M)
+    if count:
+        return new
+    return re.sub(r"^(framework_version:.*)$", rf"\g<1>\n{line}", text, count=1, flags=re.M)
+
+
+def apply(root: Path, framework: Path, target: str | None,
+          resolve: Callable[[str], str] = tag_commit) -> list[str]:
+    """Set framework_version and framework_commit, then render. Stop if a person must act first."""
     _, actions, _ = plan(root, framework, target)
     if actions:
         raise UpgradeError("Not applied. " + str(len(actions)) + " action(s) need a person first. "
@@ -215,6 +244,13 @@ def apply(root: Path, framework: Path, target: str | None) -> list[str]:
                          count=1, flags=re.M)
     if not count:
         raise UpgradeError(f"{CONFIG}: no 'framework_version:' line to change.")
+    try:
+        new = _set_commit(new, resolve(f"v{target}"))
+    except UpgradeError as error:
+        if re.search(r"^framework_commit:", text, flags=re.M):
+            raise  # the old commit would install the old stone: stop before a write
+        print(f"warning: {error} framework_commit is not set, so G3 installs stone from the tag.",
+              file=sys.stderr)
     path.write_text(new, encoding="utf-8")
     result = render.render(root, framework)
     return result.wrote + result.drift

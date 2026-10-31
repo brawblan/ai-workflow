@@ -13,9 +13,18 @@
 # eval: the planned eval folder (lifecycle.md).
 # protected_dirs: the folders of the harness that hold its settings, role files, and hook entry. The hook
 # and K6 protect them for every role, with `.cornerstone/` (D76). The core names no harness folder (P12).
+# instruction_files: the files that the harness loads as rules, in any folder. With
+# `protect_instruction_files: true` in the repo config, the hook and K6 protect them too (D87).
+# Each letter is a class of both cases, because a file system that ignores case loads `agents.md`
+# for `AGENTS.md` (D88).
 
 protected_dirs:
   - .claude/
+
+instruction_files:
+  - "**/[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]"
+  - "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Mm][Dd]"
+  - "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Ll][Oo][Cc][Aa][Ll].[Mm][Dd]"
 
 components:
   - id: role.shaper
@@ -116,7 +125,7 @@ components:
     when: {check: K7}
     template: checks/change_size.py
     target: .cornerstone/checks/change_size.py
-    eval: evals/check-k7/
+    eval: ""                                 # D99: the unit tests are the eval
 
   - id: check.k15
     kind: check
@@ -126,7 +135,18 @@ components:
     template: checks/instruction_size.py
     target: .cornerstone/checks/instruction_size.py
     ci_step: workflows/steps/instruction-size.yml
-    eval: evals/check-k15/
+    eval: ""                                 # D99: the unit tests are the eval
+
+  - id: check.k22
+    kind: check
+    purpose: K22. Fail if a tracked instruction file has an install, a pipe to a shell, an override, an unknown host, or hidden text.
+    principle: [P6, P9]
+    when: {check: K22}
+    needs_instruction_files: true            # rendered only with protect_instruction_files: true (D89)
+    template: checks/instruction_text.py
+    target: .cornerstone/checks/instruction_text.py
+    ci_step: workflows/steps/k22.yml
+    eval: ""
 
   - id: ci-job.checks
     kind: ci-job
@@ -135,13 +155,21 @@ components:
     when: {gate: G3}
     template: workflows/cornerstone-checks.yml
     target: .github/workflows/cornerstone-checks.yml
-    eval: evals/ci-job-checks/
-    steps:                                   # the "by profile" checks that run a repo command
+    eval: ""                                 # D102: no model in the job, so its checks' tests are its eval
+    steps:                                   # the "by profile" checks; most run a repo command
       - id: k20
         name: K20 specialist findings
         when: {check: K20}
         needs: specialists
         template: workflows/steps/k20-specialists.yml
+      - id: k23
+        name: K23 new dependencies
+        when: {check: K23}
+        template: workflows/steps/k23-dependencies.yml
+      - id: k24
+        name: K24 unpinned tools
+        when: {check: K24}
+        template: workflows/steps/k24-workflows.yml
       - id: k4
         name: K4 integration tests
         when: {check: K4}
@@ -223,4 +251,4 @@ components:
     when: {check: K16}
     template: workflows/cornerstone-k16.yml
     target: .github/workflows/cornerstone-k16.yml
-    eval: evals/check-k16/
+    eval: ""                                 # D99: the unit tests are the eval

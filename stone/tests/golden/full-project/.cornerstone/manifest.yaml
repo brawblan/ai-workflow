@@ -1,153 +1,149 @@
 framework_version: 0.8.0
 components:
-- id: check.k15
-  kind: check
-  purpose: K15. Fail if the instruction file is over the line limit of the model profile.
-  principle:
-  - P4
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/check-k15/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .cornerstone/checks/instruction_size.py
-  hash: f3f1a17d28fa5dc9dc7b3b3d6c633fd4a8ac90ccd3254f1a1e4210b847d76886
-- id: check.k6
-  kind: check
-  purpose: K6. Fail if an implementer commit changes a protected path.
-  principle:
-  - P2
-  - P6
-  source: framework
-  owner: octocat
-  eval: ''
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .cornerstone/checks/protected_paths.py
-  hash: b119dda0f2c438020ab82725da07ad03134b0dcca563336e0425eb5fd3373cd1
-- id: check.k7
-  kind: check
-  purpose: K7. Fail if the diff is over the size limit of the PR profile and has no
-    waiver.
-  principle:
-  - P10
-  source: framework
-  owner: octocat
-  eval: evals/check-k7/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .cornerstone/checks/change_size.py
-  hash: eb7e5246d4000148a2f0c1295d054c42287123c9017328bbce4da7e7e7f74a6e
-- id: ci-job.checks
-  kind: ci-job
-  purpose: G3. Run K6, K7, K14, and the repo checks on each pull request.
-  principle:
-  - P1
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/ci-job-checks/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .github/workflows/cornerstone-checks.yml
-  hash: 285c66aacadfd7dc22c8fb837c52884eed1b73026ff896092f2dbacd663cf15c
-- id: hook.path-match
-  kind: hook
-  purpose: Match a path against paths.tests and paths.checks. The hook and K6 import
-    it.
-  principle:
-  - P2
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/hook-protect-paths/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .cornerstone/lib/path_match.py
-  hash: f2f05f2a1c56c9e1a9534bff3111ee50c3836c43edd764af6d3975b8fbe92a65
-- id: hook.protect-paths
-  kind: hook
-  purpose: Block an edit to a path that the current role must not change.
-  principle:
-  - P2
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/hook-protect-paths/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .cornerstone/hooks/protect-paths.py
-  hash: 2404f67589a2f7d8e2c1a423d5e05cac9a87da458a2e2e591d3a74d2b0318645
-- id: hook.settings
-  kind: hook
-  purpose: Register the protected-path hook in the harness settings. Other keys stay
-    as they are.
-  principle:
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/hook-protect-paths/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .claude/settings.json
-  hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
-- id: role.planner
-  kind: role
-  purpose: Write the plan artifact and the progress file. A human approves them at
-    G2.
-  principle:
-  - P3
-  - P7
-  source: framework
-  owner: octocat
-  eval: evals/role-planner/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .claude/agents/planner.md
-  hash: 3c36629e6ea6c3156694c544acf0e6562be819187aada63c8fa9a4f2669795d1
-- id: role.reviewer
-  kind: role
-  purpose: Find defects and scope drift in a fresh session.
-  principle:
-  - P2
-  - P11
-  source: framework
-  owner: octocat
-  eval: evals/role-reviewer/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .claude/agents/reviewer.md
-  hash: 6a9f5184e06dfd0f274230baaa587a49632fd721c0fab0e88740fc38bf292f54
-- id: role.shaper
-  kind: role
-  purpose: Interview the human until the ticket meets the Definition of Ready.
-  principle:
-  - P3
-  source: framework
-  owner: octocat
-  eval: evals/role-shaper/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .claude/agents/shaper.md
-  hash: 4b79970810b144f67f2babc87a2fe0de7d04cf0be69f8a1de1440312209b7c0b
+  - id: check.k15
+    kind: check
+    purpose: K15. Fail if the instruction file is over the line limit of the model profile.
+    principle:
+      - P4
+      - P6
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/checks/instruction_size.py
+    hash: f3f1a17d28fa5dc9dc7b3b3d6c633fd4a8ac90ccd3254f1a1e4210b847d76886
+  - id: check.k6
+    kind: check
+    purpose: K6. Fail if an implementer commit changes a protected path.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/checks/protected_paths.py
+    hash: 8f5949d693aa8a8de398e3f3c3e6bc237c38c2215e971295ee04a4cb19032b3e
+  - id: check.k7
+    kind: check
+    purpose: K7. Fail if the diff is over the size limit of the PR profile and has no waiver.
+    principle:
+      - P10
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/checks/change_size.py
+    hash: eb7e5246d4000148a2f0c1295d054c42287123c9017328bbce4da7e7e7f74a6e
+  - id: ci-job.checks
+    kind: ci-job
+    purpose: G3. Run K6, K7, K14, and the repo checks on each pull request.
+    principle:
+      - P1
+      - P6
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .github/workflows/cornerstone-checks.yml
+    hash: 2d6a75f505217698d75d0aff8e2ef4efb5652bc5601a0fef5347a1c07f6b1366
+  - id: hook.path-match
+    kind: hook
+    purpose: Match a path against paths.tests and paths.checks. The hook and K6 import it.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: evals/hook-protect-paths/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/lib/path_match.py
+    hash: f2f05f2a1c56c9e1a9534bff3111ee50c3836c43edd764af6d3975b8fbe92a65
+  - id: hook.protect-paths
+    kind: hook
+    purpose: Block an edit to a path that the current role must not change.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: evals/hook-protect-paths/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/hooks/protect-paths.py
+    hash: 2404f67589a2f7d8e2c1a423d5e05cac9a87da458a2e2e591d3a74d2b0318645
+  - id: hook.settings
+    kind: hook
+    purpose: Register the protected-path hook in the harness settings. Other keys stay as they are.
+    principle:
+      - P6
+    source: framework
+    owner: octocat
+    eval: evals/hook-protect-paths/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .claude/settings.json
+    hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+  - id: role.planner
+    kind: role
+    purpose: Write the plan artifact and the progress file. A human approves them at G2.
+    principle:
+      - P3
+      - P7
+    source: framework
+    owner: octocat
+    eval: evals/role-planner/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .claude/agents/planner.md
+    hash: d4472158cf9e7643247c98f25eb960dc392f1af7750f7315fed65b210f1bc010
+  - id: role.reviewer
+    kind: role
+    purpose: Find defects and scope drift in a fresh session.
+    principle:
+      - P2
+      - P11
+    source: framework
+    owner: octocat
+    eval: evals/role-reviewer/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .claude/agents/reviewer.md
+    hash: 6a9f5184e06dfd0f274230baaa587a49632fd721c0fab0e88740fc38bf292f54
+  - id: role.shaper
+    kind: role
+    purpose: Interview the human until the ticket meets the Definition of Ready.
+    principle:
+      - P3
+    source: framework
+    owner: octocat
+    eval: evals/role-shaper/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .claude/agents/shaper.md
+    hash: 4b79970810b144f67f2babc87a2fe0de7d04cf0be69f8a1de1440312209b7c0b

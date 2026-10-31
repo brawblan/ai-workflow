@@ -30,15 +30,31 @@ $gate_if
           printf '%s\n' "$${PR_BODY}" | python3 .cornerstone/checks/change_size.py \
             "origin/$${BASE_REF}" --body - --mode block --format github
 
-      # stone comes from the framework tag in framework_version. A venv keeps it apart from the repo.
+      # stone comes from framework_commit, else from the tag in framework_version (D92). A venv keeps
+      # it apart from the repo. The hashes pin PyYAML and the build tool. pip gets no other package.
       - name: Install stone
 $marker_if
         env:
-          STONE_TAG: v$framework_version
+          STONE_REF: $stone_ref
         run: |
           python3 -m venv "$${RUNNER_TEMP}/stone"
-          "$${RUNNER_TEMP}/stone/bin/pip" install --quiet \
-            "cornerstone-stone @ git+https://github.com/brawblan/ai-workflow@$${STONE_TAG}#subdirectory=stone"
+          cat > "$${RUNNER_TEMP}/stone-requirements.txt" <<'EOF'
+          PyYAML==6.0.3 \
+            --hash=sha256:10892704fc220243f5305762e276552a0395f7beb4dbf9b14ec8fd43b57f126c \
+            --hash=sha256:b8bb0864c5a28024fac8a632c443c87c5aa6f215c0b126c449ae1a150412f31d \
+            --hash=sha256:9149cad251584d5fb4981be1ecde53a1ca46c891a79788c0df828d2f166bda28 \
+            --hash=sha256:ba1cc08a7ccde2d2ec775841541641e4548226580ab850948cbfda66a1befcdc \
+            --hash=sha256:ee2922902c45ae8ccada2c5b501ab86c36525b883eff4255313a253a3160861c \
+            --hash=sha256:0f29edc409a6392443abf94b9cf89ce99889a1dd5376d94316ae5145dfedd5d6 \
+            --hash=sha256:501a031947e3a9025ed4405a168e6ef5ae3126c59f90ce0cd6f2bfc477be31b7 \
+            --hash=sha256:c458b6d084f9b935061bc36216e8a69a7e293a2f1e68bf956dcd9e6cbcd143f5
+          setuptools==84.2.1 \
+            --hash=sha256:ca140b45d5325a9478f880e351484f62fef15f336462e449ca0c03c873d589c2
+          EOF
+          "$${RUNNER_TEMP}/stone/bin/pip" install --quiet --require-hashes --only-binary :all: \
+            -r "$${RUNNER_TEMP}/stone-requirements.txt"
+          "$${RUNNER_TEMP}/stone/bin/pip" install --quiet --no-deps --no-build-isolation \
+            "cornerstone-stone @ git+https://github.com/brawblan/ai-workflow@$${STONE_REF}#subdirectory=stone"
 
       # K14 blocks (D45, D49). The PR body needs the Evidence, Decision log, Review findings, and Confidence sections.
       - name: K14 PR evidence
@@ -50,6 +66,7 @@ $gate_if
             | "$${RUNNER_TEMP}/stone/bin/stone" check-evidence - --mode block --format github
 
 $ci_step_check_k15
+$ci_step_check_k22
 $ci_setup
       - name: Install
 $marker_if
