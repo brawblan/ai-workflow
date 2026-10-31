@@ -1,96 +1,91 @@
 framework_version: 0.8.0
 components:
-- id: hook.path-match
-  kind: hook
-  purpose: Match a path against paths.tests and paths.checks. The hook and K6 import
-    it.
-  principle:
-  - P2
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/hook-protect-paths/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .cornerstone/lib/path_match.py
-  hash: f2f05f2a1c56c9e1a9534bff3111ee50c3836c43edd764af6d3975b8fbe92a65
-- id: hook.protect-paths
-  kind: hook
-  purpose: Block an edit to a path that the current role must not change.
-  principle:
-  - P2
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/hook-protect-paths/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .cornerstone/hooks/protect-paths.py
-  hash: 3d8e770a9bba15f30ded44a05f41dbf8b2ebce75d05a18d42a532fdb493af310
-- id: hook.settings
-  kind: hook
-  purpose: Register the protected-path hook in the harness settings. Other keys stay
-    as they are.
-  principle:
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/hook-protect-paths/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .claude/settings.json
-  hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
-- id: role.investigator
-  kind: role
-  purpose: Read, run, and report. Write only in the reports path, or anywhere on a
-    spike branch.
-  principle:
-  - P2
-  - P11
-  source: framework
-  owner: octocat
-  eval: evals/role-investigator/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .claude/agents/investigator.md
-  hash: 74a87438e55a23789e019cfd4605338af6e9720c9cc97ceaabfe31981830aeff
-- id: trigger.issue-opened.bug-triage
-  kind: ci-job
-  purpose: Start the first role of the profile on each new issue. Post its report
-    on the issue.
-  principle:
-  - P6
-  - P9
-  source: framework
-  owner: octocat
-  eval: evals/trigger-issue-opened/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .github/workflows/cornerstone-bug-triage-issue-opened.yml
-  hash: a491a3ed381d480842145561e5354fa44bf3b4cbb296609119550bb5d508df53
-- id: trigger.schedule.bug-triage
-  kind: ci-job
-  purpose: Start the first role of the profile on its schedule. Post its report as
-    an issue.
-  principle:
-  - P6
-  - P9
-  source: framework
-  owner: octocat
-  eval: evals/trigger-schedule/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .github/workflows/cornerstone-bug-triage-schedule.yml
-  hash: b587f914df32667143deb30a039376d92622595d20849e55bdb9f0a1947aeee1
+  - id: hook.path-match
+    kind: hook
+    purpose: Match a path against paths.tests and paths.checks. The hook and K6 import it.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: evals/hook-protect-paths/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/lib/path_match.py
+    hash: f2f05f2a1c56c9e1a9534bff3111ee50c3836c43edd764af6d3975b8fbe92a65
+  - id: hook.protect-paths
+    kind: hook
+    purpose: Block an edit to a path that the current role must not change.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: evals/hook-protect-paths/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/hooks/protect-paths.py
+    hash: 3d8e770a9bba15f30ded44a05f41dbf8b2ebce75d05a18d42a532fdb493af310
+  - id: hook.settings
+    kind: hook
+    purpose: Register the protected-path hook in the harness settings. Other keys stay as they are.
+    principle:
+      - P6
+    source: framework
+    owner: octocat
+    eval: evals/hook-protect-paths/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .claude/settings.json
+    hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+  - id: role.investigator
+    kind: role
+    purpose: Read, run, and report. Write only in the reports path, or anywhere on a spike branch.
+    principle:
+      - P2
+      - P11
+    source: framework
+    owner: octocat
+    eval: evals/role-investigator/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .claude/agents/investigator.md
+    hash: 74a87438e55a23789e019cfd4605338af6e9720c9cc97ceaabfe31981830aeff
+  - id: trigger.issue-opened.bug-triage
+    kind: ci-job
+    purpose: Start the first role of the profile on each new issue. Post its report on the issue.
+    principle:
+      - P6
+      - P9
+    source: framework
+    owner: octocat
+    eval: evals/trigger-issue-opened/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .github/workflows/cornerstone-bug-triage-issue-opened.yml
+    hash: 096a0a64e5168e439c206f66dff67b594f11a24eb9936f452753800dcfcdc41f
+  - id: trigger.schedule.bug-triage
+    kind: ci-job
+    purpose: Start the first role of the profile on its schedule. Post its report as an issue.
+    principle:
+      - P6
+      - P9
+    source: framework
+    owner: octocat
+    eval: evals/trigger-schedule/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .github/workflows/cornerstone-bug-triage-schedule.yml
+    hash: 14e797fb38c956983c0fafb30213f70be1d503047a7b6527fbe70997db16364a

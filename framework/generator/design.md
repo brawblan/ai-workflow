@@ -118,10 +118,18 @@ Rules:
    - Same content: skip.
    - No file on disk: write it.
    - The disk content has the hash in the manifest: write the new content.
+   - The disk content differs only in form, for example after a format on save: skip (D96).
+     YAML and JSON compare the parsed data and its types. Markdown ignores blank lines, the
+     whitespace after the indent of a line, and the width of a table column.
    - Otherwise (a human changed the file, or wrote it before the first render): report drift. Do
      not overwrite. Exit code 2.
 8. Write the manifest. Keep `added`, `owner`, and `review_by` for existing components.
 9. Print a summary: files written, files skipped, drift found.
+
+`stone render` writes YAML and Markdown in a form that a common formatter accepts with its default
+options (D96). YAML lists are indented under their key. A quoted value uses `"`, or `'` if it has a
+`"`. A long value stays on one line. Markdown table columns are aligned. A manifest in the form of
+1.4.0 or before gets the new form on the next render.
 
 ## Errors and logging
 

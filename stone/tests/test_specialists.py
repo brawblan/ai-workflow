@@ -302,10 +302,17 @@ class RenderTest(unittest.TestCase):
     def test_document_reviewer_and_manifest(self) -> None:
         err = self.render(A11Y)
         doc = (self.root / specialists.DOC).read_text(encoding="utf-8")
-        self.assertIn("| 1 | accessibility | `claude --agent accessibility-lead` | paths: "
-                      "`**/components/**`, `src/*.css.js`; personas_with: `screen reader`; "
-                      "labels: `a11y` | yes |", doc)
-        self.assertIn("| 2 | security | `/security-review` | always | no |", doc)
+        trigger = ("paths: `**/components/**`, `src/*.css.js`; personas_with: `screen reader`; "
+                   "labels: `a11y`")
+        self.assertIn(f"| 1     | accessibility | `claude --agent accessibility-lead` | {trigger} "
+                      "| yes    |", doc)
+        self.assertIn(f"| 2     | security      | `/security-review`                  | "
+                      f"{'always':<{len(trigger)}} | no     |", doc)
+        self.assertIn(f"| ----- | ------------- | ----------------------------------- | "
+                      f"{'-' * len(trigger)} | ------ |", doc)
+        self.assertEqual(doc.splitlines()[1], "")  # a blank line follows the comment
+        widths = {len(line) for line in doc.splitlines() if line.startswith("|")}
+        self.assertEqual(len(widths), 1)  # every table line has the same width
         self.assertIn("`docs/reports/<ticket-id>.<id>.md`", doc)
         self.assertIn("Also read the specialist findings that `.cornerstone/specialists.md` lists.",
                       (self.root / ".claude/agents/reviewer.md").read_text())

@@ -1,94 +1,90 @@
 framework_version: 0.8.0
 components:
-- id: check.k16
-  kind: ci-job
-  purpose: K16. Fail a pull request from a spike branch into the main or integration
-    branch (D30, D33).
-  principle:
-  - P2
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/check-k16/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .github/workflows/cornerstone-k16.yml
-  hash: bac6ded88fd656f15353a6430b312cd272dfea9721934426d9553c62571fac9f
-- id: hook.path-match
-  kind: hook
-  purpose: Match a path against paths.tests and paths.checks. The hook and K6 import
-    it.
-  principle:
-  - P2
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/hook-protect-paths/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .cornerstone/lib/path_match.py
-  hash: f2f05f2a1c56c9e1a9534bff3111ee50c3836c43edd764af6d3975b8fbe92a65
-- id: hook.protect-paths
-  kind: hook
-  purpose: Block an edit to a path that the current role must not change.
-  principle:
-  - P2
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/hook-protect-paths/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .cornerstone/hooks/protect-paths.py
-  hash: 3d8e770a9bba15f30ded44a05f41dbf8b2ebce75d05a18d42a532fdb493af310
-- id: hook.settings
-  kind: hook
-  purpose: Register the protected-path hook in the harness settings. Other keys stay
-    as they are.
-  principle:
-  - P6
-  source: framework
-  owner: octocat
-  eval: evals/hook-protect-paths/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .claude/settings.json
-  hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
-- id: role.investigator
-  kind: role
-  purpose: Read, run, and report. Write only in the reports path, or anywhere on a
-    spike branch.
-  principle:
-  - P2
-  - P11
-  source: framework
-  owner: octocat
-  eval: evals/role-investigator/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .claude/agents/investigator.md
-  hash: 74a87438e55a23789e019cfd4605338af6e9720c9cc97ceaabfe31981830aeff
-- id: role.shaper
-  kind: role
-  purpose: Interview the human until the ticket meets the Definition of Ready.
-  principle:
-  - P3
-  source: framework
-  owner: octocat
-  eval: evals/role-shaper/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .claude/agents/shaper.md
-  hash: 4b79970810b144f67f2babc87a2fe0de7d04cf0be69f8a1de1440312209b7c0b
+  - id: check.k16
+    kind: ci-job
+    purpose: K16. Fail a pull request from a spike branch into the main or integration branch (D30, D33).
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: evals/check-k16/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .github/workflows/cornerstone-k16.yml
+    hash: bac6ded88fd656f15353a6430b312cd272dfea9721934426d9553c62571fac9f
+  - id: hook.path-match
+    kind: hook
+    purpose: Match a path against paths.tests and paths.checks. The hook and K6 import it.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: evals/hook-protect-paths/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/lib/path_match.py
+    hash: f2f05f2a1c56c9e1a9534bff3111ee50c3836c43edd764af6d3975b8fbe92a65
+  - id: hook.protect-paths
+    kind: hook
+    purpose: Block an edit to a path that the current role must not change.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: evals/hook-protect-paths/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/hooks/protect-paths.py
+    hash: 3d8e770a9bba15f30ded44a05f41dbf8b2ebce75d05a18d42a532fdb493af310
+  - id: hook.settings
+    kind: hook
+    purpose: Register the protected-path hook in the harness settings. Other keys stay as they are.
+    principle:
+      - P6
+    source: framework
+    owner: octocat
+    eval: evals/hook-protect-paths/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .claude/settings.json
+    hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+  - id: role.investigator
+    kind: role
+    purpose: Read, run, and report. Write only in the reports path, or anywhere on a spike branch.
+    principle:
+      - P2
+      - P11
+    source: framework
+    owner: octocat
+    eval: evals/role-investigator/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .claude/agents/investigator.md
+    hash: 74a87438e55a23789e019cfd4605338af6e9720c9cc97ceaabfe31981830aeff
+  - id: role.shaper
+    kind: role
+    purpose: Interview the human until the ticket meets the Definition of Ready.
+    principle:
+      - P3
+    source: framework
+    owner: octocat
+    eval: evals/role-shaper/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .claude/agents/shaper.md
+    hash: 4b79970810b144f67f2babc87a2fe0de7d04cf0be69f8a1de1440312209b7c0b
