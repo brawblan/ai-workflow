@@ -155,7 +155,7 @@ components:
     when: {gate: G3}
     template: workflows/cornerstone-checks.yml
     target: .github/workflows/cornerstone-checks.yml
-    eval: evals/ci-job-checks/
+    eval: ""                                 # D102: no model in the job, so its checks' tests are its eval
     steps:                                   # the "by profile" checks; most run a repo command
       - id: k20
         name: K20 specialist findings

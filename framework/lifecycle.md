@@ -28,7 +28,8 @@ components:
 `stone check` tests these fields (D43, D50). It fails in these cases:
 
 - A component has no `eval` key, or an empty `eval` and a kind that is not `check`. A component
-  whose id starts with `check.` is a check of any kind, for example `check.k16` (D99).
+  whose id starts with `check.` is a check of any kind, for example `check.k16` (D99). The job
+  `ci-job.checks` can also have an empty `eval`, because it has no model in it (D102).
 - A manifest entry has no valid `review_by`.
 - A manifest entry has an empty `owner`.
 - A result file in `evals/results/` names a model that `models_tested` of its component does not
