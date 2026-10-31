@@ -164,8 +164,11 @@ class ClosedPostEnv(unittest.TestCase):
         self.assertEqual(env["X"], "y")
         config = Path(env["GH_CONFIG_DIR"])
         self.assertEqual((config.parent, list(config.iterdir())), (temp, []))
-        self.assertEqual(env["PATH"].split(os.pathsep)[0], str(temp / "bin"))
-        self.assertNotIn(str(self.tmp / "realbin"), env["PATH"].split(os.pathsep))
+        folders = env["PATH"].split(os.pathsep)
+        self.assertEqual(folders[0], str(temp / "bin"))
+        self.assertEqual(folders.count(str(temp / "bin")), 1)
+        # The system folders stay after the fake bin (the stub folder may stay too).
+        self.assertIn(str(self.tmp / "realbin"), folders[1:])
 
     def test_real_gh_function_and_bash_env_do_not_run(self) -> None:
         root, flow = rendered("single-ticket", "cornerstone-single-ticket-label.yml")
@@ -177,6 +180,37 @@ class ClosedPostEnv(unittest.TestCase):
         self.assertEqual(result["error"], "")
         self.assertEqual(len(result["calls"]), 1)
         self.assertEqual([p.name for p in self.tmp.iterdir() if p.name.endswith("-ran")], [])
+
+    def test_bash_folder_with_a_real_gh_still_posts_and_gh_does_not_run(self) -> None:
+        # Like /usr/bin on Linux: the one folder with bash, the shell tools, and a real gh.
+        real = self.tmp / "usrbin"
+        real.mkdir()
+        for tool in ("bash", "sh", "cat", "sed", "date", "mkdir", "printf", "env", "touch"):
+            found = shutil.which(tool)
+            if found:
+                (real / tool).symlink_to(found)
+        (real / "gh").write_text(f"#!/bin/sh\ntouch {self.tmp}/real-gh-ran\n", encoding="utf-8")
+        (real / "gh").chmod(0o755)
+        root, flow = rendered("single-ticket", "cornerstone-single-ticket-label.yml")
+        self.addCleanup(shutil.rmtree, root, True)
+        temp = root / "rt"
+        temp.mkdir()
+        with mock.patch.dict(os.environ, {"PATH": str(real)}):
+            result = trigger_eval.post(flow, "report", temp, "7")
+        self.assertEqual(result["error"], "")
+        self.assertEqual(len(result["calls"]), 1)
+        self.assertTrue(result["posted"].startswith("**Cornerstone report from the"), result)
+        self.assertFalse((self.tmp / "real-gh-ran").exists())
+
+    def test_post_names_bash_when_it_is_missing(self) -> None:
+        root, flow = rendered("single-ticket", "cornerstone-single-ticket-label.yml")
+        self.addCleanup(shutil.rmtree, root, True)
+        temp = root / "rt"
+        temp.mkdir()
+        with mock.patch("shutil.which", return_value=None):
+            result = trigger_eval.post(flow, "report", temp, "7")
+        self.assertIn("bash", result["error"])
+        self.assertEqual((result["posted"], result["calls"]), ("", []))
 
     def test_failed_post_step_names_the_step(self) -> None:
         flow = {"jobs": {"post": {"steps": [{"name": "Boom", "run": "exit 3"}]}}}
