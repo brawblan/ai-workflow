@@ -97,12 +97,12 @@ def _parser() -> argparse.ArgumentParser:
     writing.add_argument("--format", choices=["text", "github"], default="text")
 
     rules = commands.add_parser(
-        "check-rules", help="R1, R2, and R4: test the action pins, the plugin version bump, and the "
-             "commit message format (D78, D97).")
+        "check-rules", help="R1 to R4: test the action pins, the plugin version bump, the event "
+             "text in 'run', and the commit message format (D78, D97, D98).")
     rules.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
     rules.add_argument("--base", help="The base branch. Gives R2 (a skill change needs a new "
                                       "plugin version) and R4 (the commit message format). "
-                                      "Without it, only R1 runs.")
+                                      "Without it, only R1 and R3 run.")
     rules.add_argument("--skills", default=repo_rules.SKILLS, help="The skills folder, for R2.")
     rules.add_argument("--plugin-file", default=repo_rules.PLUGIN_FILE,
                        help="The plugin file with the version, for R2.")

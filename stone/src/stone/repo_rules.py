@@ -1,5 +1,5 @@
-"""Checks for rules that this repo states in prose (P6, D78, D97): action pins, version bump, and
-commit message format.
+"""Checks for rules that this repo states in prose (P6, D78, D97, D98): action pins, version bump,
+event text in `run`, and commit message format.
 
 These checks are for the repo of the framework. `stone render` does not write them for a target repo.
 """
@@ -15,16 +15,24 @@ from stone.findings import Finding
 
 PIN_CHECK = "R1"
 BUMP_CHECK = "R2"
+ENV_CHECK = "R3"
 COMMIT_CHECK = "R4"
 COMMIT_TYPES = ("build", "chore", "ci", "docs", "feat", "fix", "perf", "refactor", "revert", "style",
                 "test")
 WORKFLOWS = ".github/workflows"
+TEMPLATES = "framework/adapters/*/templates/workflows"
 SKILLS = "plugins/cornerstone/skills/"
 PLUGIN_FILE = "plugins/cornerstone/.claude-plugin/plugin.json"
 
 _USES = re.compile(r"^\s*(?:-\s+)?uses:\s*(?P<value>[^#\n]*?)\s*(?:#.*)?$")
 _ACTION_PIN = re.compile(r"^[^@\s]+@[0-9a-f]{40}$")
 _IMAGE_PIN = re.compile(r"^docker://\S+@sha256:[0-9a-f]{64}$")
+_RUN = re.compile(r"^(?P<indent>\s*(?:-\s+)?)run:(?:\s+(?P<value>.*?))?\s*$")
+_BLOCK = re.compile(r"^[|>](?:[+-]?[1-9]?|[1-9][+-])(?:\s+#.*)?$")
+_EXPRESSION = re.compile(r"\$\{\{(?P<body>.*?)(?:\}\}|$)")
+_EVENT_TEXT = re.compile(
+    r"(?<![\w.])github\s*(?:\.\s*(?:event|head_ref)\b|\[\s*['\"](?:event|head_ref)['\"]\s*\])",
+    re.IGNORECASE)
 _GIT_SUBJECT = re.compile(r'^(?:Revert|Reapply) ".*"$')
 _SUBJECT = re.compile(r"^(?P<type>[a-z]+)(?:\((?P<scope>[^()\s]+)\))?!?: \S")
 
@@ -59,6 +67,63 @@ def check_pins(root: Path) -> list[Finding]:
                     rel, number, PIN_CHECK,
                     f"'uses: {value}' is not pinned to a commit. Replace the tag or branch with "
                     "the 40-character commit SHA, and keep the tag in a comment."))
+    return findings
+
+
+def _workflow_files(root: Path, folders: tuple[str, ...]) -> list[Path]:
+    paths = {p for folder in folders for pattern in ("*.yml", "*.yaml")
+             for p in root.glob(f"{folder}/**/{pattern}")}
+    return sorted(paths)
+
+
+def run_lines(text: str) -> list[tuple[int, str]]:
+    """Return (line number, text) for each line of a `run` value. A pattern, not a YAML parser.
+
+    The value is the text after `run:`, and each next line that is blank or indented more than
+    the `run` key. This covers a block (`|` or `>`) and a plain or quoted value on more than one
+    line. A `run:` with no value and no `- ` before it is a mapping key (for example a job named
+    `run`, or `defaults: run:`), so it gives no line.
+    """
+    lines = text.splitlines()
+    found: list[tuple[int, str]] = []
+    index = 0
+    while index < len(lines):
+        match = _RUN.match(lines[index])
+        index += 1
+        if not match:
+            continue
+        value = match.group("value") or ""
+        if value.startswith("#"):
+            value = ""
+        if not value and "-" not in match.group("indent"):
+            continue
+        if value and not _BLOCK.match(value):
+            found.append((index, value))
+        key_indent = len(match.group("indent"))
+        while index < len(lines):
+            line = lines[index]
+            if line.strip() and len(line) - len(line.lstrip()) <= key_indent:
+                break
+            index += 1
+            found.append((index, line))
+    return found
+
+
+def check_event_text(root: Path,
+                     folders: tuple[str, ...] = (WORKFLOWS, TEMPLATES)) -> list[Finding]:
+    """R3: a `run` value must not hold `github.event` or `github.head_ref` in a `${{ }}`."""
+    findings: list[Finding] = []
+    for path in _workflow_files(root, folders):
+        rel = path.relative_to(root).as_posix()
+        for number, line in run_lines(path.read_text(encoding="utf-8")):
+            for expression in _EXPRESSION.finditer(line):
+                body = expression.group("body").strip()
+                if _EVENT_TEXT.search(body):
+                    findings.append(Finding(
+                        rel, number, ENV_CHECK,
+                        f"'${{{{ {body} }}}}' is inline in 'run'. Event text can hold shell code. "
+                        "Give it to the step in 'env', and use the variable in 'run' (for "
+                        "example \"$TITLE\", not ${{ env.TITLE }})."))
     return findings
 
 
@@ -144,7 +209,7 @@ def _git_show(root: Path, rev: str, path: str) -> str | None:
 
 def run(root: Path, base: str | None, skills: str = SKILLS,
         plugin_file: str = PLUGIN_FILE) -> list[Finding]:
-    findings = check_pins(root)
+    findings = check_pins(root) + check_event_text(root)
     if base:
         findings += check_version_bump(root, base, skills, plugin_file)
         findings += check_commit_format(root, base)
