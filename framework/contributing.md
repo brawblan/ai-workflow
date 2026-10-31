@@ -15,6 +15,7 @@ Rules for a PR that changes `framework/`. `AGENTS.md` points here.
 
 ## Checks for this repo only
 
-`stone check-rules` tests rules that `AGENTS.md` states for this repo: R1 (action pins) and R2
-(plugin version bump). `stone render` does not write them for a target repo (D78). To add a rule
-check, add it to `stone/src/stone/repo_rules.py`, and replay it on the merged PRs (D45).
+`stone check-rules` tests rules that `AGENTS.md` states for this repo. R1 tests the action pins.
+R2 tests the plugin version bump. R3 tests that event text goes to a step through `env`.
+`stone render` does not write them for a target repo (D78, D96). To add a rule check, add it to
+`stone/src/stone/repo_rules.py`, and replay it on the merged PRs (D45).

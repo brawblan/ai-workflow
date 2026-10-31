@@ -94,10 +94,11 @@ def _parser() -> argparse.ArgumentParser:
     writing.add_argument("--format", choices=["text", "github"], default="text")
 
     rules = commands.add_parser(
-        "check-rules", help="R1 and R2: test the action pins and the plugin version bump (D78).")
+        "check-rules", help="R1, R2, and R3: test the action pins, the plugin version bump, and the "
+             "event text in 'run' (D78, D96).")
     rules.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
     rules.add_argument("--base", help="The base branch. Gives R2: a skill change needs a new "
-                                      "plugin version. Without it, only R1 runs.")
+                                      "plugin version. Without it, only R1 and R3 run.")
     rules.add_argument("--skills", default=repo_rules.SKILLS, help="The skills folder, for R2.")
     rules.add_argument("--plugin-file", default=repo_rules.PLUGIN_FILE,
                        help="The plugin file with the version, for R2.")
@@ -217,7 +218,7 @@ def _check_rules(args: argparse.Namespace) -> int:
         print(f"check-rules: git failed: {(error.stderr or '').strip()}")
         return 2
     blocking = report(findings, args.format)
-    print(f"R1, R2: {blocking} error(s).")
+    print(f"check-rules: {blocking} error(s).")
     return 1 if blocking else 0
 
 
