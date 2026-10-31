@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import stat
 import subprocess
 from pathlib import Path
@@ -138,12 +139,15 @@ def post(workflow: dict[str, Any], report: str, runner_temp: Path,
         return {"posted": "", "calls": [], "error": ""}
     log = runner_temp / "gh-calls.txt"
     values = expressions(runner_temp, report, number)
+    bash = shutil.which("bash")  # from the PATH of the caller, before the step env replaces it
+    if not bash:
+        return {"posted": "", "calls": [], "error": "no bash on PATH: the post job needs it"}
     for step in workflow["jobs"]["post"].get("steps") or []:
         if "run" not in step:
             continue
         env = step_env(runner_temp, log,
                        {k: expand(str(v), values) for k, v in (step.get("env") or {}).items()})
-        done = subprocess.run(["bash", "--noprofile", "--norc", "-eo", "pipefail", "-c",
+        done = subprocess.run([bash, "--noprofile", "--norc", "-eo", "pipefail", "-c",
                                step["run"]], env=env, capture_output=True, text=True, timeout=60)
         if done.returncode != 0:
             return {"posted": "", "calls": _lines(log),
@@ -155,12 +159,13 @@ def post(workflow: dict[str, Any], report: str, runner_temp: Path,
 
 def step_env(runner_temp: Path, log: Path, step: dict[str, str]) -> dict[str, str]:
     """A closed environment for one post step: no token of the caller, no BASH_ENV, and no
-    exported shell function. Only the fake gh is on PATH before the system folders. The fake token
-    and an empty gh config folder win over a step value, so a real gh cannot post."""
+    exported shell function. The fake gh is first on PATH. The system folders stay, because they
+    have the shell tools of the step, and on Linux also the real gh. So the fake token and an
+    empty gh config folder win over a step value: a real gh that a step calls by its full path
+    cannot post."""
     config = runner_temp / "gh-config"
     config.mkdir(parents=True, exist_ok=True)
-    system = [d for d in os.environ.get("PATH", "").split(os.pathsep)
-              if d and not (Path(d) / "gh").exists()]
+    system = [d for d in os.environ.get("PATH", "").split(os.pathsep) if d]
     return {**{k: os.environ[k] for k in KEEP_ENV if k in os.environ}, **step,
             "PATH": os.pathsep.join([str(_fake_gh(runner_temp / "bin")), *system]),
             "RUNNER_TEMP": str(runner_temp), "GITHUB_REPOSITORY": "owner/repo",
