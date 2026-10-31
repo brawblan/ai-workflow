@@ -1,190 +1,185 @@
-framework_version: 1.4.0
+framework_version: 1.5.0
 components:
-- id: check.k22
-  kind: check
-  purpose: K22. Fail if a tracked instruction file has an install, a pipe to a shell,
-    an override, an unknown host, or hidden text.
-  principle:
-  - P6
-  - P9
-  source: framework
-  owner: brawblan
-  eval: ''
-  models_tested: []
-  added: '2026-10-30'
-  review_by: '2027-04-30'
-  files:
-  - .cornerstone/checks/instruction_text.py
-  hash: 609916d307097f1869c2b102943ebc0a1622ee60f844c65fed31abf9cd0559c1
-- id: check.k6
-  kind: check
-  purpose: K6. Fail if an implementer commit changes a protected path.
-  principle:
-  - P2
-  - P6
-  source: framework
-  owner: brawblan
-  eval: ''
-  models_tested: []
-  added: '2026-10-17'
-  review_by: '2027-04-17'
-  files:
-  - .cornerstone/checks/protected_paths.py
-  hash: f35e9db0ff42b011b8d8fa3f5c8792ad0f90dc1b23efe1e8cf4680eda5691f5b
-- id: check.k7
-  kind: check
-  purpose: K7. Fail if the diff is over the size limit of the PR profile and has no
-    waiver.
-  principle:
-  - P10
-  source: framework
-  owner: brawblan
-  eval: evals/check-k7/
-  models_tested: []
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .cornerstone/checks/change_size.py
-  hash: 45f41a923748396bf362377bdd921037b9504305a27a0c138a13f618f567b272
-- id: ci-job.checks
-  kind: ci-job
-  purpose: G3. Run K6, K7, K14, and the repo checks on each pull request.
-  principle:
-  - P1
-  - P6
-  source: framework
-  owner: brawblan
-  eval: evals/ci-job-checks/
-  models_tested: []
-  added: '2026-10-17'
-  review_by: '2027-04-17'
-  files:
-  - .github/workflows/cornerstone-checks.yml
-  hash: f02c5ed85747d1d226a45be5af6b3e0b278ec846903658a2cc490ac29438832f
-- id: hook.path-match
-  kind: hook
-  purpose: Match a path against paths.tests and paths.checks. The hook and K6 import
-    it.
-  principle:
-  - P2
-  - P6
-  source: framework
-  owner: brawblan
-  eval: evals/hook-protect-paths/
-  models_tested: []
-  added: '2026-10-22'
-  review_by: '2027-04-22'
-  files:
-  - .cornerstone/lib/path_match.py
-  hash: f2f05f2a1c56c9e1a9534bff3111ee50c3836c43edd764af6d3975b8fbe92a65
-- id: hook.protect-paths
-  kind: hook
-  purpose: Block an edit to a path that the current role must not change.
-  principle:
-  - P2
-  - P6
-  source: framework
-  owner: brawblan
-  eval: evals/hook-protect-paths/
-  models_tested:
-  - claude-opus-5-5
-  added: '2026-10-17'
-  review_by: '2027-04-17'
-  files:
-  - .cornerstone/hooks/protect-paths.py
-  hash: 83f41337c118b594e5b1c05dbe1f4f69685d16027154aa6455d94eb66d922690
-- id: hook.settings
-  kind: hook
-  purpose: Register the protected-path hook in the harness settings. Other keys stay
-    as they are.
-  principle:
-  - P6
-  source: framework
-  owner: brawblan
-  eval: evals/hook-protect-paths/
-  models_tested: []
-  added: '2026-10-17'
-  review_by: '2027-04-17'
-  files:
-  - .claude/settings.json
-  hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
-- id: role.implementer
-  kind: role
-  purpose: Change the code to meet the ticket. Write the decision log.
-  principle:
-  - P2
-  - P8
-  source: framework
-  owner: brawblan
-  eval: evals/role-implementer/
-  models_tested:
-  - claude-sonnet-5-5
-  added: '2026-10-17'
-  review_by: '2027-04-17'
-  files:
-  - .claude/agents/implementer.md
-  hash: a2828f9451b3b3278755c03ad5161cea69df4646427b3258c1ba47a1a8429c2a
-- id: role.reviewer
-  kind: role
-  purpose: Find defects and scope drift in a fresh session.
-  principle:
-  - P2
-  - P11
-  source: framework
-  owner: brawblan
-  eval: evals/role-reviewer/
-  models_tested:
-  - claude-opus-5-5
-  added: '2026-10-17'
-  review_by: '2027-04-17'
-  files:
-  - .claude/agents/reviewer.md
-  hash: e813d74853c4a499412820719e892257917a1c9c6346425692cd9f5f43776f7d
-- id: role.shaper
-  kind: role
-  purpose: Interview the human until the ticket meets the Definition of Ready.
-  principle:
-  - P3
-  source: framework
-  owner: brawblan
-  eval: evals/role-shaper/
-  models_tested:
-  - claude-opus-5-5
-  added: '2026-10-17'
-  review_by: '2027-04-17'
-  files:
-  - .claude/agents/shaper.md
-  hash: 4b79970810b144f67f2babc87a2fe0de7d04cf0be69f8a1de1440312209b7c0b
-- id: role.tester
-  kind: role
-  purpose: Write independent tests from the ticket and the diff.
-  principle:
-  - P2
-  source: framework
-  owner: brawblan
-  eval: evals/role-tester/
-  models_tested:
-  - claude-opus-5-5
-  - claude-sonnet-5-5
-  added: '2026-10-17'
-  review_by: '2027-04-17'
-  files:
-  - .claude/agents/tester.md
-  hash: 7dfc624b4dfbba720b44f9c0552fca2ea611e8c1ccf394175f85374b62174150
-- id: trigger.label.single-ticket
-  kind: ci-job
-  purpose: Start the first role of the profile when a human adds the trigger label
-    to an issue.
-  principle:
-  - P6
-  - P9
-  source: framework
-  owner: brawblan
-  eval: evals/trigger-label/
-  models_tested:
-  - claude-opus-5-5
-  added: '2026-10-18'
-  review_by: '2027-04-18'
-  files:
-  - .github/workflows/cornerstone-single-ticket-label.yml
-  hash: 42844fccc3c541fbf848234faef0079ba4247a41bfa7bf129232ec88223bcefc
+  - id: check.k22
+    kind: check
+    purpose: K22. Fail if a tracked instruction file has an install, a pipe to a shell, an override, an unknown host, or hidden text.
+    principle:
+      - P6
+      - P9
+    source: framework
+    owner: brawblan
+    eval: ""
+    models_tested: []
+    added: "2026-10-30"
+    review_by: "2027-04-30"
+    files:
+      - .cornerstone/checks/instruction_text.py
+    hash: 609916d307097f1869c2b102943ebc0a1622ee60f844c65fed31abf9cd0559c1
+  - id: check.k6
+    kind: check
+    purpose: K6. Fail if an implementer commit changes a protected path.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: brawblan
+    eval: ""
+    models_tested: []
+    added: "2026-10-17"
+    review_by: "2027-04-17"
+    files:
+      - .cornerstone/checks/protected_paths.py
+    hash: f35e9db0ff42b011b8d8fa3f5c8792ad0f90dc1b23efe1e8cf4680eda5691f5b
+  - id: check.k7
+    kind: check
+    purpose: K7. Fail if the diff is over the size limit of the PR profile and has no waiver.
+    principle:
+      - P10
+    source: framework
+    owner: brawblan
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/checks/change_size.py
+    hash: 45f41a923748396bf362377bdd921037b9504305a27a0c138a13f618f567b272
+  - id: ci-job.checks
+    kind: ci-job
+    purpose: G3. Run K6, K7, K14, and the repo checks on each pull request.
+    principle:
+      - P1
+      - P6
+    source: framework
+    owner: brawblan
+    eval: ""
+    models_tested: []
+    added: "2026-10-17"
+    review_by: "2027-04-17"
+    files:
+      - .github/workflows/cornerstone-checks.yml
+    hash: e7beaf7a6b804f102a81b72024c72cc78cb28438d7857d324e1435a432c913f8
+  - id: hook.path-match
+    kind: hook
+    purpose: Match a path against paths.tests and paths.checks. The hook and K6 import it.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: brawblan
+    eval: evals/hook-protect-paths/
+    models_tested: []
+    added: "2026-10-22"
+    review_by: "2027-04-22"
+    files:
+      - .cornerstone/lib/path_match.py
+    hash: f2f05f2a1c56c9e1a9534bff3111ee50c3836c43edd764af6d3975b8fbe92a65
+  - id: hook.protect-paths
+    kind: hook
+    purpose: Block an edit to a path that the current role must not change.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: brawblan
+    eval: evals/hook-protect-paths/
+    models_tested:
+      - claude-opus-5-5
+    added: "2026-10-17"
+    review_by: "2027-04-17"
+    files:
+      - .cornerstone/hooks/protect-paths.py
+    hash: 83f41337c118b594e5b1c05dbe1f4f69685d16027154aa6455d94eb66d922690
+  - id: hook.settings
+    kind: hook
+    purpose: Register the protected-path hook in the harness settings. Other keys stay as they are.
+    principle:
+      - P6
+    source: framework
+    owner: brawblan
+    eval: evals/hook-protect-paths/
+    models_tested: []
+    added: "2026-10-17"
+    review_by: "2027-04-17"
+    files:
+      - .claude/settings.json
+    hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+  - id: role.implementer
+    kind: role
+    purpose: Change the code to meet the ticket. Write the decision log.
+    principle:
+      - P2
+      - P8
+    source: framework
+    owner: brawblan
+    eval: evals/role-implementer/
+    models_tested:
+      - claude-sonnet-5-5
+    added: "2026-10-17"
+    review_by: "2027-04-17"
+    files:
+      - .claude/agents/implementer.md
+    hash: a2828f9451b3b3278755c03ad5161cea69df4646427b3258c1ba47a1a8429c2a
+  - id: role.reviewer
+    kind: role
+    purpose: Find defects and scope drift in a fresh session.
+    principle:
+      - P2
+      - P11
+    source: framework
+    owner: brawblan
+    eval: evals/role-reviewer/
+    models_tested:
+      - claude-opus-5-5
+    added: "2026-10-17"
+    review_by: "2027-04-17"
+    files:
+      - .claude/agents/reviewer.md
+    hash: e813d74853c4a499412820719e892257917a1c9c6346425692cd9f5f43776f7d
+  - id: role.shaper
+    kind: role
+    purpose: Interview the human until the ticket meets the Definition of Ready.
+    principle:
+      - P3
+    source: framework
+    owner: brawblan
+    eval: evals/role-shaper/
+    models_tested:
+      - claude-opus-5-5
+    added: "2026-10-17"
+    review_by: "2027-04-17"
+    files:
+      - .claude/agents/shaper.md
+    hash: 4b79970810b144f67f2babc87a2fe0de7d04cf0be69f8a1de1440312209b7c0b
+  - id: role.tester
+    kind: role
+    purpose: Write independent tests from the ticket and the diff.
+    principle:
+      - P2
+    source: framework
+    owner: brawblan
+    eval: evals/role-tester/
+    models_tested:
+      - claude-opus-5-5
+      - claude-sonnet-5-5
+    added: "2026-10-17"
+    review_by: "2027-04-17"
+    files:
+      - .claude/agents/tester.md
+    hash: 7dfc624b4dfbba720b44f9c0552fca2ea611e8c1ccf394175f85374b62174150
+  - id: trigger.label.single-ticket
+    kind: ci-job
+    purpose: Start the first role of the profile when a human adds the trigger label to an issue.
+    principle:
+      - P6
+      - P9
+    source: framework
+    owner: brawblan
+    eval: evals/trigger-label/
+    models_tested:
+      - claude-opus-5-5
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .github/workflows/cornerstone-single-ticket-label.yml
+    hash: 250b476c7f43f1aa4333319664ce9511f50b3d91a3facf1e9b7ad879b5920ee3
