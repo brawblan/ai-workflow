@@ -39,6 +39,9 @@ def _parser() -> argparse.ArgumentParser:
                        help="A file with the PR body, for the K7 profile line and waiver, and "
                             "for K20.")
     local.add_argument("--labels", default="", help="The PR labels, with commas. For K20.")
+    local.add_argument("--split-checks", action="store_true",
+                       help="Run each command of commands.all_checks that '&&' joins, and give "
+                            "each its own row. A failure does not stop the next command.")
 
     special = commands.add_parser(
         "specialists", help="Find the specialist reviews that a change needs, and their reports.")
@@ -94,11 +97,12 @@ def _parser() -> argparse.ArgumentParser:
     writing.add_argument("--format", choices=["text", "github"], default="text")
 
     rules = commands.add_parser(
-        "check-rules", help="R1, R2, and R3: test the action pins, the plugin version bump, and the "
-             "event text in 'run' (D78, D96).")
+        "check-rules", help="R1 to R4: test the action pins, the plugin version bump, the event "
+             "text in 'run', and the commit message format (D78, D97, D98).")
     rules.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
-    rules.add_argument("--base", help="The base branch. Gives R2: a skill change needs a new "
-                                      "plugin version. Without it, only R1 and R3 run.")
+    rules.add_argument("--base", help="The base branch. Gives R2 (a skill change needs a new "
+                                      "plugin version) and R4 (the commit message format). "
+                                      "Without it, only R1 and R3 run.")
     rules.add_argument("--skills", default=repo_rules.SKILLS, help="The skills folder, for R2.")
     rules.add_argument("--plugin-file", default=repo_rules.PLUGIN_FILE,
                        help="The plugin file with the version, for R2.")
@@ -175,7 +179,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "render":
         return _render(args.root, args.framework, args.dry_run)
     if args.command == "gate":
-        return _gate(args.root, args.base, args.body, _split(args.labels))
+        return _gate(args.root, args.base, args.body, _split(args.labels), args.split_checks)
     if args.command == "upgrade":
         return _upgrade(args)
     if args.command == "specialists":
@@ -222,9 +226,10 @@ def _check_rules(args: argparse.Namespace) -> int:
     return 1 if blocking else 0
 
 
-def _gate(root: Path, base: str | None, body: Path | None, labels: list[str]) -> int:
+def _gate(root: Path, base: str | None, body: Path | None, labels: list[str],
+          split_checks: bool = False) -> int:
     try:
-        steps, text = gate.run(root, base, body, labels=labels)
+        steps, text = gate.run(root, base, body, labels=labels, split_checks=split_checks)
     except gate.GateError as error:
         print(f"stone gate: {error}")
         return 2

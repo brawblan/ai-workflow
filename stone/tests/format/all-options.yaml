@@ -1,0 +1,73 @@
+framework_version: 1.5.0
+framework_commit: "0123456789abcdef0123456789abcdef01234567"
+harness: claude-code
+model_profile: claude-5
+spec_tool: plain
+protect_instruction_files: true
+profiles:
+  - single-ticket
+  - full-project
+  - app-slice
+  - bug-triage
+  - code-audit
+  - debugging
+  - dependency-upgrade
+  - refactor-migration
+  - spike
+  - adapter-refresh
+branches:
+  integration: dev
+  main: main
+commands:
+  install: pip install .
+  lint: ruff check .
+  typecheck: mypy src
+  test_unit: python -m unittest
+  test_acceptance: python -m unittest discover -s acceptance
+  test_integration: python -m unittest discover -s integration
+  architecture: lint-imports
+  property: pytest tests/property
+  differential: python scripts/differential.py
+  mutation: mutmut run
+  all_checks: make check
+commits:
+  by: human
+  trailers: notes
+paths:
+  source: [src/]
+  tests: [tests/]
+  checks: [.github/workflows/, .cornerstone/checks/]
+  plans: docs/plans/{id}/
+  specs: docs/specs/
+  reports: docs/reports/{id}/
+limits:
+  pr_changed_lines: 600
+  mutation_score_changed_code: 0.6
+ci:
+  env:
+    LOG_LEVEL: debug
+  secrets: [STRIPE_SECRET_KEY]
+  branches: [dev]
+  setup:
+    node: "22"
+    steps:
+      - uses: "owner/repo@0123456789abcdef0123456789abcdef01234567"
+        with:
+          key: value
+      - run: ./scripts/ci/prepare.sh
+specialists:
+  - id: accessibility
+    run: claude --agent accessibility-lead
+    when:
+      paths: ["**/components/**"]
+      personas_with: [screen reader]
+      labels: [a11y]
+    blocks: true
+    owner: octocat
+    eval: evals/accessibility/
+  - id: security
+    run: /security-review
+  - id: perf
+    run: claude -p "Run the perf review" --model "x"
+owners:
+  default: octocat

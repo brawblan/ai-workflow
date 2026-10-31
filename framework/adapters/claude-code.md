@@ -165,8 +165,8 @@ The action checks that the actor has write access for issue events. For `schedul
 
 | Trigger | Action input | Why |
 | --- | --- | --- |
-| `ci:issue-opened` | `allowed_non_write_users: '*'` | Any user can report a bug. The action then scrubs secrets from the environment of each command. The role has no shell, so the read path limit (D32) protects the secret, not the scrub. |
-| `ci:dependency-pr` | `allowed_bots: 'dependabot[bot],renovate[bot]'` | The bot opens the PR. The job `if` accepts only these two authors. |
+| `ci:issue-opened` | `allowed_non_write_users: "*"` | Any user can report a bug. The action then scrubs secrets from the environment of each command. The role has no shell, so the read path limit (D32) protects the secret, not the scrub. |
+| `ci:dependency-pr` | `allowed_bots: "dependabot[bot],renovate[bot]"` | The bot opens the PR. The job `if` accepts only these two authors. |
 
 ### Prompt-injection limits
 

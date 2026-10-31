@@ -373,6 +373,22 @@ the rendered set.
 Evidence section of the PR. See [D56](README.md#decisions). With `specialists`, it also runs K20.
 K20 needs `--body`, and `--labels` gives the PR labels.
 
+With `--split-checks`, `stone gate` runs each command of `commands.all_checks` that `&&` joins, and
+gives each command its own row (D96). A failure does not stop the next command, so the table shows
+the result of each one. The gate warns and runs the value as one command in these cases:
+
+- The value has no `&&`, or an empty command before or after a `&&`.
+- The value has another shell operator outside quotes: `||`, `;`, `|`, `&`, `(`, `)`, a backtick,
+  `#`, or a new line. Or it has a quote with no end.
+- A command starts with `NAME=value`.
+- A command starts with a word that changes the shell state or tests a condition. The words are
+  in `SHELL_STATE` in `stone/src/stone/gate.py`, for example `cd`, `export`, `eval`, `nvm`, and `[[`.
+
+The gate cannot find each command that changes the shell state, such as a shell function. If a
+command needs the state of the command before it, do not use the option.
+
+Without the option, the value runs as one command.
+
 `{id}` in `paths.plans` or `paths.reports` gives each ticket its own folder (D67):
 
 ```yaml
