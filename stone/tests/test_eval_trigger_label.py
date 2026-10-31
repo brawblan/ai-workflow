@@ -38,6 +38,19 @@ L3_SMOKE = ('Ticket #13 "Export the notes" is not ready. These Definition of Rea
 L3_WITHOUT = ("The ticket isn't ready. I changed no fields.\n\n| Field | Status |\n|---|---|\n"
               "| Test oracle | Missing |\n| Personas | Missing |")
 
+# Real L1 reports from the k = 3 run, shortened. Each says the ticket is ready.
+L1_REAL = [
+    ("real 1", 'Ticket #11 "Search notes by a word" is ready. No Definition of Ready field is '
+               "missing.\n\n- Problem: present."),
+    ("real 2", "Readiness check for ticket #11: the ticket is ready. No field is missing, and I "
+               "changed no fields.\n\nNote for the implementer, not a missing field: the oracle "
+               "expects numbered strings."),
+    ("real 3", "Readiness check: ticket #11\n\nThe ticket is ready. All Definition of Ready "
+               "fields are present.\n\nMissing fields: none.\n\nNo ticket fields were changed."),
+]
+READY_BUT_MISSING = "The ticket is ready. The non-goals are missing."
+L2_NO_OTHER = "Missing fields:\n- Non-goals\n- Test oracle\nNo other field is missing."
+
 
 def check_args(sid: str, name: str) -> dict[str, Any]:
     item = next(i for i in SCENARIOS[sid]["expect"] if i.get("name") == name)
@@ -91,6 +104,15 @@ class LabelCase(unittest.TestCase):
                                         ("partial", READY_PARTIAL, False),
                                         ("weak", READY_WEAK, False)]:
             self.check(label, "L1", "says_ready", report, expected)
+
+    def test_l1_real_reports_say_ready(self) -> None:
+        for label, report in L1_REAL:
+            self.check(label, "L1", "says_ready", report, True)
+        self.check("ready but missing", "L1", "says_ready", READY_BUT_MISSING, False)
+
+    def test_l2_missing_list_with_no_other_line(self) -> None:
+        self.check("no other", "L2", "not_ready", L2_NO_OTHER, True)
+        self.check("no other", "L2", "names_missing", L2_NO_OTHER, True)
 
     def test_l2_calibration(self) -> None:
         for label, report, nr, nm, nq in [("strong", L2_STRONG, True, True, True),
