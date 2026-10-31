@@ -227,8 +227,8 @@ A pin moves only after a review (P9, D91). These steps are for macOS and Linux. 
 are at `https://downloads.claude.ai/claude-code-releases/<version>/`. Signed manifests exist from
 version 2.1.89.
 
-Do not use `install.sh` for a pin move. It always downloads the newest release first and runs it.
-Thus an unreviewed build runs before the pinned one.
+Do not use `install.sh` for a pin move. `[TO CONFIRM]` that it always downloads the newest release
+first and runs it. If so, an unreviewed build runs before the pinned one.
 
 1. Read the release notes between the old and the new version.
 2. If a security notice for the new version is open, do not move the pin.
@@ -253,6 +253,8 @@ Facts to test:
   give the manifest path only. Checked: https://code.claude.com/docs/en/setup.md
 - `[TO CONFIRM]` that `claude install <version>` installs that exact version. Checked:
   https://code.claude.com/docs/en/setup.md
+- `[TO CONFIRM]` that `install.sh` runs the newest release before it installs the version that you
+  give it. The docs do not say. Checked: https://code.claude.com/docs/en/setup.md
 
 For a team repo, `requiredMinimumVersion` and `requiredMaximumVersion` in managed settings can hold
 each machine to one version. This needs managed settings.
@@ -334,6 +336,9 @@ persistence first, and then stop the tunnel.
 1. If you did not turn on Remote Login (macOS) or the OpenSSH server (Windows), turn it off.
 2. Read the SSH server logs for a login from localhost with the `svc-telemetry` key.
 3. If you find such a login, rebuild the machine.
+
+The notice does not give a log entry as an indicator. This guide adds step 2, because the tunnel
+sends logins to the local SSH server. If the logs show no such login, the machine can still be bad.
 
 ### Remove the bad version
 
