@@ -15,7 +15,7 @@ from typing import Any
 
 import yaml
 
-from stone import ci_setup, framework_check, overrides, results, specialists, specs, triggers
+from stone import ci_setup, form, framework_check, overrides, results, specialists, specs, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -593,6 +593,9 @@ def _file_state(disk: dict[str, str], component: Component, old: dict[str, Any] 
     if not disk or (old and len(disk) == len(component.files)
                     and content_hash(disk) == old["hash"]):
         return "wrote"  # new, or unchanged since the last render
+    if disk.keys() == component.files.keys() and all(
+            form.same_form(path, text, component.files[path]) for path, text in disk.items()):
+        return "skipped"  # a person changed the form only, for example with a format on save
     return "drift"  # a person changed, removed, or wrote a generated file
 
 
@@ -717,9 +720,10 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
 
     new_manifest = {"framework_version": str(config["framework_version"]),
                     "components": sorted(entries, key=lambda entry: entry["id"])}
-    manifest_text = yaml.safe_dump(new_manifest, sort_keys=False, allow_unicode=True)
+    manifest_text = form.dump_yaml(new_manifest)
     manifest_path = root / MANIFEST
-    if not manifest_path.exists() or manifest_path.read_text(encoding="utf-8") != manifest_text:
+    if not manifest_path.exists() or not form.same_form(
+            str(MANIFEST), manifest_path.read_text(encoding="utf-8"), manifest_text):
         to_write[str(MANIFEST)] = manifest_text
         result.wrote.append(str(MANIFEST))
     else:

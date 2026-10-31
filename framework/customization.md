@@ -371,6 +371,12 @@ only, and the lines to add to `.git/info/exclude`. It writes nothing outside the
 Evidence section of the PR. See [D56](README.md#decisions). With `specialists`, it also runs K20.
 K20 needs `--body`, and `--labels` gives the PR labels.
 
+With `--split-checks`, `stone gate` runs each command of `commands.all_checks` that `&&` joins, and
+gives each command its own row (D96). A failure does not stop the next command, so the table shows
+the result of each one. If the value has another shell operator (`||`, `;`, `|`, `&`, `(`, a
+backtick, or `#`), or a command that changes the shell state (`cd`, `export`, or `NAME=value`), the
+gate warns and runs the value as one command. Without the option, the value runs as one command.
+
 `{id}` in `paths.plans` or `paths.reports` gives each ticket its own folder (D67):
 
 ```yaml

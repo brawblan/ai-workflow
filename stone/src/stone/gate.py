@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import datetime as dt
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -16,6 +17,10 @@ from stone import specialists
 CONFIG = Path(".cornerstone/config.yaml")
 CHECKS = Path(".cornerstone/checks")
 K20_MODE = "block"  # the same mode as the K20 step of the G3 workflow. Blocks since 1.4.0 (D80).
+SHELL_STATE = {"cd", "pushd", "popd", "export", "source", ".", "set", "unset", "alias"}
+ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=\S*$")
+TOKEN = re.compile(r"'[^']*'|\"(?:\\.|[^\"\\])*\"|\\.|&&|[|;&()`#\n]|[^'\"\\&|;()`#\n]+")
+OPERATOR = re.compile(r"[|;&()`#\n]")
 
 
 class GateError(Exception):
@@ -52,8 +57,36 @@ def default_base(config: dict[str, Any]) -> str:
     return f"origin/{branches.get('integration') or branches.get('main') or 'main'}"
 
 
+def split_commands(command: str) -> list[str]:
+    """Return the commands that a top-level '&&' joins, or [command] if a split can change the result.
+
+    A command splits only if '&&' is its only shell operator, outside quotes. A command that changes
+    the shell state, such as `cd` or `export`, does not split: the next command needs that state.
+    """
+    tokens = TOKEN.findall(command)
+    if "".join(tokens) != command or any(OPERATOR.fullmatch(token) for token in tokens):
+        return [command]  # a quote with no end, or an operator such as || ; | & ( ` #
+    parts = [part.strip() for part in "".join(
+        "\0" if token == "&&" else token for token in tokens).split("\0")]
+    if len(parts) == 1 or not all(parts) or any(
+            part.split()[0] in SHELL_STATE or ASSIGNMENT.match(part) for part in parts):
+        return [command]
+    return parts
+
+
+def check_steps(all_checks: str, split: bool) -> list[Step]:
+    """Return one step for `commands.all_checks`, or with split one step for each command."""
+    commands = split_commands(all_checks) if split else [all_checks]
+    if len(commands) == 1:
+        if split:
+            print("warning: commands.all_checks has a shell operator other than '&&', or a command "
+                  "such as cd. It runs as one command.", file=sys.stderr)
+        return [Step("All checks", all_checks)]
+    return [Step(f"All checks: `{command}`", command) for command in commands]
+
+
 def plan(root: Path, config: dict[str, Any], base: str, body: Path | None,
-         labels: list[str] | None = None) -> list[Step]:
+         labels: list[str] | None = None, split_checks: bool = False) -> list[Step]:
     no_k6 = (config.get("commits") or {}).get("trailers") == "none"
     for script in ("change_size.py",) if no_k6 else ("protected_paths.py", "change_size.py"):
         if not (root / CHECKS / script).exists():
@@ -76,7 +109,7 @@ def plan(root: Path, config: dict[str, Any], base: str, body: Path | None,
         if not body:
             k20.skipped = "no --body"
         steps.append(k20)
-    return steps + [Step("All checks", all_checks)]
+    return steps + check_steps(all_checks, split_checks)
 
 
 def run_step(root: Path, step: Step) -> None:
@@ -99,10 +132,11 @@ def evidence(steps: list[Step], base: str, head: str, today: dt.date) -> str:
 
 
 def run(root: Path, base: str | None = None, body: Path | None = None,
-        today: dt.date | None = None, labels: list[str] | None = None) -> tuple[list[Step], str]:
+        today: dt.date | None = None, labels: list[str] | None = None,
+        split_checks: bool = False) -> tuple[list[Step], str]:
     config = load_config(root)
     base = base or default_base(config)
-    steps = plan(root, config, base, body, labels)
+    steps = plan(root, config, base, body, labels, split_checks)
     for step in steps:
         if not step.skipped:
             run_step(root, step)

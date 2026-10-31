@@ -39,6 +39,9 @@ def _parser() -> argparse.ArgumentParser:
                        help="A file with the PR body, for the K7 profile line and waiver, and "
                             "for K20.")
     local.add_argument("--labels", default="", help="The PR labels, with commas. For K20.")
+    local.add_argument("--split-checks", action="store_true",
+                       help="Run each command of commands.all_checks that '&&' joins, and give "
+                            "each its own row. A failure does not stop the next command.")
 
     special = commands.add_parser(
         "specialists", help="Find the specialist reviews that a change needs, and their reports.")
@@ -174,7 +177,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "render":
         return _render(args.root, args.framework, args.dry_run)
     if args.command == "gate":
-        return _gate(args.root, args.base, args.body, _split(args.labels))
+        return _gate(args.root, args.base, args.body, _split(args.labels), args.split_checks)
     if args.command == "upgrade":
         return _upgrade(args)
     if args.command == "specialists":
@@ -221,9 +224,10 @@ def _check_rules(args: argparse.Namespace) -> int:
     return 1 if blocking else 0
 
 
-def _gate(root: Path, base: str | None, body: Path | None, labels: list[str]) -> int:
+def _gate(root: Path, base: str | None, body: Path | None, labels: list[str],
+          split_checks: bool = False) -> int:
     try:
-        steps, text = gate.run(root, base, body, labels=labels)
+        steps, text = gate.run(root, base, body, labels=labels, split_checks=split_checks)
     except gate.GateError as error:
         print(f"stone gate: {error}")
         return 2
