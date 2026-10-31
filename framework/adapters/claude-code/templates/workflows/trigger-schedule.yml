@@ -4,7 +4,7 @@ name: cornerstone-$profile-schedule
 
 on:
   schedule:
-    - cron: '$cron'
+    - cron: "$cron"
   workflow_dispatch:
 
 permissions: {}
