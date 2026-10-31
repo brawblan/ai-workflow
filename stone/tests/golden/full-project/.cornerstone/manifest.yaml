@@ -52,7 +52,7 @@ components:
       - P6
     source: framework
     owner: octocat
-    eval: evals/ci-job-checks/
+    eval: ""
     models_tested: []
     added: "2026-10-18"
     review_by: "2027-04-18"
