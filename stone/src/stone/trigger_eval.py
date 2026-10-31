@@ -209,7 +209,7 @@ def framed(posted: str, report: str, role: str, calls: str, call: str) -> tuple[
 def _frame_problem(lines: list[str], report: str, role: str) -> str:
     """Return what is wrong with the header, the quote, or the mentions, or ''."""
     header = HEADER.match(lines[0])
-    if not header or header.group("role") != role:
+    if (header.group("role") if header else "") != role:
         return f"the first line is not the header for the {role}: {lines[0][:80]!r}"
     body = lines[2:] if len(lines) > 2 and lines[1] == "" else []
     if not body or any(not line.startswith("> ") for line in body):
