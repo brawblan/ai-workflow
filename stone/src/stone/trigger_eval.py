@@ -211,7 +211,11 @@ def _frame_problem(lines: list[str], report: str, role: str) -> str:
     header = HEADER.match(lines[0])
     if (header.group("role") if header else "") != role:
         return f"the first line is not the header for the {role}: {lines[0][:80]!r}"
-    body = lines[2:] if len(lines) > 2 and lines[1] == "" else []
+    return _quote_problem(lines[2:] if len(lines) > 2 and lines[1] == "" else [], report)
+
+
+def _quote_problem(body: list[str], report: str) -> str:
+    """Return what is wrong with the quoted report under the header, or ''."""
     if not body or any(not line.startswith("> ") for line in body):
         return "a line of the report is not in a quote"
     if re.search(rf"@(?!{ZWSP})|</(?!{ZWSP})", "\n".join(body)):
