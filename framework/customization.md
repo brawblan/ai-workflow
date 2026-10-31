@@ -366,7 +366,9 @@ A repo can connect its own review agents or skills to the roles ([D59](README.md
 
 Use it when one developer runs the roles in a shared repo before the team agrees to the workflow.
 `stone render` then writes no file in `.github/workflows/`. It prints a warning that G3 is local
-only, and the lines to add to `.git/info/exclude`. It writes nothing outside the rendered set.
+only, and the lines to add to `.git/info/exclude`. It asks `git check-ignore` and lists only the
+paths that git does not ignore. If git cannot answer, it lists all of them. It writes nothing outside
+the rendered set.
 `stone gate` runs K6, K7, and `commands.all_checks` on the machine, and prints a table for the
 Evidence section of the PR. See [D56](README.md#decisions). With `specialists`, it also runs K20.
 K20 needs `--body`, and `--labels` gives the PR labels.

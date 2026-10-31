@@ -7,6 +7,7 @@ import datetime as dt
 import hashlib
 import json
 import re
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -737,8 +738,10 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
     if config.get("delivery", "ci") == "local":
         print("warning: delivery is local. No workflow file was written, so G3 runs on this "
               "machine only. Run 'stone gate' and paste its output in the PR.", file=sys.stderr)
-        print("Add these lines to .git/info/exclude:", file=sys.stderr)
-        for pattern in ignore_patterns(config, components):
+        missing = not_ignored(root, ignore_patterns(config, components))
+        if missing:
+            print("Add these lines to .git/info/exclude:", file=sys.stderr)
+        for pattern in missing:
             print(f"  {pattern}", file=sys.stderr)
     if not dry_run:
         _write(root, to_write)
@@ -755,6 +758,26 @@ def ignore_patterns(config: dict[str, Any], components: list[Component]) -> list
     for key in ("plans", "specs", "reports"):
         patterns.add(specs.base_folder(one_folder(_get(config, f"paths.{key}"), key)))
     return sorted(patterns)
+
+
+def not_ignored(root: Path, patterns: list[str]) -> list[str]:
+    """Return the patterns that git does not ignore in root (#227).
+
+    Ask git, so that anchored entries, parent folders, wildcards, .gitignore, and the global
+    excludes file count. If git cannot answer (no repo, no git), return all the patterns.
+    """
+    try:
+        out = subprocess.run(["git", "check-ignore", "--no-index", "--stdin", "-z"], cwd=root,
+                             input="\0".join(patterns), capture_output=True, text=True,
+                             check=False)
+    except OSError:
+        out = None
+    if out is None or out.returncode not in (0, 1):  # 1: git ignores none of them
+        print("note: git cannot check the ignore rules here, so all the lines show.",
+              file=sys.stderr)
+        return patterns
+    ignored = set(out.stdout.split("\0"))
+    return [pattern for pattern in patterns if pattern not in ignored]
 
 
 def _write(root: Path, files: dict[str, str]) -> None:
