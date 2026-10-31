@@ -34,7 +34,8 @@ jobs:
       - name: stone check
         run: stone check --format github
 
-      # R1 to R4 block (D78, D97, D98). R2 and R4 need the base branch, so they run on a PR only.
+      # R1 to R4 and K9 block (D78, D97, D98, D100). R2, R4, and K9 need the base branch, so they
+      # run on a PR only. K9 does not run on a release PR into main (D103).
       - name: R1 action pins and R3 event text
         if: github.event_name != 'pull_request'
         run: stone check-rules --format github
@@ -43,7 +44,10 @@ jobs:
         if: github.event_name == 'pull_request'
         env:
           BASE_REF: ${{ github.base_ref }}
-        run: stone check-rules --base "origin/${BASE_REF}" --format github
+        run: |
+          skip=()
+          if [ "$BASE_REF" = "main" ]; then skip=(--skip-k9); fi
+          stone check-rules --base "origin/${BASE_REF}" "${skip[@]}" --format github
 
       # K17 blocks (D45, framework/writing.md).
       - name: K17 on changed lines
