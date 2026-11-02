@@ -6,42 +6,46 @@ hide:
 
 # Cornerstone
 
-**Agent-assisted software delivery, where checks decide that work is done.**
+**A general workflow layer for coding agents that you update when the models improve.**
 
 Version 1.5.0. All 10 profiles are supported, and each generated check blocks.
 
-Cornerstone says how a human and an agent deliver software together. It sets who does each stage,
-which gates stop the work, and which checks decide that work is done. The core names no tool.
-Adapters turn it into files for your harness, and the `stone` CLI writes those files into your repo.
+Cornerstone is a wrapper around the way that you work with a coding agent. It sets who does each
+stage, which gates stop the work, and which checks decide that work is done.
+
+I made it because models change fast. A rule that helps one model can hurt the next model. So the
+core names no tool and no model. The details for each model are in one small model profile. When
+a new model comes out, you change that profile, run the evals, and keep only the changes that help.
+The rest of your workflow stays the same.
 
 [Get started](docs/guides/README.md){ .md-button .md-button--primary }
 [Read the principles](framework/principles.md){ .md-button }
 
-## Why use it
+## What you get
 
-Agents write code fast. But an agent stops when the work looks done. It can claim a check that it
-did not run. It can write tests that agree with its own mistakes. It can drift from the ticket.
-Also, models change, and a rule that helps one model can hurt the next model.
-
-Cornerstone gives you:
-
-- **Proof, not claims.** CI output shows that work is done.
-- **Independent judges.** A different role, in a fresh session, writes the tests and reviews.
-- **Right-sized process.** A profile sets the plan and the gates for each type of work.
-- **Rules that expire.** Each part has an eval and a review date, and it leaves when the evidence goes.
-- **No lock-in.** When a tool changes, only its adapter changes.
-
-## Who it is for
-
-- A developer who uses a coding agent on real repos and wants the result checked.
-- A team that wants one process for many types of work.
-- A person who uses Spec Kit, OpenSpec, or BMAD and wants a layer that does not depend on one tool.
-
-It is not a prompt library or an IDE. At this time the only adapter is for Claude Code.
+| Part | What it is |
+| --- | --- |
+| [Roles](framework/workflow-model.md) | Six agent roles: shaper, planner, implementer, tester, reviewer, and investigator. Each role runs in its own session. |
+| [Profiles](framework/profiles/README.md) | Ten workflow types, from a spike to a full project. Each sets its plan form, roles, gates, and checks. |
+| [Gates](framework/gates.md) | Five stop points, G1 to G5. A human or CI must pass each one. |
+| [Checks](framework/checks.md) | 24 CI checks, K1 to K24: tests, protected paths, change size, secrets, PR evidence, and more. |
+| [Hooks](framework/adapters/claude-code.md) | Local guards. For example, a hook stops the implementer when it tries to change a test. |
+| [Adapters and model profiles](framework/adapters/contract.md) | The only place for harness and model details. Claude Code is the first adapter. |
+| [`stone` CLI](stone/README.md) | Writes the roles, hooks, and CI checks into your repo. It also validates the framework and the writing. |
+| [Plugin skills](docs/guides/README.md) | `setup`, `project-setup`, `ticket-delivery`, and `ste-writing`, for use in the agent session. |
+| [Evals and lifecycle review](framework/lifecycle.md) | A test and a review date for each part, so that a part with no evidence leaves. |
+| [Research dossier](docs/research/dossier.md) | The cited evidence for each rule. |
 
 ## What Cornerstone does
 
 <div class="grid cards" markdown>
+
+-   :material-update:{ .lg .middle } **Moves with the models**
+
+    ---
+
+    A new model needs only a new model profile. The adapter-refresh profile watches vendor
+    releases and opens a PR with eval results.
 
 -   :material-check-decagram:{ .lg .middle } **Checks decide**
 
@@ -68,13 +72,8 @@ It is not a prompt library or an IDE. At this time the only adapter is for Claud
 
     ---
 
-    Ten profiles, from a spike to a full project. Each profile sets its plan form and its gates.
-
--   :material-swap-horizontal:{ .lg .middle } **Neutral core, thin adapters**
-
-    ---
-
-    The core names no harness, vendor, or model. When a tool changes, only its adapter changes.
+    Each profile sets its plan form and its gates. A spike gets few gates. A full project gets all
+    of them.
 
 -   :material-timer-sand:{ .lg .middle } **Each part earns its place**
 
@@ -84,6 +83,20 @@ It is not a prompt library or an IDE. At this time the only adapter is for Claud
     goes.
 
 </div>
+
+## Why use it
+
+Agents write code fast. But an agent stops when the work looks done. It can claim a check that it
+did not run. It can write tests that agree with its own mistakes. It can drift from the ticket.
+Cornerstone puts a check or a human gate at each of these points.
+
+## Who it is for
+
+- A developer who uses a coding agent on real repos and wants the result checked.
+- A team that wants one process for many types of work.
+- A person who uses Spec Kit, OpenSpec, or BMAD and wants a layer that does not depend on one tool.
+
+It is not a prompt library or an IDE. At this time the only adapter is for Claude Code.
 
 ## How it compares
 
@@ -155,8 +168,14 @@ selects the gates that apply. See the [workflow model](framework/workflow-model.
 
 ## Status
 
-Draft v0. The framework is complete enough to use on one profile. The `stone` CLI validates the
-framework, checks the writing standard, and renders the roles of all 10 profiles. Claude Code is the
-first harness adapter. The next steps are in the [roadmap](framework/README.md#roadmap).
+The table shows the current version. Version 1.0.0 met the exit criteria on 2026-10-21.
+
+| Area | State |
+| --- | --- |
+| Profiles | `stone render` writes every component of all 10 profiles. Each profile has a golden-file test and a guide. |
+| Checks | Each generated check blocks: K6, K7, K14, K15, and K16. K17 blocks in this repo. |
+| Adapters | Claude Code is the only harness adapter. Its model profile for Claude 5 is `active`. |
+| Evals | There are evals for all six roles, the protected-path hook, the trigger workflows, and the writing guidance. See [evals](evals/README.md). |
+| Open | The first blind A/B rating of STE text, at the end of Q4 2026. See the [roadmap](framework/README.md#roadmap). |
 
 Each rule cites its evidence in the [research dossier](docs/research/dossier.md).
