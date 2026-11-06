@@ -53,9 +53,9 @@ fn build(options: &IndexOptions) -> Result<Summary, String> {
         fs::create_dir_all(parent)
             .map_err(|error| format!("cannot make {}: {error}", parent.display()))?;
     }
-    let broken = |error: rusqlite::Error| format!("broken index {}: {error}", db_path.display());
-    let mut conn = db::open(&db_path).map_err(broken)?;
-    update::run(&mut conn, &root, &db_path, options.max_file_size).map_err(broken)
+    let with_path = |message: String| format!("{}: {message}", db_path.display());
+    let mut conn = db::open(&db_path).map_err(|error| with_path(db::describe(&error)))?;
+    update::run(&mut conn, &root, &db_path, options.max_file_size).map_err(with_path)
 }
 
 fn fail(message: &str) -> ExitCode {

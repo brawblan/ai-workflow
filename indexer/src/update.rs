@@ -2,9 +2,10 @@
 
 use std::collections::{HashMap, HashSet};
 use std::fmt;
-use std::fs;
+use std::fs::File;
+use std::io::Read;
 use std::path::{Path, PathBuf};
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use rusqlite::{Connection, Result, TransactionBehavior, params};
 use xxhash_rust::xxh3::xxh3_64;
@@ -14,7 +15,11 @@ use crate::lang;
 use crate::walk::{self, Candidate};
 
 /// A file with a NUL byte in this many first bytes is binary, and the index skips it.
-const BINARY_CHECK_BYTES: usize = 8192;
+const BINARY_CHECK_BYTES: u64 = 8192;
+
+/// A file changed less than this long before the build can change again with the same modified
+/// time. The index then stores the modified time 0, so the next build reads the file again.
+const RACY_WINDOW: Duration = Duration::from_secs(2);
 
 #[derive(Default)]
 pub struct Summary {
@@ -53,11 +58,27 @@ struct Prepared<'a> {
 
 /// Brings the index at `db_path` up to date with the files under `root`.
 /// The update is one write transaction, so a second build waits for the first.
-pub fn run(conn: &mut Connection, root: &Path, db_path: &Path, max_size: u64) -> Result<Summary> {
+pub fn run(
+    conn: &mut Connection,
+    root: &Path,
+    db_path: &Path,
+    max_size: u64,
+) -> std::result::Result<Summary, String> {
     let start = Instant::now();
-    let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+    let describe = |error: rusqlite::Error| db::describe(&error);
+    let tx = conn
+        .transaction_with_behavior(TransactionBehavior::Immediate)
+        .map_err(describe)?;
     db::ensure_schema(&tx)?;
-    let stored = stored_files(&tx)?;
+    let mut summary = sync(&tx, root, db_path, max_size).map_err(describe)?;
+    tx.commit().map_err(describe)?;
+    summary.elapsed = start.elapsed();
+    Ok(summary)
+}
+
+fn sync(conn: &Connection, root: &Path, db_path: &Path, max_size: u64) -> Result<Summary> {
+    let racy_from = now_ns().saturating_sub(i64::try_from(RACY_WINDOW.as_nanos()).unwrap_or(0));
+    let stored = stored_files(conn)?;
     let candidates = walk::files(root, max_size, &index_files(db_path));
     let mut summary = Summary::default();
     let mut seen = HashSet::new();
@@ -73,16 +94,21 @@ pub fn run(conn: &mut Connection, root: &Path, db_path: &Path, max_size: u64) ->
     }
     for prepared in changed.into_iter().filter_map(prepare) {
         seen.insert(prepared.candidate.path.as_str());
-        if write(&tx, &prepared, stored.get(&prepared.candidate.path))? {
+        let old = stored.get(&prepared.candidate.path);
+        if write(conn, &prepared, old, racy_from)? {
             summary.parsed += 1;
         } else {
             summary.unchanged += 1;
         }
     }
-    summary.removed = remove_gone(&tx, &stored, &seen)?;
-    tx.commit()?;
-    summary.elapsed = start.elapsed();
+    summary.removed = remove_gone(conn, &stored, &seen)?;
     Ok(summary)
+}
+
+fn now_ns() -> i64 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_or(0, |age| i64::try_from(age.as_nanos()).unwrap_or(i64::MAX))
 }
 
 /// The index file and the SQLite files next to it. The walk skips them.
@@ -111,10 +137,7 @@ fn stored_files(conn: &Connection) -> Result<HashMap<String, Stored>> {
 
 /// Reads a file. Returns `None` if the read fails or the file is binary.
 fn prepare(candidate: &Candidate) -> Option<Prepared<'_>> {
-    let bytes = fs::read(&candidate.abs).ok()?;
-    if bytes[..bytes.len().min(BINARY_CHECK_BYTES)].contains(&0) {
-        return None;
-    }
+    let bytes = read_text(&candidate.abs)?;
     let newlines = bytes.iter().filter(|&&byte| byte == b'\n').count();
     let last_line = usize::from(!bytes.is_empty() && !bytes.ends_with(b"\n"));
     Some(Prepared {
@@ -124,26 +147,51 @@ fn prepare(candidate: &Candidate) -> Option<Prepared<'_>> {
     })
 }
 
+/// Reads the first 8 KB, and the rest only if the first part has no NUL byte.
+fn read_text(path: &Path) -> Option<Vec<u8>> {
+    let mut file = File::open(path).ok()?;
+    let mut bytes = Vec::new();
+    (&mut file)
+        .take(BINARY_CHECK_BYTES)
+        .read_to_end(&mut bytes)
+        .ok()?;
+    if bytes.contains(&0) {
+        return None;
+    }
+    file.read_to_end(&mut bytes).ok()?;
+    Some(bytes)
+}
+
 /// Writes the row of one file. Returns false if only the size or the modified time changed.
-fn write(conn: &Connection, prepared: &Prepared, old: Option<&Stored>) -> Result<bool> {
+/// A new or changed file gets a new row, so `ON DELETE CASCADE` removes its old rows in the
+/// other tables.
+fn write(
+    conn: &Connection,
+    prepared: &Prepared,
+    old: Option<&Stored>,
+    racy_from: i64,
+) -> Result<bool> {
     let candidate = prepared.candidate;
+    let mtime_ns = if candidate.mtime_ns >= racy_from {
+        0
+    } else {
+        candidate.mtime_ns
+    };
     if old.is_some_and(|old| old.hash == prepared.hash) {
         conn.execute(
             "UPDATE files SET size = ?2, mtime_ns = ?3 WHERE path = ?1",
-            params![candidate.path, candidate.size, candidate.mtime_ns],
+            params![candidate.path, candidate.size, mtime_ns],
         )?;
         return Ok(false);
     }
-    conn.execute("DELETE FROM symbols WHERE path = ?1", [&candidate.path])?;
+    conn.execute("DELETE FROM files WHERE path = ?1", [&candidate.path])?;
     conn.execute(
         "INSERT INTO files (path, size, mtime_ns, hash, language, lines)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6)
-         ON CONFLICT (path) DO UPDATE SET size = ?2, mtime_ns = ?3, hash = ?4, language = ?5,
-         lines = ?6",
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         params![
             candidate.path,
             candidate.size,
-            candidate.mtime_ns,
+            mtime_ns,
             prepared.hash,
             lang::language(&candidate.path),
             prepared.lines

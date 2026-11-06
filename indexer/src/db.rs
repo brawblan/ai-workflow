@@ -1,15 +1,20 @@
 //! The SQLite index: open it, check the schema version, and make the tables.
 
 use std::path::Path;
-use std::time::Duration;
+use std::thread;
+use std::time::{Duration, Instant};
 
-use rusqlite::{Connection, OptionalExtension, Result};
+use rusqlite::{Connection, Error, ErrorCode, OptionalExtension, Result};
 
-/// Change this number with each change to `SCHEMA`. A build then makes a new index.
+/// Change this number with each change to `SCHEMA`, and with each parser change that changes the
+/// rows. A build then makes a new index, so it parses each file again.
 pub const SCHEMA_VERSION: i64 = 1;
 
 /// A second build waits this long for the first build to finish.
 const BUSY_TIMEOUT: Duration = Duration::from_secs(600);
+
+/// The wait between two tries to set WAL mode.
+const WAL_RETRY: Duration = Duration::from_millis(20);
 
 /// Each table that refers to `files` deletes its rows with the file (`ON DELETE CASCADE`).
 const SCHEMA: &[&str] = &[
@@ -37,21 +42,67 @@ const SCHEMA: &[&str] = &[
     "CREATE INDEX symbols_path_line ON symbols(path, line)",
 ];
 
+/// What the file at the index path holds.
+enum Contents {
+    Empty,
+    Index(Option<i64>),
+    Foreign,
+}
+
 /// Opens the index in WAL mode, so a reader does not wait for a build.
 pub fn open(path: &Path) -> Result<Connection> {
     let conn = Connection::open(path)?;
     conn.busy_timeout(BUSY_TIMEOUT)?;
-    conn.pragma_update(None, "journal_mode", "WAL")?;
+    set_wal(&conn)?;
     conn.pragma_update(None, "foreign_keys", "ON")?;
     Ok(conn)
 }
 
+/// The text of an index error for the user.
+pub fn describe(error: &Error) -> String {
+    if error.sqlite_error_code() == Some(ErrorCode::DatabaseBusy) {
+        format!("another process holds the index lock: {error}")
+    } else {
+        format!("broken index: {error}")
+    }
+}
+
+/// SQLite does not call the busy handler when two processes set WAL mode on a new file at the same
+/// time. One of them gets `SQLITE_BUSY` at once, so this function tries again until the timeout.
+fn set_wal(conn: &Connection) -> Result<()> {
+    let start = Instant::now();
+    loop {
+        match conn.pragma_update(None, "journal_mode", "WAL") {
+            Err(error)
+                if error.sqlite_error_code() == Some(ErrorCode::DatabaseBusy)
+                    && start.elapsed() < BUSY_TIMEOUT =>
+            {
+                thread::sleep(WAL_RETRY);
+            }
+            result => return result,
+        }
+    }
+}
+
 /// Makes a new, empty index if the schema version is not `SCHEMA_VERSION`.
 /// Call it in a write transaction. Returns true if it made a new index.
-pub fn ensure_schema(conn: &Connection) -> Result<bool> {
-    if stored_version(conn)? == Some(SCHEMA_VERSION) {
-        return Ok(false);
+/// A database with other tables, and no `meta` or `files` table, is not an index. The function
+/// then changes nothing and returns an error.
+pub fn ensure_schema(conn: &Connection) -> std::result::Result<bool, String> {
+    match contents(conn).map_err(|error| describe(&error))? {
+        Contents::Index(Some(SCHEMA_VERSION)) => return Ok(false),
+        Contents::Foreign => {
+            return Err("broken index: the database is not a stone-index index. \
+                 Use another --db path."
+                .to_string());
+        }
+        Contents::Empty | Contents::Index(_) => {}
     }
+    make_schema(conn).map_err(|error| describe(&error))?;
+    Ok(true)
+}
+
+fn make_schema(conn: &Connection) -> Result<()> {
     drop_all_tables(conn)?;
     for statement in SCHEMA {
         conn.execute(statement, [])?;
@@ -60,18 +111,27 @@ pub fn ensure_schema(conn: &Connection) -> Result<bool> {
         "INSERT INTO meta (key, value) VALUES ('schema_version', ?1)",
         [SCHEMA_VERSION.to_string()],
     )?;
-    Ok(true)
+    Ok(())
+}
+
+fn contents(conn: &Connection) -> Result<Contents> {
+    let names = conn
+        .prepare("SELECT name FROM sqlite_master WHERE name NOT LIKE 'sqlite_%'")?
+        .query_map([], |row| row.get::<_, String>(0))?
+        .collect::<Result<Vec<_>>>()?;
+    if names.is_empty() {
+        return Ok(Contents::Empty);
+    }
+    if names.iter().any(|name| name == "meta") {
+        return stored_version(conn).map(Contents::Index);
+    }
+    if names.iter().any(|name| name == "files") {
+        return Ok(Contents::Index(None));
+    }
+    Ok(Contents::Foreign)
 }
 
 fn stored_version(conn: &Connection) -> Result<Option<i64>> {
-    let has_meta: bool = conn.query_row(
-        "SELECT count(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = 'meta'",
-        [],
-        |row| row.get(0),
-    )?;
-    if !has_meta {
-        return Ok(None);
-    }
     let value: Option<String> = conn
         .query_row(
             "SELECT value FROM meta WHERE key = 'schema_version'",
