@@ -16,8 +16,10 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | `docs/research/dossier.md` | The cited evidence for the framework |
 | `docs/tips/` | How the owner works, and why |
 | `stone/` | The `stone` CLI (Python 3.11+, PyYAML only) and its tests |
+| `indexer/` | The `stone-index` code indexer (Rust, D104). Its tests are in `indexer/tests/`. |
 | `mkdocs.yml`, `website/` | The docs site, https://brawblan.github.io/ai-workflow/. `website/content/` mirrors the repo folders with symlinks. |
 | `.github/workflows/stone.yml` | CI: unit tests, `stone check`, and K17 |
+| `.github/workflows/indexer.yml` | CI: the Rust checks of `indexer/`, on Linux and macOS |
 
 ## Commands
 
@@ -29,10 +31,13 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | Validate the framework | `stone check` |
 | Writing check (K17) on your changes | `stone check-writing --diff origin/dev` |
 | Action pins, plugin version bump, event text in `env`, and commit message format (R1 to R4, D78, D97, D98) | `stone check-rules --base origin/dev` |
+| Rust format check (in `indexer/`) | `cargo fmt --check` |
+| Rust lint (in `indexer/`) | `cargo clippy --locked -- -D warnings` |
+| Rust tests (in `indexer/`) | `cargo test --locked` |
 | Validate the plugin | `claude plugin validate .` |
 | Preview the docs site | `pip install -r website/requirements.txt && mkdocs serve` |
 | Try a skill before you push | `claude --plugin-dir plugins/cornerstone` |
-| All checks before a push | `python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/dev && stone check-rules --base origin/dev` |
+| All checks before a push | `python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/dev && stone check-rules --base origin/dev && (cd indexer && cargo fmt --check && cargo clippy --locked -- -D warnings && cargo test --locked)` |
 
 ## Rules for every task
 
@@ -61,6 +66,8 @@ tool-neutral, and `stone check` fails on a vendor name in it.
 ## Code
 
 - Python 3.11+, with type hints, clear function names, and idempotent operations.
+- Rust in `indexer/`: put each test in `indexer/tests/`, not in `indexer/src/`. CI fails on a test in `src/`.
+  Clippy must give no warnings. Give a reason in the PR body for each new crate (D104).
 - Use `unittest` for tests. Do not add a dependency without a reason in the PR body.
 - In GitHub Actions, pin each action to a commit SHA and set minimum permissions.
 - Pass event text (for example a PR body) to a step through `env`, not inline in `run`.
