@@ -1,0 +1,19 @@
+[package]
+name = "stone-index"
+# The same version as stone (stone/pyproject.toml). The release checklist sets both.
+version = "1.5.0"
+edition = "2024"
+rust-version = "1.99"
+description = "The code indexer of Cornerstone"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "stone-index"
+path = "src/main.rs"
+
+[dependencies]
+
+[lints.clippy]
+# K9 length cap. clippy.toml sets the threshold to limits.function_lines.
+too_many_lines = "warn"

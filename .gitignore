@@ -17,3 +17,6 @@ build/
 
 # stone eval: transcripts and run records
 .cornerstone/eval-runs/
+
+# Rust
+indexer/target/
