@@ -87,6 +87,17 @@ class IndexerVersionTest(unittest.TestCase):
             version, expected,
             _cargo_hint(version, f"pyproject.toml version is {expected}"),
         )
+    def test_cargo_lock_version_matches_cargo_toml(self) -> None:
+        version = _cargo_version()
+        lock = tomllib.loads((REPO / "indexer" / "Cargo.lock").read_text(encoding="utf-8"))
+        entries = [p for p in lock["package"] if p["name"] == "stone-index"]
+        self.assertEqual(len(entries), 1, "indexer/Cargo.lock: expected one stone-index entry.")
+        self.assertEqual(
+            entries[0]["version"], version,
+            f"indexer/Cargo.lock stone-index version is {entries[0]['version']}, but "
+            f"indexer/Cargo.toml is {version}. Run 'cargo update -p stone-index --offline' "
+            "in indexer/ (step 3 of the release checklist in framework/versioning.md).",
+        )
 
 
 if __name__ == "__main__":
