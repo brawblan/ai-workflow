@@ -63,8 +63,9 @@ installed `stone`.
    `stone check-writing --diff origin/dev`.
 2. In `upgrades.yaml`, set `released` of the newest entry to the date of the release.
 3. Set the same version in `stone/pyproject.toml`, in `stone/src/stone/__init__.py`, and in
-   `indexer/Cargo.toml` (D104). Also set it in
-   the line `Version X.Y.Z.` of `README.md` and of `website/content/index.md`. A unit test compares them.
+   `indexer/Cargo.toml` (D104). In `indexer/`, run `cargo update -p stone-index --offline` to set it
+   in `Cargo.lock`. Also set it in the line `Version X.Y.Z.` of `README.md` and of
+   `website/content/index.md`. A unit test compares them.
 4. If a skill changed, raise the version in the `plugin.json` file of the plugin.
 5. Merge the changes of steps 2 to 4 into `dev` with a PR. Then open a release PR from `dev` into `main`. Wait for the checks
    `stone`, `checks`, and `build`.
