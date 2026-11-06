@@ -34,10 +34,12 @@ SRC = Path(__file__).resolve().parent / "src" / "stone"
 
 
 def package_files(package: Path, prefix: str) -> dict[str, Path]:
-    """Map each archive name to its source file. Skip caches and compiled modules."""
+    """Map each archive name to its source file. Skip caches, compiled modules, and dotfiles."""
     files: dict[str, Path] = {}
     for path in package.rglob("*"):
-        if not path.is_file() or "__pycache__" in path.parts or path.suffix in COMPILED_SUFFIXES:
+        parts = path.relative_to(package).parts
+        if (not path.is_file() or "__pycache__" in parts or path.suffix in COMPILED_SUFFIXES
+                or any(part.startswith(".") for part in parts)):
             continue
         files[f"{prefix}/{path.relative_to(package).as_posix()}"] = path
     return files
@@ -65,6 +67,7 @@ def entry(name: str) -> zipfile.ZipInfo:
     info = zipfile.ZipInfo(name, date_time=FIXED_TIME)
     info.compress_type = zipfile.ZIP_DEFLATED
     info.external_attr = FILE_MODE
+    info.create_system = 3  # Unix, also on Windows, so each OS gives the same bytes
     return info
 
 
