@@ -27,6 +27,12 @@ jobs:
       - name: Unit tests
         run: python stone/tests/run_parallel.py
 
+      # The release workflow builds the same zipapp (#253). Build it on each PR, and run stone check.
+      - name: Zipapp build and stone check
+        run: |
+          python stone/build_zipapp.py --out "$RUNNER_TEMP/stone.pyz"
+          python "$RUNNER_TEMP/stone.pyz" check --format github
+
       # D96: the render output passes Prettier with its default options. The runner has Node.
       - name: Prettier on the render output
         run: bash stone/tests/format/check_render_format.sh
