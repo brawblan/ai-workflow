@@ -16,8 +16,8 @@ commands:                          # from AGENTS.md. No lint, type check, or acc
   test_unit: python stone/tests/run_parallel.py -q
   all_checks: python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/dev
 paths:
-  source: [stone/src/]
-  tests: [stone/tests/]            # protected for the implementer
+  source: [stone/src/, indexer/src/]
+  tests: [stone/tests/, indexer/tests/]         # protected for the implementer
   checks: [.github/workflows/, .cornerstone/checks/]
   plans: docs/plans/
 limits:
