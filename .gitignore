@@ -20,3 +20,6 @@ build/
 
 # Rust
 indexer/target/
+
+# stone-index: the local code index (D104)
+.cornerstone/index.db*

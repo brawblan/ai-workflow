@@ -13,6 +13,13 @@ name = "stone-index"
 path = "src/main.rs"
 
 [dependencies]
+ignore = "0.4"
+rusqlite = { version = "0.41", features = ["bundled"] }
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+# The tests read the index.
+[dev-dependencies]
+rusqlite = { version = "0.41", features = ["bundled"] }
 
 [lints.clippy]
 # K9 length cap. clippy.toml sets the threshold to limits.function_lines.
