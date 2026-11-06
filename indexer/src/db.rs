@@ -82,10 +82,13 @@ fn stored_version(conn: &Connection) -> Result<Option<i64>> {
     Ok(value.and_then(|text| text.parse().ok()))
 }
 
+/// Drops each table, the newest first. A table that refers to another table is newer, so it goes
+/// first: the foreign key check of a drop needs the table that the key refers to.
 fn drop_all_tables(conn: &Connection) -> Result<()> {
     let names = conn
         .prepare(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+             ORDER BY rowid DESC",
         )?
         .query_map([], |row| row.get::<_, String>(0))?
         .collect::<Result<Vec<_>>>()?;
