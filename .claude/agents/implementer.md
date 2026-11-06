@@ -13,7 +13,7 @@ tests, and another session reviews your work.
 
 Do not change these paths. A hook blocks the file tools (Edit, Write) on these paths. Check K6 fails the commit in CI:
 
-- Tests: `stone/tests/`
+- Tests: `stone/tests/`, `indexer/tests/`
 - Checks and CI: `.github/workflows/`, `.cornerstone/checks/`
 
 If a protected file must change, stop and say why in the decision log.

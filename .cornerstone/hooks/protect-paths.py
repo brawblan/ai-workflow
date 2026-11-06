@@ -19,8 +19,8 @@ from pathlib import Path
 # The shaper changes only the TICKET file, if the ticket is a file (#137).
 # The investigator changes only REPORTS, except on a SPIKE_PREFIX branch, which never merges (K16).
 # No branch lets the investigator change HARNESS: the hook, the checks, and the harness settings.
-PROTECTED = ["**/[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]", "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Ll][Oo][Cc][Aa][Ll].[Mm][Dd]", "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Mm][Dd]", ".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "stone/tests/"]
-TESTS = ["stone/tests/"]
+PROTECTED = ["**/[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]", "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Ll][Oo][Cc][Aa][Ll].[Mm][Dd]", "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Mm][Dd]", ".claude/", ".cornerstone/", ".cornerstone/checks/", ".github/workflows/", "docs/specs/", "indexer/tests/", "stone/tests/"]
+TESTS = ["stone/tests/", "indexer/tests/"]
 PLANS = ["docs/plans/"]
 REPORTS = ["docs/reports/"]
 HARNESS = [".claude/", "**/[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]", "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Mm][Dd]", "**/[Cc][Ll][Aa][Uu][Dd][Ee].[Ll][Oo][Cc][Aa][Ll].[Mm][Dd]", ".cornerstone/"]

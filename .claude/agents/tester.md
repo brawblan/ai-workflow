@@ -11,7 +11,7 @@ not the implementation.
 
 ## Paths
 
-- Write tests only here: `stone/tests/`
+- Write tests only here: `stone/tests/`, `indexer/tests/`
 - Do not change source code. If the code looks wrong, report it. Do not fix it.
 
 ## Steps

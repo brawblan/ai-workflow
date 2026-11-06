@@ -29,7 +29,7 @@ components:
     review_by: "2027-04-17"
     files:
       - .cornerstone/checks/protected_paths.py
-    hash: f35e9db0ff42b011b8d8fa3f5c8792ad0f90dc1b23efe1e8cf4680eda5691f5b
+    hash: 7c6b333d8277aefdf335a9fd1fd6a4a3c4d49cfbf72b88edbb706c36f1c765f6
   - id: check.k7
     kind: check
     purpose: K7. Fail if the diff is over the size limit of the PR profile and has no waiver.
@@ -89,7 +89,7 @@ components:
     review_by: "2027-04-17"
     files:
       - .cornerstone/hooks/protect-paths.py
-    hash: 83f41337c118b594e5b1c05dbe1f4f69685d16027154aa6455d94eb66d922690
+    hash: 1f76c22a9b3fe0e90529dd5e61d854ecaa7e001b20c1af686f65830690a161f0
   - id: hook.settings
     kind: hook
     purpose: Register the protected-path hook in the harness settings. Other keys stay as they are.
@@ -119,7 +119,7 @@ components:
     review_by: "2027-04-17"
     files:
       - .claude/agents/implementer.md
-    hash: a2828f9451b3b3278755c03ad5161cea69df4646427b3258c1ba47a1a8429c2a
+    hash: 6d690401685f5fcc87612d37af76f507a4cdb0d8ced132fa711d35c5c9a491a7
   - id: role.reviewer
     kind: role
     purpose: Find defects and scope drift in a fresh session.
@@ -166,7 +166,7 @@ components:
     review_by: "2027-04-17"
     files:
       - .claude/agents/tester.md
-    hash: 7dfc624b4dfbba720b44f9c0552fca2ea611e8c1ccf394175f85374b62174150
+    hash: dfff669aeb384434b27d4052a31568a65c25d5f35c4b7b91c0f019f9f4914e92
   - id: trigger.label.single-ticket
     kind: ci-job
     purpose: Start the first role of the profile when a human adds the trigger label to an issue.
