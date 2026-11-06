@@ -73,6 +73,8 @@ installed `stone`.
    commit `vX.Y.Z`, and push the tag. The tag starts the `pages` workflow, which
    deploys the docs site. A push to `dev` or `main` does not deploy it. Copy the summary, the config
    changes, and the steps of the entry into the notes of the release.
+   When you publish the release, the `zipapp` workflow attaches `stone.pyz` and `stone.pyz.sha256`.
+   After it runs, download the two files. Test the checksum, and run `python3 stone.pyz check`.
 8. Now move this repo to the new version. Run `stone upgrade --apply`. It sets `framework_version`
    and `framework_commit` in `.cornerstone/config.yaml`, and renders. Commit the config change
    alone, with `Role: human`. Then commit the generated files alone. Open this PR into `dev`. Do
