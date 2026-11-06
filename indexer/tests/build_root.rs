@@ -25,6 +25,7 @@ fn ac1_index_goes_to_repo_root_when_run_in_a_subfolder() {
 #[test]
 fn ac1_git_file_as_in_a_worktree_marks_the_root() {
     let fx = Fixture::new("root-gitfile");
+    fs::remove_dir_all(fx.root.join(".git")).unwrap();
     fs::write(fx.root.join(".git"), "gitdir: /nowhere\n").unwrap();
     fx.write("sub/f.py", b"x\n");
     let out = fx.run_in(&fx.root.join("sub"), &["build"]);
@@ -36,8 +37,7 @@ fn ac1_git_file_as_in_a_worktree_marks_the_root() {
 #[test]
 fn ac1_no_git_puts_the_index_in_the_current_folder() {
     let fx = Fixture::new("root-nogit");
-    let outside_git = fx.root.ancestors().all(|dir| !dir.join(".git").exists());
-    if !outside_git {
+    if !fx.no_git() {
         eprintln!("skip: the temp folder is inside a git repo");
         return;
     }
@@ -134,4 +134,24 @@ fn ac15_the_index_files_are_not_indexed() {
             .iter()
             .all(|p| !p.starts_with(".cornerstone/index.db"))
     );
+}
+
+#[test]
+fn ac12_foreign_database_is_a_broken_index_and_is_kept() {
+    let fx = Fixture::new("foreign");
+    fx.write("a.md", b"a\n");
+    let db = fx.root.join("other.db");
+    let conn = rusqlite::Connection::open(&db).unwrap();
+    conn.execute("CREATE TABLE users (name TEXT)", []).unwrap();
+    conn.execute("INSERT INTO users VALUES ('ann')", [])
+        .unwrap();
+    drop(conn);
+    let out = fx.build(&["--db", "other.db"]);
+    assert_eq!(out.status.code(), Some(2));
+    assert!(stderr(&out).contains("broken index"), "{}", stderr(&out));
+    let conn = rusqlite::Connection::open(&db).unwrap();
+    let count: i64 = conn
+        .query_row("SELECT count(*) FROM users", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(count, 1);
 }

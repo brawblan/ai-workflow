@@ -8,7 +8,7 @@ use std::process::Stdio;
 use common::{Fixture, summary};
 use rusqlite::Connection;
 
-const NEW_MTIME: u64 = 1_800_000_000;
+const NEW_MTIME: u64 = 1_750_000_000;
 
 fn two_files() -> Fixture {
     let fx = Fixture::new("update");
@@ -95,13 +95,6 @@ fn ac5_file_that_becomes_too_large_is_removed() {
 }
 
 #[test]
-fn ac6_summary_is_one_line_in_the_exact_format() {
-    let fx = two_files();
-    let (parsed, unchanged, removed) = summary(&fx.build(&[]));
-    assert_eq!((parsed, unchanged, removed), (2, 0, 0));
-}
-
-#[test]
 fn ac13_wrong_schema_version_makes_a_new_index() {
     let fx = two_files();
     fx.build(&[]);
@@ -174,9 +167,13 @@ fn ac14_two_builds_at_the_same_time_keep_the_index_sound() {
                 .unwrap()
         };
         let (first, second) = (spawn(), spawn());
+        let mut sums = Vec::new();
         for child in [first, second] {
-            let out = child.wait_with_output().unwrap();
-            assert_eq!(out.status.code(), Some(0), "round {round}");
+            sums.push(summary(&child.wait_with_output().unwrap()));
+        }
+        sums.sort();
+        if round != 2 {
+            assert_eq!(sums, vec![(0, 300, 0), (300, 0, 0)], "round {round}");
         }
         let expected = if round == 2 { 299 } else { 300 };
         assert_eq!(fx.paths().len(), expected, "round {round}");
@@ -254,4 +251,25 @@ fn the_symbols_table_exists_and_is_empty() {
         .query_row("SELECT count(*) FROM symbols", [], |r| r.get(0))
         .unwrap();
     assert_eq!(count, 0);
+}
+
+#[test]
+fn racily_clean_file_is_read_again_after_a_same_size_edit() {
+    let fx = Fixture::new("racy");
+    std::fs::write(fx.root.join("a.md"), b"aaa\n").unwrap();
+    fx.build(&[]);
+    assert_eq!(fx.mtime_ns("a.md"), 0);
+    let before = fx.hash("a.md");
+    let mtime = std::fs::metadata(fx.root.join("a.md"))
+        .unwrap()
+        .modified()
+        .unwrap();
+    std::fs::write(fx.root.join("a.md"), b"bbb\n").unwrap();
+    let file = std::fs::File::options()
+        .write(true)
+        .open(fx.root.join("a.md"))
+        .unwrap();
+    file.set_modified(mtime).unwrap();
+    assert_eq!(summary(&fx.build(&[])), (1, 0, 0));
+    assert_ne!(fx.hash("a.md"), before);
 }

@@ -30,6 +30,7 @@ impl Fixture {
         let home = base.join("home");
         fs::create_dir_all(&root).unwrap();
         fs::create_dir_all(home.join("xdg").join("git")).unwrap();
+        fs::create_dir_all(root.join(".git")).unwrap();
         Fixture { base, root, home }
     }
 
@@ -52,6 +53,12 @@ impl Fixture {
 
     pub fn remove(&self, rel: &str) {
         fs::remove_file(self.root.join(rel)).unwrap();
+    }
+
+    /// Removes the default `.git` folder. Returns false if a folder above the fixture has `.git`.
+    pub fn no_git(&self) -> bool {
+        fs::remove_dir_all(self.root.join(".git")).unwrap();
+        self.root.ancestors().all(|dir| !dir.join(".git").exists())
     }
 
     pub fn git_dir(&self) {

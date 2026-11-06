@@ -25,6 +25,9 @@ fn ac2_gitignore_applies_with_a_git_folder() {
 #[test]
 fn ac2_gitignore_applies_with_no_git_folder() {
     let fx = Fixture::new("gi-nogit");
+    if !fx.no_git() {
+        return;
+    }
     fx.write(".gitignore", b"ignored.md\n");
     fx.write("ignored.md", b"x\n");
     fx.write("kept.md", b"x\n");
