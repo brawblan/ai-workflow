@@ -1,0 +1,2 @@
+# K9: the same cap as limits.function_lines in .cornerstone/config.yaml.
+too-many-lines-threshold = 60
