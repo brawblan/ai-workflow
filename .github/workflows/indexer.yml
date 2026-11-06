@@ -23,9 +23,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # Each Rust test goes in indexer/tests/, so the hook and K6 protect it (paths.tests).
+      # A grep error (exit 2) fails the step too. A line with not(test) passes.
       - name: No tests in indexer/src/
         run: |
-          if grep -rnE '#\[(test|cfg\((.*[(, ])?test[,) ])' src; then
+          status=0
+          matches=$(grep -rnE '#!?\[(([a-z_]+::)*test([](]|$)|cfg(_attr)?\((.*[(, ])?test[,) ])' src) || status=$?
+          if [ "$status" -gt 1 ]; then
+            echo "::error::grep failed with exit $status."
+            exit 1
+          fi
+          matches=$(printf '%s\n' "$matches" | grep -v 'not(test)' || true)
+          if [ -n "$matches" ]; then
+            printf '%s\n' "$matches"
             echo "::error::Move each Rust test to indexer/tests/ (D104)."
             exit 1
           fi
