@@ -39,21 +39,30 @@ byte in its first 8 KB.
 The build is incremental:
 
 - It reads a file again only if the size or the modified time changed.
+- If a file changed in the 2 seconds before the build, or has a modified time in the future, the
+  next build reads it again. Thus a second edit with the same size and modified time is not lost.
+- It reads the first 8 KB of a file first. It reads the rest only if the file is not binary. A
+  binary file has no row, so each build reads its first 8 KB again.
 - It writes the row of a file again only if the content hash changed.
 - It removes the rows of each file that is gone, ignored, binary, or too large.
 - If the schema version of the index is not the version of the binary, it makes a new index.
+- If the file at the index path is a SQLite database with no `meta` or `files` table, but with other
+  tables, the build stops and changes nothing.
 
 The build prints one summary line, for example `3 parsed, 120 unchanged, 1 removed in 0.05s`.
 
 The index uses SQLite WAL mode. If two builds run at the same time, the second build waits for the
-first, for a maximum of 10 minutes.
+first, for a maximum of 10 minutes. This is also true for a new index.
 
 ## Exit codes
 
 | Code | Meaning |
 | --- | --- |
 | 0 | The command worked. |
-| 2 | A usage error, or a broken index. To fix a broken index, delete the file and run `build`. |
+| 2 | A usage error, a broken index, or a lock that another process held for more than 10 minutes. |
+
+If the error says "broken index", make sure that no other build runs. Then delete the index file and
+run `build`.
 
 ## The index
 
