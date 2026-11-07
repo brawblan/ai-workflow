@@ -58,6 +58,7 @@ current folder.
 | --- | --- | --- |
 | `--db <path>` | `.cornerstone/index.db` in the repo root | Sets the path of the index. A relative path starts at the current folder. |
 | `--max-file-size <bytes>` | `1048576` (1 MB) | Skips each file that is larger. |
+| `--lang <ext>=<lang>` | None | Sets the language of a file extension. Repeat it for more extensions. `<lang>` is `python`, `markdown`, `typescript`, `tsx`, `javascript`, `jsx`, `c`, `cpp`, or `csharp`. For example, `--lang h=c` reads `.h` files as C. Give the same option to each command, because a command that gets another language reads the file again. |
 
 The walk follows `.gitignore`, `.git/info/exclude`, and the global git ignore file, also with no git.
 It also follows `.ignore` files. It skips the `.git` folder, symbolic links, and a file with a NUL
@@ -145,7 +146,7 @@ match the glob, with the SQLite `GLOB` rules: `*` also matches `/`. A JSON resul
 ### Query options
 
 `find`, `outline`, `refs`, and `search` have these options. They also have `--db` and `--max-file-size` of `build`.
-`--max-file-size` has no effect with `--no-update`. Put `--` before a name or a path that starts
+`--max-file-size` has no effect with `--no-update`. `--lang` also works for these commands. Put `--` before a name or a path that starts
 with `-`.
 
 | Option | Default | What it does |
@@ -193,6 +194,9 @@ The index keeps each symbol that tree-sitter finds in the file.
 | Python | `.py`, `.pyi` | `function`, `class`, `method` |
 | TypeScript | `.ts`, `.mts`, `.cts`, `.tsx` | `function`, `class`, `method`, `interface`, `type`, `enum`, `namespace`, `constant` |
 | JavaScript | `.js`, `.mjs`, `.cjs`, `.jsx` | `function`, `class`, `method`, `constant` |
+| C | `.c` | `function`, `struct`, `union`, `enum`, `typedef`, `macro` |
+| C++ | `.cc`, `.cpp`, `.cxx`, `.hpp`, `.hh`, `.hxx`, `.h` | The C kinds, and `class`, `namespace`, `method` |
+| C# | `.cs` | `namespace`, `class`, `struct`, `record`, `interface`, `enum`, `method`, `property` |
 | Markdown | `.md`, `.markdown` | `heading` |
 
 - A function in a class is a `method`. A class field with a function value is also a `method`.
@@ -200,6 +204,18 @@ The index keeps each symbol that tree-sitter finds in the file.
 - `constant` is an exported `const`, also with `declare`. An exported `const` with a function
   value is a `function`. A `declare function` is a `function`.
 - A decorated Python definition starts on the line of its first decorator.
+- C and C++: a `macro` is a `#define` with a body. A `#define` with no body, for example a header
+  guard, is not a symbol. A `struct`, `union`, `enum`, or `class` needs a body. A type that a
+  declaration only names is not a symbol. The struct in `typedef struct {...} P;` has no name, so
+  only `P` is a symbol. A `typedef struct N {...} N;` gives a `struct` and a `typedef`.
+- C++: a function in a class, and a function with a scope in its name, is a `method`. A
+  declaration of a method in a class is also a `method`. `void Parser::parse() {}` gets the
+  qualified name `Parser.parse`, and `namespace a::b` gets the name `a.b`. A template is a symbol
+  of the kind of its declaration, for example a `class` for a class template.
+- C++: `class EXPORT Name {...}` and `struct EXPORT Name {...}`, with an export macro, are read as
+  `Name`. The grammar cannot read `class EXPORT Name : Base {...}`, so the index has no symbol for it.
+- C#: a file-scoped `namespace A;` and `namespace A.B {}` are a `namespace`. A `record struct` is a
+  `record`. A constructor, a field, and an event are not symbols.
 - The index keeps symbols to a nesting depth of 32. It skips deeper symbols.
 - The qualified name of a code symbol joins the names of its parents with `.`, for example
   `Parser.parse`.
@@ -218,6 +234,8 @@ link of the index again.
 | --- | --- | --- |
 | Python | `import` | `import a.b` gives `a.b`. `from m import a` gives `m.a`. `from m import *` gives `m`. |
 | TypeScript, JavaScript | `import`, `export`, `require` | `import` and `export ... from` with a source. `require()` and `import()` with a string. |
+| C, C++ | `include` | `#include "a.h"` gives `a.h`. `#include <a.h>` gives `<a.h>`. |
+| C# | `using` | `using A.B;` gives `A.B`. `using static` and `using X = A.B;` also give `A.B`. |
 | Markdown | `link` | Relative links, also in table cells, and link reference definitions, with no `#anchor` and no `?query`. A link in a code span is not a link. |
 
 The build resolves a target to a file of the repo where it can:
@@ -229,6 +247,9 @@ The build resolves a target to a file of the repo where it can:
   module, the build uses `m`. A relative import starts at the folder of the file.
 - A TypeScript or JavaScript target that starts with `./` or `../`: the path, then the path with
   each extension, then its `index` file. A `.js` target can also be a `.ts` file.
+- A C or C++ `#include "..."`: first the path from the folder of the file, then the path from the
+  repo root, then the nearest file whose path ends with the target. An `#include <...>` stays text.
+  A `using` stays text.
 - A Markdown link: the relative path.
 
 Other targets, for example an external package, keep only their target text.

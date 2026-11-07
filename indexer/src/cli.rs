@@ -3,19 +3,23 @@
 use std::path::PathBuf;
 use std::slice::Iter;
 
+use crate::lang::{self, Override};
+
 /// The default of `--max-file-size`: 1 MB.
 pub const DEFAULT_MAX_FILE_SIZE: u64 = 1_048_576;
 
 /// The default of `--limit`.
 pub const DEFAULT_LIMIT: usize = 20;
 
-pub const USAGE: &str = "usage: stone-index build [--db PATH] [--max-file-size BYTES]
+pub const USAGE: &str =
+    "usage: stone-index build [--db PATH] [--max-file-size BYTES] [--lang EXT=LANG]
        stone-index find NAME [--kind KIND] [QUERY OPTIONS]
        stone-index outline PATH [QUERY OPTIONS]
        stone-index refs PATH|MODULE [QUERY OPTIONS]
        stone-index search WORDS [--path GLOB] [QUERY OPTIONS]
        stone-index --version
 query options: --limit N, --format text|json, --no-update, --db PATH, --max-file-size BYTES,
+--lang EXT=LANG (repeatable, for example h=c),
 and -- before a NAME or a PATH that starts with -";
 
 pub enum Command {
@@ -31,6 +35,7 @@ pub enum Command {
 pub struct IndexOptions {
     pub db: Option<PathBuf>,
     pub max_file_size: u64,
+    pub langs: Vec<Override>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -78,6 +83,7 @@ fn parse_query(args: &[String], is_query: bool, extra: &str) -> Result<Query, St
         index: IndexOptions {
             db: None,
             max_file_size: DEFAULT_MAX_FILE_SIZE,
+            langs: Vec::new(),
         },
     };
     let mut targets = Vec::new();
@@ -86,6 +92,10 @@ fn parse_query(args: &[String], is_query: bool, extra: &str) -> Result<Query, St
         match arg.as_str() {
             "--db" => query.index.db = Some(PathBuf::from(value(&mut args, arg)?)),
             "--max-file-size" => query.index.max_file_size = number(value(&mut args, arg)?, arg)?,
+            "--lang" => query
+                .index
+                .langs
+                .push(lang::parse_override(value(&mut args, arg)?)?),
             "--kind" if extra == arg => query.kind = Some(value(&mut args, arg)?.to_string()),
             "--path" if extra == arg => query.path = Some(value(&mut args, arg)?.to_string()),
             "--limit" if is_query => query.limit = number(value(&mut args, arg)?, arg)?,

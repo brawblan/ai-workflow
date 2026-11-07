@@ -8,6 +8,7 @@ mod links;
 mod query;
 mod refs;
 mod resolve;
+mod rules;
 mod search;
 mod symbols;
 mod update;
@@ -85,8 +86,7 @@ fn open_updated(place: &Place, options: &IndexOptions) -> Result<(Connection, Su
     }
     let with_path = |message: String| format!("{}: {message}", db_path.display());
     let mut conn = db::open(db_path).map_err(|error| with_path(db::describe(&error)))?;
-    let summary =
-        update::run(&mut conn, &place.root, db_path, options.max_file_size).map_err(with_path)?;
+    let summary = update::run(&mut conn, &place.root, db_path, options).map_err(with_path)?;
     Ok((conn, summary))
 }
 
