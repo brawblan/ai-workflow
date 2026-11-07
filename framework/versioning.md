@@ -81,7 +81,7 @@ installed `stone`.
    `python3 <download folder>/stone.pyz check`.
    The `indexer-release` workflow attaches an archive and a wheel of `stone-index` for each of
    the five targets, and `SHA256SUMS` (#258). After it runs, check that the release has the 11
-   files. Download `SHA256SUMS` and the macOS arm64 wheel, and test the checksum. Then run
+   `stone-index` files. Download `SHA256SUMS` and the macOS arm64 wheel, and test the checksum. Then run
    `uv tool install <wheel>` and `stone-index --version`.
 8. Now move this repo to the new version. Run `stone upgrade --apply`. It sets `framework_version`
    and `framework_commit` in `.cornerstone/config.yaml`, and renders. Commit the config change

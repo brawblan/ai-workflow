@@ -31,8 +31,8 @@ To test the checksum of a download, run this command in the download folder:
 sha256sum --check --ignore-missing SHA256SUMS
 ```
 
-On macOS, use `shasum -a 256 --check --ignore-missing SHA256SUMS`. The Cargo and Clone options
-need Rust. The file `rust-toolchain.toml` sets the version.
+On macOS, use `shasum -a 256 --check --ignore-missing SHA256SUMS`. The Cargo option needs Rust 1.99
+or later as the default toolchain. The Clone option uses the version in `rust-toolchain.toml`.
 
 `stone index <args>` runs `stone-index <args>` from your `PATH`. If `stone-index` is not on your
 `PATH`, it prints the install commands and exits with code 2.
