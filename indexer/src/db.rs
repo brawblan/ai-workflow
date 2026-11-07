@@ -8,7 +8,7 @@ use rusqlite::{Connection, Error, ErrorCode, OptionalExtension, Result};
 
 /// Change this number with each change to `SCHEMA`, and with each parser change that changes the
 /// rows. A build then makes a new index, so it parses each file again.
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 /// A second build waits this long for the first build to finish.
 const BUSY_TIMEOUT: Duration = Duration::from_secs(600);
@@ -16,7 +16,8 @@ const BUSY_TIMEOUT: Duration = Duration::from_secs(600);
 /// The wait between two tries to set WAL mode.
 const WAL_RETRY: Duration = Duration::from_millis(20);
 
-/// Each table that refers to `files` deletes its rows with the file (`ON DELETE CASCADE`).
+/// Each table that refers to `files` deletes its rows with the file (`ON DELETE CASCADE`). The
+/// FTS5 table `chunks` reads its text from `chunk_rows`. Two triggers keep it in step.
 const SCHEMA: &[&str] = &[
     "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
     "CREATE TABLE files (
@@ -41,6 +42,31 @@ const SCHEMA: &[&str] = &[
     "CREATE INDEX symbols_name ON symbols(name)",
     "CREATE INDEX symbols_qualified_name ON symbols(qualified_name)",
     "CREATE INDEX symbols_path_line ON symbols(path, line)",
+    "CREATE TABLE links (
+        id INTEGER PRIMARY KEY,
+        path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        line INTEGER NOT NULL,
+        kind TEXT NOT NULL,
+        target TEXT NOT NULL,
+        resolved TEXT NOT NULL
+    )",
+    "CREATE INDEX links_path ON links(path)",
+    "CREATE INDEX links_target ON links(target)",
+    "CREATE INDEX links_resolved ON links(resolved)",
+    "CREATE TABLE chunk_rows (
+        id INTEGER PRIMARY KEY,
+        path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
+        line INTEGER NOT NULL,
+        text TEXT NOT NULL
+    )",
+    "CREATE INDEX chunk_rows_path ON chunk_rows(path)",
+    "CREATE VIRTUAL TABLE chunks USING fts5(text, content='chunk_rows', content_rowid='id')",
+    "CREATE TRIGGER chunk_rows_insert AFTER INSERT ON chunk_rows BEGIN
+        INSERT INTO chunks (rowid, text) VALUES (new.id, new.text);
+    END",
+    "CREATE TRIGGER chunk_rows_delete AFTER DELETE ON chunk_rows BEGIN
+        INSERT INTO chunks (chunks, rowid, text) VALUES ('delete', old.id, old.text);
+    END",
 ];
 
 /// What the file at the index path holds.
@@ -154,13 +180,14 @@ fn stored_version(conn: &Connection) -> Result<Option<i64>> {
     Ok(value.and_then(|text| text.parse().ok()))
 }
 
-/// Drops each table, the newest first. A table that refers to another table is newer, so it goes
-/// first: the foreign key check of a drop needs the table that the key refers to.
+/// Drops each table, the virtual tables and then the newest first. A virtual table drops its own
+/// tables. A table that refers to another table is newer, so it goes first: the foreign key check
+/// of a drop needs the table that the key refers to.
 fn drop_all_tables(conn: &Connection) -> Result<()> {
     let names = conn
         .prepare(
             "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
-             ORDER BY rowid DESC",
+             ORDER BY sql LIKE 'CREATE VIRTUAL TABLE%' DESC, rowid DESC",
         )?
         .query_map([], |row| row.get::<_, String>(0))?
         .collect::<Result<Vec<_>>>()?;

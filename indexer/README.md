@@ -18,6 +18,8 @@ cargo install --locked --path .
 | `stone-index build` | Makes or updates the index of the repo. |
 | `stone-index find <name>` | Prints the symbols with this name. |
 | `stone-index outline <path>` | Prints the symbols of one file. |
+| `stone-index refs <path or module>` | Prints the links into a file or a module, and the links out of it. |
+| `stone-index search "<words>"` | Prints the lines of the blocks of text that best match the words. |
 | `stone-index --version`, `stone-index -V` | Prints the name and the version. |
 
 ### build
@@ -78,15 +80,46 @@ symbol two spaces for each parent above it, and each heading two spaces for each
   4 method parse
 ```
 
+### refs
+
+`refs <target>` takes a repo path or a module name. If the index has a file at the path, `refs`
+prints two groups. `in` has the links whose target resolves to the file. `out` has the links of the
+file. Else, if the target is a Python module of the repo, `refs` uses its file. Else, `in` has the
+links whose target text is the target, for example `react`. Each line is `path:line kind target`:
+
+```text
+in
+stone/src/stone/cli.py:10 import stone.evals
+out
+stone/src/stone/evals.py:11 import json
+```
+
+The `--limit` applies to each group. A JSON result has `path`, `line`, `kind`, `target`, and
+`resolved`. The section [Links](#links) tells which links the build reads.
+
+### search
+
+`search "<words>"` finds the blocks of text that have at least one of the words, with FTS5. The
+best bm25 rank comes first. For each block, it prints the first line with one of the words, as
+`path:line: text`. The line has no space at its ends:
+
+```text
+stone/src/stone/repo_rules.py:154: def check_version_bump(root: Path, base: str, skills: str = SKILLS,
+```
+
+A word is a run of letters and digits, with no case. `--path <glob>` searches only the paths that
+match the glob, with the SQLite `GLOB` rules: `*` also matches `/`. A JSON result has `path`,
+`line`, and `text`.
+
 ### Query options
 
-`find` and `outline` have these options. They also have `--db` and `--max-file-size` of `build`.
+`find`, `outline`, `refs`, and `search` have these options. They also have `--db` and `--max-file-size` of `build`.
 `--max-file-size` has no effect with `--no-update`. Put `--` before a name or a path that starts
 with `-`.
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `--limit <n>` | `20` | Prints a maximum of `n` symbols. If the limit cuts the results, the last text line gives the number of symbols that it did not print. |
+| `--limit <n>` | `20` | Prints a maximum of `n` results. If the limit cuts the results, the last text line gives the number of symbols that it did not print. |
 | `--format text\|json` | `text` | `json` prints one object: `results` (a list of symbols) and `omitted` (the number that the limit cut). |
 | `--no-update` | Off | Reads the index as it is. With no option, the command first updates the index, as `build` does, and prints no summary. |
 
@@ -98,8 +131,8 @@ The text output shows each control character in a name as `?`.
 
 | Code | Meaning |
 | --- | --- |
-| 0 | The command worked. For `find` and `outline`: there are results. |
-| 1 | `find` or `outline` found no results. |
+| 0 | The command worked. For a query: there are results. |
+| 1 | A query found no results. |
 | 2 | A usage error, a broken index, no index with `--no-update`, or a lock that another process held for more than 10 minutes. |
 
 If the error says "broken index", make sure that no other build runs. Then delete the index file and
@@ -112,6 +145,9 @@ run `build`.
 | `meta` | `key`, `value`. The key `schema_version` holds the schema version. |
 | `files` | `path`, `size`, `mtime_ns`, `hash`, `language`, `lines` |
 | `symbols` | `id`, `name`, `qualified_name`, `kind`, `path`, `line`, `end_line`, `parent`, `level` |
+| `links` | `id`, `path`, `line`, `kind`, `target`, `resolved`. `resolved` is empty if the target is not a file of the repo. |
+| `chunk_rows` | `id`, `path`, `line`, `text`: the text of each file in blocks of at most 50 lines. `line` is the first line of the block. |
+| `chunks` | The FTS5 index of `chunk_rows.text`. Two triggers keep it in step with `chunk_rows`. |
 
 The index holds each text file. The `language` column is empty for a language that the indexer
 does not parse.
@@ -141,3 +177,25 @@ The index keeps each symbol that tree-sitter finds in the file.
   a lower level. A heading ends on the line before the next heading of the same or a higher level.
 - The name of a heading has no closing `#` sequence. A heading on more than one line gets one
   line, with a space between the lines.
+
+## Links
+
+The build reads the links of each new or changed file. If a file is new or gone, it resolves each
+link of the index again.
+
+| Language | Kind | Links |
+| --- | --- | --- |
+| Python | `import` | `import a.b` gives `a.b`. `from m import a` gives `m.a`. `from m import *` gives `m`. |
+| TypeScript, JavaScript | `import`, `export`, `require` | `import` and `export ... from` with a source. `require()` and `import()` with a string. |
+| Markdown | `link` | Relative links and link reference definitions, with no `#anchor` and no `?query`. A link in a code span is not a link. |
+
+The build resolves a target to a file of the repo where it can:
+
+- A Python module: the file whose path ends with the module path, as `.py`, `.pyi`, or
+  `__init__.py`. If two files match, the file nearest to the importer wins. If `m.a` is not a
+  module, the build uses `m`. A relative import starts at the folder of the file.
+- A TypeScript or JavaScript target that starts with `./` or `../`: the path, then the path with
+  each extension, then its `index` file. A `.js` target can also be a `.ts` file.
+- A Markdown link: the relative path.
+
+Other targets, for example an external package, keep only their target text.

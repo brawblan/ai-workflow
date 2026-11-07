@@ -152,7 +152,7 @@ pub fn render(results: &Results, format: Format) -> String {
 
 /// The text with each control character as `?`, so file content cannot send terminal escape
 /// sequences.
-fn plain(text: &str) -> String {
+pub fn plain(text: &str) -> String {
     text.chars()
         .map(|character| {
             if character.is_control() {
@@ -183,7 +183,7 @@ fn json_row(row: &Row) -> String {
     text
 }
 
-fn json_string(text: &str) -> String {
+pub fn json_string(text: &str) -> String {
     let mut out = String::from("\"");
     for character in text.chars() {
         match character {

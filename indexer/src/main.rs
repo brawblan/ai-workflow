@@ -1,10 +1,14 @@
-//! `stone-index`: the code indexer of Cornerstone. It has `build`, `find`, `outline`, and
-//! `--version`.
+//! `stone-index`: the code indexer of Cornerstone. It has `build`, `find`, `outline`, `refs`,
+//! `search`, and `--version`.
 
 mod cli;
 mod db;
 mod lang;
+mod links;
 mod query;
+mod refs;
+mod resolve;
+mod search;
 mod symbols;
 mod update;
 mod walk;
@@ -42,8 +46,10 @@ fn main() -> ExitCode {
     let result = match cli::parse(&args) {
         Ok(Command::Version) => Ok(format!("{NAME} {VERSION}\n")),
         Ok(Command::Build(options)) => build(&options).map(|summary| format!("{summary}\n")),
-        Ok(Command::Find(query)) => return run_query(&query, true),
-        Ok(Command::Outline(query)) => return run_query(&query, false),
+        Ok(Command::Find(query)) => return run_query(&query, find),
+        Ok(Command::Outline(query)) => return run_query(&query, outline),
+        Ok(Command::Refs(query)) => return run_query(&query, refs),
+        Ok(Command::Search(query)) => return run_query(&query, search),
         Err(message) => return fail(&format!("{message}\n{USAGE}")),
     };
     match result {
@@ -98,35 +104,73 @@ fn open_existing(place: &Place) -> Result<Connection, String> {
     Ok(conn)
 }
 
-/// Runs `find` (if `is_find`) or `outline`. Exit 0 with results, 1 with none, and 2 on an error.
-fn run_query(query: &Query, is_find: bool) -> ExitCode {
+/// The output of a query, true if it has no results, and a hint for stderr.
+type Answer = (String, bool, Option<String>);
+
+/// The query step of one command. It returns an `Answer` or an error message.
+type Ask = fn(&Place, &Connection, &Query) -> Result<Answer, String>;
+
+fn describe(place: &Place) -> impl Fn(rusqlite::Error) -> String {
+    let path = place.db_path.display().to_string();
+    move |error| format!("{path}: {}", db::describe(&error))
+}
+
+fn find(place: &Place, conn: &Connection, query: &Query) -> Result<Answer, String> {
+    let results = query::find(conn, &query.target, query.kind.as_deref(), query.limit)
+        .map_err(describe(place))?;
+    let empty = results.rows.is_empty() && results.omitted == 0;
+    Ok((query::render(&results, query.format), empty, None))
+}
+
+fn outline(place: &Place, conn: &Connection, query: &Query) -> Result<Answer, String> {
+    // A path with no row gets a hint, so an agent can tell a wrong path from a file with
+    // no symbols.
+    let path = repo_path(place, &query.target)?;
+    let results = query::outline(conn, &path, query.limit).map_err(describe(place))?;
+    let indexed =
+        !results.rows.is_empty() || query::is_indexed(conn, &path).map_err(describe(place))?;
+    let hint = (!indexed).then(|| format!("{path} is not in the index"));
+    let empty = results.rows.is_empty() && results.omitted == 0;
+    Ok((query::render(&results, query.format), empty, hint))
+}
+
+/// The target is a path if it names a file of the index. Else it is a module name.
+fn refs(place: &Place, conn: &Connection, query: &Query) -> Result<Answer, String> {
+    let path = repo_path(place, &query.target).ok();
+    let found =
+        refs::refs(conn, path.as_deref(), &query.target, query.limit).map_err(describe(place))?;
+    let empty = found.incoming.is_empty() && found.outgoing.is_empty() && found.omitted == 0;
+    Ok((refs::render(&found, query.format), empty, None))
+}
+
+fn search(place: &Place, conn: &Connection, query: &Query) -> Result<Answer, String> {
+    let words = search::words(&query.target);
+    if words.is_empty() {
+        return Err("the search needs a word".to_string());
+    }
+    let hits = search::search(conn, &words, query.path.as_deref(), query.limit)
+        .map_err(describe(place))?;
+    let empty = hits.rows.is_empty() && hits.omitted == 0;
+    Ok((search::render(&hits, query.format), empty, None))
+}
+
+/// Runs a query command. Exit 0 with results, 1 with none, and 2 on an error.
+fn run_query(query: &Query, ask: Ask) -> ExitCode {
     let result = place(&query.index).and_then(|place| {
         let conn = if query.update {
             open_updated(&place, &query.index)?.0
         } else {
             open_existing(&place)?
         };
-        let describe = |error| format!("{}: {}", place.db_path.display(), db::describe(&error));
-        if is_find {
-            let results = query::find(&conn, &query.target, query.kind.as_deref(), query.limit);
-            return results.map(|results| (results, None)).map_err(describe);
-        }
-        // A path with no row gets a hint, so an agent can tell a wrong path from a file with
-        // no symbols.
-        let path = repo_path(&place, &query.target)?;
-        let results = query::outline(&conn, &path, query.limit).map_err(describe)?;
-        let indexed =
-            !results.rows.is_empty() || query::is_indexed(&conn, &path).map_err(describe)?;
-        let hint = (!indexed).then(|| format!("{path} is not in the index"));
-        Ok((results, hint))
+        ask(&place, &conn, query)
     });
     match result {
-        Ok((results, hint)) => {
-            print!("{}", query::render(&results, query.format));
+        Ok((text, empty, hint)) => {
+            print!("{text}");
             if let Some(hint) = hint {
                 eprintln!("{NAME}: {hint}");
             }
-            if results.rows.is_empty() && results.omitted == 0 {
+            if empty {
                 ExitCode::from(EXIT_NO_RESULTS)
             } else {
                 ExitCode::SUCCESS

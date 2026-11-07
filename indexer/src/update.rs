@@ -13,8 +13,13 @@ use xxhash_rust::xxh3::xxh3_64;
 
 use crate::db;
 use crate::lang;
+use crate::links::{self, Link};
+use crate::resolve::Resolver;
 use crate::symbols::{self, Symbol};
 use crate::walk::{self, Candidate};
+
+/// The most lines in one block of text in `chunks`.
+const CHUNK_LINES: usize = 50;
 
 /// A file with a NUL byte in this many first bytes is binary, and the index skips it.
 const BINARY_CHECK_BYTES: u64 = 8192;
@@ -58,6 +63,9 @@ struct Prepared<'a> {
     lines: i64,
     language: Option<&'static str>,
     symbols: Vec<Symbol>,
+    links: Vec<Link>,
+    /// The first line and the text of each block of lines.
+    chunks: Vec<(i64, String)>,
 }
 
 /// Brings the index at `db_path` up to date with the files under `root`.
@@ -100,16 +108,30 @@ fn sync(conn: &Connection, root: &Path, db_path: &Path, max_size: u64) -> Result
         .into_par_iter()
         .filter_map(|candidate| prepare(candidate, stored.get(&candidate.path)))
         .collect();
-    for prepared in prepared {
-        seen.insert(prepared.candidate.path.as_str());
+    seen.extend(
+        prepared
+            .iter()
+            .map(|prepared| prepared.candidate.path.as_str()),
+    );
+    // A new or a gone file can change the target of a link in a file that did not change.
+    let same_files =
+        seen.len() == stored.len() && seen.iter().all(|path| stored.contains_key(*path));
+    if same_files && prepared.is_empty() {
+        return Ok(summary);
+    }
+    let resolver = Resolver::new(seen.iter().copied());
+    for prepared in &prepared {
         let old = stored.get(&prepared.candidate.path);
-        if write(conn, &prepared, old, racy_from)? {
+        if write(conn, prepared, old, racy_from, &resolver)? {
             summary.parsed += 1;
         } else {
             summary.unchanged += 1;
         }
     }
     summary.removed = remove_gone(conn, &stored, &seen)?;
+    if !same_files {
+        resolve_all(conn, &resolver)?;
+    }
     Ok(summary)
 }
 
@@ -152,16 +174,33 @@ fn prepare<'a>(candidate: &'a Candidate, old: Option<&Stored>) -> Option<Prepare
     let changed = old.is_none_or(|old| old.hash != hash);
     let newlines = bytes.iter().filter(|&&byte| byte == b'\n').count();
     let last_line = usize::from(!bytes.is_empty() && !bytes.ends_with(b"\n"));
+    let parsed = language
+        .filter(|_| changed)
+        .and_then(|language| symbols::symbols(language, &bytes));
+    let links = parsed.as_ref().map(links::links).unwrap_or_default();
     Some(Prepared {
         candidate,
         hash,
         lines: i64::try_from(newlines + last_line).unwrap_or(i64::MAX),
         language,
-        symbols: match language {
-            Some(language) if changed => symbols::symbols(language, &bytes),
-            _ => Vec::new(),
-        },
+        symbols: parsed.map(|parsed| parsed.symbols).unwrap_or_default(),
+        links,
+        chunks: if changed { chunks(&bytes) } else { Vec::new() },
     })
+}
+
+/// The text of a file in blocks of `CHUNK_LINES` lines.
+fn chunks(bytes: &[u8]) -> Vec<(i64, String)> {
+    let text = String::from_utf8_lossy(bytes);
+    let lines: Vec<&str> = text.lines().collect();
+    lines
+        .chunks(CHUNK_LINES)
+        .enumerate()
+        .map(|(index, block)| {
+            let line = i64::try_from(index * CHUNK_LINES + 1).unwrap_or(i64::MAX);
+            (line, block.join("\n"))
+        })
+        .collect()
 }
 
 /// Reads the first 8 KB, and the rest only if the first part has no NUL byte.
@@ -187,6 +226,7 @@ fn write(
     prepared: &Prepared,
     old: Option<&Stored>,
     racy_from: i64,
+    resolver: &Resolver,
 ) -> Result<bool> {
     let candidate = prepared.candidate;
     let mtime_ns = if candidate.mtime_ns >= racy_from {
@@ -215,7 +255,42 @@ fn write(
         ],
     )?;
     write_symbols(conn, &candidate.path, &prepared.symbols)?;
+    write_links(conn, &candidate.path, &prepared.links, resolver)?;
+    let mut insert =
+        conn.prepare_cached("INSERT INTO chunk_rows (path, line, text) VALUES (?1, ?2, ?3)")?;
+    for (line, text) in &prepared.chunks {
+        insert.execute(params![candidate.path, line, text])?;
+    }
     Ok(true)
+}
+
+fn write_links(conn: &Connection, path: &str, links: &[Link], resolver: &Resolver) -> Result<()> {
+    let mut insert = conn.prepare_cached(
+        "INSERT INTO links (path, line, kind, target, resolved) VALUES (?1, ?2, ?3, ?4, ?5)",
+    )?;
+    for link in links {
+        let resolved = resolver.resolve(path, &link.target).unwrap_or_default();
+        insert.execute(params![path, link.line, link.kind, link.target, resolved])?;
+    }
+    Ok(())
+}
+
+/// Resolves the target of each link again, and writes each target that changed.
+fn resolve_all(conn: &Connection, resolver: &Resolver) -> Result<()> {
+    let rows = conn
+        .prepare("SELECT id, path, target, resolved FROM links")?
+        .query_map([], |row| {
+            Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+        })?
+        .collect::<Result<Vec<(i64, String, String, String)>>>()?;
+    let mut update = conn.prepare("UPDATE links SET resolved = ?2 WHERE id = ?1")?;
+    for (id, path, target, resolved) in rows {
+        let now = resolver.resolve(&path, &target).unwrap_or_default();
+        if now != resolved {
+            update.execute(params![id, now])?;
+        }
+    }
+    Ok(())
 }
 
 fn write_symbols(conn: &Connection, path: &str, symbols: &[Symbol]) -> Result<()> {
