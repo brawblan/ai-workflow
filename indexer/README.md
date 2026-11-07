@@ -3,9 +3,6 @@
 `stone-index` is the code indexer of Cornerstone (D104). It keeps a local SQLite index of the files
 in a repo. An agent can then ask the index where a symbol is, and read fewer files.
 
-This version has the `build` command only. The query commands come in the next version (issue
-#255).
-
 ## Install
 
 Install Rust with `rustup`. Then run this command in `indexer/`:
@@ -19,6 +16,8 @@ cargo install --locked --path .
 | Command | What it does |
 | --- | --- |
 | `stone-index build` | Makes or updates the index of the repo. |
+| `stone-index find <name>` | Prints the symbols with this name. |
+| `stone-index outline <path>` | Prints the symbols of one file. |
 | `stone-index --version`, `stone-index -V` | Prints the name and the version. |
 
 ### build
@@ -54,12 +53,47 @@ The build prints one summary line, for example `3 parsed, 120 unchanged, 1 remov
 The index uses SQLite WAL mode. If two builds run at the same time, the second build waits for the
 first, for a maximum of 10 minutes. This is also true for a new index.
 
+### find
+
+`find <name>` prints each symbol whose qualified name is `<name>`, or whose last part is `<name>`.
+For a heading, the name is the heading text. The output is in path and line order, one line for
+each symbol:
+
+```text
+stone/src/stone/evals.py:190 function find_component
+```
+
+`--kind <kind>` prints only the symbols of that kind, for example `--kind method`. The section
+[Symbols](#symbols) lists the kinds.
+
+### outline
+
+`outline <path>` prints the symbols of one file in line order, one line for each symbol, as
+`line kind name`. A relative path starts at the current folder. The output indents each code
+symbol two spaces for each parent above it, and each heading two spaces for each level above 1:
+
+```text
+3 class Parser
+  4 method parse
+```
+
+### Query options
+
+`find` and `outline` have these options. They also have `--db` and `--max-file-size` of `build`.
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `--limit <n>` | `20` | Prints a maximum of `n` symbols. If the limit cuts the results, the last text line gives the number of symbols that it did not print. |
+| `--format text\|json` | `text` | `json` prints one object: `results` (a list of symbols) and `omitted` (the number that the limit cut). |
+| `--no-update` | Off | Reads the index as it is. With no option, the command first updates the index, as `build` does, and prints no summary. |
+
 ## Exit codes
 
 | Code | Meaning |
 | --- | --- |
-| 0 | The command worked. |
-| 2 | A usage error, a broken index, or a lock that another process held for more than 10 minutes. |
+| 0 | The command worked. For `find` and `outline`: there are results. |
+| 1 | `find` or `outline` found no results. |
+| 2 | A usage error, a broken index, no index with `--no-update`, or a lock that another process held for more than 10 minutes. |
 
 If the error says "broken index", make sure that no other build runs. Then delete the index file and
 run `build`.

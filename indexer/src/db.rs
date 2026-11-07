@@ -103,6 +103,14 @@ pub fn ensure_schema(conn: &Connection) -> std::result::Result<bool, String> {
     Ok(true)
 }
 
+/// True if the index has the schema of this binary.
+pub fn is_current(conn: &Connection) -> Result<bool> {
+    Ok(matches!(
+        contents(conn)?,
+        Contents::Index(Some(SCHEMA_VERSION))
+    ))
+}
+
 fn make_schema(conn: &Connection) -> Result<()> {
     drop_all_tables(conn)?;
     for statement in SCHEMA {
