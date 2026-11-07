@@ -184,10 +184,16 @@ The text output shows each control character in a name as `?`.
 
 ## Benchmarks
 
-Run `indexer/bench.sh <repo> [runs]` from the repo of `stone`. It builds the release binary and
-prints one Markdown table. The table has the median of `runs` (default 10) for a cold build, a
-no-change build, and each query command with `--no-update`, and the size of the index. If the
-`sqlite3` program has the `dbstat` table, it also prints the size of each table and index.
+Run `indexer/bench.sh <repo> [runs]`. It builds the release binary and prints one Markdown table.
+The table gives the median of `runs` runs (default 10) for these items:
+
+- a cold build
+- a no-change build
+- each query command with `--no-update`
+- the size of the index
+
+If the `sqlite3` program has the `dbstat` table, the script also prints the size of each table and
+index.
 
 | Variable | Default | What it sets |
 | --- | --- | --- |
@@ -201,9 +207,9 @@ in the PR. The script does not run in CI, because the times on shared runners di
 A test fails if the query plan of a statement scans `symbols`, `links`, or `chunk_rows` with no
 index. The SQL of the query commands is in `src/sql.rs`.
 
-Two attempts to make the index smaller or the build faster did not meet their limits (D108):
-`detail=column` for the full-text table made the vscode index 8.5 percent smaller, and a cache of
-64 MB did not make the full build faster. The build already writes in one transaction.
+Two attempts did not meet their limits (D108). `detail=column` made the vscode index 8.5 percent
+smaller. A cache of 64 MB did not make the full build faster. The build already writes in one
+transaction.
 
 ## Exit codes
 
