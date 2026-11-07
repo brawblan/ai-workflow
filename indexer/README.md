@@ -101,13 +101,16 @@ The `--limit` applies to each group. A JSON result has `path`, `line`, `kind`, `
 
 `search "<words>"` finds the blocks of text that have at least one of the words, with FTS5. The
 best bm25 rank comes first. For each block, it prints the first line with one of the words, as
-`path:line: text`. The line has no space at its ends:
+`path:line: text`. The line has no space at its ends. The index holds no text, so `search` reads
+each file of a hit. It skips a hit in a file that changed after the update, for example with
+`--no-update`:
 
 ```text
 stone/src/stone/repo_rules.py:154: def check_version_bump(root: Path, base: str, skills: str = SKILLS,
 ```
 
-A word is a run of letters and digits, with no case. `--path <glob>` searches only the paths that
+A word is a run of letters and digits, with no case. A letter with a diacritic is not the same
+letter: `resume` does not find `résumé`. `--path <glob>` searches only the paths that
 match the glob, with the SQLite `GLOB` rules: `*` also matches `/`. A JSON result has `path`,
 `line`, and `text`.
 
@@ -146,8 +149,8 @@ run `build`.
 | `files` | `path`, `size`, `mtime_ns`, `hash`, `language`, `lines` |
 | `symbols` | `id`, `name`, `qualified_name`, `kind`, `path`, `line`, `end_line`, `parent`, `level` |
 | `links` | `id`, `path`, `line`, `kind`, `target`, `resolved`. `resolved` is empty if the target is not a file of the repo. |
-| `chunk_rows` | `id`, `path`, `line`, `text`: the text of each file in blocks of at most 50 lines. `line` is the first line of the block. |
-| `chunks` | The FTS5 index of `chunk_rows.text`. Two triggers keep it in step with `chunk_rows`. |
+| `chunk_rows` | `id`, `path`, `line`: one row for each block of at most 50 lines of a file. `line` is the first line of the block. |
+| `chunks` | A contentless FTS5 table with the words of each block, with the `id` of its `chunk_rows` row. A trigger deletes it with its row. |
 
 The index holds each text file. The `language` column is empty for a language that the indexer
 does not parse.
@@ -187,12 +190,14 @@ link of the index again.
 | --- | --- | --- |
 | Python | `import` | `import a.b` gives `a.b`. `from m import a` gives `m.a`. `from m import *` gives `m`. |
 | TypeScript, JavaScript | `import`, `export`, `require` | `import` and `export ... from` with a source. `require()` and `import()` with a string. |
-| Markdown | `link` | Relative links and link reference definitions, with no `#anchor` and no `?query`. A link in a code span is not a link. |
+| Markdown | `link` | Relative links, also in table cells, and link reference definitions, with no `#anchor` and no `?query`. A link in a code span is not a link. |
 
 The build resolves a target to a file of the repo where it can:
 
-- A Python module: the file whose path ends with the module path, as `.py`, `.pyi`, or
-  `__init__.py`. If two files match, the file nearest to the importer wins. If `m.a` is not a
+- A Python module: first a file next to the importer. Then a file whose path ends with the module
+  path, as `.py`, `.pyi`, or `__init__.py`. A name with one part matches only from the repo root or
+  from a top package, so `import logging` does not match `tools/logging.py`. If two files match,
+  the file nearest to the importer wins. If `m.a` is not a
   module, the build uses `m`. A relative import starts at the folder of the file.
 - A TypeScript or JavaScript target that starts with `./` or `../`: the path, then the path with
   each extension, then its `index` file. A `.js` target can also be a `.ts` file.

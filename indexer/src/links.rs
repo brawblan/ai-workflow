@@ -105,7 +105,7 @@ fn script(node: Node, source: &[u8], found: &mut Vec<Link>) {
 fn markdown(node: Node, source: &[u8], found: &mut Vec<Link>) {
     let first_line = lines(node).0;
     let destinations = match node.kind() {
-        "inline" => inline_destinations(&text(node, source)),
+        "inline" | "pipe_table_cell" => inline_destinations(&text(node, source)),
         "link_reference_definition" => {
             let mut cursor = node.walk();
             let children: Vec<Node> = node.named_children(&mut cursor).collect();

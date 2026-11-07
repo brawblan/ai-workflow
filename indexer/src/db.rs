@@ -17,7 +17,8 @@ const BUSY_TIMEOUT: Duration = Duration::from_secs(600);
 const WAL_RETRY: Duration = Duration::from_millis(20);
 
 /// Each table that refers to `files` deletes its rows with the file (`ON DELETE CASCADE`). The
-/// FTS5 table `chunks` reads its text from `chunk_rows`. Two triggers keep it in step.
+/// contentless FTS5 table `chunks` has the same rowid as `chunk_rows`, and a trigger deletes it
+/// with its row. A search reads the text from the file.
 const SCHEMA: &[&str] = &[
     "CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)",
     "CREATE TABLE files (
@@ -56,16 +57,14 @@ const SCHEMA: &[&str] = &[
     "CREATE TABLE chunk_rows (
         id INTEGER PRIMARY KEY,
         path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
-        line INTEGER NOT NULL,
-        text TEXT NOT NULL
+        line INTEGER NOT NULL
     )",
     "CREATE INDEX chunk_rows_path ON chunk_rows(path)",
-    "CREATE VIRTUAL TABLE chunks USING fts5(text, content='chunk_rows', content_rowid='id')",
-    "CREATE TRIGGER chunk_rows_insert AFTER INSERT ON chunk_rows BEGIN
-        INSERT INTO chunks (rowid, text) VALUES (new.id, new.text);
-    END",
+    "CREATE VIRTUAL TABLE chunks USING fts5(
+        text, content='', contentless_delete=1, tokenize='unicode61 remove_diacritics 0'
+    )",
     "CREATE TRIGGER chunk_rows_delete AFTER DELETE ON chunk_rows BEGIN
-        INSERT INTO chunks (chunks, rowid, text) VALUES ('delete', old.id, old.text);
+        DELETE FROM chunks WHERE rowid = old.id;
     END",
 ];
 

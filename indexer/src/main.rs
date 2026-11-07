@@ -148,8 +148,9 @@ fn search(place: &Place, conn: &Connection, query: &Query) -> Result<Answer, Str
     if words.is_empty() {
         return Err("the search needs a word".to_string());
     }
-    let hits = search::search(conn, &words, query.path.as_deref(), query.limit)
-        .map_err(describe(place))?;
+    let glob = query.path.as_deref();
+    let hits =
+        search::search(conn, &place.root, &words, glob, query.limit).map_err(describe(place))?;
     let empty = hits.rows.is_empty() && hits.omitted == 0;
     Ok((search::render(&hits, query.format), empty, None))
 }

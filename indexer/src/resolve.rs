@@ -12,8 +12,10 @@ const SCRIPT_EXTENSIONS: &[&str] = &[
 /// The files of the repo, and the Python modules that each file can be.
 pub struct Resolver<'a> {
     files: HashSet<&'a str>,
-    /// Each dotted name of a Python file, from its last part to its full path. `a/b/c.py` is
-    /// `c`, `b.c`, and `a.b.c`. A package is its `__init__.py`.
+    /// The dotted names of each Python file: each name with two or more parts, the name from the
+    /// repo root, and the name from a top package (a folder with `__init__.py` in a folder with
+    /// none). Thus `tools/logging.py` is not `logging`, and the standard `logging` stays
+    /// external. A package is its `__init__.py`.
     modules: HashMap<String, Vec<&'a str>>,
 }
 
@@ -21,6 +23,15 @@ impl<'a> Resolver<'a> {
     pub fn new(paths: impl IntoIterator<Item = &'a str>) -> Self {
         let files: HashSet<&str> = paths.into_iter().collect();
         let mut modules: HashMap<String, Vec<&str>> = HashMap::new();
+        let packages: HashSet<&str> = files
+            .iter()
+            .filter_map(|path| {
+                let stem = path
+                    .strip_suffix("__init__.py")
+                    .or_else(|| path.strip_suffix("__init__.pyi"));
+                stem.map(|stem| stem.trim_end_matches('/'))
+            })
+            .collect();
         for &path in &files {
             let Some(stem) = path
                 .strip_suffix(".py")
@@ -33,7 +44,14 @@ impl<'a> Resolver<'a> {
                 Some((&"__init__", package)) => package,
                 _ => &parts[..],
             };
-            for start in 0..parts.len() {
+            let is_root = |start: usize| {
+                let package = parts[..=start].join("/");
+                start == 0
+                    || parts.len() - start > 1
+                    || (packages.contains(package.as_str())
+                        && !packages.contains(parts[..start].join("/").as_str()))
+            };
+            for start in (0..parts.len()).filter(|&start| is_root(start)) {
                 modules
                     .entry(parts[start..].join("."))
                     .or_default()
@@ -64,8 +82,14 @@ impl<'a> Resolver<'a> {
             .or_else(|| self.module(from, parent?))
     }
 
-    /// The best file for a dotted module name: the one nearest to `from`.
+    /// The file of a dotted module name next to `from`, else the best file from a root: the one
+    /// nearest to `from`.
     pub fn module(&self, from: &str, name: &str) -> Option<String> {
+        let sibling = join(from, &name.replace('.', "/"))?;
+        let siblings = [format!("{sibling}.py"), format!("{sibling}/__init__.py")];
+        if let Some(path) = siblings.iter().find_map(|path| self.file(path)) {
+            return Some(path);
+        }
         let paths = self.modules.get(name)?;
         // The nearest path wins. The first path in text order wins a tie.
         let near = |a: &&&str, b: &&&str| {

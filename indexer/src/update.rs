@@ -19,7 +19,7 @@ use crate::symbols::{self, Symbol};
 use crate::walk::{self, Candidate};
 
 /// The most lines in one block of text in `chunks`.
-const CHUNK_LINES: usize = 50;
+pub const CHUNK_LINES: usize = 50;
 
 /// A file with a NUL byte in this many first bytes is binary, and the index skips it.
 const BINARY_CHECK_BYTES: u64 = 8192;
@@ -169,7 +169,7 @@ fn stored_files(conn: &Connection) -> Result<HashMap<String, Stored>> {
 /// the file is binary. The update calls it on many threads at once.
 fn prepare<'a>(candidate: &'a Candidate, old: Option<&Stored>) -> Option<Prepared<'a>> {
     let bytes = read_text(&candidate.abs)?;
-    let hash = format!("{:016x}", xxh3_64(&bytes));
+    let hash = hash(&bytes);
     let language = lang::language(&candidate.path);
     let changed = old.is_none_or(|old| old.hash != hash);
     let newlines = bytes.iter().filter(|&&byte| byte == b'\n').count();
@@ -203,8 +203,13 @@ fn chunks(bytes: &[u8]) -> Vec<(i64, String)> {
         .collect()
 }
 
+/// The content hash that the `files` table stores.
+pub fn hash(bytes: &[u8]) -> String {
+    format!("{:016x}", xxh3_64(bytes))
+}
+
 /// Reads the first 8 KB, and the rest only if the first part has no NUL byte.
-fn read_text(path: &Path) -> Option<Vec<u8>> {
+pub fn read_text(path: &Path) -> Option<Vec<u8>> {
     let mut file = File::open(path).ok()?;
     let mut bytes = Vec::new();
     (&mut file)
@@ -256,10 +261,12 @@ fn write(
     )?;
     write_symbols(conn, &candidate.path, &prepared.symbols)?;
     write_links(conn, &candidate.path, &prepared.links, resolver)?;
-    let mut insert =
-        conn.prepare_cached("INSERT INTO chunk_rows (path, line, text) VALUES (?1, ?2, ?3)")?;
+    let mut insert = conn.prepare_cached("INSERT INTO chunk_rows (path, line) VALUES (?1, ?2)")?;
+    let mut text_insert =
+        conn.prepare_cached("INSERT INTO chunks (rowid, text) VALUES (?1, ?2)")?;
     for (line, text) in &prepared.chunks {
-        insert.execute(params![candidate.path, line, text])?;
+        let id = insert.insert(params![candidate.path, line])?;
+        text_insert.execute(params![id, text])?;
     }
     Ok(true)
 }
