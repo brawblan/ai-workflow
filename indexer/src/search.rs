@@ -131,7 +131,7 @@ fn expand(rows: Vec<Hit>, root: &Path, context: usize) -> Vec<Hit> {
             let lines: Vec<(i64, String, bool)> = (start..=end)
                 .filter_map(|number| {
                     let index = usize::try_from(number - 1).ok()?;
-                    let text = file.get(index)?.trim_end().to_string();
+                    let text = file.get(index)?.trim_end().replace('\t', "    ");
                     Some((number, text, hit_lines.binary_search(&number).is_ok()))
                 })
                 .collect();

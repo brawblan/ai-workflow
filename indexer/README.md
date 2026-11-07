@@ -162,7 +162,7 @@ match the glob, with the SQLite `GLOB` rules: `*` also matches `/`. A JSON resul
 
 `--context <n>` (default `0`) prints `n` lines before and after each hit. A hit line is
 `path:line: text`. A context line is `path-line- text`, as in grep. In this mode the lines keep
-their indent. The ranges of one file that touch or overlap print once, and a line `--` separates
+their indent, and each tab is four spaces (also in `show`). The ranges of one file that touch or overlap print once, and a line `--` separates
 the ranges. A JSON result then also has `lines`, a list of `line`, `text`, and `hit`.
 
 ### Query options

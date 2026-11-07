@@ -53,7 +53,7 @@ fn cut(text: &str, row: &Row, max: usize) -> (Option<Vec<String>>, usize) {
         .lines()
         .skip(start)
         .take(count)
-        .map(str::to_string)
+        .map(|line| line.replace('\t', "    "))
         .collect();
     let more = all.len().saturating_sub(max);
     let kept = all.into_iter().take(max).collect();
