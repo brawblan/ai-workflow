@@ -52,6 +52,11 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
   the default in [customization.md](framework/customization.md). If a PR is larger, split it, or
   record a waiver in the PR body.
 
+## Code index
+
+- If `stone-index` is on PATH, ask the code index before you search or read code. Then read only the lines that it gives.
+- Use `stone-index find <name>`, `stone-index refs <path or module>`, `stone-index outline <path>`, or `stone-index search "<words>"`.
+
 ## Framework changes
 
 Before you change `framework/`, read [framework/contributing.md](framework/contributing.md). The core stays
