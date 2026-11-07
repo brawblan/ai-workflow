@@ -72,6 +72,15 @@ class Parser:
 
     async def run(self):
         pass
+
+class Outer:
+    class Inner:
+        def m(self):
+            pass
+
+@deco
+class Deco:
+    pass
 ";
 
 #[test]
@@ -82,9 +91,13 @@ fn ac3_ac4_python_symbols() {
         "p.py:3-6 function top [-] -
 p.py:4-5 function top.inner [-] top
 p.py:8-16 class Parser [-] -
-p.py:10-13 method Parser.parse [-] Parser
+p.py:9-13 method Parser.parse [-] Parser
 p.py:11-12 function Parser.parse.helper [-] Parser.parse
-p.py:15-16 method Parser.run [-] Parser"
+p.py:15-16 method Parser.run [-] Parser
+p.py:18-21 class Outer [-] -
+p.py:19-21 class Outer.Inner [-] Outer
+p.py:20-21 method Outer.Inner.m [-] Outer.Inner
+p.py:23-25 class Deco [-] -"
     );
 }
 
@@ -104,6 +117,17 @@ const hidden = 1;
 export let v = 1;
 export const { a } = x;
 export default class Def {}
+export class Comp {
+  handler = () => {};
+  fe = function () {};
+  am = async () => {};
+  n = 1;
+}
+namespace NS { export function inner() {} }
+declare function df(): void;
+export declare const DC: number;
+export const gen = function* () {};
+const obj = { m() {} };
 ";
 
 #[test]
@@ -127,6 +151,15 @@ t.ts:11-11 function fe [-] -
 t.ts:12-12 constant A [-] -
 t.ts:12-12 constant B [-] -
 t.ts:16-16 class Def [-] -
+t.ts:17-22 class Comp [-] -
+t.ts:18-18 method Comp.handler [-] Comp
+t.ts:19-19 method Comp.fe [-] Comp
+t.ts:20-20 method Comp.am [-] Comp
+t.ts:23-23 namespace NS [-] -
+t.ts:23-23 function NS.inner [-] NS
+t.ts:24-24 function df [-] -
+t.ts:25-25 constant DC [-] -
+t.ts:26-26 function gen [-] -
 x.tsx:1-1 function D [-] -"
     );
 }
@@ -142,7 +175,10 @@ export const N = 2;
 ";
     let fx = built(&[
         ("j.jsx", jsx),
-        ("k.js", "export function h() {}\nlet z = 1;\n"),
+        (
+            "k.js",
+            "export function h() {}\nlet z = 1;\nclass X { field = () => {}; plain = 2; }\n",
+        ),
     ]);
     assert_eq!(
         dump(&fx),
@@ -151,7 +187,9 @@ j.jsx:2-4 class K [-] -
 j.jsx:3-3 method K.m [-] K
 j.jsx:5-5 function g [-] -
 j.jsx:6-6 constant N [-] -
-k.js:1-1 function h [-] -"
+k.js:1-1 function h [-] -
+k.js:3-3 class X [-] -
+k.js:3-3 method X.field [-] X"
     );
 }
 
@@ -172,6 +210,11 @@ Sub
 #
 ###### Deep
 end
+# Title ##
+# C#
+Para
+continued
+=====
 ";
     let fx = built(&[("m.md", md)]);
     assert_eq!(
@@ -182,7 +225,10 @@ m.md:7-7 heading C [3] B
 m.md:8-15 heading Setext [1] -
 m.md:10-10 heading D [2] Setext
 m.md:11-15 heading Sub [2] Setext
-m.md:14-15 heading Deep [6] Sub"
+m.md:14-15 heading Deep [6] Sub
+m.md:16-16 heading Title [1] -
+m.md:17-17 heading C# [1] -
+m.md:18-20 heading Para continued [1] -"
     );
 }
 
@@ -283,4 +329,31 @@ fn unknown_language_has_no_symbols() {
     let fx = built(&[("a.rb", "def f; end\n")]);
     assert_eq!(fx.paths(), vec!["a.rb"]);
     assert_eq!(dump(&fx), "");
+}
+
+#[test]
+fn nesting_depth_is_capped_at_32_symbols() {
+    let src = format!(
+        "{}{}\n",
+        (0..40)
+            .map(|i| format!("function a{i}(){{"))
+            .collect::<String>(),
+        "}".repeat(40)
+    );
+    let fx = built(&[("d.js", &src)]);
+    let found = names(&fx);
+    assert_eq!(found.len(), 32);
+    assert_eq!(found.iter().map(|n| n.split('.').count()).max(), Some(32));
+}
+
+#[test]
+fn many_nested_blocks_build_with_exit_0() {
+    let src = format!(
+        "{}{}\n",
+        (0..3000)
+            .map(|i| format!("if (x) {{ const v{i} = 1;"))
+            .collect::<String>(),
+        "}".repeat(3000)
+    );
+    built(&[("blocks.js", &src)]);
 }
