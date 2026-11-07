@@ -400,3 +400,27 @@ fn review_sibling_and_top_package_imports_still_resolve() {
         vec![row(1, "import", "pkg.m", "src/pkg/m.py")]
     );
 }
+
+#[test]
+fn review_import_in_python_package_skips_sibling_file() {
+    let fx = built(&[
+        ("pkg/__init__.py", ""),
+        ("pkg/html.py", "import html\n"),
+        ("pkg/util.py", "import json\n"),
+        ("pkg/json.py", "x = 1\n"),
+        ("tools/run.py", "import helper\n"),
+        ("tools/helper.py", "x = 1\n"),
+    ]);
+    assert_eq!(
+        links(&fx, "pkg/html.py"),
+        vec![row(1, "import", "html", "")]
+    );
+    assert_eq!(
+        links(&fx, "pkg/util.py"),
+        vec![row(1, "import", "json", "")]
+    );
+    assert_eq!(
+        links(&fx, "tools/run.py"),
+        vec![row(1, "import", "helper", "tools/helper.py")]
+    );
+}
