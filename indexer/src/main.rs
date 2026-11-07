@@ -94,15 +94,8 @@ fn open_existing(place: &Place) -> Result<Connection, String> {
         ));
     }
     let conn = db::open(db_path).map_err(|error| with_path(db::describe(&error)))?;
-    match db::is_current(&conn) {
-        Ok(true) => Ok(conn),
-        Ok(false) => Err(with_path(
-            "broken index: the schema version is not the version of this binary. \
-             Run `stone-index build`."
-                .to_string(),
-        )),
-        Err(error) => Err(with_path(db::describe(&error))),
-    }
+    db::check_current(&conn).map_err(with_path)?;
+    Ok(conn)
 }
 
 /// Runs `find` (if `is_find`) or `outline`. Exit 0 with results, 1 with none, and 2 on an error.
@@ -113,16 +106,26 @@ fn run_query(query: &Query, is_find: bool) -> ExitCode {
         } else {
             open_existing(&place)?
         };
-        let results = if is_find {
-            query::find(&conn, &query.target, query.kind.as_deref(), query.limit)
-        } else {
-            query::outline(&conn, &repo_path(&place, &query.target)?, query.limit)
-        };
-        results.map_err(|error| format!("{}: {}", place.db_path.display(), db::describe(&error)))
+        let describe = |error| format!("{}: {}", place.db_path.display(), db::describe(&error));
+        if is_find {
+            let results = query::find(&conn, &query.target, query.kind.as_deref(), query.limit);
+            return results.map(|results| (results, None)).map_err(describe);
+        }
+        // A path with no row gets a hint, so an agent can tell a wrong path from a file with
+        // no symbols.
+        let path = repo_path(&place, &query.target)?;
+        let results = query::outline(&conn, &path, query.limit).map_err(describe)?;
+        let indexed =
+            !results.rows.is_empty() || query::is_indexed(&conn, &path).map_err(describe)?;
+        let hint = (!indexed).then(|| format!("{path} is not in the index"));
+        Ok((results, hint))
     });
     match result {
-        Ok(results) => {
+        Ok((results, hint)) => {
             print!("{}", query::render(&results, query.format));
+            if let Some(hint) = hint {
+                eprintln!("{NAME}: {hint}");
+            }
             if results.rows.is_empty() && results.omitted == 0 {
                 ExitCode::from(EXIT_NO_RESULTS)
             } else {
@@ -134,33 +137,33 @@ fn run_query(query: &Query, is_find: bool) -> ExitCode {
 }
 
 /// The path of a file from the repo root, with `/` between the parts. A relative `path` starts
-/// at the current folder.
+/// at the current folder. The repo root is a real path, so the function resolves the symbolic
+/// links in a path that exists. It resolves `.` and `..` as text in a path that does not exist.
 fn repo_path(place: &Place, path: &str) -> Result<String, String> {
-    let mut parts: Vec<String> = Vec::new();
-    for component in place.cwd.join(path).components() {
+    let joined = place.cwd.join(path);
+    let full = fs::canonicalize(&joined).unwrap_or_else(|_| lexical(&joined));
+    let relative = full
+        .strip_prefix(&place.root)
+        .map_err(|_| format!("{path} is not in the repo {}", place.root.display()))?;
+    let parts: Vec<_> = relative
+        .components()
+        .map(|part| part.as_os_str().to_string_lossy())
+        .collect();
+    Ok(parts.join("/"))
+}
+
+fn lexical(path: &Path) -> PathBuf {
+    let mut out = PathBuf::new();
+    for component in path.components() {
         match component {
             Component::ParentDir => {
-                parts.pop();
+                out.pop();
             }
-            Component::Normal(part) => parts.push(part.to_string_lossy().into_owned()),
-            Component::CurDir | Component::RootDir | Component::Prefix(_) => {}
+            Component::CurDir => {}
+            other => out.push(other),
         }
     }
-    let root: Vec<String> = place
-        .root
-        .components()
-        .filter_map(|component| match component {
-            Component::Normal(part) => Some(part.to_string_lossy().into_owned()),
-            _ => None,
-        })
-        .collect();
-    match parts.strip_prefix(root.as_slice()) {
-        Some(relative) => Ok(relative.join("/")),
-        None => Err(format!(
-            "{path} is not in the repo {}",
-            Path::new(&place.root).display()
-        )),
-    }
+    out
 }
 
 fn fail(message: &str) -> ExitCode {

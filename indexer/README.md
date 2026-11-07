@@ -69,7 +69,8 @@ stone/src/stone/evals.py:190 function find_component
 ### outline
 
 `outline <path>` prints the symbols of one file in line order, one line for each symbol, as
-`line kind name`. A relative path starts at the current folder. The output indents each code
+`line kind name`. The path can be absolute, or relative to the current folder. If the index has no
+row for the path, a line on stderr says so. The exit code is then 1. The output indents each code
 symbol two spaces for each parent above it, and each heading two spaces for each level above 1:
 
 ```text
@@ -80,12 +81,18 @@ symbol two spaces for each parent above it, and each heading two spaces for each
 ### Query options
 
 `find` and `outline` have these options. They also have `--db` and `--max-file-size` of `build`.
+`--max-file-size` has no effect with `--no-update`. Put `--` before a name or a path that starts
+with `-`.
 
 | Option | Default | What it does |
 | --- | --- | --- |
 | `--limit <n>` | `20` | Prints a maximum of `n` symbols. If the limit cuts the results, the last text line gives the number of symbols that it did not print. |
 | `--format text\|json` | `text` | `json` prints one object: `results` (a list of symbols) and `omitted` (the number that the limit cut). |
 | `--no-update` | Off | Reads the index as it is. With no option, the command first updates the index, as `build` does, and prints no summary. |
+
+Each JSON result has `path`, `line`, `end_line`, `kind`, `name`, `qualified_name`, and `level`.
+`level` is `null` for a code symbol. An `outline` result also has `depth`, the indent level from 0.
+The text output shows each control character in a name as `?`.
 
 ## Exit codes
 

@@ -30,14 +30,16 @@ const COLUMNS: &str = "path, line, end_line, kind, name, qualified_name, level, 
 /// The symbols whose qualified name or name (the last part) is `name`, in path and line order.
 /// The name of a heading is its text.
 pub fn find(conn: &Connection, name: &str, kind: Option<&str>, limit: usize) -> Result<Results> {
+    // One read transaction, so the count and the rows come from the same state of the index.
+    let tx = conn.unchecked_transaction()?;
     let filter = "(qualified_name = ?1 OR name = ?1) AND (?2 IS NULL OR kind = ?2)";
-    let total: i64 = conn.query_row(
+    let total: i64 = tx.query_row(
         &format!("SELECT count(*) FROM symbols WHERE {filter}"),
         params![name, kind],
         |row| row.get(0),
     )?;
     let sql = format!("SELECT {COLUMNS} FROM symbols WHERE {filter} ORDER BY path, line LIMIT ?3");
-    let rows = conn
+    let rows = tx
         .prepare(&sql)?
         .query_map(
             params![name, kind, i64::try_from(limit).unwrap_or(i64::MAX)],
@@ -48,6 +50,15 @@ pub fn find(conn: &Connection, name: &str, kind: Option<&str>, limit: usize) -> 
         .unwrap_or(0)
         .saturating_sub(rows.len());
     Ok(Results { rows, omitted })
+}
+
+/// True if the index has a row for the file at `path`.
+pub fn is_indexed(conn: &Connection, path: &str) -> Result<bool> {
+    conn.query_row(
+        "SELECT count(*) > 0 FROM files WHERE path = ?1",
+        [path],
+        |row| row.get(0),
+    )
 }
 
 /// The symbols of one file in line order. A code symbol is one level deeper than its parent. A
@@ -100,12 +111,21 @@ pub fn render(results: &Results, format: Format) -> String {
                 let _ = match row.depth {
                     Some(depth) => {
                         let indent = "  ".repeat(depth);
-                        writeln!(out, "{indent}{} {} {}", row.line, row.kind, row.name)
+                        writeln!(
+                            out,
+                            "{indent}{} {} {}",
+                            row.line,
+                            row.kind,
+                            plain(&row.name)
+                        )
                     }
                     None => writeln!(
                         out,
                         "{}:{} {} {}",
-                        row.path, row.line, row.kind, row.qualified_name
+                        plain(&row.path),
+                        row.line,
+                        row.kind,
+                        plain(&row.qualified_name)
                     ),
                 };
             }
@@ -128,6 +148,20 @@ pub fn render(results: &Results, format: Format) -> String {
         }
     }
     out
+}
+
+/// The text with each control character as `?`, so file content cannot send terminal escape
+/// sequences.
+fn plain(text: &str) -> String {
+    text.chars()
+        .map(|character| {
+            if character.is_control() {
+                '?'
+            } else {
+                character
+            }
+        })
+        .collect()
 }
 
 fn json_row(row: &Row) -> String {

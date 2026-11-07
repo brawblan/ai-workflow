@@ -13,7 +13,8 @@ pub const USAGE: &str = "usage: stone-index build [--db PATH] [--max-file-size B
        stone-index find NAME [--kind KIND] [QUERY OPTIONS]
        stone-index outline PATH [QUERY OPTIONS]
        stone-index --version
-query options: --limit N, --format text|json, --no-update, --db PATH, --max-file-size BYTES";
+query options: --limit N, --format text|json, --no-update, --db PATH, --max-file-size BYTES,
+and -- before a NAME or a PATH that starts with -";
 
 pub enum Command {
     Version,
@@ -80,6 +81,7 @@ fn parse_query(args: &[String], is_query: bool, has_kind: bool) -> Result<Query,
             "--limit" if is_query => query.limit = number(value(&mut args, arg)?, arg)?,
             "--format" if is_query => query.format = format(value(&mut args, arg)?)?,
             "--no-update" if is_query => query.update = false,
+            "--" if is_query => targets.extend(args.by_ref().cloned()),
             _ if is_query && !arg.starts_with("--") => targets.push(arg.clone()),
             _ => return Err(format!("unknown option: {arg}")),
         }
