@@ -39,6 +39,9 @@ tools:   # the same lists as the role files, plus the commands that the role run
   shaper: [Read, Grep, Glob, Write, Edit]   # a file ticket (D60); the hook limits the edits
   planner: [Read, Grep, Glob, Write]
   writer: [Read, Grep, Glob]   # the guidance.writing eval (D69): read-only
+  # The guidance.index eval: read-only, plus the index queries in both variants. Only the rule
+  # text differs, so the `none` run can use the index too, but no text tells it to.
+  reader: [Read, Grep, Glob, "Bash(stone-index *)"]
   tester: [Read, Grep, Glob, Edit, Write, "Bash(python -m unittest*)", "Bash(git diff*)",
            "Bash(git log*)", "Bash(git show*)", "Bash(git add*)", "Bash(git commit*)",
            "Bash(git status*)"]

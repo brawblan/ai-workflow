@@ -23,3 +23,6 @@ indexer/target/
 
 # stone-index: the local code index (D104)
 .cornerstone/index.db*
+
+# The generated fixture of the guidance.index eval (make_fixture.py)
+evals/index-guidance/fixtures/
