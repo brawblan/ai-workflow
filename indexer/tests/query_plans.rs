@@ -41,9 +41,7 @@ fn unindexed_scans(details: &[String], tables: &[&str]) -> Vec<String> {
 }
 
 fn plan_of(conn: &Connection, sql: &str) -> Vec<String> {
-    let mut statement = conn
-        .prepare(&format!("EXPLAIN QUERY PLAN {sql}"))
-        .unwrap();
+    let mut statement = conn.prepare(&format!("EXPLAIN QUERY PLAN {sql}")).unwrap();
     statement
         .query_map([], |row| row.get::<_, String>(3))
         .unwrap()
@@ -65,7 +63,10 @@ fn plans_use_an_index_for_symbols_links_and_chunk_rows() {
     let built = fx.build(&[]);
     assert_eq!(built.status.code(), Some(0), "stderr: {}", stderr(&built));
 
-    let out = fx.run_in(&fx.root, &["plans", "--db", fx.default_db().to_str().unwrap()]);
+    let out = fx.run_in(
+        &fx.root,
+        &["plans", "--db", fx.default_db().to_str().unwrap()],
+    );
     assert_eq!(out.status.code(), Some(0), "stderr: {}", stderr(&out));
     let text = stdout(&out);
 
