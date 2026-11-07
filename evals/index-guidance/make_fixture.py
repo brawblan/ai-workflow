@@ -1,4 +1,4 @@
-"""Make the fixtures of the guidance.index eval (D107): `shop` (228 files) and `market` (622 files).
+"""Make the fixtures of the guidance.index eval (D107): `shop` (228 files) and `market` (624 files).
 
 Usage: python3 make_fixture.py [<fixtures folder>]. The default is `fixtures` next to this file.
 The script deletes `shop` and `market` in that folder first, and the output is the same on each
@@ -380,6 +380,21 @@ async function rebuildSupplierCache() {
         "CALLS": "\n  await rebuildSupplierCache();"},
 }
 
+
+def rules(name: str, count: int = 24) -> str:
+    """Functions that no chain calls. They make a whole-file read of an M3 file cost more (#279)."""
+    return "".join(f'''
+function {name}Rule{i:02d}(row) {{
+  // Rule {i}: keep the row when field_{i} is set, else mark the row for review.
+  if (row.field_{i} === undefined || row.field_{i} === null) {{
+    return {{ ...row, review: [...(row.review || []), "field_{i}"] }};
+  }}
+  const value = String(row.field_{i}).trim();
+  return {{ ...row, field_{i}: value.length > 64 ? value.slice(0, 64) : value }};
+}}
+''' for i in range(1, count + 1))
+
+
 # The facts of the M scenarios. Some names repeat on purpose: NotificationService.record_event does
 # not use the audit module, and fetchExchangeRates is not fetchExchangeRate.
 AUDIT_IMPORT = "from shopapi.core.audit import record_event\n"
@@ -455,7 +470,7 @@ export async function fetchExchangeRates(): Promise<Record<string, number>> {
     ("tools/{e}/migrate.js", "vendor"): {
         "IMPORTS": 'const { normalizeVendor } = require("../lib/normalize");\n'
                    'const { pushToLedger } = require("../ledger/migrate");\n',
-        "EXPORTS": ", syncVendors", "EXTRA": '''
+        "EXPORTS": ", syncVendors", "EXTRA": rules("checkVendor") + '''
 async function syncVendors(source) {
   const db = await connect();
   const rows = await db.all(source || "vendor_feed");
@@ -463,7 +478,7 @@ async function syncVendors(source) {
   log(`synced ${rows.length} vendors`);
 }
 '''},
-    ("tools/{e}/migrate.js", "ledger"): {"EXPORTS": ", pushToLedger", "EXTRA": '''
+    ("tools/{e}/migrate.js", "ledger"): {"EXPORTS": ", pushToLedger", "EXTRA": rules("checkEntry") + '''
 async function pushToLedger(entry) {
   const db = await connect();
   await db.insert("ledger_entries", entry);
@@ -496,11 +511,40 @@ export async function fetchExchangeRate(currency: string): Promise<number> {
   return http.get(`/rates/${currency}`);
 }
 ''',
-    "tools/lib/normalize.js": '''function normalizeVendor(row) {
+    "tools/lib/normalize.js": rules("cleanVendor").lstrip() + '''
+function normalizeVendor(row) {
   return { id: `vendor-${row.id}`, amount: Number(row.amount) || 0, status: "new" };
 }
 
 module.exports = { normalizeVendor };
+''',
+    "tools/lib/memory-db.js": '''const tables = new Map();
+
+function table(name) {
+  if (!tables.has(name)) tables.set(name, new Map());
+  return tables.get(name);
+}
+
+function open() {
+  return {
+    all: async (name) => [...table(name).values()],
+    insert: async (name, row) => { table(name).set(row.id, row); },
+    update: async (name, id, fields) => { table(name).set(id, { ...table(name).get(id), ...fields }); },
+    clear: async (name) => { table(name).clear(); },
+  };
+}
+
+module.exports = { open };
+''',
+    # A file with "sync" in its name that the sync command does not run. M3 fails an answer that names it.
+    "tools/vendor/sync.js": '''const { connect } = require("../lib/db");
+
+async function syncVendorFeed(rows) {
+  const db = await connect();
+  for (const row of rows) await db.insert("vendors", row);
+}
+
+module.exports = { syncVendorFeed };
 ''',
 }
 
