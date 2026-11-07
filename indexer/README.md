@@ -251,9 +251,9 @@ The build resolves a target to a file of the repo where it can:
   module, the build uses `m`. A relative import starts at the folder of the file.
 - A TypeScript or JavaScript target that starts with `./` or `../`: the path, then the path with
   each extension, then its `index` file. A `.js` target can also be a `.ts` file.
-- A C or C++ `#include "..."`: first the path from the folder of the file, then the path from the
-  repo root, then the nearest file whose path ends with the target. An `#include <...>` stays text.
-  A `using` stays text.
+- A C or C++ `#include "..."` tries three paths in this order. First, the path from the folder of
+  the file. Then, the path from the repo root. Last, the nearest file whose path ends with the
+  target. An `#include <...>` stays text. A `using` stays text.
 - A Markdown link: the relative path.
 
 Other targets, for example an external package, keep only their target text.
