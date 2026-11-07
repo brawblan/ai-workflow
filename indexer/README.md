@@ -43,6 +43,7 @@ or later as the default toolchain. The Clone option uses the version in `rust-to
 | --- | --- |
 | `stone-index build` | Makes or updates the index of the repo. |
 | `stone-index find <name>` | Prints the symbols with this name. |
+| `stone-index show <name>` | Prints the lines of each symbol with this name. |
 | `stone-index outline <path>` | Prints the symbols of one file. |
 | `stone-index refs <path or module>` | Prints the links into a file or a module, and the links out of it. |
 | `stone-index search "<words>"` | Prints the lines of the blocks of text that best match the words. |
@@ -95,6 +96,22 @@ stone/src/stone/evals.py:190 function find_component
 `--kind <kind>` prints only the symbols of that kind, for example `--kind method`. The section
 [Symbols](#symbols) lists the kinds.
 
+### show
+
+`show <name>` uses the match rule and `--kind` of `find`. For each match it prints a header,
+`path:line-end_line kind qualified-name`, and the lines of the symbol from the file:
+
+```text
+stone/src/stone/evals.py:190-208 function find_component
+def find_component(framework: Path, harness: str, component_id: str,
+...
+```
+
+`--max-lines <n>` (default `80`) caps the lines of each symbol. If it cuts a symbol, the last line
+is `... <k> more lines (path:a-b)`. `show` has `--limit` with a default of `5`. If a file changed
+after the update (`--no-update`), `show` prints `stale: <path>` for that file and no lines. A JSON
+result has the members of `find`, and `lines` (`null` for a stale file) and `more`.
+
 ### outline
 
 `outline <path>` prints the symbols of one file in line order, one line for each symbol, as
@@ -143,15 +160,20 @@ letter: `resume` does not find `résumé`. `--path <glob>` searches only the pat
 match the glob, with the SQLite `GLOB` rules: `*` also matches `/`. A JSON result has `path`,
 `line`, and `text`.
 
+`--context <n>` (default `0`) prints `n` lines before and after each hit. A hit line is
+`path:line: text`. A context line is `path-line- text`, as in grep. In this mode the lines keep
+their indent. The ranges of one file that touch or overlap print once, and a line `--` separates
+the ranges. A JSON result then also has `lines`, a list of `line`, `text`, and `hit`.
+
 ### Query options
 
-`find`, `outline`, `refs`, and `search` have these options. They also have `--db` and `--max-file-size` of `build`.
+`find`, `show`, `outline`, `refs`, and `search` have these options. They also have `--db` and `--max-file-size` of `build`.
 `--max-file-size` has no effect with `--no-update`. `--lang` also works for these commands. Put `--` before a name or a path that starts
 with `-`.
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `--limit <n>` | `20` | Prints a maximum of `n` results. If the limit cuts the results, the last text line gives the number of symbols that it did not print. |
+| `--limit <n>` | `20` (`5` for `show`) | Prints a maximum of `n` results. If the limit cuts the results, the last text line gives the number of symbols that it did not print. |
 | `--format text\|json` | `text` | `json` prints one object: `results` (a list of symbols) and `omitted` (the number that the limit cut). |
 | `--no-update` | Off | Reads the index as it is. With no option, the command first updates the index, as `build` does, and prints no summary. |
 

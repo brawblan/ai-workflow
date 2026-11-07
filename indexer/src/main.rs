@@ -1,5 +1,5 @@
-//! `stone-index`: the code indexer of Cornerstone. It has `build`, `find`, `outline`, `refs`,
-//! `search`, and `--version`.
+//! `stone-index`: the code indexer of Cornerstone. It has `build`, `find`, `show`, `outline`,
+//! `refs`, `search`, and `--version`.
 
 mod cli;
 mod db;
@@ -10,6 +10,7 @@ mod refs;
 mod resolve;
 mod rules;
 mod search;
+mod show;
 mod symbols;
 mod update;
 mod walk;
@@ -48,6 +49,7 @@ fn main() -> ExitCode {
         Ok(Command::Version) => Ok(format!("{NAME} {VERSION}\n")),
         Ok(Command::Build(options)) => build(&options).map(|summary| format!("{summary}\n")),
         Ok(Command::Find(query)) => return run_query(&query, find),
+        Ok(Command::Show(query)) => return run_query(&query, show),
         Ok(Command::Outline(query)) => return run_query(&query, outline),
         Ok(Command::Refs(query)) => return run_query(&query, refs),
         Ok(Command::Search(query)) => return run_query(&query, search),
@@ -122,6 +124,12 @@ fn find(place: &Place, conn: &Connection, query: &Query) -> Result<Answer, Strin
     Ok((query::render(&results, query.format), empty, None))
 }
 
+fn show(place: &Place, conn: &Connection, query: &Query) -> Result<Answer, String> {
+    let blocks = show::show(conn, &place.root, query).map_err(describe(place))?;
+    let empty = blocks.blocks.is_empty() && blocks.omitted == 0;
+    Ok((show::render(&blocks, query.format), empty, None))
+}
+
 fn outline(place: &Place, conn: &Connection, query: &Query) -> Result<Answer, String> {
     // A path with no row gets a hint, so an agent can tell a wrong path from a file with
     // no symbols.
@@ -149,8 +157,8 @@ fn search(place: &Place, conn: &Connection, query: &Query) -> Result<Answer, Str
         return Err("the search needs a word".to_string());
     }
     let glob = query.path.as_deref();
-    let hits =
-        search::search(conn, &place.root, &words, glob, query.limit).map_err(describe(place))?;
+    let hits = search::search(conn, &place.root, &words, glob, query.limit, query.context)
+        .map_err(describe(place))?;
     let empty = hits.rows.is_empty() && hits.omitted == 0;
     Ok((search::render(&hits, query.format), empty, None))
 }
