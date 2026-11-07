@@ -5,10 +5,13 @@ from __future__ import annotations
 import contextlib
 import io
 import json
+import os
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
+import test_evals as base
 from stone import cli, eval_metrics, evals
 from stone.evals import Run
 
@@ -72,12 +75,6 @@ class TranscriptTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertIsNone(eval_metrics.transcript_stats(Path(tmp) / "none.out"))
 
-    def test_ac2_empty_transcript_gives_zero_not_none(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / "t.out"
-            path.write_text("", encoding="utf-8")
-            self.assertEqual(eval_metrics.transcript_stats(path), (0, 0))
-
     def test_ac2_multibyte_counts_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "t.out"
@@ -131,8 +128,18 @@ class TableTests(unittest.TestCase):
         self.assertEqual(row["Tool bytes mean"], "200")
         self.assertEqual(row["Pass rate"], "0.50")
 
-    def test_ac4_single_run_standard_error_is_zero(self) -> None:
-        self.assertEqual(eval_metrics.mean_and_error([0.5]), (0.5, 0.0))
+    def test_ac4_variant_with_one_cost_value_shows_dash_for_se(self) -> None:
+        runs = [make_run("s1", "with", 1, 0.5), make_run("s2", "without", 1, 0.4),
+                make_run("s2", "without", 2, 0.6)]
+        lines = eval_metrics.variant_table(runs, evals._rate)
+        head = [c.strip() for c in lines[0].strip("|").split("|")]
+        rows = {c[0]: dict(zip(head, c)) for c in
+                ([x.strip() for x in line.strip("|").split("|")] for line in lines[2:])}
+        self.assertEqual(rows["with"]["Cost mean"], "0.5000")
+        self.assertEqual(rows["with"]["Cost SE"], "—")
+        self.assertNotEqual(rows["without"]["Cost SE"], "—")
+
+    def test_ac4_mean_and_error_of_empty_is_none(self) -> None:
         self.assertIsNone(eval_metrics.mean_and_error([]))
 
 
@@ -152,6 +159,24 @@ class DifferenceTests(unittest.TestCase):
         line = next(x for x in text.splitlines() if x.startswith("Cost, with minus without"))
         self.assertIn("+0.0200 USD", line)
         self.assertIn("within 2 standard errors", line)
+
+    def test_ac5_one_run_per_variant_is_not_tested(self) -> None:
+        runs = [make_run("s", "without", 1, 0.5), make_run("s", "with", 1, 0.1)]
+        line = next(x for x in evals.summary("c", "m", runs).splitlines()
+                    if x.startswith("Cost, with minus without"))
+        self.assertIn("-0.4000 USD", line)
+        self.assertIn("not tested", line)
+        self.assertNotIn("SE", line.replace("standard error", ""))
+        self.assertNotIn("more than 2 standard errors", line)
+
+    def test_ac5_one_variant_with_one_run_is_not_tested(self) -> None:
+        runs = [make_run("s", "without", t, c) for t, c in enumerate([0.5, 0.51, 0.49], 1)]
+        runs += [make_run("s", "with", 1, 0.1)]
+        line = next(x for x in evals.summary("c", "m", runs).splitlines()
+                    if x.startswith("Cost, with minus without"))
+        self.assertIn("not tested", line)
+        self.assertNotIn("more than 2 standard errors", line)
+        self.assertNotIn("(SE", line)
 
     def test_ac5_one_line_for_each_non_base_variant(self) -> None:
         runs = [make_run("s", v, 1, c) for v, c in
@@ -213,6 +238,64 @@ class OldFileTests(unittest.TestCase):
             path.write_text(json.dumps(row) + "\n", encoding="utf-8")
             runs = evals.load_runs(path, Path(tmp))
             self.assertNotIn("tool_calls", runs[0].usage)
+
+
+    def test_ac6_stored_zero_tool_calls_is_kept_and_shown_as_zero(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "t.out").write_text("\n".join(transcript_lines()), encoding="utf-8")
+            row = json.loads(json.dumps(self.OLD))
+            row["usage"].update(transcript="t.out", tool_calls=0, tool_bytes=0)
+            path = Path(tmp) / "runs.jsonl"
+            path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+            runs = evals.load_runs(path, Path(tmp))
+            self.assertEqual(runs[0].usage["tool_calls"], 0)
+            text = evals.summary("c", "m", runs)
+        lines = text.splitlines()
+        head = [c.strip() for c in next(x for x in lines if x.startswith("| Scenario"))
+                .strip("|").split("|")]
+        got = dict(zip(head, [c.strip() for c in next(
+            x for x in lines if x.startswith("| s | with |")).strip("|").split("|")]))
+        self.assertEqual(got["Tool calls"], "0.0")
+
+    def test_ac6_relative_transcript_path_found_when_root_differs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp, tempfile.TemporaryDirectory() as other:
+            (Path(tmp) / "t.out").write_text("\n".join(transcript_lines()), encoding="utf-8")
+            row = json.loads(json.dumps(self.OLD))
+            row["usage"]["transcript"] = "t.out"
+            path = Path(other) / "runs.jsonl"
+            path.write_text(json.dumps(row) + "\n", encoding="utf-8")
+            old = os.getcwd()
+            os.chdir(tmp)
+            try:
+                runs = evals.load_runs(path, Path(other))
+            finally:
+                os.chdir(old)
+            self.assertEqual(runs[0].usage["tool_calls"], 2)
+            self.assertEqual(runs[0].usage["tool_bytes"], 10)
+
+
+class RunOnceToolMetricsTests(base.EvalTestCase):
+    def _usage(self, stdout: list[str]) -> dict:
+        self.plan({"with": [{"stdout": stdout}]})
+        self.scenarios(self.scenario())
+        self.eval("--variant", "with")
+        runs = self.runs()
+        self.assertEqual(len(runs), 1)
+        return runs[0]["usage"]
+
+    def test_ac2_run_once_writes_tool_calls_and_bytes(self) -> None:
+        usage = self._usage(transcript_lines())
+        self.assertEqual(usage["tool_calls"], 2)
+        self.assertEqual(usage["tool_bytes"], 10)
+
+    def test_ac2_run_once_with_empty_output_writes_no_tool_metrics(self) -> None:
+        self.plan({})
+        self.scenarios(self.scenario())
+        with mock.patch.object(evals, "_harness", return_value=(0, "", "")):
+            self.eval("--variant", "with")
+        usage = self.runs()[0]["usage"]
+        self.assertNotIn("tool_calls", usage)
+        self.assertNotIn("tool_bytes", usage)
 
 
 class SummaryOptionTests(unittest.TestCase):
