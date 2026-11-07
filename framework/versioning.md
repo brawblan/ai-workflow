@@ -60,7 +60,8 @@ installed `stone`.
 `dev` collects merged work. `main` holds only released code. Do the steps in this order.
 
 1. On a branch from `dev`, run `python -m unittest discover -s stone/tests`, `stone check`, and
-   `stone check-writing --diff origin/dev`.
+   `stone check-writing --diff origin/dev`. In `indexer/`, run `cargo fmt --check`,
+   `cargo clippy --locked --all-targets -- -D warnings`, and `cargo test --locked` (D104).
 2. In `upgrades.yaml`, set `released` of the newest entry to the date of the release.
 3. Set the same version in `stone/pyproject.toml`, in `stone/src/stone/__init__.py`, and in
    `indexer/Cargo.toml` (D104). In `indexer/`, run `cargo update -p stone-index --offline` to set it
