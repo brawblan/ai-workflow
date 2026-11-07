@@ -8,6 +8,7 @@ use rusqlite::{Connection, Result, params};
 
 use crate::cli::Format;
 use crate::query::{json_string, plain};
+use crate::sql;
 use crate::update::{self, CHUNK_LINES};
 
 /// One hit: the first line of a block that has one of the words. With `--context`, a hit is a
@@ -48,20 +49,10 @@ pub fn search(
     let tx = conn.unchecked_transaction()?;
     let quoted: Vec<String> = words.iter().map(|word| format!("\"{word}\"")).collect();
     let terms = quoted.join(" OR ");
-    let from = "FROM chunks JOIN chunk_rows AS block ON block.id = chunks.rowid
-         JOIN files ON files.path = block.path WHERE chunks MATCH ?1 AND (?2 IS NULL OR block.path GLOB ?2)";
-    let total: i64 = tx.query_row(
-        &format!("SELECT count(*) {from}"),
-        params![terms, glob],
-        |row| row.get(0),
-    )?;
-    let sql = format!(
-        "SELECT block.path, block.line, files.hash {from}
-         ORDER BY bm25(chunks), block.path, block.line LIMIT ?3"
-    );
+    let total: i64 = tx.query_row(sql::SEARCH_COUNT, params![terms, glob], |row| row.get(0))?;
     let limit_value = i64::try_from(limit).unwrap_or(i64::MAX);
     let blocks = tx
-        .prepare(&sql)?
+        .prepare(sql::SEARCH_ROWS)?
         .query_map(params![terms, glob, limit_value], |row| {
             Ok((row.get(0)?, row.get(1)?, row.get(2)?))
         })?

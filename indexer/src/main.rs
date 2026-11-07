@@ -11,6 +11,7 @@ mod resolve;
 mod rules;
 mod search;
 mod show;
+mod sql;
 mod symbols;
 mod update;
 mod walk;
@@ -48,6 +49,7 @@ fn main() -> ExitCode {
     let result = match cli::parse(&args) {
         Ok(Command::Version) => Ok(format!("{NAME} {VERSION}\n")),
         Ok(Command::Build(options)) => build(&options).map(|summary| format!("{summary}\n")),
+        Ok(Command::Plans(options)) => plans(&options),
         Ok(Command::Find(query)) => return run_query(&query, find),
         Ok(Command::Show(query)) => return run_query(&query, show),
         Ok(Command::Outline(query)) => return run_query(&query, outline),
@@ -77,6 +79,27 @@ fn place(options: &IndexOptions) -> Result<Place, String> {
 
 fn build(options: &IndexOptions) -> Result<Summary, String> {
     open_updated(&place(options)?, options).map(|(_, summary)| summary)
+}
+
+/// The query plan of each SQL statement of the query commands, one line for each plan step:
+/// `name<TAB>detail`. It does not update the index.
+fn plans(options: &IndexOptions) -> Result<String, String> {
+    let place = place(options)?;
+    let conn = open_existing(&place)?;
+    let mut out = String::new();
+    for (name, statement) in sql::PLANS {
+        let mut plan = conn
+            .prepare(&format!("EXPLAIN QUERY PLAN {statement}"))
+            .map_err(describe(&place))?;
+        let details = plan
+            .query_map([], |row| row.get::<_, String>(3))
+            .and_then(Iterator::collect::<rusqlite::Result<Vec<_>>>)
+            .map_err(describe(&place))?;
+        for detail in details {
+            out.push_str(&format!("{name}\t{detail}\n"));
+        }
+    }
+    Ok(out)
 }
 
 /// Opens the index, and brings it up to date with the files.
