@@ -146,7 +146,8 @@ scenarios:
       - {check: matches, path: "@report", pattern: "\\bpushToLedger\\b"}
       - {check: matches, path: "@report", pattern: "ledger/migrate\\.js"}
       # No other .js file, for example tools/vendor/sync.js, which the command does not run (#279).
-      - {check: matches, path: "@report", pattern: '\A(?![\s\S]*?(?<![\w/.-])(?!(?:tools/)?(?:vendor/index|vendor/migrate|lib/normalize|ledger/migrate|lib/db|lib/memory-db|lib/log)\.js\b|(?:index|migrate|normalize|db|memory-db|log)\.js\b)[\w/.-]*\.js\b)'}
+      # A line with not, n't, skip, or nothing can name it: it says that the file is not in the chain.
+      - {check: matches, path: "@report", pattern: '\A(?![\s\S]*?^(?![^\n]*(?:\bnot\b|n''t\b|\bskips?\b|\bnothing\b))[^\n]*?(?<![\w/.-])(?!(?:tools/)?(?:vendor/index|vendor/migrate|lib/normalize|ledger/migrate|lib/db|lib/memory-db|lib/log)\.js\b|(?:index|migrate|normalize|db|memory-db|log)\.js\b)[\w/.-]*\.js\b)'}
 
   - id: M4
     title: What a Python method does, and what it calls in other files
