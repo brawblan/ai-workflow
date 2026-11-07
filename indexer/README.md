@@ -5,10 +5,17 @@ in a repo. An agent can then ask the index where a symbol is, and read fewer fil
 
 ## Install
 
-Each release has an archive and a wheel of `stone-index` for five targets: Linux x86-64
-(`x86_64-unknown-linux-gnu`), Linux arm64 (`aarch64-unknown-linux-gnu`), macOS x86-64
-(`x86_64-apple-darwin`), macOS arm64 (`aarch64-apple-darwin`), and Windows x86-64
-(`x86_64-pc-windows-msvc`). The file `SHA256SUMS` of the release has the checksum of each file.
+Each release has an archive and a wheel of `stone-index` for each of these five targets:
+
+| Platform | Target |
+| --- | --- |
+| Linux x86-64 | `x86_64-unknown-linux-gnu` |
+| Linux arm64 | `aarch64-unknown-linux-gnu` |
+| macOS x86-64 | `x86_64-apple-darwin` |
+| macOS arm64 | `aarch64-apple-darwin` |
+| Windows x86-64 | `x86_64-pc-windows-msvc` |
+
+The file `SHA256SUMS` of the release has the checksum of each file.
 The Linux files need glibc 2.28 or later. Use one of these four options.
 
 | Option | Command |

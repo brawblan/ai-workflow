@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 
 from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, index, ready_check,
@@ -27,6 +28,22 @@ def _add_check_rules(commands: argparse._SubParsersAction) -> None:
     rules.add_argument("--skip-k9", action="store_true",
                        help="Do not run K9. For a release PR into main (D103).")
     rules.add_argument("--format", choices=["text", "github"], default="text")
+
+
+def _add_more_commands(commands: argparse._SubParsersAction) -> None:
+    """Add check-rules, and index (#258). _parse sends each argument after 'index' to stone-index,
+    also --help and --version."""
+    _add_check_rules(commands)
+    commands.add_parser("index", add_help=False,
+                        help="Run stone-index from PATH with the same arguments (#258).")
+
+
+def _parse(argv: list[str] | None) -> argparse.Namespace:
+    """Parse argv. For 'index', keep each argument after it unparsed, in `args`."""
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["index"]:
+        return argparse.Namespace(command="index", args=argv[1:])
+    return _parser().parse_args(argv)
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -113,7 +130,7 @@ def _parser() -> argparse.ArgumentParser:
                          help="warn: report only (the first 2 weeks). block: fail on errors.")
     writing.add_argument("--format", choices=["text", "github"], default="text")
 
-    _add_check_rules(commands)
+    _add_more_commands(commands)
 
     evidence = commands.add_parser("check-evidence",
                                    help="K14: fail if a required PR section is missing or empty.")
@@ -173,18 +190,14 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--keep", action="store_true", help="Keep the workspace of each run.")
     run.add_argument("--check-only", action="store_true",
                      help="Validate the scenarios and list the runs. Start no run.")
-
-    # main() sends each argument after 'index' to stone-index, also --help and --version.
-    commands.add_parser("index", add_help=False,
-                        help="Run stone-index from PATH with the same arguments (#258).")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    argv = sys.argv[1:] if argv is None else argv
-    if argv[:1] == ["index"]:
-        return index.run(argv[1:])
-    args = _parser().parse_args(argv)
+    args = _parse(argv)
+    handler = _HANDLERS.get(args.command)
+    if handler:
+        return handler(args)
     if args.command == "check":
         findings = framework_check.run(args.root, args.framework, args.links)
         blocking = report(findings, args.format)
@@ -194,12 +207,6 @@ def main(argv: list[str] | None = None) -> int:
         return _render(args.root, args.framework, args.dry_run)
     if args.command == "gate":
         return _gate(args.root, args.base, args.body, _split(args.labels), args.split_checks)
-    if args.command == "upgrade":
-        return _upgrade(args)
-    if args.command == "specialists":
-        return _specialists(args)
-    if args.command == "check-specialists":
-        return _check_specialists(args)
     if args.command == "spec":
         return _spec(args.root, args.spec_command, getattr(args, "plan", ""))
     if args.command == "check-evidence":
@@ -210,10 +217,6 @@ def main(argv: list[str] | None = None) -> int:
         return _check_workflows(args.body, None if args.all else args.base, args.mode, args.format)
     if args.command == "check-ready":
         return _check_ready(args.ticket, args.profile, args.mode, args.format)
-    if args.command == "check-rules":
-        return _check_rules(args)
-    if args.command == "eval":
-        return _eval(args)
 
     rules_path = args.rules or args.root / writing_check.DEFAULT_RULES
     dictionary = args.dictionary or args.root / writing_check.DEFAULT_DICTIONARY
@@ -426,3 +429,14 @@ def _render(root: Path, framework: Path | None, dry_run: bool) -> int:
         print("Drift: a person changed generated content. Restore it, or move the change to "
               "the repo config, delete the file, and render again.")
     return result.exit_code
+
+
+# The commands whose handler takes only the parsed arguments.
+_HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "upgrade": _upgrade,
+    "specialists": _specialists,
+    "check-specialists": _check_specialists,
+    "check-rules": _check_rules,
+    "eval": _eval,
+    "index": lambda args: index.run(args.args),
+}
