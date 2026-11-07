@@ -1,0 +1,94 @@
+# Eval of the code index guidance (issue #259). Run from the repo root:
+#   python3 evals/index-guidance/make_fixture.py
+#   cd indexer && cargo build --release --locked && cd ..
+#   PATH="$PWD/indexer/target/release:$PATH" stone eval guidance.index --model <model> --trials 3
+# `stone eval` copies fixtures/shop (gitignored) as it is, and the runs inherit PATH. So make the
+# fixture and put `stone-index` on PATH first.
+# `variants` replaces with and without (D69). Both variants get the same prompt, the same fixture,
+# and the same tools (Read, Grep, Glob, and `stone-index` in the `reader` list of eval.yaml).
+#   none   no text about the index (the baseline)
+#   rule   the candidate rule for AGENTS.md, 2 lines (P4)
+# The rule passes if its mean cost is lower than `none` and its outcome rate is not lower (AC 5).
+# Each check reads the final text. A path check needs only the unique end of the path.
+
+component: guidance.index
+role: reader
+task: |
+  You answer a question about the code of this repo. Do not change any file.
+  Give each file as its path from the repo root. Reply with the answer only.
+
+variants:
+  none: []
+  rule:
+    - {copy: variants/rule.md, to: CLAUDE.md}
+
+scenarios:
+  - id: X1
+    title: Where a Python method is
+    fixture: fixtures/shop
+    prompt: Where is apply_loyalty_discount defined? Give the file and the class.
+    expect:
+      - {check: matches, path: "@report", pattern: "customer_service\\.py"}
+      - {check: matches, path: "@report", pattern: "\\bCustomerService\\b"}
+
+  - id: X2
+    title: Where a TypeScript function is
+    fixture: fixtures/shop
+    prompt: Where is the function formatMoney defined? Give the file.
+    expect:
+      - {check: matches, path: "@report", pattern: "lib/format\\.ts"}
+
+  - id: X3
+    title: What imports a Python module
+    fixture: fixtures/shop
+    prompt: Which files import the module shopapi.models.refund? List each file.
+    expect:
+      - {check: matches, path: "@report", pattern: "refund_repo\\.py"}
+      - {check: matches, path: "@report", pattern: "refund_service\\.py"}
+      - {check: matches, path: "@report", pattern: "payment_service\\.py"}
+      - {check: matches, path: "@report", pattern: "test_refund\\.py"}
+
+  - id: X4
+    title: What imports a TypeScript module
+    fixture: fixtures/shop
+    prompt: Which files import web/src/api/couponApi.ts? List each file.
+    expect:
+      - {check: matches, path: "@report", pattern: "couponStore\\.ts"}
+      - {check: matches, path: "@report", pattern: "cartStore\\.ts"}
+
+  - id: X5
+    title: The methods of a class
+    fixture: fixtures/shop
+    prompt: List the methods of the class WarehouseService.
+    expect:
+      - {check: matches, path: "@report", pattern: "\\bcreate\\b"}
+      - {check: matches, path: "@report", pattern: "\\bclose\\b"}
+      - {check: matches, path: "@report", pattern: "\\bfind_open\\b"}
+      - {check: matches, path: "@report", pattern: "\\breserve_stock\\b"}
+      - {check: matches, path: "@report", pattern: "\\brelease_stock\\b"}
+      - {check: matches, path: "@report", pattern: "\\brebalance\\b"}
+
+  - id: X6
+    title: Where a JavaScript function is, and its callers
+    fixture: fixtures/shop
+    prompt: Where is rebuildSupplierCache defined, and which files call it?
+    expect:
+      - {check: matches, path: "@report", pattern: "supplier/migrate\\.js"}
+      - {check: matches, path: "@report", pattern: "supplier/index\\.js"}
+      - {check: matches, path: "@report", pattern: "warehouse/report\\.js"}
+
+  - id: X7
+    title: Where an error text is
+    fixture: fixtures/shop
+    prompt: Which function raises the error "quota exceeded for tenant"? Give the file and the function.
+    expect:
+      - {check: matches, path: "@report", pattern: "limits\\.py"}
+      - {check: matches, path: "@report", pattern: "\\bcheck_quota\\b"}
+
+  - id: X8
+    title: What a method does
+    fixture: fixtures/shop
+    prompt: What does InvoiceStore.settle do in the web app? Name the API function that it calls.
+    expect:
+      - {check: matches, path: "@report", pattern: "\\bpostSettlement\\b"}
+      - {check: matches, path: "@report", pattern: "\\bclosed\\b"}

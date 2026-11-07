@@ -132,6 +132,7 @@ A guidance eval tests text that tells an agent what to do, for example the writi
 | Eval | Folder | Variants | Last result |
 | --- | --- | --- | --- |
 | `guidance.writing` | [writing-guidance](./writing-guidance/) | `none` (0 words), `always` (189), `current` (860), `short` (81) | 2026-10-23, `claude-sonnet-5-5`, k = 3, 4 tasks. Outcome minus `none`: `always` +0.25, `current` +0.42, `short` +0.42. Cost $1.98. |
+| `guidance.index` | [index-guidance](./index-guidance/) | `none` (0 lines), `rule` (2 lines) | 2026-11-07, `claude-sonnet-5-5`, k = 3, 8 tasks. Outcome 1.00 in both. Mean cost $0.04369 `none`, $0.04307 `rule`. Output tokens 238.5 `none`, 186.9 `rule`. Cost $2.08. D107 has the risks. |
 
 Notes on the `guidance.writing` result:
 
