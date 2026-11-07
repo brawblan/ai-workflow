@@ -4,6 +4,7 @@
 # no-change build, and each query command with --no-update, and the size of the index. If the
 # sqlite3 program has the dbstat table, it also prints the size of each table and index.
 #
+# The script needs cargo, awk, sort, and time. It uses git, if it is on PATH, to find a source file.
 # Set BENCH_NAME, BENCH_WORDS, or BENCH_PATH to change the arguments of the queries. A query
 # sample is the mean of QUERY_BATCH runs, because `time -p` has a resolution of 10 ms.
 set -eu
@@ -26,12 +27,10 @@ path=${BENCH_PATH:-$(git -C "$repo" ls-files '*.ts' '*.py' '*.rs' '*.c' '*.cs' '
 
 cd "$repo"
 
-# Prints the seconds that one run of the arguments takes.
-if (time -p true) 2>&1 | grep -q '^real'; then
-    seconds() { { time -p "$@" >/dev/null 2>&1; } 2>&1 | awk '/^real/ { print $2 }'; }
-else
-    seconds() { /usr/bin/time -p "$@" 2>&1 >/dev/null | awk '/^real/ { print $2 }'; }
-fi
+# Prints the seconds that one run of the arguments takes. The command output goes to /dev/null
+# inside, so the report of `time -p` is the only text. This works with the shell keyword and with
+# /usr/bin/time.
+seconds() { { time -p sh -c '"$@" >/dev/null 2>&1' sh "$@"; } 2>&1 | awk '/^real/ { print $2 }'; }
 
 # Prints the seconds of a loop of $1 runs of the other arguments.
 batch() {
@@ -48,6 +47,7 @@ median() { sort -n | awk '{ v[NR] = $1 } END { if (NR % 2) print v[(NR + 1) / 2]
 measure() {
     size=$1
     shift
+    "$@" >/dev/null 2>&1 || { echo "bench.sh: this command failed: $*" >&2; exit 1; }
     i=0
     while [ "$i" -lt "$runs" ]; do
         batch "$size" "$@"

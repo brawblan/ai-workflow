@@ -184,7 +184,7 @@ The text output shows each control character in a name as `?`.
 
 ## Benchmarks
 
-Run `indexer/bench.sh <repo> [runs]`. It builds the release binary and prints one Markdown table.
+Run `indexer/bench.sh <repo> [runs]`. It needs `cargo`, `awk`, `sort`, and `time`. It builds the release binary and prints one Markdown table.
 The table gives the median of `runs` runs (default 10) for these items:
 
 - a cold build

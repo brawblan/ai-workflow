@@ -23,9 +23,9 @@ macro_rules! symbol_filter {
 
 macro_rules! chunk_from {
     () => {
-        "FROM chunks JOIN chunk_rows AS block ON block.id = chunks.rowid
-         JOIN files ON files.path = block.path
-         WHERE chunks MATCH ?1 AND (?2 IS NULL OR block.path GLOB ?2)"
+        "FROM chunks JOIN chunk_rows ON chunk_rows.id = chunks.rowid
+         JOIN files ON files.path = chunk_rows.path
+         WHERE chunks MATCH ?1 AND (?2 IS NULL OR chunk_rows.path GLOB ?2)"
     };
 }
 
@@ -52,9 +52,9 @@ pub const OUTLINE: &str = concat!(
 pub const SEARCH_COUNT: &str = concat!("SELECT count(*) ", chunk_from!());
 
 pub const SEARCH_ROWS: &str = concat!(
-    "SELECT block.path, block.line, files.hash ",
+    "SELECT chunk_rows.path, chunk_rows.line, files.hash ",
     chunk_from!(),
-    " ORDER BY bm25(chunks), block.path, block.line LIMIT ?3"
+    " ORDER BY bm25(chunks), chunk_rows.path, chunk_rows.line LIMIT ?3"
 );
 
 pub const PYTHON_FILES: &str = "SELECT path FROM files WHERE language = 'python' ORDER BY path";
