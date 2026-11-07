@@ -173,7 +173,7 @@ def _parser() -> argparse.ArgumentParser:
     ready.add_argument("--format", choices=["text", "github"], default="text")
 
     run = commands.add_parser("eval", help="Run the eval of one component, with it and without it.")
-    run.add_argument("component", help="The component ID, for example role.tester.")
+    run.add_argument("component", nargs="?", help="The component ID, for example role.tester.")
     run.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
     run.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
     run.add_argument("--scenario", action="append", metavar="ID",
@@ -188,6 +188,8 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--run-config", type=Path,
                      help="The harness command file. Default: the eval.yaml of the adapter.")
     run.add_argument("--keep", action="store_true", help="Keep the workspace of each run.")
+    run.add_argument("--summary", type=Path, metavar="RUNS_JSONL",
+                     help="Print the result tables from a kept runs.jsonl. Start no run.")
     run.add_argument("--check-only", action="store_true",
                      help="Validate the scenarios and list the runs. Start no run.")
     return parser
@@ -395,7 +397,23 @@ def _check_ready(ticket: str, profile: str | None, mode: str, fmt: str) -> int:
     return 1 if blocking else 0
 
 
+def _eval_summary(args: argparse.Namespace) -> int:
+    try:
+        runs = evals.load_runs(args.summary, args.root)
+    except evals.EvalError as error:
+        print(f"stone eval: {error}")
+        return 2
+    print(evals.summary(args.component or args.summary.parent.name, args.model or "unknown", runs),
+          end="")
+    return 0
+
+
 def _eval(args: argparse.Namespace) -> int:
+    if args.summary:
+        return _eval_summary(args)
+    if not args.component:
+        print("stone eval: give a component ID, or use --summary.")
+        return 2
     if args.trials < 1:
         print("stone eval: --trials must be 1 or more.")
         return 2

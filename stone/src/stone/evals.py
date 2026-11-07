@@ -27,7 +27,7 @@ from typing import Any
 
 import yaml
 
-from stone import render, results, specs, trigger_eval, triggers
+from stone import eval_metrics, render, results, specs, trigger_eval, triggers
 from stone.markdown import split_frontmatter
 
 VARIANTS = ("with", "without")
@@ -430,6 +430,9 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
         if stderr:
             transcript.with_suffix(".err").write_text(stderr, encoding="utf-8")
         run.usage.update(transcript=str(transcript), workspace=str(workspace.path))
+        stats = eval_metrics.transcript_stats(transcript)
+        if stats:
+            run.usage.update(tool_calls=stats[0], tool_bytes=stats[1])
         run.checks = grade(folder, scenario, workspace)
     finally:
         if not opts["keep"]:
@@ -641,30 +644,37 @@ def _rate(runs: list[Run], kind: str | None) -> float:
 
 
 def summary(component: str, model: str, runs: list[Run]) -> str:
-    """Return the result table in Markdown: one row for each scenario and variant."""
+    """Return the result tables in Markdown: each scenario and variant, then each variant."""
     lines = [f"# Eval results: {component}", "", f"Model: `{model}`. Date: {dt.date.today()}.", "",
-             "| Scenario | Variant | Trials | pass^k | Outcome | Contract | Cost | Tokens out "
-             "| Seconds | Errors |",
-             "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |"]
-    for sid in dict.fromkeys(r.scenario for r in runs):
-        for variant in dict.fromkeys(r.variant for r in runs):
-            group = [r for r in runs if r.scenario == sid and r.variant == variant]
-            if group:
-                lines.append(
-                    f"| {sid} | {variant} | {len(group)} | {int(all(r.passed() for r in group))} "
-                    f"| {_rate(group, 'outcome'):.2f} | {_rate(group, 'contract'):.2f} "
-                    f"| {_mean(group, 'cost_usd', 2)} | {_mean(group, 'output_tokens')} "
-                    f"| {_mean(group, 'seconds', 1)} | {sum(bool(r.error) for r in group)} |")
+             *eval_metrics.scenario_table(runs, _rate), "",
+             *eval_metrics.variant_table(runs, _rate)]
     names = list(dict.fromkeys(r.variant for r in runs))
-    base = next((name for name in ("without", "none") if name in names), "")
-    others = [name for name in names if name != base]
-    if base and others:
+    base = next((name for name in eval_metrics.BASE_NAMES if name in names), "")
+    if base and len(names) > 1:
         lines.append("")
-        for name in others:
+        for name in (n for n in names if n != base):
             gain = (_rate([r for r in runs if r.variant == name], "outcome")
                     - _rate([r for r in runs if r.variant == base], "outcome"))
             lines.append(f"Outcome pass rate, {name} minus {base}: {gain:+.2f}.")
+        lines += eval_metrics.cost_difference_lines(runs)
     return "\n".join(lines) + "\n"
+
+
+def load_runs(path: Path, root: Path = Path(".")) -> list[Run]:
+    """Read a kept `runs.jsonl`. A key that an old file lacks stays missing, except the tool
+    metrics: they come from the transcript of the run, if the file still exists."""
+    try:
+        rows = [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()
+                if line.strip()]
+        runs = [Run(**row) for row in rows]
+    except (OSError, json.JSONDecodeError, TypeError) as error:
+        raise EvalError(f"{path}: cannot read the runs file ({error}).") from error
+    for run in runs:
+        stats = None if "tool_calls" in run.usage or not run.usage.get("transcript") else \
+            eval_metrics.transcript_stats(root / str(run.usage["transcript"]))
+        if stats:
+            run.usage.update(tool_calls=stats[0], tool_bytes=stats[1])
+    return runs
 
 
 def _first_role(framework: Path, entry: dict[str, Any]) -> str:
