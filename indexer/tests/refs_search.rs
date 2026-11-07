@@ -341,3 +341,62 @@ fn ac7_json_format() {
         )
     );
 }
+
+#[test]
+fn review_markdown_link_in_table_cell_is_a_link() {
+    let fx = built(&[
+        ("t.md", "| a | b |\n|---|---|\n| x | [b](b.md) |\n"),
+        ("b.md", "x\n"),
+    ]);
+    assert_eq!(links(&fx, "t.md"), vec![row(3, "link", "b.md", "b.md")]);
+}
+
+#[test]
+fn review_search_prints_the_line_with_the_whole_word() {
+    let fx = built(&[("a.py", "db = database()\nreturn merge_base(x)\n")]);
+    assert_eq!(
+        run(&fx, &["search", "base"]),
+        (0, "a.py:2: return merge_base(x)\n".into())
+    );
+}
+
+#[test]
+fn review_search_skips_a_stale_hit() {
+    let fx = built(&[("a.txt", "zebra here\n"), ("b.txt", "zebra there\n")]);
+    fx.write("a.txt", b"lion here\n");
+    let (code, text) = run(&fx, &["search", "zebra", "--no-update"]);
+    assert_eq!(code, 0);
+    assert!(text.starts_with("b.txt:1: zebra there\n"), "{text}");
+    assert!(!text.contains("a.txt"), "{text}");
+}
+
+#[test]
+fn review_import_of_standard_module_stays_external() {
+    let fx = built(&[
+        ("app/main.py", "import logging\n"),
+        ("tools/logging.py", "x = 1\n"),
+    ]);
+    assert_eq!(
+        links(&fx, "app/main.py"),
+        vec![row(1, "import", "logging", "")]
+    );
+}
+
+#[test]
+fn review_sibling_and_top_package_imports_still_resolve() {
+    let fx = built(&[
+        ("app/main.py", "from . import util\n"),
+        ("app/util.py", "x = 1\n"),
+        ("src/pkg/__init__.py", ""),
+        ("src/pkg/m.py", "x = 1\n"),
+        ("use.py", "import pkg.m\n"),
+    ]);
+    assert_eq!(
+        links(&fx, "app/main.py"),
+        vec![row(1, "import", ".util", "app/util.py")]
+    );
+    assert_eq!(
+        links(&fx, "use.py"),
+        vec![row(1, "import", "pkg.m", "src/pkg/m.py")]
+    );
+}

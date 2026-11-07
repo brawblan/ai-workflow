@@ -288,7 +288,7 @@ fn touched_file_keeps_its_symbol_rows() {
 }
 
 #[test]
-fn schema_version_1_index_is_made_again_as_version_2() {
+fn schema_version_1_index_is_made_again_as_current() {
     let fx = built(&[("a.py", "def one():\n    pass\n"), ("b.md", "# H\n")]);
     fx.conn()
         .execute(
