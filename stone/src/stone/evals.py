@@ -400,6 +400,13 @@ def _setup(folder: Path, data: dict[str, Any], scenario: dict[str, Any], variant
     return workspace, argv, env, workflow
 
 
+def _add_tool_stats(run: Run, transcript: Path, has_output: bool) -> None:
+    """Count the tool calls and result bytes. A run with no output gets no value, not 0."""
+    stats = eval_metrics.transcript_stats(transcript) if has_output else None
+    if stats:
+        run.usage.update(tool_calls=stats[0], tool_bytes=stats[1])
+
+
 def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], variant: str,
              trial: int, opts: dict[str, Any]) -> Run:
     run = Run(scenario["id"], variant, trial)
@@ -430,9 +437,7 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
         if stderr:
             transcript.with_suffix(".err").write_text(stderr, encoding="utf-8")
         run.usage.update(transcript=str(transcript), workspace=str(workspace.path))
-        stats = eval_metrics.transcript_stats(transcript) if stdout else None
-        if stats:
-            run.usage.update(tool_calls=stats[0], tool_bytes=stats[1])
+        _add_tool_stats(run, transcript, bool(stdout))
         run.checks = grade(folder, scenario, workspace)
     finally:
         if not opts["keep"]:

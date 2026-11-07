@@ -123,15 +123,16 @@ def _verdict(diff: float, error: float, runs: int) -> str:
 
 
 def _difference_line(runs: list[Any], name: str, base: str) -> str:
-    base_cost = mean_and_error(_values([r for r in runs if r.variant == base], "cost_usd"))
-    other = mean_and_error(_values([r for r in runs if r.variant == name], "cost_usd"))
-    if not (base_cost and other):
+    costs = {v: _values([r for r in runs if r.variant == v], "cost_usd") for v in (name, base)}
+    other, ref = mean_and_error(costs[name]), mean_and_error(costs[base])
+    if not (other and ref):
         return f"Cost, {name} minus {base}: {MISSING}. A run has no cost."
-    diff = other[0] - base_cost[0]
-    error = math.hypot(other[1], base_cost[1])
-    least = min(len(_values([r for r in runs if r.variant == v], "cost_usd")) for v in (name, base))
+    diff = other[0] - ref[0]
+    error = math.hypot(other[1], ref[1])
+    least = min(len(costs[name]), len(costs[base]))
     note = f" (SE {error:.4f})" if least > 1 else ""
-    return f"Cost, {name} minus {base}: {diff:+.4f} USD. The difference is {_verdict(diff, error, least)}{note}."
+    return (f"Cost, {name} minus {base}: {diff:+.4f} USD. "
+            f"The difference is {_verdict(diff, error, least)}{note}.")
 
 
 def cost_difference_lines(runs: list[Any]) -> list[str]:
