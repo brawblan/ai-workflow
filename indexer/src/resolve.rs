@@ -17,6 +17,8 @@ pub struct Resolver<'a> {
     /// none). Thus `tools/logging.py` is not `logging`, and the standard `logging` stays
     /// external. A package is its `__init__.py`.
     modules: HashMap<String, Vec<&'a str>>,
+    /// The folders with `__init__.py`.
+    packages: HashSet<&'a str>,
 }
 
 impl<'a> Resolver<'a> {
@@ -58,7 +60,11 @@ impl<'a> Resolver<'a> {
                     .push(path);
             }
         }
-        Self { files, modules }
+        Self {
+            files,
+            modules,
+            packages,
+        }
     }
 
     /// The repo path of the target of a link in the file `from`, or `None`.
@@ -83,20 +89,33 @@ impl<'a> Resolver<'a> {
     }
 
     /// The file of a dotted module name next to `from`, else the best file from a root: the one
-    /// nearest to `from`.
+    /// nearest to `from`. A file in a package has no import from its folder, as in Python 3. A
+    /// file never imports itself.
     pub fn module(&self, from: &str, name: &str) -> Option<String> {
-        let sibling = join(from, &name.replace('.', "/"))?;
-        let siblings = [format!("{sibling}.py"), format!("{sibling}/__init__.py")];
-        if let Some(path) = siblings.iter().find_map(|path| self.file(path)) {
-            return Some(path);
+        let folder = from.rsplit_once('/').map_or("", |(folder, _)| folder);
+        if !self.packages.contains(folder) {
+            let sibling = join(from, &name.replace('.', "/"))?;
+            let siblings = [format!("{sibling}.py"), format!("{sibling}/__init__.py")];
+            let found = siblings.iter().find_map(|path| self.file(path));
+            if let Some(path) = found.filter(|path| path != from) {
+                return Some(path);
+            }
         }
-        let paths = self.modules.get(name)?;
+        let paths: Vec<&&str> = self
+            .modules
+            .get(name)?
+            .iter()
+            .filter(|path| **path != from)
+            .collect();
         // The nearest path wins. The first path in text order wins a tie.
         let near = |a: &&&str, b: &&&str| {
             let order = common_prefix(from, a).cmp(&common_prefix(from, b));
             order.then_with(|| b.cmp(a))
         };
-        paths.iter().max_by(near).map(|path| (*path).to_string())
+        paths
+            .into_iter()
+            .max_by(near)
+            .map(|path| (*path).to_string())
     }
 
     fn python_relative(&self, from: &str, target: &str) -> Option<String> {
