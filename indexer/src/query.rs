@@ -3,18 +3,18 @@
 use std::collections::HashMap;
 use std::fmt::Write;
 
-use rusqlite::{Connection, Result, Row as SqlRow, params};
+use rusqlite::{Connection, OptionalExtension, Result, Row as SqlRow, params};
 
 use crate::cli::Format;
 
 /// One symbol in the output. `depth` is set only for `outline`.
 pub struct Row {
-    path: String,
-    line: i64,
-    end_line: i64,
-    kind: String,
-    name: String,
-    qualified_name: String,
+    pub path: String,
+    pub line: i64,
+    pub end_line: i64,
+    pub kind: String,
+    pub name: String,
+    pub qualified_name: String,
     level: Option<i64>,
     depth: Option<usize>,
 }
@@ -50,6 +50,14 @@ pub fn find(conn: &Connection, name: &str, kind: Option<&str>, limit: usize) -> 
         .unwrap_or(0)
         .saturating_sub(rows.len());
     Ok(Results { rows, omitted })
+}
+
+/// The content hash of the file at `path` in the index, if it has a row.
+pub fn file_hash(conn: &Connection, path: &str) -> Result<Option<String>> {
+    conn.query_row("SELECT hash FROM files WHERE path = ?1", [path], |row| {
+        row.get(0)
+    })
+    .optional()
 }
 
 /// True if the index has a row for the file at `path`.
@@ -138,7 +146,7 @@ pub fn render(results: &Results, format: Format) -> String {
             }
         }
         Format::Json => {
-            let rows: Vec<String> = results.rows.iter().map(json_row).collect();
+            let rows: Vec<String> = results.rows.iter().map(|row| json_row(row, "")).collect();
             let _ = writeln!(
                 out,
                 "{{\"results\":[{}],\"omitted\":{}}}",
@@ -164,7 +172,8 @@ pub fn plain(text: &str) -> String {
         .collect()
 }
 
-fn json_row(row: &Row) -> String {
+/// The JSON object of a row. `extra` is more members, with a first comma, or empty.
+pub fn json_row(row: &Row, extra: &str) -> String {
     let optional = |value: Option<String>| value.unwrap_or_else(|| "null".to_string());
     let mut text = format!(
         "{{\"path\":{},\"line\":{},\"end_line\":{},\"kind\":{},\"name\":{},\"qualified_name\":{},\"level\":{}",
@@ -179,6 +188,7 @@ fn json_row(row: &Row) -> String {
     if let Some(depth) = row.depth {
         let _ = write!(text, ",\"depth\":{depth}");
     }
+    text.push_str(extra);
     text.push('}');
     text
 }

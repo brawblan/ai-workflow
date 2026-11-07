@@ -11,12 +11,19 @@ pub const DEFAULT_MAX_FILE_SIZE: u64 = 1_048_576;
 /// The default of `--limit`.
 pub const DEFAULT_LIMIT: usize = 20;
 
+/// The default of `--limit` for `show`.
+pub const DEFAULT_SHOW_LIMIT: usize = 5;
+
+/// The default of `--max-lines`.
+pub const DEFAULT_MAX_LINES: usize = 80;
+
 pub const USAGE: &str =
     "usage: stone-index build [--db PATH] [--max-file-size BYTES] [--lang EXT=LANG]
        stone-index find NAME [--kind KIND] [QUERY OPTIONS]
+       stone-index show NAME [--kind KIND] [--max-lines N] [QUERY OPTIONS]
        stone-index outline PATH [QUERY OPTIONS]
        stone-index refs PATH|MODULE [QUERY OPTIONS]
-       stone-index search WORDS [--path GLOB] [QUERY OPTIONS]
+       stone-index search WORDS [--path GLOB] [--context N] [QUERY OPTIONS]
        stone-index --version
 query options: --limit N, --format text|json, --no-update, --db PATH, --max-file-size BYTES,
 --lang EXT=LANG (repeatable, for example h=c),
@@ -26,6 +33,7 @@ pub enum Command {
     Version,
     Build(IndexOptions),
     Find(Query),
+    Show(Query),
     Outline(Query),
     Refs(Query),
     Search(Query),
@@ -50,6 +58,8 @@ pub struct Query {
     pub kind: Option<String>,
     pub path: Option<String>,
     pub limit: usize,
+    pub max_lines: usize,
+    pub context: usize,
     pub format: Format,
     pub update: bool,
     pub index: IndexOptions,
@@ -59,25 +69,36 @@ pub fn parse(args: &[String]) -> Result<Command, String> {
     match args.split_first() {
         Some((flag, [])) if flag == "--version" || flag == "-V" => Ok(Command::Version),
         Some((command, rest)) => match command.as_str() {
-            "build" => parse_query(rest, false, "").map(|query| Command::Build(query.index)),
-            "find" => parse_query(rest, true, "--kind").map(Command::Find),
-            "outline" => parse_query(rest, true, "").map(Command::Outline),
-            "refs" => parse_query(rest, true, "").map(Command::Refs),
-            "search" => parse_query(rest, true, "--path").map(Command::Search),
+            "build" => parse_query(rest, false, &[], DEFAULT_LIMIT)
+                .map(|query| Command::Build(query.index)),
+            "find" => parse_query(rest, true, &["--kind"], DEFAULT_LIMIT).map(Command::Find),
+            "show" => parse_query(rest, true, &["--kind", "--max-lines"], DEFAULT_SHOW_LIMIT)
+                .map(Command::Show),
+            "outline" => parse_query(rest, true, &[], DEFAULT_LIMIT).map(Command::Outline),
+            "refs" => parse_query(rest, true, &[], DEFAULT_LIMIT).map(Command::Refs),
+            "search" => parse_query(rest, true, &["--path", "--context"], DEFAULT_LIMIT)
+                .map(Command::Search),
             _ => Err(format!("unknown command or option: {command}")),
         },
         None => Err("no command".to_string()),
     }
 }
 
-/// Parses the options. A query command needs one target. `extra` is the one option of the
-/// command: `--kind` of `find` or `--path` of `search`.
-fn parse_query(args: &[String], is_query: bool, extra: &str) -> Result<Query, String> {
+/// Parses the options. A query command needs one target. `extra` holds the options of the
+/// command, for example `--kind` of `find` or `--path` of `search`.
+fn parse_query(
+    args: &[String],
+    is_query: bool,
+    extra: &[&str],
+    default_limit: usize,
+) -> Result<Query, String> {
     let mut query = Query {
         target: String::new(),
         kind: None,
         path: None,
-        limit: DEFAULT_LIMIT,
+        limit: default_limit,
+        max_lines: DEFAULT_MAX_LINES,
+        context: 0,
         format: Format::Text,
         update: true,
         index: IndexOptions {
@@ -96,8 +117,18 @@ fn parse_query(args: &[String], is_query: bool, extra: &str) -> Result<Query, St
                 .index
                 .langs
                 .push(lang::parse_override(value(&mut args, arg)?)?),
-            "--kind" if extra == arg => query.kind = Some(value(&mut args, arg)?.to_string()),
-            "--path" if extra == arg => query.path = Some(value(&mut args, arg)?.to_string()),
+            "--kind" if extra.contains(&"--kind") => {
+                query.kind = Some(value(&mut args, arg)?.to_string())
+            }
+            "--path" if extra.contains(&"--path") => {
+                query.path = Some(value(&mut args, arg)?.to_string());
+            }
+            "--max-lines" if extra.contains(&"--max-lines") => {
+                query.max_lines = number(value(&mut args, arg)?, arg)?;
+            }
+            "--context" if extra.contains(&"--context") => {
+                query.context = number(value(&mut args, arg)?, arg)?;
+            }
             "--limit" if is_query => query.limit = number(value(&mut args, arg)?, arg)?,
             "--format" if is_query => query.format = format(value(&mut args, arg)?)?,
             "--no-update" if is_query => query.update = false,
