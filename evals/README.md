@@ -132,7 +132,7 @@ A guidance eval tests text that tells an agent what to do, for example the writi
 | Eval | Folder | Variants | Last result |
 | --- | --- | --- | --- |
 | `guidance.writing` | [writing-guidance](./writing-guidance/) | `none` (0 words), `always` (189), `current` (860), `short` (81) | 2026-10-23, `claude-sonnet-5-5`, k = 3, 4 tasks. Outcome minus `none`: `always` +0.25, `current` +0.42, `short` +0.42. Cost $1.98. |
-| `guidance.index` | [index-guidance](./index-guidance/) | `none` (0 lines), `rule` (2 lines) | 2026-11-07, `claude-sonnet-5-5`, k = 3, 8 tasks. Outcome 1.00 in both. Mean cost $0.04369 `none`, $0.04307 `rule`. Output tokens 238.5 `none`, 186.9 `rule`. Cost $2.08. D107 has the risks. |
+| `guidance.index` | [index-guidance](./index-guidance/) | `none` (0 lines), `rule` (2 lines), `rule-show` (3 lines) | 2026-11-07, `claude-sonnet-5-5`, k = 3, 4 multi-file tasks (M1 to M4). Outcome 1.00 in all variants. Mean cost $0.06367 `none`, $0.06202 `rule`, $0.06045 `rule-show`. No difference is more than 2 SE. One cold-cache `none` run raises the `none` mean. Cost $2.23. D109 has the risks. The 8-task run of D107 is in [its result file](./results/20261107-080010-guidance.index-claude-sonnet-5-5.md). |
 
 Notes on the `guidance.writing` result:
 

@@ -1,9 +1,11 @@
-"""Make the fixture of the guidance.index eval (D107): a shop repo of 228 files.
+"""Make the fixtures of the guidance.index eval (D107): `shop` (228 files) and `market` (622 files).
 
-Usage: python3 make_fixture.py [<output folder>]. The default is `fixtures/shop` next to this file.
-The script deletes the folder first, and the output is the same on each run. 14 entities get 5
-Python, 5 TypeScript, and 5 JavaScript files each. They share a few common names (`load`, `save`,
-`Store`), as in a real repo. PLANTS has the facts that the scenarios ask about.
+Usage: python3 make_fixture.py [<fixtures folder>]. The default is `fixtures` next to this file.
+The script deletes `shop` and `market` in that folder first, and the output is the same on each
+run. Each entity gets 5 Python, 5 TypeScript, and 5 JavaScript files. The entities share a few
+common names (`load`, `save`, `Store`), as in a real repo. `shop` has 14 entities, and PLANTS has
+the facts of the X scenarios. `market` has 40 entities, PLANTS, and MARKET_PLANTS: the facts of the
+M scenarios, which each need code from 3 files or more.
 """
 
 from __future__ import annotations
@@ -14,6 +16,10 @@ from pathlib import Path
 
 ENTITIES = ("order", "invoice", "customer", "product", "shipment", "payment", "refund", "coupon",
             "warehouse", "supplier", "review", "cart", "wishlist", "notification")
+MARKET_ENTITIES = ENTITIES + (
+    "ledger", "payout", "subscription", "vendor", "tax", "region", "carrier", "label", "promotion",
+    "bundle", "gift", "loyalty", "ticket", "survey", "banner", "page", "menu", "session", "account",
+    "address", "plan", "quote", "receipt", "rate", "station", "batch")
 
 PY = {
     "api/shopapi/models/{e}.py": '''"""The {E} record of the shop API."""
@@ -113,7 +119,7 @@ from __future__ import annotations
 
 from shopapi.core.http import Request, Response
 from shopapi.services.{e}_service import {E}Service
-
+{IMPORTS}
 
 def handle_get(service: {E}Service, request: Request) -> Response:
     item = service.repo.load(request.params["id"])
@@ -130,7 +136,7 @@ def handle_post(service: {E}Service, request: Request) -> Response:
 def register(router, service: {E}Service) -> None:
     router.add("GET", "/{e}s/<id>", lambda request: handle_get(service, request))
     router.add("POST", "/{e}s", lambda request: handle_post(service, request))
-''',
+{EXTRA}''',
     "api/tests/test_{e}.py": '''import unittest
 
 from shopapi.models.{e} import {E}
@@ -250,7 +256,7 @@ module.exports = { seed{E}s };
 ''',
     "tools/{e}/migrate.js": '''const { log } = require("../lib/log");
 const { connect } = require("../lib/db");
-
+{IMPORTS}
 async function migrate{E}s() {
   const db = await connect();
   const rows = await db.all("{e}s");
@@ -289,7 +295,7 @@ async function main(argv) {
     return undefined;
   }
   if (command === "report") return report{E}s();
-  throw new Error(`unknown command: ${command}`);
+{COMMANDS}  throw new Error(`unknown command: ${command}`);
 }
 
 module.exports = { main };
@@ -374,6 +380,130 @@ async function rebuildSupplierCache() {
         "CALLS": "\n  await rebuildSupplierCache();"},
 }
 
+# The facts of the M scenarios. Some names repeat on purpose: NotificationService.record_event does
+# not use the audit module, and fetchExchangeRates is not fetchExchangeRate.
+AUDIT_IMPORT = "from shopapi.core.audit import record_event\n"
+RATES_IMPORT = 'import { fetchExchangeRate } from "../lib/rates";\n'
+MARKET_PLANTS = {
+    ("api/shopapi/services/{e}_service.py", "shipment"): {"IMPORTS": AUDIT_IMPORT, "EXTRA": '''
+    def ship(self, item_id: str) -> None:
+        self.close(item_id)
+        record_event("shipped", item_id)
+'''},
+    ("api/shopapi/services/{e}_service.py", "ledger"): {"IMPORTS": AUDIT_IMPORT, "EXTRA": '''
+    def post_entry(self, item: object, amount: int) -> Ledger:
+        entry = self.create(amount=amount, notes=f"entry for {item.id}")
+        record_event("posted", entry.id)
+        return entry
+'''},
+    ("api/shopapi/services/{e}_service.py", "subscription"): {"IMPORTS": AUDIT_IMPORT, "EXTRA": '''
+    def renew(self, item_id: str, months: int = 1) -> None:
+        item = self.repo.load(item_id)
+        item.notes = f"renewed for {months} months"
+        self.repo.save(item)
+        record_event("renewed", item_id)
+'''},
+    ("api/shopapi/handlers/{e}_handler.py", "account"): {"IMPORTS": "from shopapi.core.audit import audit_path\n",
+                                                         "EXTRA": '''
+
+def handle_audit_file(service: AccountService, request: Request) -> Response:
+    return Response(200, {"path": audit_path(request.tenant)})
+'''},
+    ("api/shopapi/services/{e}_service.py", "notification"): {"EXTRA": '''
+    def record_event(self, kind: str, item_id: str) -> None:
+        self.create(notes=f"{kind}: {item_id}")
+'''},
+    ("api/shopapi/services/{e}_service.py", "payout"): {
+        "IMPORTS": "from shopapi.core.fx import convert_amount\n"
+                   "from shopapi.services.ledger_service import LedgerService\n",
+        "EXTRA": '''
+    def settle_batch(self, ledger: LedgerService, currency: str) -> int:
+        """Post each open payout to the ledger in the currency, then close it."""
+        count = 0
+        for item in self.find_open():
+            ledger.post_entry(item, convert_amount(item.amount, currency))
+            self.close(item.id)
+            count += 1
+        return count
+'''},
+    ("web/src/stores/{e}Store.ts", "ledger"): {"IMPORTS": RATES_IMPORT, "EXTRA": '''
+  async convert(id: string, currency: string): Promise<number> {
+    const rate = await fetchExchangeRate(currency);
+    return Math.round((this.rows.find((r) => r.id === id)?.amount ?? 0) * rate);
+  }
+'''},
+    ("web/src/stores/{e}Store.ts", "payout"): {"IMPORTS": RATES_IMPORT, "EXTRA": '''
+  async preview(id: string): Promise<string> {
+    const rate = await fetchExchangeRate("EUR");
+    return `${id}: ${rate}`;
+  }
+'''},
+    ("web/src/api/{e}Api.ts", "quote"): {"EXTRA": '''
+export async function priceQuote(id: string, currency: string): Promise<number> {
+  const { fetchExchangeRate } = await import("../lib/rates");
+  const row = await fetchQuote(id);
+  return row.amount * (await fetchExchangeRate(currency));
+}
+'''},
+    ("web/src/api/{e}Api.ts", "rate"): {"EXTRA": '''
+export async function fetchExchangeRates(): Promise<Record<string, number>> {
+  return http.get("/rates");
+}
+'''},
+    ("tools/{e}/index.js", "vendor"): {"EXPORTS": ", syncVendors",
+                                       "COMMANDS": '  if (command === "sync") return syncVendors(argv[3]);\n'},
+    ("tools/{e}/migrate.js", "vendor"): {
+        "IMPORTS": 'const { normalizeVendor } = require("../lib/normalize");\n'
+                   'const { pushToLedger } = require("../ledger/migrate");\n',
+        "EXPORTS": ", syncVendors", "EXTRA": '''
+async function syncVendors(source) {
+  const db = await connect();
+  const rows = await db.all(source || "vendor_feed");
+  for (const row of rows) await pushToLedger(normalizeVendor(row));
+  log(`synced ${rows.length} vendors`);
+}
+'''},
+    ("tools/{e}/migrate.js", "ledger"): {"EXPORTS": ", pushToLedger", "EXTRA": '''
+async function pushToLedger(entry) {
+  const db = await connect();
+  await db.insert("ledger_entries", entry);
+}
+'''},
+}
+
+MARKET_SHARED = {
+    "api/shopapi/core/audit.py": '''from pathlib import Path
+
+EVENTS: list[tuple[str, str]] = []
+
+
+def record_event(kind: str, item_id: str) -> None:
+    EVENTS.append((kind, item_id))
+
+
+def audit_path(tenant: str) -> Path:
+    return Path("audit") / f"{tenant}.log"
+''',
+    "api/shopapi/core/fx.py": '''RATES = {"USD": 1.0, "EUR": 0.9}
+
+
+def convert_amount(amount: int, currency: str) -> int:
+    return round(amount * RATES[currency])
+''',
+    "web/src/lib/rates.ts": '''import { http } from "./http";
+
+export async function fetchExchangeRate(currency: string): Promise<number> {
+  return http.get(`/rates/${currency}`);
+}
+''',
+    "tools/lib/normalize.js": '''function normalizeVendor(row) {
+  return { id: `vendor-${row.id}`, amount: Number(row.amount) || 0, status: "new" };
+}
+
+module.exports = { normalizeVendor };
+''',
+}
+
 SHARED = {
     "README.md": "# Shop\n\nThe shop API (`api/`), the web app (`web/`), and the data tools (`tools/`).\n",
     "api/pyproject.toml": '[project]\nname = "shopapi"\nversion = "0.1.0"\n',
@@ -443,18 +573,20 @@ def check_quota(request: Request, used: int, plan: str = "free") -> None:
 
 def fill(template: str, entity: str, slots: dict[str, str]) -> str:
     text = template
-    for name in ("IMPORTS", "EXTRA", "EXPORTS", "CALLS"):
+    for name in ("IMPORTS", "EXTRA", "EXPORTS", "CALLS", "COMMANDS"):
         text = text.replace("{" + name + "}", slots.get(name, ""))
     return (text.replace("{E}", entity.capitalize()).replace("{U}", entity.upper())
             .replace("{e}", entity))
 
 
-def make(out: Path) -> int:
+def make(out: Path, entities: tuple[str, ...] = ENTITIES, shared: dict[str, str] | None = None,
+         plants: dict[tuple[str, str], dict[str, str]] | None = None) -> int:
     shutil.rmtree(out, ignore_errors=True)
-    files = dict(SHARED)
-    for entity in ENTITIES:
+    files = dict(SHARED if shared is None else shared)
+    plants = PLANTS if plants is None else plants
+    for entity in entities:
         for path, template in {**PY, **TS, **JS}.items():
-            files[fill(path, entity, {})] = fill(template, entity, PLANTS.get((path, entity), {}))
+            files[fill(path, entity, {})] = fill(template, entity, plants.get((path, entity), {}))
     for path, text in sorted(files.items()):
         (out / path).parent.mkdir(parents=True, exist_ok=True)
         (out / path).write_text(text, encoding="utf-8")
@@ -462,5 +594,7 @@ def make(out: Path) -> int:
 
 
 if __name__ == "__main__":
-    target = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / "fixtures/shop"
-    print(f"wrote {make(target)} files to {target}")
+    folder = Path(sys.argv[1]) if len(sys.argv) > 1 else Path(__file__).resolve().parent / "fixtures"
+    print(f"wrote {make(folder / 'shop')} files to {folder / 'shop'}")
+    count = make(folder / "market", MARKET_ENTITIES, {**SHARED, **MARKET_SHARED}, {**PLANTS, **MARKET_PLANTS})
+    print(f"wrote {count} files to {folder / 'market'}")

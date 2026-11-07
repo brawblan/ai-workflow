@@ -1,14 +1,18 @@
-# Eval of the code index guidance (issue #259). Run from the repo root:
+# Eval of the code index guidance (issues #259 and #275). Run from the repo root:
 #   python3 evals/index-guidance/make_fixture.py
 #   cd indexer && cargo build --release --locked && cd ..
 #   PATH="$PWD/indexer/target/release:$PATH" stone eval guidance.index --model <model> --trials 3
-# `stone eval` copies fixtures/shop (gitignored) as it is, and the runs inherit PATH. So make the
-# fixture and put `stone-index` on PATH first.
+# `stone eval` copies fixtures/shop and fixtures/market (gitignored) as they are, and the runs
+# inherit PATH. So make the fixtures and put `stone-index` on PATH first.
 # `variants` replaces with and without (D69). Both variants get the same prompt, the same fixture,
 # and the same tools (Read, Grep, Glob, and `stone-index` in the `reader` list of eval.yaml).
 #   none   no text about the index (the baseline)
-#   rule   the candidate rule for AGENTS.md, 2 lines (P4)
-# The rule passes if its mean cost is lower than `none` and its outcome rate is not lower (AC 5).
+#   rule       the rule in AGENTS.md, 2 lines (P4)
+#   rule-show  the rule and a third line that names `show` and `search --context` (#275)
+# X1 to X8 (#259) need 1 file or 2 and use fixtures/shop. M1 to M4 (#275) need code from 3 files
+# or more and use fixtures/market, a larger repo.
+# `rule-show` passes if its mean cost is lower than `rule` by more than 2 standard errors, and its
+# outcome rate is not lower (#275 AC 5).
 # Each check reads the final text. A path check needs only the unique end of the path.
 
 component: guidance.index
@@ -21,6 +25,8 @@ variants:
   none: []
   rule:
     - {copy: variants/rule.md, to: CLAUDE.md}
+  rule-show:
+    - {copy: variants/rule-show.md, to: CLAUDE.md}
 
 scenarios:
   - id: X1
@@ -92,3 +98,59 @@ scenarios:
     expect:
       - {check: matches, path: "@report", pattern: "\\bpostSettlement\\b"}
       - {check: matches, path: "@report", pattern: "\\bclosed\\b"}
+
+  - id: M1
+    title: The importers of a Python module, and the callers in each
+    fixture: fixtures/market
+    prompt: >-
+      Which files import the module shopapi.core.audit? For each file, name the function or method
+      that calls record_event, or say that none does.
+    expect:
+      - {check: matches, path: "@report", pattern: "ledger_service\\.py"}
+      - {check: matches, path: "@report", pattern: "shipment_service\\.py"}
+      - {check: matches, path: "@report", pattern: "subscription_service\\.py"}
+      - {check: matches, path: "@report", pattern: "account_handler\\.py"}
+      - {check: matches, path: "@report", pattern: "\\bpost_entry\\b"}
+      - {check: matches, path: "@report", pattern: "\\bship\\b"}
+      - {check: matches, path: "@report", pattern: "\\brenew\\b"}
+
+  - id: M2
+    title: A TypeScript function, its callers, and the caller in each file
+    fixture: fixtures/market
+    prompt: >-
+      Where is the function fetchExchangeRate defined, and which files call it? For each file that
+      calls it, name the function or method that calls it.
+    expect:
+      - {check: matches, path: "@report", pattern: "lib/rates\\.ts"}
+      - {check: matches, path: "@report", pattern: "ledgerStore\\.ts"}
+      - {check: matches, path: "@report", pattern: "payoutStore\\.ts"}
+      - {check: matches, path: "@report", pattern: "quoteApi\\.ts"}
+      - {check: matches, path: "@report", pattern: "\\bconvert\\b"}
+      - {check: matches, path: "@report", pattern: "\\bpreview\\b"}
+      - {check: matches, path: "@report", pattern: "\\bpriceQuote\\b"}
+
+  - id: M3
+    title: A JavaScript call chain across files
+    fixture: fixtures/market
+    prompt: >-
+      What runs when a user runs `node tools/vendor/index.js sync`? List each function in the chain
+      and its file, down to the function that writes to the database.
+    expect:
+      - {check: matches, path: "@report", pattern: "\\bsyncVendors\\b"}
+      - {check: matches, path: "@report", pattern: "vendor/migrate\\.js"}
+      - {check: matches, path: "@report", pattern: "\\bnormalizeVendor\\b"}
+      - {check: matches, path: "@report", pattern: "lib/normalize\\.js"}
+      - {check: matches, path: "@report", pattern: "\\bpushToLedger\\b"}
+      - {check: matches, path: "@report", pattern: "ledger/migrate\\.js"}
+
+  - id: M4
+    title: What a Python method does, and what it calls in other files
+    fixture: fixtures/market
+    prompt: >-
+      What does PayoutService.settle_batch do? Name each function or method from another file that
+      it calls, and give the file of each.
+    expect:
+      - {check: matches, path: "@report", pattern: "\\bconvert_amount\\b"}
+      - {check: matches, path: "@report", pattern: "core/fx\\.py"}
+      - {check: matches, path: "@report", pattern: "\\bpost_entry\\b"}
+      - {check: matches, path: "@report", pattern: "ledger_service\\.py"}
