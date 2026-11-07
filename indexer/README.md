@@ -47,6 +47,7 @@ or later as the default toolchain. The Clone option uses the version in `rust-to
 | `stone-index outline <path>` | Prints the symbols of one file. |
 | `stone-index refs <path or module>` | Prints the links into a file or a module, and the links out of it. |
 | `stone-index search "<words>"` | Prints the lines of the blocks of text that best match the words. |
+| `stone-index plans` | Prints the query plan of each SQL statement of the query commands. A test uses it. |
 | `stone-index --version`, `stone-index -V` | Prints the name and the version. |
 
 ### build
@@ -180,6 +181,35 @@ with `-`.
 Each JSON result has `path`, `line`, `end_line`, `kind`, `name`, `qualified_name`, and `level`.
 `level` is `null` for a code symbol. An `outline` result also has `depth`, the indent level from 0.
 The text output shows each control character in a name as `?`.
+
+## Benchmarks
+
+Run `indexer/bench.sh <repo> [runs]`. It needs `cargo`, `awk`, `sort`, and `time`. It builds the release binary and prints one Markdown table.
+The table gives the median of `runs` runs (default 10) for these items:
+
+- a cold build
+- a no-change build
+- each query command with `--no-update`
+- the size of the index
+
+If the `sqlite3` program has the `dbstat` table, the script also prints the size of each table and
+index.
+
+| Variable | Default | What it sets |
+| --- | --- | --- |
+| `BENCH_NAME` | `main` | The name for `find` and `show` |
+| `BENCH_WORDS` | `error handler` | The words for `search` |
+| `BENCH_PATH` | The first tracked source file | The path for `outline` and `refs` |
+
+Run the script on the same machine, with no other work, before and after a change. Put both tables
+in the PR. The script does not run in CI, because the times on shared runners differ too much.
+
+A test fails if the query plan of a statement scans `symbols`, `links`, or `chunk_rows` with no
+index. The SQL of the query commands is in `src/sql.rs`.
+
+Two attempts did not meet their limits (D108). `detail=column` made the vscode index 8.5 percent
+smaller. A cache of 64 MB did not make the full build faster. The build already writes in one
+transaction.
 
 ## Exit codes
 

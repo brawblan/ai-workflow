@@ -7,6 +7,7 @@ use rusqlite::{Connection, Result};
 use crate::cli::Format;
 use crate::query::{self, json_string, plain};
 use crate::resolve::Resolver;
+use crate::sql;
 
 pub struct Ref {
     path: String,
@@ -23,8 +24,6 @@ pub struct Refs {
     pub omitted: usize,
 }
 
-const COLUMNS: &str = "path, line, kind, target, resolved";
-
 /// The links of `path` if the index has that file. Else the links of the Python module `name`,
 /// or the links whose target text is `name`. Each group keeps at most `limit` links.
 pub fn refs(conn: &Connection, path: Option<&str>, name: &str, limit: usize) -> Result<Refs> {
@@ -35,13 +34,10 @@ pub fn refs(conn: &Connection, path: Option<&str>, name: &str, limit: usize) -> 
     };
     let (incoming, outgoing) = match &file {
         Some(file) => (
-            select(&tx, "resolved = ?1 ORDER BY path, line, id", file)?,
-            select(&tx, "path = ?1 ORDER BY line, id", file)?,
+            select(&tx, sql::REFS_INTO, file)?,
+            select(&tx, sql::REFS_OUT_OF, file)?,
         ),
-        None => (
-            select(&tx, "target = ?1 ORDER BY path, line, id", name)?,
-            Vec::new(),
-        ),
+        None => (select(&tx, sql::REFS_TARGET, name)?, Vec::new()),
     };
     let mut omitted = 0;
     let mut cut = |mut rows: Vec<Ref>| {
@@ -60,14 +56,14 @@ pub fn refs(conn: &Connection, path: Option<&str>, name: &str, limit: usize) -> 
 /// The Python file of the dotted module `name`, from the files of the index.
 fn module_file(conn: &Connection, name: &str) -> Result<Option<String>> {
     let paths = conn
-        .prepare("SELECT path FROM files WHERE language = 'python' ORDER BY path")?
+        .prepare(sql::PYTHON_FILES)?
         .query_map([], |row| row.get::<_, String>(0))?
         .collect::<Result<Vec<_>>>()?;
     Ok(Resolver::new(paths.iter().map(String::as_str), &[]).module("", name))
 }
 
-fn select(conn: &Connection, filter: &str, value: &str) -> Result<Vec<Ref>> {
-    conn.prepare(&format!("SELECT {COLUMNS} FROM links WHERE {filter}"))?
+fn select(conn: &Connection, statement: &str, value: &str) -> Result<Vec<Ref>> {
+    conn.prepare(statement)?
         .query_map([value], |row| {
             Ok(Ref {
                 path: row.get(0)?,

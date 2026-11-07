@@ -6,6 +6,7 @@ use std::fmt::Write;
 use rusqlite::{Connection, OptionalExtension, Result, Row as SqlRow, params};
 
 use crate::cli::Format;
+use crate::sql;
 
 /// One symbol in the output. `depth` is set only for `outline`.
 pub struct Row {
@@ -25,22 +26,14 @@ pub struct Results {
     pub omitted: usize,
 }
 
-const COLUMNS: &str = "path, line, end_line, kind, name, qualified_name, level, id, parent";
-
 /// The symbols whose qualified name or name (the last part) is `name`, in path and line order.
 /// The name of a heading is its text.
 pub fn find(conn: &Connection, name: &str, kind: Option<&str>, limit: usize) -> Result<Results> {
     // One read transaction, so the count and the rows come from the same state of the index.
     let tx = conn.unchecked_transaction()?;
-    let filter = "(qualified_name = ?1 OR name = ?1) AND (?2 IS NULL OR kind = ?2)";
-    let total: i64 = tx.query_row(
-        &format!("SELECT count(*) FROM symbols WHERE {filter}"),
-        params![name, kind],
-        |row| row.get(0),
-    )?;
-    let sql = format!("SELECT {COLUMNS} FROM symbols WHERE {filter} ORDER BY path, line LIMIT ?3");
+    let total: i64 = tx.query_row(sql::FIND_COUNT, params![name, kind], |row| row.get(0))?;
     let rows = tx
-        .prepare(&sql)?
+        .prepare(sql::FIND_ROWS)?
         .query_map(
             params![name, kind, i64::try_from(limit).unwrap_or(i64::MAX)],
             |row| read_row(row).map(|(row, _, _)| row),
@@ -54,27 +47,20 @@ pub fn find(conn: &Connection, name: &str, kind: Option<&str>, limit: usize) -> 
 
 /// The content hash of the file at `path` in the index, if it has a row.
 pub fn file_hash(conn: &Connection, path: &str) -> Result<Option<String>> {
-    conn.query_row("SELECT hash FROM files WHERE path = ?1", [path], |row| {
-        row.get(0)
-    })
-    .optional()
+    conn.query_row(sql::FILE_HASH, [path], |row| row.get(0))
+        .optional()
 }
 
 /// True if the index has a row for the file at `path`.
 pub fn is_indexed(conn: &Connection, path: &str) -> Result<bool> {
-    conn.query_row(
-        "SELECT count(*) > 0 FROM files WHERE path = ?1",
-        [path],
-        |row| row.get(0),
-    )
+    conn.query_row(sql::IS_INDEXED, [path], |row| row.get(0))
 }
 
 /// The symbols of one file in line order. A code symbol is one level deeper than its parent. A
 /// heading has the depth of its level, from 0.
 pub fn outline(conn: &Connection, path: &str, limit: usize) -> Result<Results> {
-    let sql = format!("SELECT {COLUMNS} FROM symbols WHERE path = ?1 ORDER BY line, id");
     let all = conn
-        .prepare(&sql)?
+        .prepare(sql::OUTLINE)?
         .query_map([path], read_row)?
         .collect::<Result<Vec<_>>>()?;
     let mut depths: HashMap<i64, usize> = HashMap::new();

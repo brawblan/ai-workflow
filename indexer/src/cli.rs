@@ -19,6 +19,7 @@ pub const DEFAULT_MAX_LINES: usize = 80;
 
 pub const USAGE: &str =
     "usage: stone-index build [--db PATH] [--max-file-size BYTES] [--lang EXT=LANG]
+       stone-index plans [--db PATH]
        stone-index find NAME [--kind KIND] [QUERY OPTIONS]
        stone-index show NAME [--kind KIND] [--max-lines N] [QUERY OPTIONS]
        stone-index outline PATH [QUERY OPTIONS]
@@ -32,6 +33,7 @@ and -- before a NAME or a PATH that starts with -";
 pub enum Command {
     Version,
     Build(IndexOptions),
+    Plans(IndexOptions),
     Find(Query),
     Show(Query),
     Outline(Query),
@@ -71,6 +73,8 @@ pub fn parse(args: &[String]) -> Result<Command, String> {
         Some((command, rest)) => match command.as_str() {
             "build" => parse_query(rest, false, &[], DEFAULT_LIMIT)
                 .map(|query| Command::Build(query.index)),
+            "plans" => parse_query(rest, false, &[], DEFAULT_LIMIT)
+                .map(|query| Command::Plans(query.index)),
             "find" => parse_query(rest, true, &["--kind"], DEFAULT_LIMIT).map(Command::Find),
             "show" => parse_query(rest, true, &["--kind", "--max-lines"], DEFAULT_SHOW_LIMIT)
                 .map(Command::Show),
