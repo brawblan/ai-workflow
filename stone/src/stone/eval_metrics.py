@@ -99,7 +99,8 @@ def scenario_table(runs: list[Any], rate: Callable[[list[Any], str | None], floa
 
 def _variant_cells(group: list[Any], rate: Callable[[list[Any], str | None], float]) -> list[str]:
     cost = mean_and_error(_values(group, "cost_usd"))
-    return [f"{cost[0]:.4f}" if cost else MISSING, f"{cost[1]:.4f}" if cost else MISSING,
+    error = MISSING if len(_values(group, "cost_usd")) < 2 else f"{cost[1]:.4f}"  # type: ignore[index]
+    return [f"{cost[0]:.4f}" if cost else MISSING, error,
             mean(group, "turns", 1), mean(group, "tool_bytes"), f"{rate(group, 'outcome'):.2f}"]
 
 
@@ -115,7 +116,9 @@ def variant_table(runs: list[Any], rate: Callable[[list[Any], str | None], float
     return lines
 
 
-def _verdict(diff: float, error: float) -> str:
+def _verdict(diff: float, error: float, runs: int) -> str:
+    if runs < 2:
+        return "not tested: a variant has fewer than 2 runs, so the standard error is not known"
     return "more than 2 standard errors" if abs(diff) > 2 * error else "within 2 standard errors"
 
 
@@ -126,8 +129,9 @@ def _difference_line(runs: list[Any], name: str, base: str) -> str:
         return f"Cost, {name} minus {base}: {MISSING}. A run has no cost."
     diff = other[0] - base_cost[0]
     error = math.hypot(other[1], base_cost[1])
-    return (f"Cost, {name} minus {base}: {diff:+.4f} USD. "
-            f"The difference is {_verdict(diff, error)} (SE {error:.4f}).")
+    least = min(len(_values([r for r in runs if r.variant == v], "cost_usd")) for v in (name, base))
+    note = f" (SE {error:.4f})" if least > 1 else ""
+    return f"Cost, {name} minus {base}: {diff:+.4f} USD. The difference is {_verdict(diff, error, least)}{note}."
 
 
 def cost_difference_lines(runs: list[Any]) -> list[str]:

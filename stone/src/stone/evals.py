@@ -430,7 +430,7 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
         if stderr:
             transcript.with_suffix(".err").write_text(stderr, encoding="utf-8")
         run.usage.update(transcript=str(transcript), workspace=str(workspace.path))
-        stats = eval_metrics.transcript_stats(transcript)
+        stats = eval_metrics.transcript_stats(transcript) if stdout else None
         if stats:
             run.usage.update(tool_calls=stats[0], tool_bytes=stats[1])
         run.checks = grade(folder, scenario, workspace)
@@ -634,11 +634,6 @@ def grade(folder: Path, scenario: dict[str, Any], ws: Workspace) -> list[dict[st
 # Report ------------------------------------------------------------------------------------
 
 
-def _mean(runs: list[Run], key: str, digits: int = 0) -> str:
-    values = [r.usage[key] for r in runs if isinstance(r.usage.get(key), (int, float))]
-    return f"{sum(values) / len(values):.{digits}f}" if values else "—"
-
-
 def _rate(runs: list[Run], kind: str | None) -> float:
     return sum(r.passed(kind) for r in runs) / len(runs) if runs else 0.0
 
@@ -660,6 +655,11 @@ def summary(component: str, model: str, runs: list[Run]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _kept_path(root: Path, stored: str) -> Path:
+    """The stored path starts at the working folder of the run. Try it, then try it under root."""
+    return Path(stored) if Path(stored).exists() else root / stored
+
+
 def load_runs(path: Path, root: Path = Path(".")) -> list[Run]:
     """Read a kept `runs.jsonl`. A key that an old file lacks stays missing, except the tool
     metrics: they come from the transcript of the run, if the file still exists."""
@@ -671,7 +671,7 @@ def load_runs(path: Path, root: Path = Path(".")) -> list[Run]:
         raise EvalError(f"{path}: cannot read the runs file ({error}).") from error
     for run in runs:
         stats = None if "tool_calls" in run.usage or not run.usage.get("transcript") else \
-            eval_metrics.transcript_stats(root / str(run.usage["transcript"]))
+            eval_metrics.transcript_stats(_kept_path(root, str(run.usage["transcript"])))
         if stats:
             run.usage.update(tool_calls=stats[0], tool_bytes=stats[1])
     return runs
