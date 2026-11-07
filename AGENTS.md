@@ -32,12 +32,12 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | Writing check (K17) on your changes | `stone check-writing --diff origin/dev` |
 | Action pins, plugin version bump, event text in `env`, and commit message format (R1 to R4, D78, D97, D98) | `stone check-rules --base origin/dev` |
 | Rust format check (in `indexer/`) | `cargo fmt --check` |
-| Rust lint (in `indexer/`) | `cargo clippy --locked -- -D warnings` |
+| Rust lint (in `indexer/`) | `cargo clippy --locked --all-targets -- -D warnings` |
 | Rust tests (in `indexer/`) | `cargo test --locked` |
 | Validate the plugin | `claude plugin validate .` |
 | Preview the docs site | `pip install -r website/requirements.txt && mkdocs serve` |
 | Try a skill before you push | `claude --plugin-dir plugins/cornerstone` |
-| All checks before a push | `python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/dev && stone check-rules --base origin/dev && (cd indexer && cargo fmt --check && cargo clippy --locked -- -D warnings && cargo test --locked)` |
+| All checks before a push | `python stone/tests/run_parallel.py -q && stone check && stone check-writing --diff origin/dev && stone check-rules --base origin/dev && (cd indexer && cargo fmt --check && cargo clippy --locked --all-targets -- -D warnings && cargo test --locked)` |
 
 ## Rules for every task
 
