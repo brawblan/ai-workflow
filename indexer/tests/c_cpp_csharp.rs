@@ -115,7 +115,7 @@ enum Color { RED, GREEN };\ntypedef unsigned long ulong_t;\n#endif\n";
 fn ac3_cpp_symbols_keep_declaration_kind() {
     let src = "namespace ns {\nclass Widget {\npublic:\n  void draw();\n};\n\
 template <typename T> class Box { };\ntemplate <typename T> T twice(T v) { return v; }\n\
-class EXPORT Exported { };\n}\n";
+class EXPORT Exported { int a; };\n}\n";
     let fx = built(&[("w.cpp", src)], &[]);
     assert_eq!(
         syms(&fx, "w.cpp"),
@@ -135,7 +135,10 @@ fn ac3_csharp_symbols() {
     let src = "using System;\nnamespace App {\npublic class C {\n  public int P { get; set; }\n  public void M() {}\n}\n\
 public struct S { }\npublic record R(int A);\npublic interface I { }\npublic enum E { A }\n}\n";
     let fx = built(
-        &[("a.cs", src), ("b.cs", "namespace A;\nclass K { }\n")],
+        &[
+            ("a.cs", src),
+            ("b.cs", "namespace A;\nclass K { void M() {} }\n"),
+        ],
         &[],
     );
     let got = syms(&fx, "a.cs");
@@ -153,11 +156,8 @@ public struct S { }\npublic record R(int A);\npublic interface I { }\npublic enu
     }
     let b = syms(&fx, "b.cs");
     assert!(b.contains(&"namespace A".to_string()), "{b:?}");
-    assert!(
-        b.iter()
-            .any(|s| s.starts_with("class ") && s.ends_with("K")),
-        "{b:?}"
-    );
+    assert!(b.contains(&"class A.K".to_string()), "{b:?}");
+    assert!(b.contains(&"method A.K.M".to_string()), "{b:?}");
 }
 
 #[test]
