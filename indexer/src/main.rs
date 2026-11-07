@@ -3,6 +3,7 @@
 mod cli;
 mod db;
 mod lang;
+mod symbols;
 mod update;
 mod walk;
 
