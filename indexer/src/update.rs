@@ -7,11 +7,13 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
+use rayon::prelude::*;
 use rusqlite::{Connection, Result, TransactionBehavior, params};
 use xxhash_rust::xxh3::xxh3_64;
 
 use crate::db;
 use crate::lang;
+use crate::symbols::{self, Symbol};
 use crate::walk::{self, Candidate};
 
 /// A file with a NUL byte in this many first bytes is binary, and the index skips it.
@@ -54,6 +56,8 @@ struct Prepared<'a> {
     candidate: &'a Candidate,
     hash: String,
     lines: i64,
+    language: Option<&'static str>,
+    symbols: Vec<Symbol>,
 }
 
 /// Brings the index at `db_path` up to date with the files under `root`.
@@ -92,7 +96,11 @@ fn sync(conn: &Connection, root: &Path, db_path: &Path, max_size: u64) -> Result
             changed.push(candidate);
         }
     }
-    for prepared in changed.into_iter().filter_map(prepare) {
+    let prepared: Vec<Prepared> = changed
+        .into_par_iter()
+        .filter_map(|candidate| prepare(candidate, stored.get(&candidate.path)))
+        .collect();
+    for prepared in prepared {
         seen.insert(prepared.candidate.path.as_str());
         let old = stored.get(&prepared.candidate.path);
         if write(conn, &prepared, old, racy_from)? {
@@ -135,15 +143,24 @@ fn stored_files(conn: &Connection) -> Result<HashMap<String, Stored>> {
     rows.collect()
 }
 
-/// Reads a file. Returns `None` if the read fails or the file is binary.
-fn prepare(candidate: &Candidate) -> Option<Prepared<'_>> {
+/// Reads a file, and parses it if the content hash changed. Returns `None` if the read fails or
+/// the file is binary. The update calls it on many threads at once.
+fn prepare<'a>(candidate: &'a Candidate, old: Option<&Stored>) -> Option<Prepared<'a>> {
     let bytes = read_text(&candidate.abs)?;
+    let hash = format!("{:016x}", xxh3_64(&bytes));
+    let language = lang::language(&candidate.path);
+    let changed = old.is_none_or(|old| old.hash != hash);
     let newlines = bytes.iter().filter(|&&byte| byte == b'\n').count();
     let last_line = usize::from(!bytes.is_empty() && !bytes.ends_with(b"\n"));
     Some(Prepared {
         candidate,
-        hash: format!("{:016x}", xxh3_64(&bytes)),
+        hash,
         lines: i64::try_from(newlines + last_line).unwrap_or(i64::MAX),
+        language,
+        symbols: match language {
+            Some(language) if changed => symbols::symbols(language, &bytes),
+            _ => Vec::new(),
+        },
     })
 }
 
@@ -193,11 +210,35 @@ fn write(
             candidate.size,
             mtime_ns,
             prepared.hash,
-            lang::language(&candidate.path),
+            prepared.language,
             prepared.lines
         ],
     )?;
+    write_symbols(conn, &candidate.path, &prepared.symbols)?;
     Ok(true)
+}
+
+fn write_symbols(conn: &Connection, path: &str, symbols: &[Symbol]) -> Result<()> {
+    let mut insert = conn.prepare_cached(
+        "INSERT INTO symbols (name, qualified_name, kind, path, line, end_line, parent, level)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+    )?;
+    let mut ids = Vec::with_capacity(symbols.len());
+    for symbol in symbols {
+        let parent = symbol.parent.map(|index: usize| ids[index]);
+        let params = params![
+            symbol.name,
+            symbol.qualified_name,
+            symbol.kind,
+            path,
+            symbol.line,
+            symbol.end_line,
+            parent,
+            symbol.level
+        ];
+        ids.push(insert.insert(params)?);
+    }
+    Ok(())
 }
 
 /// Deletes the rows of each stored file that the walk did not keep. Returns the count.

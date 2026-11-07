@@ -8,7 +8,7 @@ use rusqlite::{Connection, Error, ErrorCode, OptionalExtension, Result};
 
 /// Change this number with each change to `SCHEMA`, and with each parser change that changes the
 /// rows. A build then makes a new index, so it parses each file again.
-pub const SCHEMA_VERSION: i64 = 1;
+pub const SCHEMA_VERSION: i64 = 2;
 
 /// A second build waits this long for the first build to finish.
 const BUSY_TIMEOUT: Duration = Duration::from_secs(600);
@@ -35,7 +35,8 @@ const SCHEMA: &[&str] = &[
         path TEXT NOT NULL REFERENCES files(path) ON DELETE CASCADE,
         line INTEGER NOT NULL,
         end_line INTEGER NOT NULL,
-        parent INTEGER REFERENCES symbols(id) ON DELETE CASCADE
+        parent INTEGER REFERENCES symbols(id) ON DELETE CASCADE,
+        level INTEGER
     )",
     "CREATE INDEX symbols_name ON symbols(name)",
     "CREATE INDEX symbols_qualified_name ON symbols(qualified_name)",
