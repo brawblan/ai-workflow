@@ -92,15 +92,26 @@ fn set_wal(conn: &Connection) -> Result<()> {
 pub fn ensure_schema(conn: &Connection) -> std::result::Result<bool, String> {
     match contents(conn).map_err(|error| describe(&error))? {
         Contents::Index(Some(SCHEMA_VERSION)) => return Ok(false),
-        Contents::Foreign => {
-            return Err("broken index: the database is not a stone-index index. \
-                 Use another --db path."
-                .to_string());
-        }
+        Contents::Foreign => return Err(FOREIGN.to_string()),
         Contents::Empty | Contents::Index(_) => {}
     }
     make_schema(conn).map_err(|error| describe(&error))?;
     Ok(true)
+}
+
+/// The error for a database that is not an index.
+const FOREIGN: &str =
+    "broken index: the database is not a stone-index index. Use another --db path.";
+
+/// An error if the file is not an index with the schema of this binary.
+pub fn check_current(conn: &Connection) -> std::result::Result<(), String> {
+    match contents(conn).map_err(|error| describe(&error))? {
+        Contents::Index(Some(SCHEMA_VERSION)) => Ok(()),
+        Contents::Foreign => Err(FOREIGN.to_string()),
+        Contents::Empty | Contents::Index(_) => Err("broken index: the schema version is not \
+             the version of this binary. Run `stone-index build`."
+            .to_string()),
+    }
 }
 
 fn make_schema(conn: &Connection) -> Result<()> {
