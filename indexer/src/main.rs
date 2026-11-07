@@ -91,8 +91,11 @@ fn plans(options: &IndexOptions) -> Result<String, String> {
         let mut plan = conn
             .prepare(&format!("EXPLAIN QUERY PLAN {statement}"))
             .map_err(describe(&place))?;
+        let nulls = vec![rusqlite::types::Null; plan.parameter_count()];
         let details = plan
-            .query_map([], |row| row.get::<_, String>(3))
+            .query_map(rusqlite::params_from_iter(nulls), |row| {
+                row.get::<_, String>(3)
+            })
             .and_then(Iterator::collect::<rusqlite::Result<Vec<_>>>)
             .map_err(describe(&place))?;
         for detail in details {
