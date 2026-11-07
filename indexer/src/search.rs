@@ -182,7 +182,8 @@ fn score(line: &str, terms: &[Vec<String>]) -> usize {
 
 /// The offset and the text of the line of a block with the most of the `terms`, the first one if
 /// two lines have the same number. The text has no space at the ends and a space for each tab.
-/// `None` if no line has a term.
+/// If a phrase runs over a line break, a line with one word of it is the hit line. `None` if no
+/// line has a word.
 fn best_line(lines: &[&str], terms: &[Vec<String>]) -> Option<(i64, String)> {
     let mut best: Option<(usize, usize)> = None;
     for (index, line) in lines.iter().enumerate() {
@@ -190,6 +191,18 @@ fn best_line(lines: &[&str], terms: &[Vec<String>]) -> Option<(i64, String)> {
         if count > 0 && best.is_none_or(|(_, top)| count > top) {
             best = Some((index, count));
         }
+    }
+    if best.is_none() {
+        // A phrase can run over a line break: no line has all its words, but FTS5 matched it.
+        let flat: Vec<Vec<String>> = terms
+            .iter()
+            .flatten()
+            .map(|word| vec![word.clone()])
+            .collect();
+        best = lines
+            .iter()
+            .position(|line| score(line, &flat) > 0)
+            .map(|index| (index, 1));
     }
     let (index, _) = best?;
     let offset = i64::try_from(index).unwrap_or(0);
