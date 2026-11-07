@@ -1041,7 +1041,7 @@ class RecordsTest(EvalTestCase):
         self.assertAlmostEqual(float(self.col(t1_with, "outcome")), 0.5)
         self.assertAlmostEqual(float(self.col(t1_with, "contract")), 1.0)
         self.assertAlmostEqual(float(self.col(t1_with, "cost")), 0.3)
-        self.assertAlmostEqual(float(self.col(t1_with, "token")), 20)
+        self.assertAlmostEqual(float(self.col(t1_with, "tokens out")), 20)
         self.assertGreaterEqual(float(self.col(t1_with, "second")), 0)
         self.assertEqual(self.col(t1_with, "error"), "0")
         t1_without = rows[("T1", "without")]
