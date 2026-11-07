@@ -1,4 +1,4 @@
-//! The symbol rules of C, C++, and C#. Each language has its own table of node kinds.
+//! The symbol rules of C, C++, C#, and Rust. Each language has its own table of node kinds.
 
 use tree_sitter::Node;
 
@@ -103,6 +103,59 @@ pub fn csharp_symbol(node: Node, source: &[u8]) -> Option<(&'static str, String)
         _ => return None,
     };
     Some((kind, text(node.child_by_field_name("name")?, source)))
+}
+
+/// The kind and the name of a Rust symbol node. An item in an `impl` block gets the type in its
+/// name, so `impl Parser { fn parse() }` gives `Parser.parse`. A trait is the parent of its items.
+pub fn rust_symbol(node: Node, source: &[u8], context: &Context) -> Option<(&'static str, String)> {
+    let block = context
+        .parent_node
+        .filter(|parent| parent.kind() == "declaration_list")
+        .and_then(|parent| parent.parent());
+    let member = block.is_some_and(|block| matches!(block.kind(), "impl_item" | "trait_item"));
+    let kind = match node.kind() {
+        "function_item" | "function_signature_item" if member => "method",
+        "function_item" | "function_signature_item" => "function",
+        "struct_item" => "struct",
+        "enum_item" => "enum",
+        "union_item" => "union",
+        "trait_item" => "trait",
+        // `mod a;` is a link. Only a module with a body is a symbol.
+        "mod_item" => {
+            node.child_by_field_name("body")?;
+            "mod"
+        }
+        "const_item" => "constant",
+        "static_item" => "static",
+        "type_item" => "type",
+        "macro_definition" => "macro",
+        _ => return None,
+    };
+    let name = text(node.child_by_field_name("name")?, source);
+    let owner = block
+        .filter(|block| block.kind() == "impl_item")
+        .and_then(|block| block.child_by_field_name("type"));
+    Some(match owner {
+        Some(owner) => (kind, format!("{}.{name}", impl_type(owner, source))),
+        None => (kind, name),
+    })
+}
+
+/// The name of the type of an `impl` block, with no generic parameters and no path:
+/// `impl<T> a::Box<T>` gives `Box`.
+fn impl_type(mut node: Node, source: &[u8]) -> String {
+    for _ in 0..MAX_DECLARATOR_DEPTH {
+        let inner = match node.kind() {
+            "generic_type" | "reference_type" | "pointer_type" => node.child_by_field_name("type"),
+            "scoped_type_identifier" => node.child_by_field_name("name"),
+            _ => None,
+        };
+        match inner {
+            Some(inner) => node = inner,
+            None => break,
+        }
+    }
+    text(node, source)
 }
 
 /// The name that a declarator declares. `Parser::parse` gives `Parser.parse`.

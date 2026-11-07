@@ -19,6 +19,7 @@ pub fn links(parsed: &Parsed) -> Vec<Link> {
         "markdown" => markdown,
         "c" | "cpp" => include,
         "csharp" => using,
+        "rust" => rust,
         _ => return Vec::new(),
     };
     let mut found = Vec::new();
@@ -134,6 +135,76 @@ fn using(node: Node, source: &[u8], found: &mut Vec<Link>) {
             "using",
             text(name, source).split_whitespace().collect(),
         );
+    }
+}
+
+/// `mod a;` gives `a`. `use` gives one link for each path that it names: `use a::{b, c::*};` gives
+/// `a::b` and `a::c`.
+fn rust(node: Node, source: &[u8], found: &mut Vec<Link>) {
+    match node.kind() {
+        "mod_item" if node.child_by_field_name("body").is_none() => {
+            if let Some(name) = node.child_by_field_name("name") {
+                push(found, node, "mod", text(name, source));
+            }
+        }
+        "use_declaration" => {
+            let mut targets = Vec::new();
+            if let Some(argument) = node.child_by_field_name("argument") {
+                use_paths(argument, source, "", 0, &mut targets);
+            }
+            for target in targets {
+                push(found, node, "use", target);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// The deepest nesting of `use` lists that the reader follows.
+const MAX_USE_DEPTH: usize = 32;
+
+/// The paths of a `use` tree. `prefix` is the path above the node.
+fn use_paths(node: Node, source: &[u8], prefix: &str, depth: usize, out: &mut Vec<String>) {
+    if depth > MAX_USE_DEPTH {
+        return;
+    }
+    let path = |node: Node| -> String {
+        let written: String = text(node, source).split_whitespace().collect();
+        let written = written.trim_start_matches("::");
+        match prefix {
+            "" => written.to_string(),
+            _ => format!("{prefix}::{written}"),
+        }
+    };
+    let mut cursor = node.walk();
+    match node.kind() {
+        "use_list" => {
+            for child in node.named_children(&mut cursor) {
+                if child.kind().ends_with("_comment") {
+                    continue;
+                }
+                use_paths(child, source, prefix, depth + 1, out);
+            }
+        }
+        "scoped_use_list" => {
+            let base = node
+                .child_by_field_name("path")
+                .map_or_else(|| prefix.to_string(), path);
+            if let Some(list) = node.child_by_field_name("list") {
+                use_paths(list, source, &base, depth + 1, out);
+            }
+        }
+        "use_as_clause" => {
+            if let Some(inner) = node.child_by_field_name("path") {
+                use_paths(inner, source, prefix, depth + 1, out);
+            }
+        }
+        "use_wildcard" => {
+            let base = node.named_child(0).map_or_else(|| prefix.to_string(), path);
+            out.push(base);
+        }
+        "self" if !prefix.is_empty() => out.push(prefix.to_string()),
+        _ => out.push(path(node)),
     }
 }
 

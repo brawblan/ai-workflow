@@ -54,6 +54,7 @@ fn grammar(language: &str) -> Option<Language> {
         "c" => tree_sitter_c::LANGUAGE,
         "cpp" => tree_sitter_cpp::LANGUAGE,
         "csharp" => tree_sitter_c_sharp::LANGUAGE,
+        "rust" => tree_sitter_rust::LANGUAGE,
         _ => return None,
     };
     Some(grammar.into())
@@ -87,15 +88,7 @@ fn code_symbols(language: &str, root: Node, source: &[u8]) -> Vec<Symbol> {
         if let Some((kind, name)) =
             code_symbol(node, source, &context).filter(|_| depth < MAX_SYMBOL_DEPTH)
         {
-            // A C++ method outside its class has the class in its name: `Parser.parse`.
-            let (scope, name) = match name.rsplit_once('.') {
-                Some((scope, last))
-                    if language == "cpp" && matches!(kind, "function" | "method") =>
-                {
-                    (Some(scope), last.to_string())
-                }
-                _ => (None, name),
-            };
+            let (scope, name) = split_scope(language, kind, name);
             let local = scope.map_or_else(|| name.clone(), |scope| format!("{scope}.{name}"));
             let qualified_name = match parent {
                 Some(index) => format!("{}.{local}", found[index].qualified_name),
@@ -135,6 +128,20 @@ fn code_symbols(language: &str, root: Node, source: &[u8]) -> Vec<Symbol> {
     found
 }
 
+/// A C++ method outside its class, and a Rust item in an `impl` block, have the type in their
+/// name: `Parser.parse` gives the scope `Parser` and the name `parse`.
+fn split_scope(language: &str, kind: &str, name: String) -> (Option<String>, String) {
+    match name.rsplit_once('.') {
+        Some((scope, last))
+            if language == "rust"
+                || (language == "cpp" && matches!(kind, "function" | "method")) =>
+        {
+            (Some(scope.to_string()), last.to_string())
+        }
+        _ => (None, name),
+    }
+}
+
 /// The index of the symbol of a file-scoped C# namespace that comes before `node` in its file.
 fn file_scoped_namespace(found: &[Symbol], node: Node, parent_node: Option<Node>) -> Option<usize> {
     let is_top = parent_node.is_some_and(|parent| parent.kind() == "compilation_unit");
@@ -162,6 +169,7 @@ fn code_symbol(node: Node, source: &[u8], context: &Context) -> Option<(&'static
         "c" => rules::c_symbol(node, source),
         "cpp" => rules::cpp_symbol(node, source, context),
         "csharp" => rules::csharp_symbol(node, source),
+        "rust" => rules::rust_symbol(node, source, context),
         _ => script_symbol(node, source, context),
     }
 }

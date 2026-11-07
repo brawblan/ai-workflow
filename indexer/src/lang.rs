@@ -13,6 +13,7 @@ pub const NAMES: &[&str] = &[
     "c",
     "cpp",
     "csharp",
+    "rust",
 ];
 
 /// A `--lang EXT=LANG` setting: a file extension in lower case, and the language that it gets.
@@ -35,6 +36,7 @@ pub fn language_with(path: &str, overrides: &[Override]) -> Option<&'static str>
         "c" => "c",
         "cc" | "cpp" | "cxx" | "hpp" | "hh" | "hxx" | "h" => "cpp",
         "cs" => "csharp",
+        "rs" => "rust",
         _ => return None,
     };
     Some(name)

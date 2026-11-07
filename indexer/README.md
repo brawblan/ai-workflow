@@ -58,7 +58,7 @@ current folder.
 | --- | --- | --- |
 | `--db <path>` | `.cornerstone/index.db` in the repo root | Sets the path of the index. A relative path starts at the current folder. |
 | `--max-file-size <bytes>` | `1048576` (1 MB) | Skips each file that is larger. |
-| `--lang <ext>=<lang>` | None | Sets the language of a file extension. Repeat it for more extensions. `<lang>` is `python`, `markdown`, `typescript`, `tsx`, `javascript`, `jsx`, `c`, `cpp`, or `csharp`. For example, `--lang h=c` reads `.h` files as C. Give the same option to each command, because a command that gets another language reads the file again. |
+| `--lang <ext>=<lang>` | None | Sets the language of a file extension. Repeat it for more extensions. `<lang>` is `python`, `markdown`, `typescript`, `tsx`, `javascript`, `jsx`, `c`, `cpp`, `csharp`, or `rust`. For example, `--lang h=c` reads `.h` files as C. Give the same option to each command, because a command that gets another language reads the file again. |
 
 The walk follows `.gitignore`, `.git/info/exclude`, and the global git ignore file, also with no git.
 It also follows `.ignore` files. It skips the `.git` folder, symbolic links, and a file with a NUL
@@ -197,6 +197,7 @@ The index keeps each symbol that tree-sitter finds in the file.
 | C | `.c` | `function`, `struct`, `union`, `enum`, `typedef`, `macro` |
 | C++ | `.cc`, `.cpp`, `.cxx`, `.hpp`, `.hh`, `.hxx`, `.h` | The C kinds, and `class`, `namespace`, `method` |
 | C# | `.cs` | `namespace`, `class`, `struct`, `record`, `interface`, `enum`, `method`, `property` |
+| Rust | `.rs` | `function`, `method`, `struct`, `enum`, `union`, `trait`, `mod`, `constant`, `static`, `type`, `macro` |
 | Markdown | `.md`, `.markdown` | `heading` |
 
 - A function in a class is a `method`. A class field with a function value is also a `method`.
@@ -220,6 +221,10 @@ The index keeps each symbol that tree-sitter finds in the file.
   `Name`. The grammar cannot read `class EXPORT Name : Base {...}`, so the index has no symbol for it. It also cannot read an empty `class EXPORT Name {};`.
 - C#: a file-scoped `namespace A;` holds the declarations after it, so `class K` is `A.K`. A file-scoped namespace and `namespace A.B {}` are a `namespace`. A `record struct` is a
   `record`. A constructor, a field, and an event are not symbols.
+- Rust: an item in `impl Type` or `impl Trait for Type` gets the qualified name `Type.item`, and a
+  function there is a `method`. An item in `trait Trait` gets `Trait.item`. A generic type and a
+  type with a path use only the name: `impl<T> a::Box<T>` gives `Box`. A `mod` is a symbol only if
+  it has a body. A `macro` is a `macro_rules!` definition. The `impl` block has no symbol.
 - The index keeps symbols to a nesting depth of 32. It skips deeper symbols.
 - The qualified name of a code symbol joins the names of its parents with `.`, for example
   `Parser.parse`.
@@ -240,6 +245,7 @@ link of the index again.
 | TypeScript, JavaScript | `import`, `export`, `require` | `import` and `export ... from` with a source. `require()` and `import()` with a string. |
 | C, C++ | `include` | `#include "a.h"` gives `a.h`. `#include <a.h>` gives `<a.h>`. |
 | C# | `using` | `using A.B;` gives `A.B`. `using static` and `using X = A.B;` also give `A.B`. |
+| Rust | `mod`, `use` | `mod a;` gives `a`. `use a::{b, c::*};` gives `a::b` and `a::c`. An `as` name is not in the target. |
 | Markdown | `link` | Relative links, also in table cells, and link reference definitions, with no `#anchor` and no `?query`. A link in a code span is not a link. |
 
 The build resolves a target to a file of the repo where it can:
@@ -254,6 +260,11 @@ The build resolves a target to a file of the repo where it can:
 - A C or C++ `#include "..."` tries three paths in this order. First, the path from the folder of
   the file. Then, the path from the repo root. Last, the nearest file whose path ends with the
   target. An `#include <...>` stays text. A `using` stays text.
+- A Rust `mod a;` is `a.rs` or `a/mod.rs` in the folder of the module of the file. That folder is
+  the folder of the file for `main.rs`, `lib.rs`, and `mod.rs`. Else it is the folder with the
+  name of the file. A `use crate::a::b::Item;` starts at the nearest `main.rs` or `lib.rs` at or
+  above the file. It goes down each part that is a module file, and gives the last one. A `use` of
+  an outside crate, and a `use` with `self` or `super`, stay text.
 - A Markdown link: the relative path.
 
 Other targets, for example an external package, keep only their target text.

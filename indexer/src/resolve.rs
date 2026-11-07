@@ -85,6 +85,7 @@ impl<'a> Resolver<'a> {
             "python" => self.python_module(from, target),
             "markdown" => self.file(&join(from, target)?),
             "c" | "cpp" => self.include(from, target),
+            "rust" => self.rust(from, target),
             _ if target.starts_with("./") || target.starts_with("../") => {
                 self.script(&join(from, target)?)
             }
@@ -164,6 +165,46 @@ impl<'a> Resolver<'a> {
         })
     }
 
+    /// A Rust target with the 2018 rules. A name with no `::` is a `mod a;` of the file. A path
+    /// that starts with `crate::` starts at the crate root. Each part that is a module file moves
+    /// the walk down. The first part that is not one is an item of the last module.
+    fn rust(&self, from: &str, target: &str) -> Option<String> {
+        let mut parts = target.split("::").peekable();
+        let (mut folder, mut last) = if parts.peek() == Some(&"crate") {
+            parts.next();
+            let root = self.crate_root(from)?;
+            (parent(&root).to_string(), Some(root))
+        } else if target.contains("::") {
+            return None;
+        } else {
+            (rust_module_folder(from), None)
+        };
+        for part in parts {
+            let file = child(&folder, &format!("{part}.rs"));
+            let nested = child(&child(&folder, part), "mod.rs");
+            let Some(found) = self.file(&file).or_else(|| self.file(&nested)) else {
+                break;
+            };
+            folder = child(&folder, part);
+            last = Some(found);
+        }
+        last
+    }
+
+    /// The `main.rs` or `lib.rs` in the nearest folder at or above the file.
+    fn crate_root(&self, from: &str) -> Option<String> {
+        let mut folder = parent(from);
+        loop {
+            let root = ["main.rs", "lib.rs"]
+                .iter()
+                .find_map(|name| self.file(&child(folder, name)));
+            if root.is_some() || folder.is_empty() {
+                return root;
+            }
+            folder = parent(folder);
+        }
+    }
+
     fn script(&self, base: &str) -> Option<String> {
         let mut paths = vec![base.to_string()];
         if let Some(stem) = [".js", ".jsx", ".mjs", ".cjs"]
@@ -183,6 +224,28 @@ impl<'a> Resolver<'a> {
 
     fn file(&self, path: &str) -> Option<String> {
         self.files.contains(path).then(|| path.to_string())
+    }
+}
+
+fn parent(path: &str) -> &str {
+    path.rsplit_once('/').map_or("", |(folder, _)| folder)
+}
+
+fn child(folder: &str, name: &str) -> String {
+    if folder.is_empty() {
+        name.to_string()
+    } else {
+        format!("{folder}/{name}")
+    }
+}
+
+/// The folder of the child modules of a Rust file: its own folder for `main.rs`, `lib.rs`, and
+/// `mod.rs`, else the folder with the name of the file.
+fn rust_module_folder(path: &str) -> String {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    match name.strip_suffix(".rs") {
+        Some("main" | "lib" | "mod") | None => parent(path).to_string(),
+        Some(stem) => child(parent(path), stem),
     }
 }
 
