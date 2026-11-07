@@ -126,7 +126,7 @@ fn sync(conn: &Connection, root: &Path, db_path: &Path, options: &IndexOptions) 
     if same_files && prepared.is_empty() {
         return Ok(summary);
     }
-    let resolver = Resolver::new(seen.iter().copied());
+    let resolver = Resolver::new(seen.iter().copied(), &options.langs);
     for prepared in &prepared {
         let old = stored.get(&prepared.candidate.path);
         if write(conn, prepared, old, racy_from, &resolver)? {

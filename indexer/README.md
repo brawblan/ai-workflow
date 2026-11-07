@@ -212,6 +212,10 @@ The index keeps each symbol that tree-sitter finds in the file.
   declaration of a method in a class is also a `method`. `void Parser::parse() {}` gets the
   qualified name `Parser.parse`, and `namespace a::b` gets the name `a.b`. A template is a symbol
   of the kind of its declaration, for example a `class` for a class template.
+- C++: the build cannot tell a function in a namespace, `void ns::helper() {}`, from a method, so
+  both are a `method`. A member template that a class only declares is not a symbol. A function
+  pointer field is not a symbol. The name of a method has no template arguments: `Box<T>::put`
+  gives `Box.put`.
 - C++: `class EXPORT Name {...}` and `struct EXPORT Name {...}`, with an export macro, are read as
   `Name`. The grammar cannot read `class EXPORT Name : Base {...}`, so the index has no symbol for it. It also cannot read an empty `class EXPORT Name {};`.
 - C#: a file-scoped `namespace A;` holds the declarations after it, so `class K` is `A.K`. A file-scoped namespace and `namespace A.B {}` are a `namespace`. A `record struct` is a

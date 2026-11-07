@@ -21,10 +21,12 @@ pub struct Resolver<'a> {
     packages: HashSet<&'a str>,
     /// The C and C++ files by name, for an `#include` that gives only the end of a path.
     sources: HashMap<&'a str, Vec<&'a str>>,
+    /// The `--lang` settings of the build.
+    langs: &'a [lang::Override],
 }
 
 impl<'a> Resolver<'a> {
-    pub fn new(paths: impl IntoIterator<Item = &'a str>) -> Self {
+    pub fn new(paths: impl IntoIterator<Item = &'a str>, langs: &'a [lang::Override]) -> Self {
         let files: HashSet<&str> = paths.into_iter().collect();
         let mut modules: HashMap<String, Vec<&str>> = HashMap::new();
         let packages: HashSet<&str> = files
@@ -38,7 +40,7 @@ impl<'a> Resolver<'a> {
             .collect();
         let mut sources: HashMap<&str, Vec<&str>> = HashMap::new();
         for &path in &files {
-            if matches!(lang::language(path), Some("c" | "cpp")) {
+            if matches!(lang::language_with(path, langs), Some("c" | "cpp")) {
                 let name = path.rsplit('/').next().unwrap_or(path);
                 sources.entry(name).or_default().push(path);
             }
@@ -72,12 +74,13 @@ impl<'a> Resolver<'a> {
             modules,
             packages,
             sources,
+            langs,
         }
     }
 
     /// The repo path of the target of a link in the file `from`, or `None`.
     pub fn resolve(&self, from: &str, target: &str) -> Option<String> {
-        match lang::language(from)? {
+        match lang::language_with(from, self.langs)? {
             "python" if target.starts_with('.') => self.python_relative(from, target),
             "python" => self.python_module(from, target),
             "markdown" => self.file(&join(from, target)?),

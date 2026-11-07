@@ -19,11 +19,7 @@ pub const NAMES: &[&str] = &[
 pub type Override = (String, &'static str);
 
 /// The language name that the index stores, or `None` if the indexer does not parse the file.
-pub fn language(path: &str) -> Option<&'static str> {
-    language_with(path, &[])
-}
-
-/// Like `language`, but an override replaces the language of its extension.
+/// An override replaces the language of its extension.
 pub fn language_with(path: &str, overrides: &[Override]) -> Option<&'static str> {
     let extension = Path::new(path).extension()?.to_str()?.to_ascii_lowercase();
     if let Some((_, name)) = overrides.iter().find(|(ext, _)| *ext == extension) {

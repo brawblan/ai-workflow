@@ -62,7 +62,12 @@ pub fn cpp_symbol(node: Node, source: &[u8], context: &Context) -> Option<(&'sta
         // A method that the class declares and a .cpp file defines.
         "field_declaration" if in_class => {
             let declarator = node.child_by_field_name("declarator")?;
-            (declarator.kind() == "function_declarator")
+            // A function pointer, `void (*cb)(int)`, is a field, not a method.
+            let plain = declarator.kind() == "function_declarator"
+                && declarator
+                    .child_by_field_name("declarator")
+                    .is_some_and(|inner| inner.kind() != "parenthesized_declarator");
+            plain
                 .then(|| declarator_name(declarator, source))?
                 .map(|name| ("method", name))
         }
@@ -124,8 +129,23 @@ fn scoped_name(node: Node, source: &[u8]) -> String {
     } else {
         node
     };
-    text(name, source)
+    without_arguments(&text(name, source))
         .replace("::", ".")
         .trim_start_matches('.')
         .to_string()
+}
+
+/// The text with no `<...>` template arguments: `Box<T>::put` gives `Box::put`.
+fn without_arguments(name: &str) -> String {
+    let mut depth = 0usize;
+    name.chars()
+        .filter(|&c| {
+            match c {
+                '<' => depth += 1,
+                '>' => depth = depth.saturating_sub(1),
+                _ => return depth == 0,
+            }
+            false
+        })
+        .collect()
 }
