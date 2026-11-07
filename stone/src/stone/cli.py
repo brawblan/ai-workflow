@@ -7,6 +7,7 @@ import subprocess
 import sys
 from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
 from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, index, ready_check,
                    render, repo_rules, specialists, specs, upgrade, workflow_check, writing_check)
@@ -44,6 +45,29 @@ def _parse(argv: list[str] | None) -> argparse.Namespace:
     if argv[:1] == ["index"]:
         return argparse.Namespace(command="index", args=argv[1:])
     return _parser().parse_args(argv)
+
+
+def _add_eval(commands: Any) -> None:
+    run = commands.add_parser("eval", help="Run the eval of one component, with it and without it.")
+    run.add_argument("component", nargs="?", help="The component ID, for example role.tester.")
+    run.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    run.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
+    run.add_argument("--scenario", action="append", metavar="ID",
+                     help="Run only this scenario. Repeat for more. Default: all.")
+    run.add_argument("--variant", default="both",
+                     help="'with', 'without', or 'both' (default). A guidance eval takes the names "
+                          "in the 'variants' of its scenarios.")
+    run.add_argument("--trials", type=int, default=1, help="Runs for each scenario and variant.")
+    run.add_argument("--model", help="Default: the role model in the model profile.")
+    run.add_argument("--budget", default="5", help="The cost limit for each run. Default: 5.")
+    run.add_argument("--timeout", type=int, default=1800, help="Seconds for each run.")
+    run.add_argument("--run-config", type=Path,
+                     help="The harness command file. Default: the eval.yaml of the adapter.")
+    run.add_argument("--keep", action="store_true", help="Keep the workspace of each run.")
+    run.add_argument("--summary", type=Path, metavar="RUNS_JSONL",
+                     help="Print the result tables from a kept runs.jsonl. Start no run.")
+    run.add_argument("--check-only", action="store_true",
+                     help="Validate the scenarios and list the runs. Start no run.")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -172,24 +196,7 @@ def _parser() -> argparse.ArgumentParser:
                        help="warn: report only (D82). block: fail on findings.")
     ready.add_argument("--format", choices=["text", "github"], default="text")
 
-    run = commands.add_parser("eval", help="Run the eval of one component, with it and without it.")
-    run.add_argument("component", help="The component ID, for example role.tester.")
-    run.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
-    run.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
-    run.add_argument("--scenario", action="append", metavar="ID",
-                     help="Run only this scenario. Repeat for more. Default: all.")
-    run.add_argument("--variant", default="both",
-                     help="'with', 'without', or 'both' (default). A guidance eval takes the names "
-                          "in the 'variants' of its scenarios.")
-    run.add_argument("--trials", type=int, default=1, help="Runs for each scenario and variant.")
-    run.add_argument("--model", help="Default: the role model in the model profile.")
-    run.add_argument("--budget", default="5", help="The cost limit for each run. Default: 5.")
-    run.add_argument("--timeout", type=int, default=1800, help="Seconds for each run.")
-    run.add_argument("--run-config", type=Path,
-                     help="The harness command file. Default: the eval.yaml of the adapter.")
-    run.add_argument("--keep", action="store_true", help="Keep the workspace of each run.")
-    run.add_argument("--check-only", action="store_true",
-                     help="Validate the scenarios and list the runs. Start no run.")
+    _add_eval(commands)
     return parser
 
 
@@ -395,7 +402,23 @@ def _check_ready(ticket: str, profile: str | None, mode: str, fmt: str) -> int:
     return 1 if blocking else 0
 
 
+def _eval_summary(args: argparse.Namespace) -> int:
+    try:
+        runs = evals.load_runs(args.summary, args.root)
+    except evals.EvalError as error:
+        print(f"stone eval: {error}")
+        return 2
+    print(evals.summary(args.component or args.summary.parent.name, args.model or "unknown", runs),
+          end="")
+    return 0
+
+
 def _eval(args: argparse.Namespace) -> int:
+    if args.summary:
+        return _eval_summary(args)
+    if not args.component:
+        print("stone eval: give a component ID, or use --summary.")
+        return 2
     if args.trials < 1:
         print("stone eval: --trials must be 1 or more.")
         return 2

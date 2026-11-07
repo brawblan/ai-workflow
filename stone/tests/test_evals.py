@@ -316,7 +316,13 @@ class EvalTestCase(unittest.TestCase):
         files = list((self.root / "evals/results").glob("*.md"))
         self.assertEqual(len(files), 1, files)
         text = files[0].read_text(encoding="utf-8")
-        lines = [line for line in text.splitlines() if line.startswith("|")]
+        lines: list[str] = []
+        for line in text.splitlines():
+            if not lines and not line.startswith("| Scenario |"):
+                continue
+            if not line.strip():
+                break
+            lines.append(line)
         header = [cell.strip().lower() for cell in lines[0].strip().strip("|").split("|")]
         rows = {}
         for line in lines[2:]:
@@ -1035,7 +1041,7 @@ class RecordsTest(EvalTestCase):
         self.assertAlmostEqual(float(self.col(t1_with, "outcome")), 0.5)
         self.assertAlmostEqual(float(self.col(t1_with, "contract")), 1.0)
         self.assertAlmostEqual(float(self.col(t1_with, "cost")), 0.3)
-        self.assertAlmostEqual(float(self.col(t1_with, "token")), 20)
+        self.assertAlmostEqual(float(self.col(t1_with, "tokens out")), 20)
         self.assertGreaterEqual(float(self.col(t1_with, "second")), 0)
         self.assertEqual(self.col(t1_with, "error"), "0")
         t1_without = rows[("T1", "without")]
