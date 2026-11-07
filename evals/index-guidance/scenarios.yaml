@@ -2,16 +2,14 @@
 #   python3 evals/index-guidance/make_fixture.py
 #   cd indexer && cargo build --release --locked && cd ..
 #   PATH="$PWD/indexer/target/release:$PATH" stone eval guidance.index --model <model> --trials 3
-# make_fixture.py writes fixtures/shop (gitignored): 228 files in Python, TypeScript, and
-# JavaScript. The output is the same on each run. `stone eval` copies the folder as it is, so make
-# it first. The runs inherit PATH, so `stone-index` must be on it.
+# `stone eval` copies fixtures/shop (gitignored) as it is, and the runs inherit PATH. So make the
+# fixture and put `stone-index` on PATH first.
 # `variants` replaces with and without (D69). Both variants get the same prompt, the same fixture,
 # and the same tools (Read, Grep, Glob, and `stone-index` in the `reader` list of eval.yaml).
 #   none   no text about the index (the baseline)
 #   rule   the candidate rule for AGENTS.md, 2 lines (P4)
 # The rule passes if its mean cost is lower than `none` and its outcome rate is not lower (AC 5).
-# Each check reads the final text of the run. A path check needs only the end of the path that is
-# unique in the fixture. A name check accepts the name in any form (a qualified name, a code span).
+# Each check reads the final text. A path check needs only the unique end of the path.
 
 component: guidance.index
 role: reader

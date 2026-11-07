@@ -1,12 +1,9 @@
-"""Make the fixture of the guidance.index eval: a shop repo in Python, TypeScript, and JavaScript.
+"""Make the fixture of the guidance.index eval (D107): a shop repo of 228 files.
 
 Usage: python3 make_fixture.py [<output folder>]. The default is `fixtures/shop` next to this file.
-The output is the same on each run, so the answers of the scenarios do not change. The script
-deletes the output folder first.
-
-Each of the 14 entities gets 5 Python, 5 TypeScript, and 5 JavaScript files (210 files), plus the
-shared files. The entities use the same few common names (`load`, `save`, `validate`, `Store`), as a
-real repo does. The facts that the scenarios ask about are in PLANTS.
+The script deletes the folder first, and the output is the same on each run. 14 entities get 5
+Python, 5 TypeScript, and 5 JavaScript files each. They share a few common names (`load`, `save`,
+`Store`), as in a real repo. PLANTS has the facts that the scenarios ask about.
 """
 
 from __future__ import annotations
