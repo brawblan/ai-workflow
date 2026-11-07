@@ -224,3 +224,20 @@ fn ac6_find_outline_refs_text() {
         "in\nsrc/net.rs:1 use crate::Conn\nout\nsrc/lib.rs:5 mod net\n"
     );
 }
+
+#[test]
+fn use_list_comments_are_skipped() {
+    let src = "use a::{b, /* x */ // note\n    c};\n";
+    let fx = built(&[("a.rs", src)], &[]);
+    let targets: Vec<String> = links(&fx, "a.rs").into_iter().map(|t| t.1).collect();
+    assert_eq!(targets, vec!["a::b", "a::c"]);
+}
+
+#[test]
+fn search_finds_a_line_in_a_rust_file() {
+    let fx = built(&[("src/lib.rs", "pub fn zebra() {}\n")], &[]);
+    assert_eq!(
+        run(&fx, &["search", "zebra"]),
+        "src/lib.rs:1: pub fn zebra() {}\n"
+    );
+}
