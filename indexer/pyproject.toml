@@ -1,0 +1,18 @@
+# Maturin builds a wheel that holds only the stone-index binary (#258). The release workflow builds
+# one wheel for each target. The version comes from Cargo.toml.
+[build-system]
+requires = ["maturin>=1.16,<2"]
+build-backend = "maturin"
+
+[project]
+name = "stone-index"
+description = "The code indexer of Cornerstone"
+license = "MIT"
+readme = "README.md"
+dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/brawblan/ai-workflow"
+
+[tool.maturin]
+bindings = "bin"
