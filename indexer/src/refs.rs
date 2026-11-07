@@ -63,7 +63,7 @@ fn module_file(conn: &Connection, name: &str) -> Result<Option<String>> {
         .prepare("SELECT path FROM files WHERE language = 'python' ORDER BY path")?
         .query_map([], |row| row.get::<_, String>(0))?
         .collect::<Result<Vec<_>>>()?;
-    Ok(Resolver::new(paths.iter().map(String::as_str)).module("", name))
+    Ok(Resolver::new(paths.iter().map(String::as_str), &[]).module("", name))
 }
 
 fn select(conn: &Connection, filter: &str, value: &str) -> Result<Vec<Ref>> {

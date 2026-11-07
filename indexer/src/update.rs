@@ -11,6 +11,7 @@ use rayon::prelude::*;
 use rusqlite::{Connection, Result, TransactionBehavior, params};
 use xxhash_rust::xxh3::xxh3_64;
 
+use crate::cli::IndexOptions;
 use crate::db;
 use crate::lang;
 use crate::links::{self, Link};
@@ -54,6 +55,7 @@ struct Stored {
     size: i64,
     mtime_ns: i64,
     hash: String,
+    language: Option<String>,
 }
 
 /// A file that the update read, with the facts to write.
@@ -74,7 +76,7 @@ pub fn run(
     conn: &mut Connection,
     root: &Path,
     db_path: &Path,
-    max_size: u64,
+    options: &IndexOptions,
 ) -> std::result::Result<Summary, String> {
     let start = Instant::now();
     let describe = |error: rusqlite::Error| db::describe(&error);
@@ -82,22 +84,27 @@ pub fn run(
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(describe)?;
     db::ensure_schema(&tx)?;
-    let mut summary = sync(&tx, root, db_path, max_size).map_err(describe)?;
+    let mut summary = sync(&tx, root, db_path, options).map_err(describe)?;
     tx.commit().map_err(describe)?;
     summary.elapsed = start.elapsed();
     Ok(summary)
 }
 
-fn sync(conn: &Connection, root: &Path, db_path: &Path, max_size: u64) -> Result<Summary> {
+fn sync(conn: &Connection, root: &Path, db_path: &Path, options: &IndexOptions) -> Result<Summary> {
     let racy_from = now_ns().saturating_sub(i64::try_from(RACY_WINDOW.as_nanos()).unwrap_or(0));
     let stored = stored_files(conn)?;
-    let candidates = walk::files(root, max_size, &index_files(db_path));
+    let candidates = walk::files(root, options.max_file_size, &index_files(db_path));
     let mut summary = Summary::default();
     let mut seen = HashSet::new();
     let mut changed = Vec::new();
     for candidate in &candidates {
         let old = stored.get(&candidate.path);
-        if old.is_some_and(|old| old.size == candidate.size && old.mtime_ns == candidate.mtime_ns) {
+        let same_language = |old: &Stored| {
+            old.language.as_deref() == lang::language_with(&candidate.path, &options.langs)
+        };
+        if old.is_some_and(|old| {
+            old.size == candidate.size && old.mtime_ns == candidate.mtime_ns && same_language(old)
+        }) {
             summary.unchanged += 1;
             seen.insert(candidate.path.as_str());
         } else {
@@ -106,7 +113,7 @@ fn sync(conn: &Connection, root: &Path, db_path: &Path, max_size: u64) -> Result
     }
     let prepared: Vec<Prepared> = changed
         .into_par_iter()
-        .filter_map(|candidate| prepare(candidate, stored.get(&candidate.path)))
+        .filter_map(|candidate| prepare(candidate, stored.get(&candidate.path), &options.langs))
         .collect();
     seen.extend(
         prepared
@@ -119,7 +126,7 @@ fn sync(conn: &Connection, root: &Path, db_path: &Path, max_size: u64) -> Result
     if same_files && prepared.is_empty() {
         return Ok(summary);
     }
-    let resolver = Resolver::new(seen.iter().copied());
+    let resolver = Resolver::new(seen.iter().copied(), &options.langs);
     for prepared in &prepared {
         let old = stored.get(&prepared.candidate.path);
         if write(conn, prepared, old, racy_from, &resolver)? {
@@ -153,12 +160,13 @@ fn index_files(db_path: &Path) -> Vec<PathBuf> {
 }
 
 fn stored_files(conn: &Connection) -> Result<HashMap<String, Stored>> {
-    let mut statement = conn.prepare("SELECT path, size, mtime_ns, hash FROM files")?;
+    let mut statement = conn.prepare("SELECT path, size, mtime_ns, hash, language FROM files")?;
     let rows = statement.query_map([], |row| {
         let stored = Stored {
             size: row.get(1)?,
             mtime_ns: row.get(2)?,
             hash: row.get(3)?,
+            language: row.get(4)?,
         };
         Ok((row.get(0)?, stored))
     })?;
@@ -167,11 +175,15 @@ fn stored_files(conn: &Connection) -> Result<HashMap<String, Stored>> {
 
 /// Reads a file, and parses it if the content hash changed. Returns `None` if the read fails or
 /// the file is binary. The update calls it on many threads at once.
-fn prepare<'a>(candidate: &'a Candidate, old: Option<&Stored>) -> Option<Prepared<'a>> {
+fn prepare<'a>(
+    candidate: &'a Candidate,
+    old: Option<&Stored>,
+    langs: &[lang::Override],
+) -> Option<Prepared<'a>> {
     let bytes = read_text(&candidate.abs)?;
     let hash = hash(&bytes);
-    let language = lang::language(&candidate.path);
-    let changed = old.is_none_or(|old| old.hash != hash);
+    let language = lang::language_with(&candidate.path, langs);
+    let changed = old.is_none_or(|old| old.hash != hash || old.language.as_deref() != language);
     let newlines = bytes.iter().filter(|&&byte| byte == b'\n').count();
     let last_line = usize::from(!bytes.is_empty() && !bytes.ends_with(b"\n"));
     let parsed = language
@@ -239,7 +251,9 @@ fn write(
     } else {
         candidate.mtime_ns
     };
-    if old.is_some_and(|old| old.hash == prepared.hash) {
+    if old.is_some_and(|old| {
+        old.hash == prepared.hash && old.language.as_deref() == prepared.language
+    }) {
         conn.execute(
             "UPDATE files SET size = ?2, mtime_ns = ?3 WHERE path = ?1",
             params![candidate.path, candidate.size, mtime_ns],

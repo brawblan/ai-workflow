@@ -8,7 +8,7 @@ use rusqlite::{Connection, Error, ErrorCode, OptionalExtension, Result};
 
 /// Change this number with each change to `SCHEMA`, and with each parser change that changes the
 /// rows. A build then makes a new index, so it parses each file again.
-pub const SCHEMA_VERSION: i64 = 3;
+pub const SCHEMA_VERSION: i64 = 4;
 
 /// A second build waits this long for the first build to finish.
 const BUSY_TIMEOUT: Duration = Duration::from_secs(600);

@@ -1,4 +1,4 @@
-//! The links of a file: imports and relative Markdown links. Each language has its own reader.
+//! The links of a file: imports, includes, and relative Markdown links. Each language has its own reader.
 
 use tree_sitter::Node;
 
@@ -17,6 +17,8 @@ pub fn links(parsed: &Parsed) -> Vec<Link> {
         "python" => python,
         "typescript" | "tsx" | "javascript" | "jsx" => script,
         "markdown" => markdown,
+        "c" | "cpp" => include,
+        "csharp" => using,
         _ => return Vec::new(),
     };
     let mut found = Vec::new();
@@ -98,6 +100,40 @@ fn script(node: Node, source: &[u8], found: &mut Vec<Link>) {
         let quoted = text(string, source);
         let target = quoted.get(1..quoted.len().saturating_sub(1)).unwrap_or("");
         push(found, node, kind, target.to_string());
+    }
+}
+
+/// `#include "a.h"` gives `a.h`. `#include <a.h>` gives `<a.h>`, so the resolver can tell them
+/// apart: only a quoted include can be a file of the repo.
+fn include(node: Node, source: &[u8], found: &mut Vec<Link>) {
+    if node.kind() != "preproc_include" {
+        return;
+    }
+    let Some(path) = node.child_by_field_name("path") else {
+        return;
+    };
+    let written = text(path, source);
+    let target = match path.kind() {
+        "string_literal" => written.trim_matches('"'),
+        "system_lib_string" => written.as_str(),
+        _ => return,
+    };
+    push(found, node, "include", target.trim().to_string());
+}
+
+/// `using A.B;` gives `A.B`. `using static A.B;` gives `A.B`. `using X = A.B;` gives `A.B`.
+fn using(node: Node, source: &[u8], found: &mut Vec<Link>) {
+    if node.kind() != "using_directive" {
+        return;
+    }
+    let mut cursor = node.walk();
+    if let Some(name) = node.named_children(&mut cursor).last() {
+        push(
+            found,
+            node,
+            "using",
+            text(name, source).split_whitespace().collect(),
+        );
     }
 }
 
