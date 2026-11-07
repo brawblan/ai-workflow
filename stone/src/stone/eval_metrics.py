@@ -90,11 +90,10 @@ def scenario_table(runs: list[Any], rate: Callable[[list[Any], str | None], floa
     head = ["Scenario", "Variant", "Trials", "pass^k", "Outcome", "Contract",
             *(title for title, _, _ in COLUMNS), "Seconds", "Errors"]
     lines = ["| " + " | ".join(head) + " |", "| " + " | ".join("---" for _ in head) + " |"]
-    for sid in dict.fromkeys(r.scenario for r in runs):
-        for variant in dict.fromkeys(r.variant for r in runs):
-            group = [r for r in runs if r.scenario == sid and r.variant == variant]
-            if group:
-                lines.append(_scenario_row(group, rate))
+    groups: dict[tuple[str, str], list[Any]] = {}
+    for r in runs:
+        groups.setdefault((r.scenario, r.variant), []).append(r)
+    lines += [_scenario_row(group, rate) for group in groups.values()]
     return lines
 
 
