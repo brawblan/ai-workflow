@@ -76,6 +76,15 @@ def mean_and_error(values: list[float]) -> tuple[float, float] | None:
     return average, math.sqrt(variance / len(values))
 
 
+def _scenario_row(group: list[Any], rate: Callable[[list[Any], str | None], float]) -> str:
+    cells = [group[0].scenario, group[0].variant, str(len(group)),
+             str(int(all(r.passed() for r in group))),
+             f"{rate(group, 'outcome'):.2f}", f"{rate(group, 'contract'):.2f}",
+             *(mean(group, key, digits) for _, key, digits in COLUMNS),
+             mean(group, "seconds", 1), str(sum(bool(r.error) for r in group))]
+    return "| " + " | ".join(cells) + " |"
+
+
 def scenario_table(runs: list[Any], rate: Callable[[list[Any], str | None], float]) -> list[str]:
     """One row for each scenario and variant."""
     head = ["Scenario", "Variant", "Trials", "pass^k", "Outcome", "Contract",
@@ -84,13 +93,8 @@ def scenario_table(runs: list[Any], rate: Callable[[list[Any], str | None], floa
     for sid in dict.fromkeys(r.scenario for r in runs):
         for variant in dict.fromkeys(r.variant for r in runs):
             group = [r for r in runs if r.scenario == sid and r.variant == variant]
-            if not group:
-                continue
-            cells = [sid, variant, str(len(group)), str(int(all(r.passed() for r in group))),
-                     f"{rate(group, 'outcome'):.2f}", f"{rate(group, 'contract'):.2f}",
-                     *(mean(group, key, digits) for _, key, digits in COLUMNS),
-                     mean(group, "seconds", 1), str(sum(bool(r.error) for r in group))]
-            lines.append("| " + " | ".join(cells) + " |")
+            if group:
+                lines.append(_scenario_row(group, rate))
     return lines
 
 
@@ -116,19 +120,19 @@ def _verdict(diff: float, error: float) -> str:
     return "more than 2 standard errors" if abs(diff) > 2 * error else "within 2 standard errors"
 
 
+def _difference_line(runs: list[Any], name: str, base: str) -> str:
+    base_cost = mean_and_error(_values([r for r in runs if r.variant == base], "cost_usd"))
+    other = mean_and_error(_values([r for r in runs if r.variant == name], "cost_usd"))
+    if not (base_cost and other):
+        return f"Cost, {name} minus {base}: {MISSING}. A run has no cost."
+    diff = other[0] - base_cost[0]
+    error = math.hypot(other[1], base_cost[1])
+    return (f"Cost, {name} minus {base}: {diff:+.4f} USD. "
+            f"The difference is {_verdict(diff, error)} (SE {error:.4f}).")
+
+
 def cost_difference_lines(runs: list[Any]) -> list[str]:
     """For each variant that is not the base: the mean cost difference to the base."""
     names = list(dict.fromkeys(r.variant for r in runs))
     base = next((name for name in BASE_NAMES if name in names), "")
-    base_cost = mean_and_error(_values([r for r in runs if r.variant == base], "cost_usd"))
-    lines = []
-    for name in (n for n in names if n != base and base):
-        other = mean_and_error(_values([r for r in runs if r.variant == name], "cost_usd"))
-        if not (base_cost and other):
-            lines.append(f"Cost, {name} minus {base}: {MISSING}. A run has no cost.")
-            continue
-        diff = other[0] - base_cost[0]
-        error = math.hypot(other[1], base_cost[1])
-        lines.append(f"Cost, {name} minus {base}: {diff:+.4f} USD. "
-                     f"The difference is {_verdict(diff, error)} (SE {error:.4f}).")
-    return lines
+    return [_difference_line(runs, name, base) for name in names if base and name != base]
