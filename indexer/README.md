@@ -46,8 +46,8 @@ The build is incremental:
 - It writes the row of a file again only if the content hash changed.
 - It removes the rows of each file that is gone, ignored, binary, or too large.
 - If the schema version of the index is not the version of the binary, it makes a new index.
-- If the file at the index path is a SQLite database with no `meta` or `files` table, but with other
-  tables, the build stops and changes nothing.
+- The file at the index path can be another SQLite database, with no `meta` or `files` table. The
+  build then stops and changes nothing.
 
 The build prints one summary line, for example `3 parsed, 120 unchanged, 1 removed in 0.05s`.
 
