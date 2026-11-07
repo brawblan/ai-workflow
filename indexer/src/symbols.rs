@@ -73,6 +73,8 @@ fn code_symbols(language: &str, root: Node, source: &[u8]) -> Vec<Symbol> {
     let mut depths: Vec<usize> = Vec::new();
     let mut stack: Vec<Item> = vec![(root, None, None, false)];
     while let Some((node, parent_node, parent, exported)) = stack.pop() {
+        // The grammar puts the declarations after `namespace A;` beside it, not inside it.
+        let parent = parent.or_else(|| file_scoped_namespace(&found, node, parent_node));
         let mut next = parent;
         let depth = parent.map_or(0, |index| depths[index] + 1);
         let parent_kind = parent.map(|index| found[index].kind);
@@ -131,6 +133,19 @@ fn code_symbols(language: &str, root: Node, source: &[u8]) -> Vec<Symbol> {
         );
     }
     found
+}
+
+/// The index of the symbol of a file-scoped C# namespace that comes before `node` in its file.
+fn file_scoped_namespace(found: &[Symbol], node: Node, parent_node: Option<Node>) -> Option<usize> {
+    let is_top = parent_node.is_some_and(|parent| parent.kind() == "compilation_unit");
+    let mut before = node.prev_named_sibling();
+    while let Some(sibling) = before.filter(|_| is_top) {
+        if sibling.kind() == "file_scoped_namespace_declaration" {
+            return found.iter().rposition(|symbol| symbol.kind == "namespace");
+        }
+        before = sibling.prev_named_sibling();
+    }
+    None
 }
 
 /// The facts about the place of a node that its symbol kind depends on.

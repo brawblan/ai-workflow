@@ -213,8 +213,8 @@ The index keeps each symbol that tree-sitter finds in the file.
   qualified name `Parser.parse`, and `namespace a::b` gets the name `a.b`. A template is a symbol
   of the kind of its declaration, for example a `class` for a class template.
 - C++: `class EXPORT Name {...}` and `struct EXPORT Name {...}`, with an export macro, are read as
-  `Name`. The grammar cannot read `class EXPORT Name : Base {...}`, so the index has no symbol for it.
-- C#: a file-scoped `namespace A;` and `namespace A.B {}` are a `namespace`. A `record struct` is a
+  `Name`. The grammar cannot read `class EXPORT Name : Base {...}`, so the index has no symbol for it. It also cannot read an empty `class EXPORT Name {};`.
+- C#: a file-scoped `namespace A;` holds the declarations after it, so `class K` is `A.K`. A file-scoped namespace and `namespace A.B {}` are a `namespace`. A `record struct` is a
   `record`. A constructor, a field, and an event are not symbols.
 - The index keeps symbols to a nesting depth of 32. It skips deeper symbols.
 - The qualified name of a code symbol joins the names of its parents with `.`, for example
