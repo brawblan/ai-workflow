@@ -146,15 +146,23 @@ The `--limit` applies to each group. A JSON result has `path`, `line`, `kind`, `
 
 ### search
 
-`search "<words>"` finds the blocks of text that have at least one of the words, with FTS5. The
-best bm25 rank comes first. For each block, it prints the first line with one of the words, as
-`path:line: text`. The line has no space at its ends. The index holds no text, so `search` reads
-each file of a hit. It skips a hit in a file that changed after the update, for example with
-`--no-update`:
+`search "<words>"` finds the blocks of text that have all the words, with FTS5. The words can be in
+different lines of the block. The best bm25 rank comes first. For each block, it prints the line with
+the most of the words, as `path:line: text`. If two lines have the same number of words, it prints the
+first one. The line has no space at its ends. The index holds no text, so `search` reads each file of a
+hit. It skips a hit in a file that changed after the update, for example with `--no-update`:
 
 ```text
 stone/src/stone/repo_rules.py:154: def check_version_bump(root: Path, base: str, skills: str = SKILLS,
 ```
+
+`--any` matches a block that has at least one of the words. Words in double quotes are a phrase. The
+block must have the words of the phrase in this order, with no other word between them. For example,
+`search '"merge base" origin'` needs the phrase `merge base` and the word `origin`. A quote with no
+closing quote runs to the end of the query. `--max-bytes <n>` (default `4000`) caps the text output.
+A hit that does not fit, and each hit after it, is not printed. The last line gives the number of
+hits that the cap and `--limit` did not print. The cap counts the hit lines, not that last line. A JSON
+result has no cap.
 
 A word is a run of letters and digits, with no case. A letter with a diacritic is not the same
 letter: `resume` does not find `résumé`. `--path <glob>` searches only the paths that
