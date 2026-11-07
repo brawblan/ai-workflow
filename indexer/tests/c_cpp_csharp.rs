@@ -97,18 +97,10 @@ fn ac3_c_symbols() {
 int add(int a, int b) { return a + b; }\nstruct Node { int v; };\nunion U { int i; float f; };\n\
 enum Color { RED, GREEN };\ntypedef unsigned long ulong_t;\n#endif\n";
     let fx = built(&[("m.c", src)], &[]);
-    let got = syms(&fx, "m.c");
-    for want in [
-        "macro MAX",
-        "function add",
-        "struct Node",
-        "union U",
-        "enum Color",
-        "typedef ulong_t",
-    ] {
-        assert!(got.contains(&want.to_string()), "{want} missing in {got:?}");
-    }
-    assert!(!got.iter().any(|s| s.contains("GUARD_H")), "{got:?}");
+    assert_eq!(
+        run(&fx, &["outline", "m.c", "--no-update"]),
+        "3 macro MAX\n4 function add\n5 struct Node\n6 union U\n7 enum Color\n8 typedef ulong_t\n"
+    );
 }
 
 #[test]
@@ -215,4 +207,40 @@ fn ac6_find_kind_and_outline_show_children() {
         run(&fx, &["outline", "a.cpp", "--no-update"]),
         "1 namespace N\n  2 class Foo\n    4 method m\n"
     );
+}
+
+#[test]
+fn ac4_template_method_outside_class_is_qualified() {
+    let src = "template <typename T> class Box {\npublic:\n  void put(T v);\n};\n\
+template <typename T> void Box<T>::put(T v) {}\n";
+    let fx = built(&[("b.cpp", src)], &[]);
+    let got = syms(&fx, "b.cpp");
+    assert_eq!(
+        got.iter().filter(|s| s.ends_with(" Box.put")).count(),
+        2,
+        "{got:?}"
+    );
+}
+
+#[test]
+fn ac5_lang_inc_cpp_resolves_include_from_root() {
+    let fx = built(
+        &[("sub/x.inc", "#include \"t.cpp\"\n"), ("t.cpp", "int t;\n")],
+        &["--lang", "inc=cpp"],
+    );
+    let l = links(&fx, "sub/x.inc");
+    assert_eq!(
+        l,
+        vec![(
+            "include".to_string(),
+            "t.cpp".to_string(),
+            "t.cpp".to_string()
+        )]
+    );
+}
+
+#[test]
+fn ac3_function_pointer_member_is_not_a_symbol() {
+    let fx = built(&[("o.c", "struct Ops { void (*cb)(int); };\n")], &[]);
+    assert_eq!(syms(&fx, "o.c"), vec!["struct Ops"]);
 }
