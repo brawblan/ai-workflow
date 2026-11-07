@@ -77,20 +77,26 @@ does not parse.
 
 ## Symbols
 
-The build parses each file in parallel with tree-sitter. A syntax error does not stop the build.
+The build parses each new or changed file with tree-sitter, on all cores. A syntax error does not stop the build.
 The index keeps each symbol that tree-sitter finds in the file.
 
 | Language | Extensions | Kinds |
 | --- | --- | --- |
 | Python | `.py`, `.pyi` | `function`, `class`, `method` |
-| TypeScript | `.ts`, `.mts`, `.cts`, `.tsx` | `function`, `class`, `method`, `interface`, `type`, `enum`, `constant` |
+| TypeScript | `.ts`, `.mts`, `.cts`, `.tsx` | `function`, `class`, `method`, `interface`, `type`, `enum`, `namespace`, `constant` |
 | JavaScript | `.js`, `.mjs`, `.cjs`, `.jsx` | `function`, `class`, `method`, `constant` |
 | Markdown | `.md`, `.markdown` | `heading` |
 
-- A function in a class is a `method`. A function in a function is a `function`.
-- `constant` is an exported `const`. An exported `const` with a function value is a `function`.
+- A function in a class is a `method`. A class field with a function value is also a `method`.
+  A function in a function is a `function`. A method in an object literal is not a symbol.
+- `constant` is an exported `const`, also with `declare`. An exported `const` with a function
+  value is a `function`. A `declare function` is a `function`.
+- A decorated Python definition starts on the line of its first decorator.
+- The index keeps symbols to a nesting depth of 32. It skips deeper symbols.
 - The qualified name of a code symbol joins the names of its parents with `.`, for example
   `Parser.parse`.
 - The qualified name of a heading is its text, because heading text can have a `.` in it.
 - The `level` of a heading is 1 to 6. The parent of a heading is the nearest heading before it with
   a lower level. A heading ends on the line before the next heading of the same or a higher level.
+- The name of a heading has no closing `#` sequence. A heading on more than one line gets one
+  line, with a space between the lines.

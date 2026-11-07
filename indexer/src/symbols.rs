@@ -46,19 +46,38 @@ fn grammar(language: &str) -> Option<Language> {
     Some(grammar.into())
 }
 
+/// The deepest nesting of code symbols that the index keeps. A deeper symbol is not stored, so a
+/// generated file cannot make qualified names that grow with the square of the depth.
+const MAX_SYMBOL_DEPTH: usize = 32;
+
+/// One node on the walk stack: the node, its parent node, the index of the nearest symbol above
+/// it, and true if an `export` statement contains it with only declarations between them.
+type Item<'tree> = (Node<'tree>, Option<Node<'tree>>, Option<usize>, bool);
+
 /// Walks the tree in source order with a stack, so a deep tree cannot overflow the thread stack.
 fn code_symbols(root: Node, source: &[u8]) -> Vec<Symbol> {
     let mut found: Vec<Symbol> = Vec::new();
-    let mut stack = vec![(root, None)];
-    while let Some((node, parent)) = stack.pop() {
+    let mut depths: Vec<usize> = Vec::new();
+    let mut stack: Vec<Item> = vec![(root, None, None, false)];
+    while let Some((node, parent_node, parent, exported)) = stack.pop() {
         let mut next = parent;
-        let parent_kind = parent.map(|index: usize| found[index].kind);
-        if let Some((kind, name)) = code_symbol(node, source, parent_kind) {
+        let depth = parent.map_or(0, |index| depths[index] + 1);
+        let parent_kind = parent.map(|index| found[index].kind);
+        let context = Context {
+            parent_node,
+            parent_kind,
+            exported,
+        };
+        if let Some((kind, name)) =
+            code_symbol(node, source, &context).filter(|_| depth < MAX_SYMBOL_DEPTH)
+        {
             let qualified_name = match parent {
                 Some(index) => format!("{}.{name}", found[index].qualified_name),
                 None => name.clone(),
             };
-            let (line, end_line) = lines(node);
+            // A decorated Python definition starts on its first decorator.
+            let outer = parent_node.filter(|outer| outer.kind() == "decorated_definition");
+            let (line, end_line) = lines(outer.unwrap_or(node));
             found.push(Symbol {
                 name,
                 qualified_name,
@@ -68,38 +87,57 @@ fn code_symbols(root: Node, source: &[u8]) -> Vec<Symbol> {
                 parent,
                 level: None,
             });
+            depths.push(depth);
             next = Some(found.len() - 1);
         }
+        let exports = node.kind() == "export_statement"
+            || (exported && matches!(node.kind(), "ambient_declaration" | "lexical_declaration"));
         let mut cursor = node.walk();
         let children: Vec<Node> = node.named_children(&mut cursor).collect();
-        stack.extend(children.into_iter().rev().map(|child| (child, next)));
+        stack.extend(
+            children
+                .into_iter()
+                .rev()
+                .map(|child| (child, Some(node), next, exports)),
+        );
     }
     found
 }
 
+/// The facts about the place of a node that its symbol kind depends on.
+struct Context<'tree> {
+    parent_node: Option<Node<'tree>>,
+    parent_kind: Option<&'static str>,
+    exported: bool,
+}
+
 /// The kind and the name of a Python, TypeScript, or JavaScript symbol node.
-fn code_symbol(
-    node: Node,
-    source: &[u8],
-    parent_kind: Option<&str>,
-) -> Option<(&'static str, String)> {
+fn code_symbol(node: Node, source: &[u8], context: &Context) -> Option<(&'static str, String)> {
+    let parent_node_kind = context.parent_node.map(|parent| parent.kind());
+    let in_class = context.parent_kind == Some("class");
     let kind = match node.kind() {
         "function_definition" | "function_declaration" | "generator_function_declaration" => {
-            if parent_kind == Some("class") {
+            if in_class {
                 "method"
             } else {
                 "function"
             }
         }
+        "function_signature" if parent_node_kind == Some("ambient_declaration") => "function",
         "class_definition" | "class_declaration" | "abstract_class_declaration" => "class",
-        "method_definition" | "abstract_method_signature" => "method",
+        "method_definition" if parent_node_kind == Some("class_body") => "method",
+        "abstract_method_signature" => "method",
+        "public_field_definition" | "field_definition" if has_function_value(node) => "method",
         "interface_declaration" => "interface",
         "type_alias_declaration" => "type",
         "enum_declaration" => "enum",
-        "variable_declarator" => exported_const_kind(node)?,
+        "internal_module" => "namespace",
+        "variable_declarator" => exported_const_kind(node, context)?,
         _ => return None,
     };
-    let name = node.child_by_field_name("name")?;
+    let name = node
+        .child_by_field_name("name")
+        .or_else(|| node.child_by_field_name("property"))?;
     if node.kind() == "variable_declarator" && name.kind() != "identifier" {
         return None;
     }
@@ -108,24 +146,30 @@ fn code_symbol(
 
 /// `function` for an exported `const` with a function value, `constant` for another exported
 /// `const`, and `None` for each other declarator.
-fn exported_const_kind(node: Node) -> Option<&'static str> {
-    let declaration = node
-        .parent()
+fn exported_const_kind(node: Node, context: &Context) -> Option<&'static str> {
+    let declaration = context
+        .parent_node
         .filter(|parent| parent.kind() == "lexical_declaration")?;
     let is_const = declaration
         .child_by_field_name("kind")
         .is_some_and(|keyword| keyword.kind() == "const");
-    let exported = declaration
-        .parent()
-        .is_some_and(|parent| parent.kind() == "export_statement");
-    if !is_const || !exported {
+    if !is_const || !context.exported {
         return None;
     }
-    let value = node.child_by_field_name("value").map(|value| value.kind());
-    match value {
-        Some("arrow_function" | "function_expression" | "function") => Some("function"),
-        _ => Some("constant"),
-    }
+    Some(if has_function_value(node) {
+        "function"
+    } else {
+        "constant"
+    })
+}
+
+fn has_function_value(node: Node) -> bool {
+    node.child_by_field_name("value").is_some_and(|value| {
+        matches!(
+            value.kind(),
+            "arrow_function" | "function_expression" | "function" | "generator_function"
+        )
+    })
 }
 
 /// The Markdown headings. A heading ends on the line before the next heading of the same or a
@@ -186,8 +230,27 @@ fn heading(node: Node, source: &[u8]) -> Option<(i64, String)> {
         }
         _ => return None,
     };
-    let name = text(*content, source).trim().to_string();
+    let mut name = text(*content, source)
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
+    if node.kind() == "atx_heading" {
+        name = without_closing_sequence(&name).to_string();
+    }
     (!name.is_empty()).then_some((level, name))
+}
+
+/// The text of an ATX heading with no closing `#` sequence: `Title ##` gives `Title`, but `C#`
+/// stays `C#`.
+fn without_closing_sequence(name: &str) -> &str {
+    let open = name.trim_end_matches('#');
+    if open.is_empty() {
+        open
+    } else if open.ends_with(' ') {
+        open.trim_end()
+    } else {
+        name
+    }
 }
 
 /// The first and the last line of a node, from 1. A node that ends at the start of a line ends
