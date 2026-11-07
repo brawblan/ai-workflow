@@ -288,7 +288,7 @@ fn touched_file_keeps_its_symbol_rows() {
 }
 
 #[test]
-fn schema_version_1_index_is_made_again_as_version_2() {
+fn schema_version_1_index_is_made_again_as_current() {
     let fx = built(&[("a.py", "def one():\n    pass\n"), ("b.md", "# H\n")]);
     fx.conn()
         .execute(
@@ -305,7 +305,7 @@ fn schema_version_1_index_is_made_again_as_version_2() {
             |r| r.get(0),
         )
         .unwrap();
-    assert_eq!(version, "2");
+    assert_eq!(version, "3");
     assert_eq!(
         dump(&fx),
         "a.py:1-2 function one [-] -\nb.md:1-1 heading H [1] -"

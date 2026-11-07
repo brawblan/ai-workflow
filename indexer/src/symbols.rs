@@ -1,6 +1,6 @@
 //! The symbols of a file, from its tree-sitter syntax tree.
 
-use tree_sitter::{Language, Node, Parser};
+use tree_sitter::{Language, Node, Parser, Tree};
 
 pub struct Symbol {
     pub name: String,
@@ -14,24 +14,32 @@ pub struct Symbol {
     pub level: Option<i64>,
 }
 
-/// The symbols of a file in line order. The list is empty for a language with no parser.
+/// The parse of one file: the syntax tree, the source, and the symbols. The link reader uses the
+/// tree and the source again.
+pub struct Parsed<'a> {
+    pub language: &'a str,
+    pub tree: Tree,
+    pub source: &'a [u8],
+    pub symbols: Vec<Symbol>,
+}
+
+/// The parse of a file, with its symbols in line order. `None` for a language with no parser.
 /// A syntax error does not stop the parse: the list has each symbol that tree-sitter finds.
-pub fn symbols(language: &str, source: &[u8]) -> Vec<Symbol> {
-    let Some(grammar) = grammar(language) else {
-        return Vec::new();
-    };
+pub fn symbols<'a>(language: &'a str, source: &'a [u8]) -> Option<Parsed<'a>> {
     let mut parser = Parser::new();
-    if parser.set_language(&grammar).is_err() {
-        return Vec::new();
-    }
-    let Some(tree) = parser.parse(source, None) else {
-        return Vec::new();
-    };
-    if language == "markdown" {
+    parser.set_language(&grammar(language)?).ok()?;
+    let tree = parser.parse(source, None)?;
+    let symbols = if language == "markdown" {
         headings(tree.root_node(), source)
     } else {
         code_symbols(tree.root_node(), source)
-    }
+    };
+    Some(Parsed {
+        language,
+        tree,
+        source,
+        symbols,
+    })
 }
 
 fn grammar(language: &str) -> Option<Language> {
@@ -255,7 +263,7 @@ fn without_closing_sequence(name: &str) -> &str {
 
 /// The first and the last line of a node, from 1. A node that ends at the start of a line ends
 /// on the line before it.
-fn lines(node: Node) -> (i64, i64) {
+pub fn lines(node: Node) -> (i64, i64) {
     let start = node.start_position().row;
     let end = node.end_position();
     let end_row = if end.column == 0 && end.row > start {
@@ -267,6 +275,6 @@ fn lines(node: Node) -> (i64, i64) {
     (to_line(start), to_line(end_row))
 }
 
-fn text(node: Node, source: &[u8]) -> String {
+pub fn text(node: Node, source: &[u8]) -> String {
     String::from_utf8_lossy(&source[node.byte_range()]).into_owned()
 }

@@ -12,6 +12,8 @@ pub const DEFAULT_LIMIT: usize = 20;
 pub const USAGE: &str = "usage: stone-index build [--db PATH] [--max-file-size BYTES]
        stone-index find NAME [--kind KIND] [QUERY OPTIONS]
        stone-index outline PATH [QUERY OPTIONS]
+       stone-index refs PATH|MODULE [QUERY OPTIONS]
+       stone-index search WORDS [--path GLOB] [QUERY OPTIONS]
        stone-index --version
 query options: --limit N, --format text|json, --no-update, --db PATH, --max-file-size BYTES,
 and -- before a NAME or a PATH that starts with -";
@@ -21,6 +23,8 @@ pub enum Command {
     Build(IndexOptions),
     Find(Query),
     Outline(Query),
+    Refs(Query),
+    Search(Query),
 }
 
 /// The options of each command that updates the index.
@@ -39,6 +43,7 @@ pub enum Format {
 pub struct Query {
     pub target: String,
     pub kind: Option<String>,
+    pub path: Option<String>,
     pub limit: usize,
     pub format: Format,
     pub update: bool,
@@ -49,20 +54,24 @@ pub fn parse(args: &[String]) -> Result<Command, String> {
     match args.split_first() {
         Some((flag, [])) if flag == "--version" || flag == "-V" => Ok(Command::Version),
         Some((command, rest)) => match command.as_str() {
-            "build" => parse_query(rest, false, false).map(|query| Command::Build(query.index)),
-            "find" => parse_query(rest, true, true).map(Command::Find),
-            "outline" => parse_query(rest, true, false).map(Command::Outline),
+            "build" => parse_query(rest, false, "").map(|query| Command::Build(query.index)),
+            "find" => parse_query(rest, true, "--kind").map(Command::Find),
+            "outline" => parse_query(rest, true, "").map(Command::Outline),
+            "refs" => parse_query(rest, true, "").map(Command::Refs),
+            "search" => parse_query(rest, true, "--path").map(Command::Search),
             _ => Err(format!("unknown command or option: {command}")),
         },
         None => Err("no command".to_string()),
     }
 }
 
-/// Parses the options. A query command needs one target, and only `find` has `--kind`.
-fn parse_query(args: &[String], is_query: bool, has_kind: bool) -> Result<Query, String> {
+/// Parses the options. A query command needs one target. `extra` is the one option of the
+/// command: `--kind` of `find` or `--path` of `search`.
+fn parse_query(args: &[String], is_query: bool, extra: &str) -> Result<Query, String> {
     let mut query = Query {
         target: String::new(),
         kind: None,
+        path: None,
         limit: DEFAULT_LIMIT,
         format: Format::Text,
         update: true,
@@ -77,7 +86,8 @@ fn parse_query(args: &[String], is_query: bool, has_kind: bool) -> Result<Query,
         match arg.as_str() {
             "--db" => query.index.db = Some(PathBuf::from(value(&mut args, arg)?)),
             "--max-file-size" => query.index.max_file_size = number(value(&mut args, arg)?, arg)?,
-            "--kind" if has_kind => query.kind = Some(value(&mut args, arg)?.to_string()),
+            "--kind" if extra == arg => query.kind = Some(value(&mut args, arg)?.to_string()),
+            "--path" if extra == arg => query.path = Some(value(&mut args, arg)?.to_string()),
             "--limit" if is_query => query.limit = number(value(&mut args, arg)?, arg)?,
             "--format" if is_query => query.format = format(value(&mut args, arg)?)?,
             "--no-update" if is_query => query.update = false,
