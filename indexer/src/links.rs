@@ -180,6 +180,9 @@ fn use_paths(node: Node, source: &[u8], prefix: &str, depth: usize, out: &mut Ve
     match node.kind() {
         "use_list" => {
             for child in node.named_children(&mut cursor) {
+                if child.kind().ends_with("_comment") {
+                    continue;
+                }
                 use_paths(child, source, prefix, depth + 1, out);
             }
         }
