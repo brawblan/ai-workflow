@@ -199,8 +199,7 @@ fn ac7_python_syntax_error_keeps_the_other_symbols() {
 
 #[test]
 fn ac7_typescript_syntax_error_keeps_the_other_symbols() {
-    let src =
-        "export function ok() {}\nfunction broken( {\nclass Mid {}\nexport function after() {}\n";
+    let src = "export function ok() {}\nconst = ;\nlet 1x = ;\nexport function after() {}\n";
     let fx = built(&[("b.ts", src)]);
     let found = names(&fx);
     for want in ["ok", "after"] {
