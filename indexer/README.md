@@ -84,7 +84,9 @@ symbol two spaces for each parent above it, and each heading two spaces for each
 
 `refs <target>` takes a repo path or a module name. If the index has a file at the path, `refs`
 prints two groups. `in` has the links whose target resolves to the file. `out` has the links of the
-file. Else, if the target is a Python module of the repo, `refs` uses its file. Else, `in` has the
+file.
+
+Else, if the target is a Python module of the repo, `refs` uses its file. Else, `in` has the
 links whose target text is the target, for example `react`. Each line is `path:line kind target`:
 
 ```text
