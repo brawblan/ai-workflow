@@ -7,8 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
-from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, ready_check, render,
-                   repo_rules, specialists, specs, upgrade, workflow_check, writing_check)
+from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, index, ready_check,
+                   render, repo_rules, specialists, specs, upgrade, workflow_check, writing_check)
 from stone.findings import report
 
 
@@ -173,10 +173,17 @@ def _parser() -> argparse.ArgumentParser:
     run.add_argument("--keep", action="store_true", help="Keep the workspace of each run.")
     run.add_argument("--check-only", action="store_true",
                      help="Validate the scenarios and list the runs. Start no run.")
+
+    # main() sends each argument after 'index' to stone-index, also --help and --version.
+    commands.add_parser("index", add_help=False,
+                        help="Run stone-index from PATH with the same arguments (#258).")
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["index"]:
+        return index.run(argv[1:])
     args = _parser().parse_args(argv)
     if args.command == "check":
         findings = framework_check.run(args.root, args.framework, args.links)
