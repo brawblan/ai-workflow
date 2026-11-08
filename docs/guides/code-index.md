@@ -14,11 +14,11 @@ where a symbol is, and reads fewer files.
 
 ## Result first
 
-- The index lowered the mean cost in each eval. The saving over all scenarios is inside the noise.
-- The clear saving is on large tasks over many files. Scenario M3 cost 25 percent less with
-  `rule-show` than with `none`.
+- The rule lowered the mean cost in the evals of D107 and D109. The saving over all scenarios is inside the noise.
+- The largest saving that the runs show is on one large multi-file task, M3. It cost 25 percent less
+  with `rule-show` than with `none`. The record gives no SE for M3.
 - The fixtures are synthetic. The trials used one model.
-- Keep the index if your repo is large. Turn it off if it adds no value for your repo.
+- No measurement used a large real repo. Keep the index, or turn it off if it adds no value for your repo.
 
 ## What the index does
 
@@ -94,9 +94,9 @@ Each run used one model. Cost is the mean cost of a run in USD. SE is the standa
 
 | Eval | Variant | Runs | Mean cost (SE) | Mean output tokens | Pass rate | Source |
 | --- | --- | --- | --- | --- | --- | --- |
-| 8 small scenarios, 224 files | `none` | 24 | 0.04369 (not in the record) | 238.5 | 24 of 24 | D107 |
+| 8 small scenarios, 224 source files | `none` | 24 | 0.04369 (not in the record) | 238.5 | 24 of 24 | D107 |
 | | `rule` | 24 | 0.04307 (not in the record) | 186.9 | 24 of 24 | D107 |
-| 4 multi-file scenarios, 624 files | `none` | 36 | 0.05273 (0.00351) | 463.1 | 36 of 36 | D109 |
+| 12 scenarios (X1 to X8 on shop, M1 to M4 on market, 624 files) | `none` | 36 | 0.05273 (0.00351) | 463.1 | 36 of 36 | D109 |
 | | `rule` | 36 | 0.05215 (0.00286) | 400.7 | 36 of 36 | D109 |
 | | `rule-show` | 36 | 0.05055 (0.00229) | 324.1 | 36 of 36 | D109 |
 
@@ -111,8 +111,7 @@ Each run used one model. Cost is the mean cost of a run in USD. SE is the standa
 
 ### Large multi-file task (M3)
 
-M3 asks for a call chain over 3 files of 221 to 240 lines each. This is where the index saves the
-most. The record gives no SE for M3, and each cell has 3 trials.
+M3 asks for a call chain over 3 files of 221 to 240 lines each. The record gives no SE for M3, and each cell has 3 trials.
 
 | Variant | M3 mean cost | Change from `none` | Source |
 | --- | --- | --- | --- |
@@ -138,8 +137,7 @@ they do not show that `rule-show` is better or worse.
 ### Speed and size
 
 The times below come from different PRs. The code, the repo state, and the machine load differed
-between the PRs. So do not compare the rows of one column across PRs. Each PR measured on a Mac,
-with a release build.
+between the PRs. So do not compare the rows of one column across PRs.
 
 | Repo | PR | Code state | Files | First build | No-change build | Query | Index size |
 | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -149,14 +147,14 @@ with a release build.
 | vscode `1745a4a6` | #266 | Contentless FTS5 (kept) | 20,621 | 17.7 s | 0.19 s | `search "tool search" --no-update` 0.02 s | 230 MB |
 | vscode `1745a4a6` | #280 | Before the PR (`origin/dev`), `bench.sh 10`, median | 20,621 | 23.04 s | 0.2315 s | `find` 0.005 s; `show` 0.006 s; `outline` 0.005 s; `refs` 0.005 s; `search` 0.037 s (all `--no-update`) | 231.7 MB |
 | vscode `1745a4a6` | #280 | After the PR (same session, same queries) | 20,621 | 22.795 s | 0.2215 s | Same as the row above | 231.7 MB |
-| opencv | #268 | C and C++ added | 6,298 | 5.79 s | 0.16 s | Not given | Not given |
+| opencv | #268 | C, C++, and C# added | 6,298 | 5.79 s | 0.16 s | Not given | Not given |
 | tokio | #276 | Rust added | 890 | 4.55 s | 0.01 s | Not given | Not given |
 
 Why the vscode first-build time goes from 6.53 s to 23.04 s:
 
-- The index grew. PR #266 added the links and the FTS5 table, and the work of the build grew with them.
-- The machine load differed. The 7.2 s and 17.7 s rows ran together in one session. The 6.53 s row and the #280 rows ran in other
-  sessions.
+- PR #266 explains 7.2 s to 17.7 s: the contentless FTS5 table adds work to the build. No PR explains
+  the step from 17.7 s to 23.04 s. The code and the machine load differed.
+- The 7.2 s and 17.7 s rows ran together in one session. The 6.53 s row and the #280 rows ran in other sessions.
 - The no-change build stays near 0.2 s in each PR. This is the time that the session-start hook takes
   when the repo has not changed.
 
@@ -169,7 +167,7 @@ limit was 25 percent. A page cache of 64 MB did not make the cold build faster: 
 | Limit | What it means |
 | --- | --- |
 | The saving is inside the noise | Over all scenarios, the cost difference is less than 1 SE (D107: under 1 SE; D109: 0.13 SE for `rule` and 0.44 SE for `rule-show`). The data does not show a cost saving on small tasks. |
-| The clear saving is on large tasks | M3 cost 11 to 25 percent less. It has 3 trials for each variant and no SE in the record. |
+| The largest saving is on one task | M3 cost 11 to 25 percent less. It has 3 trials for each variant and no SE in the record. |
 | The fixtures are synthetic | Generated code has regular names. It can favor the index more than a real repo does. |
 | One model | Every trial used one model. Another model can give other results. |
 | A large repo can need a manual first build | The hook stops the build after 120 seconds. The build writes one transaction, so a stopped first build writes nothing. Run `stone-index build` by hand once (D111). |
