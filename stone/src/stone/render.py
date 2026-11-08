@@ -707,11 +707,11 @@ def _remove(data: dict[str, Any], owned: set[str], path: str = "") -> bool:
 
 
 def _merge_json(root: Path, path: str, fragment_text: str,
-                owned_before: list[str] | None = None) -> tuple[bool, str]:
+                old: dict[str, Any] | None = None) -> tuple[bool, str]:
     """Return (the file has the fragment, the file text with the fragment merged in).
 
     The merged text keeps the indent and the final newline state of the existing file (D70).
-    First it removes the entries of `owned_before` that the fragment no longer has (D111).
+    First it removes the entries that the old manifest entry owns and the fragment no longer has (D111).
     """
     target = root / path
     text = target.read_text(encoding="utf-8") if target.exists() else ""
@@ -720,7 +720,8 @@ def _merge_json(root: Path, path: str, fragment_text: str,
     except json.JSONDecodeError as error:
         raise RenderError(f"{path} is not valid JSON: {error}. Fix the file.") from None
     fragment = json.loads(fragment_text)
-    removed = _remove(data, set(owned_before or []) - set(_entry_keys(fragment)))
+    owned = set((old or {}).get("owned") or []) - set(_entry_keys(fragment))
+    removed = _remove(data, owned)
     present = _contains(data, fragment) and not removed
     _merge(data, fragment)
     newline = "\n" if not text or text.endswith("\n") else ""
@@ -777,8 +778,7 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
         old = old_entries.get(component.id)
         paths = sorted(component.files)
         if component.merge:
-            present, merged = _merge_json(root, paths[0], component.files[paths[0]],
-                                          (old or {}).get("owned") or [])
+            present, merged = _merge_json(root, paths[0], component.files[paths[0]], old)
             write = {paths[0]: merged}
             state = ("skipped" if present
                      else "drift" if old and old["hash"] == component.hash  # entry removed
