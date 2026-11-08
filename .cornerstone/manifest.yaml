@@ -1,4 +1,4 @@
-framework_version: 1.5.0
+framework_version: 1.6.0
 components:
   - id: check.k22
     kind: check
@@ -58,7 +58,7 @@ components:
     review_by: "2027-04-17"
     files:
       - .github/workflows/cornerstone-checks.yml
-    hash: e7beaf7a6b804f102a81b72024c72cc78cb28438d7857d324e1435a432c913f8
+    hash: 29ce6572d45ec183bfa0a199ae2122435d77256e9e37f67884b54fae4cf150ac
   - id: hook.path-match
     kind: hook
     purpose: Match a path against paths.tests and paths.checks. The hook and K6 import it.
@@ -103,7 +103,10 @@ components:
     review_by: "2027-04-17"
     files:
       - .claude/settings.json
-    hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+    hash: a7b10ba69721fe194bb1a3582736033e3d7ca37fd86d4ee7c065ea90ac126a9f
+    owned:
+      - /permissions/allow=58d8cc94439549c9
+      - /hooks/SessionStart=c4249d258f305d42
   - id: role.implementer
     kind: role
     purpose: Change the code to meet the ticket. Write the decision log.
@@ -119,7 +122,7 @@ components:
     review_by: "2027-04-17"
     files:
       - .claude/agents/implementer.md
-    hash: 6d690401685f5fcc87612d37af76f507a4cdb0d8ced132fa711d35c5c9a491a7
+    hash: a8d97cb339efc6aac3dd26f38bcd1168cb88e340f6c91e8ce4b1e8bc28823224
   - id: role.reviewer
     kind: role
     purpose: Find defects and scope drift in a fresh session.
@@ -135,7 +138,7 @@ components:
     review_by: "2027-04-17"
     files:
       - .claude/agents/reviewer.md
-    hash: e813d74853c4a499412820719e892257917a1c9c6346425692cd9f5f43776f7d
+    hash: 3fb53e70d50b8215c19317303257a5516ff7115b4397630e1f5336857d55e3bc
   - id: role.shaper
     kind: role
     purpose: Interview the human until the ticket meets the Definition of Ready.
@@ -166,7 +169,7 @@ components:
     review_by: "2027-04-17"
     files:
       - .claude/agents/tester.md
-    hash: dfff669aeb384434b27d4052a31568a65c25d5f35c4b7b91c0f019f9f4914e92
+    hash: d9df6ee279f5b0dbc6b2ec42ddbc0c7303c217b21abbd67385533daad801a587
   - id: trigger.label.single-ticket
     kind: ci-job
     purpose: Start the first role of the profile when a human adds the trigger label to an issue.
