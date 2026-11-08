@@ -117,7 +117,8 @@ class OtherSettingsTest(WorkspaceCase):
         ws = self.workspace("without", self.folder(fixture))
         data = read_json(ws / SETTINGS)
         self.assertNotIn(HOOK_FILE, json.dumps(data))
-        self.assertEqual(data["permissions"], {"allow": ["Read"]})
+        # Render keeps the existing permission and adds the default code index permission (D111).
+        self.assertEqual(data["permissions"], {"allow": ["Read", "Bash(stone-index *)"]})
         self.assertEqual(data["hooks"]["PreToolUse"], [self.OTHER])
         self.assertEqual(data["hooks"]["PostToolUse"], fixture["hooks"]["PostToolUse"])
         self.assertEqual(git_status(ws), "")
