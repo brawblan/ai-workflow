@@ -643,6 +643,20 @@ def _merge(data: dict[str, Any], fragment: dict[str, Any]) -> None:
             data[key] = value
 
 
+SCALAR_ARRAY = re.compile(r'^([ \t]*)(.*)\[\n((?:[ \t]*(?:"(?:[^"\\\n]|\\.)*"|[-\w.+]+),?\n)+)'
+                          r'[ \t]*\](,?)$', re.M)
+JSON_WIDTH = 80  # the print width of a formatter with default options (D96)
+
+
+def _short_arrays(text: str) -> str:
+    """Put each short array of plain values on one line, as a formatter does (D96)."""
+    def join(match: re.Match[str]) -> str:
+        items = ", ".join(line.strip().rstrip(",") for line in match[3].splitlines())
+        line = f"{match[1]}{match[2]}[{items}]{match[4]}"
+        return line if len(line) <= JSON_WIDTH else match[0]
+    return SCALAR_ARRAY.sub(join, text)
+
+
 def _json_indent(text: str) -> str:
     """Return the indent of the first indented line of a JSON text: a tab, or N spaces."""
     for line in text.splitlines():
@@ -667,7 +681,7 @@ def _merge_json(root: Path, path: str, fragment_text: str) -> tuple[bool, str]:
     present = _contains(data, fragment)
     _merge(data, fragment)
     newline = "\n" if not text or text.endswith("\n") else ""
-    return present, json.dumps(data, indent=_json_indent(text)) + newline
+    return present, _short_arrays(json.dumps(data, indent=_json_indent(text))) + newline
 
 
 def _manifest_entry(component: Component, old: dict[str, Any] | None, config: dict[str, Any],
