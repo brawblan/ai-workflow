@@ -1,7 +1,7 @@
 [package]
 name = "stone-index"
 # The same version as stone (stone/pyproject.toml). The release checklist sets both.
-version = "1.5.0"
+version = "1.6.0"
 edition = "2024"
 rust-version = "1.99"
 description = "The code indexer of Cornerstone"

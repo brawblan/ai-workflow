@@ -3,7 +3,7 @@
 versions:
   - version: 1.6.0
     kind: minor
-    released: null
+    released: 2026-11-08
     summary: New optional key code_index. stone render adds a code index by default. Each role file of a role that reads code gets the stone-index rule, and the harness settings get the permission for the command and a build hook at session start. code_index none opts out, and a map with command, rule, and build sets another indexer (D111).
     config:
       added:
