@@ -134,10 +134,11 @@ class CustomRenderTest(RenderedBase):
         command = self.session_command(self.rendered(value))
         self.assertIn("graphify build", command)
 
-    def test_ac1_build_with_quotes_stays_valid_json(self) -> None:
-        value = dict(CUSTOM, build='graphify update --name "x y"')
-        command = self.session_command(self.rendered(value))
-        self.assertIn('graphify update --name "x y"', command)
+    def test_ac1_build_with_options_stays_valid_json(self) -> None:
+        value = {"command": "my-index", "rule": GUARD.format("my-index") + " x",
+                 "build": "my-index update --out=.cache/idx"}
+        files = self.rendered(value)
+        self.assertIn("my-index update --out=.cache/idx", self.session_command(files))
 
 
 class OptOutTest(RenderedBase):
@@ -219,6 +220,16 @@ class BadFormTest(unittest.TestCase):
     def test_ac2_build_with_newline(self) -> None:
         self.bad(dict(CUSTOM, build="graphify a\nrm -rf x"))
         self.bad(dict(CUSTOM, build=["graphify"]))
+
+    def test_ac2_build_with_shell_syntax_or_odd_spacing(self) -> None:
+        for build in ('a "b"', "a #b", "a & b", "a && b", "a | b", "a; b", "a  b", "a\nb",
+                      "a $b", "a `b`", "a 'b'", "a > b"):
+            self.bad(dict(CUSTOM, build=build))
+
+    def test_ac2_build_of_plain_words_passes(self) -> None:
+        for build in ("graphify update", "my-index update --out=.cache/idx", "x"):
+            self.assertEqual(code_index.problems({"code_index": dict(CUSTOM, build=build)}), [],
+                             build)
 
     def test_ac2_render_fails_on_a_bad_value(self) -> None:
         for value in ("graphify", ["x"], {"command": "a b", "rule": "x"}):
