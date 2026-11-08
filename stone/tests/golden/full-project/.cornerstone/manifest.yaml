@@ -102,7 +102,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .claude/settings.json
-    hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+    hash: a7b10ba69721fe194bb1a3582736033e3d7ca37fd86d4ee7c065ea90ac126a9f
   - id: role.planner
     kind: role
     purpose: Write the plan artifact and the progress file. A human approves them at G2.
@@ -117,7 +117,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .claude/agents/planner.md
-    hash: d4472158cf9e7643247c98f25eb960dc392f1af7750f7315fed65b210f1bc010
+    hash: a0a181add2d6fb1402b8b4e2596f8585d0a6a4d3171c0f5a465106f0eb351a87
   - id: role.reviewer
     kind: role
     purpose: Find defects and scope drift in a fresh session.
@@ -132,7 +132,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .claude/agents/reviewer.md
-    hash: 6a9f5184e06dfd0f274230baaa587a49632fd721c0fab0e88740fc38bf292f54
+    hash: 1e29cf781df527e00847fa35e62c2f15f77291a96e96b70224f5f97870610121
   - id: role.shaper
     kind: role
     purpose: Interview the human until the ticket meets the Definition of Ready.

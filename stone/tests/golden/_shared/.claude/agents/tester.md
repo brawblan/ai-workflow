@@ -14,6 +14,11 @@ not the implementation.
 - Write tests only here: `tests/`
 - Do not change source code. If the code looks wrong, report it. Do not fix it.
 
+## Code index
+
+- If `stone-index` is on PATH, ask the code index before you search or read code. Then read only the lines that it gives.
+- Use `stone-index find <name>`, `stone-index refs <path or module>`, `stone-index outline <path>`, or `stone-index search "<words>"`.
+
 ## Steps
 
 1. Read the ticket first. Read the diff after you list the behavior to test.

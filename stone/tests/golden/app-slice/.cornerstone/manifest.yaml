@@ -87,7 +87,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .claude/settings.json
-    hash: 17482655c3b446b7dd64f21f4d4a12b15427340718cfa00bb9f0c7d78721526f
+    hash: a7b10ba69721fe194bb1a3582736033e3d7ca37fd86d4ee7c065ea90ac126a9f
   - id: role.implementer
     kind: role
     purpose: Change the code to meet the ticket. Write the decision log.
@@ -102,7 +102,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .claude/agents/implementer.md
-    hash: 4bfd71d82355ddb3b6fab5a0a3c3965aada9c2b88094e89213e8c1862e685736
+    hash: 21d2983e0ed2c7d99efc9332d0f327d8471ca3fec1b44fa1dc32ae77a6103095
   - id: role.planner
     kind: role
     purpose: Write the plan artifact and the progress file. A human approves them at G2.
@@ -117,7 +117,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .claude/agents/planner.md
-    hash: d4472158cf9e7643247c98f25eb960dc392f1af7750f7315fed65b210f1bc010
+    hash: a0a181add2d6fb1402b8b4e2596f8585d0a6a4d3171c0f5a465106f0eb351a87
   - id: role.reviewer
     kind: role
     purpose: Find defects and scope drift in a fresh session.
@@ -132,7 +132,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .claude/agents/reviewer.md
-    hash: 6a9f5184e06dfd0f274230baaa587a49632fd721c0fab0e88740fc38bf292f54
+    hash: 1e29cf781df527e00847fa35e62c2f15f77291a96e96b70224f5f97870610121
   - id: role.shaper
     kind: role
     purpose: Interview the human until the ticket meets the Definition of Ready.
@@ -160,7 +160,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .claude/agents/tester.md
-    hash: 688ce03093ecd73a2ad012aea3a1b4566062dbb0eda92e36b59ecc25707f98d1
+    hash: 0447db5f00d73f3f6bbab1ac3e6602071694f5312b10e3b031e960a91dcc6d33
   - id: trigger.label.app-slice
     kind: ci-job
     purpose: Start the first role of the profile when a human adds the trigger label to an issue.

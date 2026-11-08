@@ -10,6 +10,22 @@
           }
         ]
       }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v stone-index >/dev/null 2>&1 || exit 0; cd \"${CLAUDE_PROJECT_DIR:-.}\" 2>/dev/null; (stone-index build & p=$!; (sleep 120; kill $p) & w=$!; wait $p; kill $w) </dev/null >/dev/null 2>&1 & exit 0",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(stone-index *)"
     ]
   }
 }
