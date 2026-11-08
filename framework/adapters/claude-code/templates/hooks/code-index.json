@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash($code_index_command_json *)"
+    ]
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "command -v $code_index_command_json >/dev/null 2>&1 || exit 0; cd \"$${CLAUDE_PROJECT_DIR:-.}\" 2>/dev/null; ($code_index_build_json & p=$$!; (sleep 120; kill $$p) & w=$$!; wait $$p; kill $$w) </dev/null >/dev/null 2>&1 & exit 0",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

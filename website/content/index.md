@@ -8,7 +8,7 @@ hide:
 
 **A general workflow layer for coding agents that you update when the models improve.**
 
-Version 1.5.0. All 10 profiles are supported, and each generated check blocks.
+Version 1.6.0. All 10 profiles are supported, and each generated check blocks.
 
 Cornerstone is a wrapper around the way that you work with a coding agent. It sets who does each
 stage, which gates stop the work, and which checks decide that work is done.

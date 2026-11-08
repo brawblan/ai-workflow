@@ -22,11 +22,51 @@ The other commands in [the generator design](../framework/generator/design.md) a
 
 ## Install
 
+Choose one option. Replace `vX.Y.Z` with a release tag, for example `v1.6.0`.
+
+| Option | Use it when |
+| --- | --- |
+| pip | You have a clone of this repo. |
+| uv | You use uv. It puts `stone` in its own environment. |
+| pipx | You use pipx. It puts `stone` in its own environment. |
+| zipapp | You want one file and no install step. |
+
+### pip
+
 Run this from the repo root:
 
 ```bash
 pip install ./stone
 ```
+
+### uv
+
+```bash
+uv tool install "git+https://github.com/brawblan/ai-workflow.git@vX.Y.Z#subdirectory=stone"
+```
+
+### pipx
+
+```bash
+pipx install "git+https://github.com/brawblan/ai-workflow.git@vX.Y.Z#subdirectory=stone"
+```
+
+### zipapp
+
+Each release from 1.6.0 has two files: `stone.pyz` and `stone.pyz.sha256`. Download both, test the
+checksum, and run the file with Python 3.11 or later:
+
+```bash
+base=https://github.com/brawblan/ai-workflow/releases/download/vX.Y.Z
+curl -fsSL --remote-name-all "$base/stone.pyz" "$base/stone.pyz.sha256"
+sha256sum -c stone.pyz.sha256   # on macOS: shasum -a 256 -c stone.pyz.sha256
+python3 stone.pyz --version
+```
+
+If the checksum test fails, do not run the file. The zipapp has PyYAML in it, so it needs no other
+install. It has no compiled module, so PyYAML uses its pure-Python code. To build the file from a
+clone, run `python stone/build_zipapp.py --out stone.pyz`. Two builds from the same commit and the
+same PyYAML version give the same bytes.
 
 ## Use
 

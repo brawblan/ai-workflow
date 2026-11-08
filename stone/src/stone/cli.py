@@ -5,10 +5,12 @@ from __future__ import annotations
 import argparse
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
+from typing import Any
 
-from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, ready_check, render,
-                   repo_rules, specialists, specs, upgrade, workflow_check, writing_check)
+from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, index, ready_check,
+                   render, repo_rules, specialists, specs, upgrade, workflow_check, writing_check)
 from stone.findings import report
 
 
@@ -27,6 +29,45 @@ def _add_check_rules(commands: argparse._SubParsersAction) -> None:
     rules.add_argument("--skip-k9", action="store_true",
                        help="Do not run K9. For a release PR into main (D103).")
     rules.add_argument("--format", choices=["text", "github"], default="text")
+
+
+def _add_more_commands(commands: argparse._SubParsersAction) -> None:
+    """Add check-rules, and index (#258). _parse sends each argument after 'index' to stone-index,
+    also --help and --version."""
+    _add_check_rules(commands)
+    commands.add_parser("index", add_help=False,
+                        help="Run stone-index from PATH with the same arguments (#258).")
+
+
+def _parse(argv: list[str] | None) -> argparse.Namespace:
+    """Parse argv. For 'index', keep each argument after it unparsed, in `args`."""
+    argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["index"]:
+        return argparse.Namespace(command="index", args=argv[1:])
+    return _parser().parse_args(argv)
+
+
+def _add_eval(commands: Any) -> None:
+    run = commands.add_parser("eval", help="Run the eval of one component, with it and without it.")
+    run.add_argument("component", nargs="?", help="The component ID, for example role.tester.")
+    run.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    run.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
+    run.add_argument("--scenario", action="append", metavar="ID",
+                     help="Run only this scenario. Repeat for more. Default: all.")
+    run.add_argument("--variant", default="both",
+                     help="'with', 'without', or 'both' (default). A guidance eval takes the names "
+                          "in the 'variants' of its scenarios.")
+    run.add_argument("--trials", type=int, default=1, help="Runs for each scenario and variant.")
+    run.add_argument("--model", help="Default: the role model in the model profile.")
+    run.add_argument("--budget", default="5", help="The cost limit for each run. Default: 5.")
+    run.add_argument("--timeout", type=int, default=1800, help="Seconds for each run.")
+    run.add_argument("--run-config", type=Path,
+                     help="The harness command file. Default: the eval.yaml of the adapter.")
+    run.add_argument("--keep", action="store_true", help="Keep the workspace of each run.")
+    run.add_argument("--summary", type=Path, metavar="RUNS_JSONL",
+                     help="Print the result tables from a kept runs.jsonl. Start no run.")
+    run.add_argument("--check-only", action="store_true",
+                     help="Validate the scenarios and list the runs. Start no run.")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -113,7 +154,7 @@ def _parser() -> argparse.ArgumentParser:
                          help="warn: report only (the first 2 weeks). block: fail on errors.")
     writing.add_argument("--format", choices=["text", "github"], default="text")
 
-    _add_check_rules(commands)
+    _add_more_commands(commands)
 
     evidence = commands.add_parser("check-evidence",
                                    help="K14: fail if a required PR section is missing or empty.")
@@ -155,29 +196,15 @@ def _parser() -> argparse.ArgumentParser:
                        help="warn: report only (D82). block: fail on findings.")
     ready.add_argument("--format", choices=["text", "github"], default="text")
 
-    run = commands.add_parser("eval", help="Run the eval of one component, with it and without it.")
-    run.add_argument("component", help="The component ID, for example role.tester.")
-    run.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
-    run.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
-    run.add_argument("--scenario", action="append", metavar="ID",
-                     help="Run only this scenario. Repeat for more. Default: all.")
-    run.add_argument("--variant", default="both",
-                     help="'with', 'without', or 'both' (default). A guidance eval takes the names "
-                          "in the 'variants' of its scenarios.")
-    run.add_argument("--trials", type=int, default=1, help="Runs for each scenario and variant.")
-    run.add_argument("--model", help="Default: the role model in the model profile.")
-    run.add_argument("--budget", default="5", help="The cost limit for each run. Default: 5.")
-    run.add_argument("--timeout", type=int, default=1800, help="Seconds for each run.")
-    run.add_argument("--run-config", type=Path,
-                     help="The harness command file. Default: the eval.yaml of the adapter.")
-    run.add_argument("--keep", action="store_true", help="Keep the workspace of each run.")
-    run.add_argument("--check-only", action="store_true",
-                     help="Validate the scenarios and list the runs. Start no run.")
+    _add_eval(commands)
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
-    args = _parser().parse_args(argv)
+    args = _parse(argv)
+    handler = _HANDLERS.get(args.command)
+    if handler:
+        return handler(args)
     if args.command == "check":
         findings = framework_check.run(args.root, args.framework, args.links)
         blocking = report(findings, args.format)
@@ -187,12 +214,6 @@ def main(argv: list[str] | None = None) -> int:
         return _render(args.root, args.framework, args.dry_run)
     if args.command == "gate":
         return _gate(args.root, args.base, args.body, _split(args.labels), args.split_checks)
-    if args.command == "upgrade":
-        return _upgrade(args)
-    if args.command == "specialists":
-        return _specialists(args)
-    if args.command == "check-specialists":
-        return _check_specialists(args)
     if args.command == "spec":
         return _spec(args.root, args.spec_command, getattr(args, "plan", ""))
     if args.command == "check-evidence":
@@ -203,10 +224,6 @@ def main(argv: list[str] | None = None) -> int:
         return _check_workflows(args.body, None if args.all else args.base, args.mode, args.format)
     if args.command == "check-ready":
         return _check_ready(args.ticket, args.profile, args.mode, args.format)
-    if args.command == "check-rules":
-        return _check_rules(args)
-    if args.command == "eval":
-        return _eval(args)
 
     rules_path = args.rules or args.root / writing_check.DEFAULT_RULES
     dictionary = args.dictionary or args.root / writing_check.DEFAULT_DICTIONARY
@@ -385,7 +402,23 @@ def _check_ready(ticket: str, profile: str | None, mode: str, fmt: str) -> int:
     return 1 if blocking else 0
 
 
+def _eval_summary(args: argparse.Namespace) -> int:
+    try:
+        runs = evals.load_runs(args.summary, args.root)
+    except evals.EvalError as error:
+        print(f"stone eval: {error}")
+        return 2
+    print(evals.summary(args.component or args.summary.parent.name, args.model or "unknown", runs),
+          end="")
+    return 0
+
+
 def _eval(args: argparse.Namespace) -> int:
+    if args.summary:
+        return _eval_summary(args)
+    if not args.component:
+        print("stone eval: give a component ID, or use --summary.")
+        return 2
     if args.trials < 1:
         print("stone eval: --trials must be 1 or more.")
         return 2
@@ -419,3 +452,14 @@ def _render(root: Path, framework: Path | None, dry_run: bool) -> int:
         print("Drift: a person changed generated content. Restore it, or move the change to "
               "the repo config, delete the file, and render again.")
     return result.exit_code
+
+
+# The commands whose handler takes only the parsed arguments.
+_HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
+    "upgrade": _upgrade,
+    "specialists": _specialists,
+    "check-specialists": _check_specialists,
+    "check-rules": _check_rules,
+    "eval": _eval,
+    "index": lambda args: index.run(args.args),
+}

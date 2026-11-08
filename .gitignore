@@ -17,3 +17,10 @@ build/
 
 # stone eval: transcripts and run records
 .cornerstone/eval-runs/
+evals/index-guidance/fixtures/
+
+# Rust
+indexer/target/
+
+# stone-index: the local code index (D104)
+.cornerstone/index.db*

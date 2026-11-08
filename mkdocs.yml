@@ -92,6 +92,7 @@ nav:
       - Refactor or migrate: docs/guides/refactor-migration.md
       - Upgrade Cornerstone: docs/guides/upgrade-cornerstone.md
       - Run the roles: docs/guides/run-the-roles.md
+      - Use the code index: docs/guides/code-index.md
   - Framework:
       - framework/README.md
       - Principles: framework/principles.md

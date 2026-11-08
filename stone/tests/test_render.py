@@ -141,6 +141,7 @@ class RenderTest(unittest.TestCase):
         self.assertEqual(self.render().exit_code, 0)
 
     def test_settings_merge_keeps_other_keys(self) -> None:
+        self.write_config(CONFIG + "code_index: none\n")  # no index permission (D111)
         settings = self.root / ".claude/settings.json"
         settings.parent.mkdir(parents=True)
         settings.write_text('{"permissions": {"allow": ["Bash(ls)"]}}', encoding="utf-8")

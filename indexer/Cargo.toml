@@ -1,0 +1,36 @@
+[package]
+name = "stone-index"
+# The same version as stone (stone/pyproject.toml). The release checklist sets both.
+version = "1.6.0"
+edition = "2024"
+rust-version = "1.99"
+description = "The code indexer of Cornerstone"
+license = "MIT"
+publish = false
+
+[[bin]]
+name = "stone-index"
+path = "src/main.rs"
+
+[dependencies]
+ignore = "0.4"
+rayon = "1"
+rusqlite = { version = "0.41", features = ["bundled"] }
+tree-sitter = "0.27"
+tree-sitter-c = "0.24.2"
+tree-sitter-c-sharp = "0.23.5"
+tree-sitter-cpp = "0.23.4"
+tree-sitter-javascript = "0.25"
+tree-sitter-md = "0.5"
+tree-sitter-python = "0.25"
+tree-sitter-rust = "0.24.2"
+tree-sitter-typescript = "0.23"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+# The tests read the index.
+[dev-dependencies]
+rusqlite = { version = "0.41", features = ["bundled"] }
+
+[lints.clippy]
+# K9 length cap. clippy.toml sets the threshold to limits.function_lines.
+too_many_lines = "warn"

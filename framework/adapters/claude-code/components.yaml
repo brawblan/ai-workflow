@@ -13,6 +13,8 @@
 # eval: the planned eval folder (lifecycle.md).
 # protected_dirs: the folders of the harness that hold its settings, role files, and hook entry. The hook
 # and K6 protect them for every role, with `.cornerstone/` (D76). The core names no harness folder (P12).
+# reads_code: a role that reads code. Its file gets the code index rule at `$code_index_rule` (D111).
+# code_index_part: a JSON part that render merges into the fragment, unless `code_index: none`.
 # instruction_files: the files that the harness loads as rules, in any folder. With
 # `protect_instruction_files: true` in the repo config, the hook and K6 protect them too (D87).
 # Each letter is a class of both cases, because a file system that ignores case loads `agents.md`
@@ -39,6 +41,7 @@ components:
   - id: role.planner
     kind: role
     role: planner
+    reads_code: true                         # gets the code index rule (D111)
     purpose: Write the plan artifact and the progress file. A human approves them at G2.
     principle: [P3, P7]
     template: agents/planner.md
@@ -48,6 +51,7 @@ components:
   - id: role.implementer
     kind: role
     role: implementer
+    reads_code: true                         # gets the code index rule (D111)
     purpose: Change the code to meet the ticket. Write the decision log.
     principle: [P2, P8]
     template: agents/implementer.md
@@ -57,6 +61,7 @@ components:
   - id: role.tester
     kind: role
     role: tester
+    reads_code: true                         # gets the code index rule (D111)
     purpose: Write independent tests from the ticket and the diff.
     principle: [P2]
     template: agents/tester.md
@@ -66,6 +71,7 @@ components:
   - id: role.reviewer
     kind: role
     role: reviewer
+    reads_code: true                         # gets the code index rule (D111)
     purpose: Find defects and scope drift in a fresh session.
     principle: [P2, P11]
     template: agents/reviewer.md
@@ -75,6 +81,7 @@ components:
   - id: role.investigator
     kind: role
     role: investigator
+    reads_code: true                         # gets the code index rule (D111)
     purpose: Read, run, and report. Write only in the reports path, or anywhere on a spike branch.
     principle: [P2, P11]
     template: agents/investigator.md
@@ -105,6 +112,7 @@ components:
     template: hooks/settings.json
     target: .claude/settings.json
     merge: json
+    code_index_part: hooks/code-index.json   # the index permission and build hook, unless code_index: none
     eval: evals/hook-protect-paths/
 
   - id: check.k6

@@ -1,0 +1,5 @@
+# P9: one exact Rust version for each machine and for CI.
+[toolchain]
+channel = "1.99.1"
+components = ["clippy", "rustfmt"]
+profile = "minimal"

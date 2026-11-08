@@ -39,6 +39,8 @@ tools:   # the same lists as the role files, plus the commands that the role run
   shaper: [Read, Grep, Glob, Write, Edit]   # a file ticket (D60); the hook limits the edits
   planner: [Read, Grep, Glob, Write]
   writer: [Read, Grep, Glob]   # the guidance.writing eval (D69): read-only
+  # The guidance.index eval (D107): both variants can run the index. Only `rule` says so.
+  reader: [Read, Grep, Glob, "Bash(stone-index *)"]
   tester: [Read, Grep, Glob, Edit, Write, "Bash(python -m unittest*)", "Bash(git diff*)",
            "Bash(git log*)", "Bash(git show*)", "Bash(git add*)", "Bash(git commit*)",
            "Bash(git status*)"]
@@ -62,10 +64,13 @@ tools:   # the same lists as the role files, plus the commands that the role run
 output_where: {type: result}   # use the last JSON object with these keys and values
 
 output:   # dotted paths in the last JSON object of the output (the "result" event).
-          # stone reads these names: report, cost_usd, input_tokens, output_tokens, turns.
+          # stone reads these names: report, cost_usd, input_tokens, output_tokens, turns,
+          # cache_read_tokens, cache_creation_tokens.
   report: result
   cost_usd: total_cost_usd
   input_tokens: usage.input_tokens
   output_tokens: usage.output_tokens
+  cache_read_tokens: usage.cache_read_input_tokens
+  cache_creation_tokens: usage.cache_creation_input_tokens
   turns: num_turns
   structured_output: structured_output   # a trigger eval: the report schema (D71)

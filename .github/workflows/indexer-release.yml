@@ -1,0 +1,150 @@
+# Build stone-index for five targets from the tag commit of a published release (#258). Attach an
+# archive and a wheel for each target, and SHA256SUMS. The build jobs cannot write. Only the upload
+# job gets contents: write, and it runs no repo code. A manual run builds and tests, with no upload.
+name: indexer-release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # The Linux jobs build in a manylinux container, so the binary needs only glibc 2.28.
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            container: quay.io/pypa/manylinux_2_28_x86_64:2026.11.01-2@sha256:7e41b1c7fd64dfc69703a1124b43c404382973ee06ec5d764b85c34d2221fded
+            python: python3.12
+            # The SHA-256 of rustup-init 1.29.3 for this target, from static.rust-lang.org.
+            rustup_sha256: b1c8cb14e30889e7e2999e6b69e62d9e9b9ffc0f4df8180564d306d9680e6c55
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-24.04-arm
+            container: quay.io/pypa/manylinux_2_28_aarch64:2026.11.01-2@sha256:54b271d9562a3686298880df05367909e949ed317e7b1b79b59c696d75f78676
+            python: python3.12
+            # The SHA-256 of rustup-init 1.29.3 for this target, from static.rust-lang.org.
+            rustup_sha256: 9f608c142e0e38a78957d0661ba1dfaf0b6fb37184cfaa4b9a0aa57af6184282
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+            python: python
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            python: python
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            python: python
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    env:
+      TARGET: ${{ matrix.target }}
+      PY: ${{ matrix.python }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      # On a release event, the checkout is the commit of the release tag.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        if: ${{ !matrix.container }}
+        with:
+          python-version: "3.12"
+
+      # The manylinux image has no Rust. The runners for macOS and Windows have rustup.
+      # A fixed rustup-init version, with a test of its checksum before it runs.
+      - name: Install rustup
+        if: ${{ matrix.container }}
+        env:
+          RUSTUP_VERSION: "1.29.3"
+          RUSTUP_SHA256: ${{ matrix.rustup_sha256 }}
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSfo /tmp/rustup-init \
+            "https://static.rust-lang.org/rustup/archive/$RUSTUP_VERSION/$TARGET/rustup-init"
+          echo "$RUSTUP_SHA256  /tmp/rustup-init" | sha256sum --check
+          chmod +x /tmp/rustup-init
+          /tmp/rustup-init -y --profile minimal --default-toolchain none
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      # rust-toolchain.toml pins the version (P9).
+      - name: Install the pinned Rust toolchain and maturin
+        working-directory: indexer
+        run: |
+          rustup toolchain install
+          "$PY" -m pip install "maturin==1.16.0"
+
+      - name: Build and test the binary
+        working-directory: indexer
+        run: |
+          # A Windows checkout has CRLF line endings, so the pattern ignores the end of the line.
+          version=$(sed -n 's/^version = "\([^"]*\)".*/\1/p' Cargo.toml | head -n 1)
+          if [ -n "$TAG" ] && [ "${TAG#v}" != "$version" ]; then
+            echo "::error::The tag $TAG is not the version $version of Cargo.toml."
+            exit 1
+          fi
+          cargo build --release --locked --target "$TARGET"
+          exe=stone-index
+          case "$TARGET" in *windows*) exe=stone-index.exe ;; esac
+          test "$("target/$TARGET/release/$exe" --version)" = "stone-index $version"
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+          echo "EXE=$exe" >> "$GITHUB_ENV"
+
+      - name: Build the archive
+        run: |
+          name="stone-index-v$VERSION-$TARGET"
+          mkdir -p "dist/$name"
+          cp "indexer/target/$TARGET/release/$EXE" LICENSE indexer/README.md "dist/$name/"
+          cd dist
+          case "$TARGET" in
+            *windows*) 7z a -tzip "$name.zip" "$name" ;;
+            *) tar -czf "$name.tar.gz" "$name" ;;
+          esac
+          rm -r "$name"
+
+      # The wheel holds only the binary (bindings = "bin" in indexer/pyproject.toml).
+      - name: Build the wheel
+        working-directory: indexer
+        run: |
+          args=()
+          case "$TARGET" in *linux*) args=(--compatibility manylinux_2_28) ;; esac
+          "$PY" -m maturin build --release --locked --target "$TARGET" --out ../dist "${args[@]}"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: stone-index-${{ matrix.target }}
+          path: dist/
+          if-no-files-found: error
+
+  upload:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: stone-index-*
+          merge-multiple: true
+          path: dist
+
+      - name: Attach the files to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          cd dist
+          sha256sum stone-index-* stone_index-* > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload "$TAG" ./* --clobber --repo "$GITHUB_REPOSITORY"

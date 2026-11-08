@@ -60,10 +60,13 @@ installed `stone`.
 `dev` collects merged work. `main` holds only released code. Do the steps in this order.
 
 1. On a branch from `dev`, run `python -m unittest discover -s stone/tests`, `stone check`, and
-   `stone check-writing --diff origin/dev`.
+   `stone check-writing --diff origin/dev`. In `indexer/`, run `cargo fmt --check`,
+   `cargo clippy --locked --all-targets -- -D warnings`, and `cargo test --locked` (D104).
 2. In `upgrades.yaml`, set `released` of the newest entry to the date of the release.
-3. Set the same version in `stone/pyproject.toml` and in `stone/src/stone/__init__.py`. Also set it in
-   the line `Version X.Y.Z.` of `README.md` and of `website/content/index.md`. A unit test compares them.
+3. Set the same version in `stone/pyproject.toml`, in `stone/src/stone/__init__.py`, and in
+   `indexer/Cargo.toml` (D104). In `indexer/`, run `cargo update -p stone-index --offline` to set it
+   in `Cargo.lock`. Also set it in the line `Version X.Y.Z.` of `README.md` and of
+   `website/content/index.md`. A unit test compares them.
 4. If a skill changed, raise the version in the `plugin.json` file of the plugin.
 5. Merge the changes of steps 2 to 4 into `dev` with a PR. Then open a release PR from `dev` into `main`. Wait for the checks
    `stone`, `checks`, and `build`.
@@ -73,6 +76,13 @@ installed `stone`.
    commit `vX.Y.Z`, and push the tag. The tag starts the `pages` workflow, which
    deploys the docs site. A push to `dev` or `main` does not deploy it. Copy the summary, the config
    changes, and the steps of the entry into the notes of the release.
+   When you publish the release, the `zipapp` workflow attaches `stone.pyz` and `stone.pyz.sha256`.
+   After it runs, download the two files and test the checksum. From the repo root, run
+   `python3 <download folder>/stone.pyz check`.
+   The `indexer-release` workflow attaches an archive and a wheel of `stone-index` for each of
+   the five targets, and `SHA256SUMS` (#258). After it runs, check that the release has the 11
+   `stone-index` files. Download `SHA256SUMS` and the macOS arm64 wheel, and test the checksum. Then run
+   `uv tool install <wheel>` and `stone-index --version`.
 8. Now move this repo to the new version. Run `stone upgrade --apply`. It sets `framework_version`
    and `framework_commit` in `.cornerstone/config.yaml`, and renders. Commit the config change
    alone, with `Role: human`. Then commit the generated files alone. Open this PR into `dev`. Do

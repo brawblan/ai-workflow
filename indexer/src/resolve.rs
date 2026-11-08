@@ -1,0 +1,270 @@
+//! Resolves the target of a link to a file of the repo.
+
+use std::collections::{HashMap, HashSet};
+
+use crate::lang;
+
+/// The extensions that a TypeScript or JavaScript import can leave out, in the order of the try.
+const SCRIPT_EXTENSIONS: &[&str] = &[
+    ".ts", ".tsx", ".d.ts", ".mts", ".cts", ".js", ".jsx", ".mjs", ".cjs",
+];
+
+/// The files of the repo, and the Python modules that each file can be.
+pub struct Resolver<'a> {
+    files: HashSet<&'a str>,
+    /// The dotted names of each Python file: each name with two or more parts, the name from the
+    /// repo root, and the name from a top package (a folder with `__init__.py` in a folder with
+    /// none). Thus `tools/logging.py` is not `logging`, and the standard `logging` stays
+    /// external. A package is its `__init__.py`.
+    modules: HashMap<String, Vec<&'a str>>,
+    /// The folders with `__init__.py`.
+    packages: HashSet<&'a str>,
+    /// The C and C++ files by name, for an `#include` that gives only the end of a path.
+    sources: HashMap<&'a str, Vec<&'a str>>,
+    /// The `--lang` settings of the build.
+    langs: &'a [lang::Override],
+}
+
+impl<'a> Resolver<'a> {
+    pub fn new(paths: impl IntoIterator<Item = &'a str>, langs: &'a [lang::Override]) -> Self {
+        let files: HashSet<&str> = paths.into_iter().collect();
+        let mut modules: HashMap<String, Vec<&str>> = HashMap::new();
+        let packages: HashSet<&str> = files
+            .iter()
+            .filter_map(|path| {
+                let stem = path
+                    .strip_suffix("__init__.py")
+                    .or_else(|| path.strip_suffix("__init__.pyi"));
+                stem.map(|stem| stem.trim_end_matches('/'))
+            })
+            .collect();
+        let mut sources: HashMap<&str, Vec<&str>> = HashMap::new();
+        for &path in &files {
+            if matches!(lang::language_with(path, langs), Some("c" | "cpp")) {
+                let name = path.rsplit('/').next().unwrap_or(path);
+                sources.entry(name).or_default().push(path);
+            }
+            let Some(stem) = path
+                .strip_suffix(".py")
+                .or_else(|| path.strip_suffix(".pyi"))
+            else {
+                continue;
+            };
+            let parts: Vec<&str> = stem.split('/').collect();
+            let parts = match parts.split_last() {
+                Some((&"__init__", package)) => package,
+                _ => &parts[..],
+            };
+            let is_root = |start: usize| {
+                let package = parts[..=start].join("/");
+                start == 0
+                    || parts.len() - start > 1
+                    || (packages.contains(package.as_str())
+                        && !packages.contains(parts[..start].join("/").as_str()))
+            };
+            for start in (0..parts.len()).filter(|&start| is_root(start)) {
+                modules
+                    .entry(parts[start..].join("."))
+                    .or_default()
+                    .push(path);
+            }
+        }
+        Self {
+            files,
+            modules,
+            packages,
+            sources,
+            langs,
+        }
+    }
+
+    /// The repo path of the target of a link in the file `from`, or `None`.
+    pub fn resolve(&self, from: &str, target: &str) -> Option<String> {
+        match lang::language_with(from, self.langs)? {
+            "python" if target.starts_with('.') => self.python_relative(from, target),
+            "python" => self.python_module(from, target),
+            "markdown" => self.file(&join(from, target)?),
+            "c" | "cpp" => self.include(from, target),
+            "rust" => self.rust(from, target),
+            _ if target.starts_with("./") || target.starts_with("../") => {
+                self.script(&join(from, target)?)
+            }
+            _ => None,
+        }
+    }
+
+    /// The file of a dotted module name. If the name is not a module, its parent can be:
+    /// `from m import a` imports `a` from `m`.
+    pub fn python_module(&self, from: &str, name: &str) -> Option<String> {
+        let parent = name.rsplit_once('.').map(|(parent, _)| parent);
+        self.module(from, name)
+            .or_else(|| self.module(from, parent?))
+    }
+
+    /// The file of a dotted module name next to `from`, else the best file from a root: the one
+    /// nearest to `from`. A file in a package has no import from its folder, as in Python 3. A
+    /// file never imports itself.
+    pub fn module(&self, from: &str, name: &str) -> Option<String> {
+        let folder = from.rsplit_once('/').map_or("", |(folder, _)| folder);
+        if !self.packages.contains(folder) {
+            let sibling = join(from, &name.replace('.', "/"))?;
+            let siblings = [format!("{sibling}.py"), format!("{sibling}/__init__.py")];
+            let found = siblings.iter().find_map(|path| self.file(path));
+            if let Some(path) = found.filter(|path| path != from) {
+                return Some(path);
+            }
+        }
+        let paths: Vec<&&str> = self
+            .modules
+            .get(name)?
+            .iter()
+            .filter(|path| **path != from)
+            .collect();
+        // The nearest path wins. The first path in text order wins a tie.
+        let near = |a: &&&str, b: &&&str| {
+            let order = common_prefix(from, a).cmp(&common_prefix(from, b));
+            order.then_with(|| b.cmp(a))
+        };
+        paths
+            .into_iter()
+            .max_by(near)
+            .map(|path| (*path).to_string())
+    }
+
+    fn python_relative(&self, from: &str, target: &str) -> Option<String> {
+        let name = target.trim_start_matches('.');
+        let up = "../".repeat(target.len() - name.len() - 1);
+        let parts: Vec<&str> = name.split('.').filter(|part| !part.is_empty()).collect();
+        let try_parts = |parts: &[&str]| {
+            let base = join(from, &format!("./{up}{}", parts.join("/")))?;
+            let base = base.trim_end_matches('/');
+            [format!("{base}.py"), format!("{base}/__init__.py")]
+                .into_iter()
+                .find_map(|path| self.file(&path))
+        };
+        try_parts(&parts).or_else(|| try_parts(parts.split_last()?.1))
+    }
+
+    /// A quoted include: first the folder of the file, then the repo root, then the file whose
+    /// path ends with the target. The nearest file wins, as for a Python module.
+    fn include(&self, from: &str, target: &str) -> Option<String> {
+        if target.starts_with('<') {
+            return None;
+        }
+        let near = join(from, target).and_then(|path| self.file(&path));
+        let rooted = join("x", target).and_then(|path| self.file(&path));
+        near.or(rooted).or_else(|| {
+            let name = target.rsplit('/').next()?;
+            let ending = format!("/{}", target.trim_start_matches("./"));
+            self.sources
+                .get(name)?
+                .iter()
+                .filter(|path| path.ends_with(&ending))
+                .max_by_key(|path| common_prefix(from, path))
+                .map(|path| (*path).to_string())
+        })
+    }
+
+    /// A Rust target with the 2018 rules. A name with no `::` is a `mod a;` of the file. A path
+    /// that starts with `crate::` starts at the crate root. Each part that is a module file moves
+    /// the walk down. The first part that is not one is an item of the last module.
+    fn rust(&self, from: &str, target: &str) -> Option<String> {
+        let mut parts = target.split("::").peekable();
+        let (mut folder, mut last) = if parts.peek() == Some(&"crate") {
+            parts.next();
+            let root = self.crate_root(from)?;
+            (parent(&root).to_string(), Some(root))
+        } else if target.contains("::") {
+            return None;
+        } else {
+            (rust_module_folder(from), None)
+        };
+        for part in parts {
+            let file = child(&folder, &format!("{part}.rs"));
+            let nested = child(&child(&folder, part), "mod.rs");
+            let Some(found) = self.file(&file).or_else(|| self.file(&nested)) else {
+                break;
+            };
+            folder = child(&folder, part);
+            last = Some(found);
+        }
+        last
+    }
+
+    /// The `main.rs` or `lib.rs` in the nearest folder at or above the file.
+    fn crate_root(&self, from: &str) -> Option<String> {
+        let mut folder = parent(from);
+        loop {
+            let root = ["main.rs", "lib.rs"]
+                .iter()
+                .find_map(|name| self.file(&child(folder, name)));
+            if root.is_some() || folder.is_empty() {
+                return root;
+            }
+            folder = parent(folder);
+        }
+    }
+
+    fn script(&self, base: &str) -> Option<String> {
+        let mut paths = vec![base.to_string()];
+        if let Some(stem) = [".js", ".jsx", ".mjs", ".cjs"]
+            .iter()
+            .find_map(|extension| base.strip_suffix(extension))
+        {
+            paths.extend(
+                [".ts", ".tsx", ".mts", ".cts"].map(|extension| format!("{stem}{extension}")),
+            );
+        }
+        for extension in SCRIPT_EXTENSIONS {
+            paths.push(format!("{base}{extension}"));
+            paths.push(format!("{base}/index{extension}"));
+        }
+        paths.into_iter().find_map(|path| self.file(&path))
+    }
+
+    fn file(&self, path: &str) -> Option<String> {
+        self.files.contains(path).then(|| path.to_string())
+    }
+}
+
+fn parent(path: &str) -> &str {
+    path.rsplit_once('/').map_or("", |(folder, _)| folder)
+}
+
+fn child(folder: &str, name: &str) -> String {
+    if folder.is_empty() {
+        name.to_string()
+    } else {
+        format!("{folder}/{name}")
+    }
+}
+
+/// The folder of the child modules of a Rust file: its own folder for `main.rs`, `lib.rs`, and
+/// `mod.rs`, else the folder with the name of the file.
+fn rust_module_folder(path: &str) -> String {
+    let name = path.rsplit('/').next().unwrap_or(path);
+    match name.strip_suffix(".rs") {
+        Some("main" | "lib" | "mod") | None => parent(path).to_string(),
+        Some(stem) => child(parent(path), stem),
+    }
+}
+
+/// The repo path of `target` from the folder of the file `from`, or `None` above the root.
+fn join(from: &str, target: &str) -> Option<String> {
+    let mut parts: Vec<&str> = from.split('/').collect();
+    parts.pop();
+    for part in target.split('/') {
+        match part {
+            "" | "." => {}
+            ".." => {
+                parts.pop()?;
+            }
+            other => parts.push(other),
+        }
+    }
+    Some(parts.join("/"))
+}
+
+fn common_prefix(a: &str, b: &str) -> usize {
+    a.bytes().zip(b.bytes()).take_while(|(x, y)| x == y).count()
+}
