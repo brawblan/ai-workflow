@@ -16,7 +16,7 @@ from typing import Any
 
 import yaml
 
-from stone import ci_setup, form, framework_check, overrides, results, specialists, specs, triggers
+from stone import ci_setup, code_index, form, framework_check, overrides, results, specialists, specs, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -68,7 +68,7 @@ K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 K23_SINCE = (1, 5, 0)  # the first framework tag with `stone check-dependencies` (D90)
 K24_SINCE = (1, 5, 0)  # the first framework tag with `stone check-workflows` (D93)
 DEFAULT_PR_LINES = overrides.DEFAULT_PR_LINES  # D4, customization.md
-BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
+BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "code_index_rule", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
 
 class RenderError(Exception):
@@ -385,7 +385,7 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     if model_profile.get("status") != "active":
         print(f"warning: model profile {model_profile['id']} has status "
               f"'{model_profile.get('status')}', not 'active'", file=sys.stderr)
-    problems = framework_check.path_pattern_problems(config, harness)
+    problems = framework_check.path_pattern_problems(config, harness) + code_index.problems(config)
     if problems:
         raise RenderError(f"{CONFIG}: {problems[0]}")
     adapter_roles = {entry["role"] for entry in registry if entry["kind"] == "role"}
@@ -439,9 +439,13 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
         values["trailers_json"] = json.dumps(commit_settings(config)["trailers"])
         for block in BLOCKS:
             values.setdefault(block, "")
+        if entry.get("reads_code"):
+            values["code_index_rule"] = code_index.role_block(config)
         if entry.get("steps"):
             values["check_steps"] = render_steps(harness, entry["steps"], profiles, values, config)
         content = substitute(harness, entry["template"], values, steps, config)
+        if entry.get("code_index_part"):
+            content = add_code_index(harness, entry["code_index_part"], content, config)
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
@@ -455,6 +459,18 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     except triggers.TriggerError as error:
         raise RenderError(str(error)) from None
     return components
+
+
+def add_code_index(harness: Path, part: str, content: str, config: dict[str, Any]) -> str:
+    """Merge the permission and the build hook of the code index into a JSON fragment (D111)."""
+    index = code_index.settings(config)
+    if index is None:
+        return content
+    values = {f"code_index_{key}_json": json.dumps(value)[1:-1] for key, value in index.items()}
+    data = json.loads(content)
+    _merge(data, json.loads(fill((harness / "templates" / part).read_text(encoding="utf-8"),
+                                 part, values, config)))
+    return json.dumps(data, indent=2) + "\n"
 
 
 def trigger_components(framework: Path, harness: Path, registry: list[dict[str, Any]],

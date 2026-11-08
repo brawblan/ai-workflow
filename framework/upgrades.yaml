@@ -1,6 +1,25 @@
 # The record of each release. `stone upgrade` reads it, and `stone check` validates it.
 # Newest first. Rules and the form: framework/versioning.md.
 versions:
+  - version: 1.6.0
+    kind: minor
+    released: null
+    summary: New optional key code_index. stone render adds a code index by default. Each role file of a role that reads code gets the stone-index rule, and the harness settings get the permission for the command and a build hook at session start. code_index none opts out, and a map with command, rule, and build sets another indexer (D111).
+    config:
+      added:
+        - {key: code_index, default: stone-index, note: "stone-index, none, or a map with command, rule, and optional build (D111)."}
+      renamed: []
+      removed: []
+    files:
+      - {path: .claude/agents/planner.md, change: changed, note: "A Code index section with the index rule, unless code_index is none (D111)."}
+      - {path: .claude/agents/implementer.md, change: changed, note: "A Code index section with the index rule, unless code_index is none (D111)."}
+      - {path: .claude/agents/tester.md, change: changed, note: "A Code index section with the index rule, unless code_index is none (D111)."}
+      - {path: .claude/agents/reviewer.md, change: changed, note: "A Code index section with the index rule, unless code_index is none (D111)."}
+      - {path: .claude/agents/investigator.md, change: changed, note: "A Code index section with the index rule, unless code_index is none (D111)."}
+      - {path: .claude/settings.json, change: changed, note: "The permission for the index command and a SessionStart build hook, unless code_index is none (D111)."}
+    steps:
+      - "Optional: set code_index in .cornerstone/config.yaml. Commit the config change alone, with the trailer Role human."
+      - "Then run stone render. Commit the generated files alone, with the trailers Role generator and Actor agent."
   - version: 1.5.0
     kind: minor
     released: 2026-10-31

@@ -232,6 +232,45 @@ instruction file changes what each later session does.
 - A PR can add a `Waiver (K22)` heading with the reason under it. K22 then reports each finding as
   a notice. A human reviews the findings at G4.
 
+### Code index (`code_index`)
+
+`stone render` adds a code index to the repo by default ([D111](README.md#decisions)). The agent
+asks the index before it searches or reads code. Render does not install the index command.
+
+- Each role file of a role that reads code gets the rule. The rule starts with the guard "If
+  `<command>` is on PATH", so a session without the command ignores it.
+- The harness settings allow the command with no permission prompt. The adapter gives the form.
+- The harness settings run the build command at session start, in the background. If the command
+  is not on PATH, the hook does nothing. The hook always exits 0. It stops the build after 120
+  seconds.
+- Run `stone render` after you change the value.
+
+| Value | Effect |
+| --- | --- |
+| absent, or `stone-index` | The default: the `stone-index` rule, permission, and build hook |
+| `none` | No rule, no permission, and no hook |
+| a map with `command`, `rule`, and optional `build` | Another indexer. `build` is `<command> build` by default. |
+
+`stone check` fails on another value. A custom `command` is one name with no shell characters. A
+custom `rule` has 1 to 3 lines (P4), and its first line starts with the guard.
+
+```yaml
+code_index: stone-index   # the default. You can leave the key out.
+```
+
+```yaml
+code_index: none
+```
+
+```yaml
+code_index:
+  command: my-index
+  rule: |
+    - If `my-index` is on PATH, ask it before you search or read code.
+    - Use `my-index query "<words>"`.
+  build: my-index update .
+```
+
 ### Gate steps by base branch (`ci.branches`)
 
 Use it when a repo promotes code with PRs between long-lived branches, for example `dev` to

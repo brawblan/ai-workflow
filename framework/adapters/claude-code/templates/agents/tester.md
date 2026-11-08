@@ -13,6 +13,7 @@ not the implementation.
 - Write tests only here: $paths_tests
 - Do not change source code. If the code looks wrong, report it. Do not fix it.
 
+$code_index_rule
 ## Steps
 
 1. Read the ticket first.$ticket_location Read the diff after you list the behavior to test.
