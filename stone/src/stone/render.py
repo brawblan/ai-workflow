@@ -84,7 +84,7 @@ class Component:
     eval: str
     files: dict[str, str]  # target path -> rendered content
     merge: bool = False  # True: a JSON fragment to merge into a shared file
-    owned: str = ""  # JSON of the code index part in the fragment. The next render removes it (D111).
+    owned: list[str] = field(default_factory=list)  # keys of the code index entries (D111)
 
     @property
     def hash(self) -> str:
@@ -459,34 +459,34 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
 
 
 def render_entry(harness: Path, entry: dict[str, Any], values: dict[str, str],
-                 steps: dict[str, str | None], config: dict[str, Any]) -> tuple[str, str]:
+                 steps: dict[str, str | None], config: dict[str, Any]) -> tuple[str, list[str]]:
     """Fill the template of one component, with the code index parts that it takes (D111).
 
-    Return the content and the JSON of the code index part that the content holds, or "".
+    Return the content and the keys of the code index entries that it holds.
     """
     if entry.get("reads_code"):
         values["code_index_rule"] = code_index.role_block(config)
     content = substitute(harness, entry["template"], values, steps, config)
     if entry.get("code_index_part"):
         return add_code_index(harness, entry["code_index_part"], content, config)
-    return content, ""
+    return content, []
 
 
 def add_code_index(harness: Path, part: str, content: str,
-                   config: dict[str, Any]) -> tuple[str, str]:
+                   config: dict[str, Any]) -> tuple[str, list[str]]:
     """Merge the permission and the build hook of the code index into a JSON fragment (D111).
 
-    Return the fragment and the JSON of the part, or the content and "" with `code_index: none`.
+    Return the fragment and the keys of the entries of the part, or no keys with `code_index: none`.
     """
     index = code_index.settings(config)
     if index is None:
-        return content, ""
+        return content, []
     values = {f"code_index_{key}_json": json.dumps(value)[1:-1] for key, value in index.items()}
     data = json.loads(content)
     owned = json.loads(fill((harness / "templates" / part).read_text(encoding="utf-8"),
                             part, values, config))
     _merge(data, owned)
-    return json.dumps(data, indent=2) + "\n", json.dumps(owned, sort_keys=True)
+    return json.dumps(data, indent=2) + "\n", _entry_keys(owned)
 
 
 def trigger_components(framework: Path, harness: Path, registry: list[dict[str, Any]],
@@ -675,26 +675,39 @@ def _json_indent(text: str) -> str:
     return "  "
 
 
-def _remove(data: dict[str, Any], part: dict[str, Any], keep: Any) -> bool:
-    """Remove each list item of the part that is not in keep. Return True if one was removed."""
+def _entry_keys(part: Any, path: str = "") -> list[str]:
+    """Return a key for each list item of a JSON part: its path and a short hash (D111)."""
+    if isinstance(part, dict):
+        return [key for name, value in part.items() for key in _entry_keys(value, f"{path}/{name}")]
+    if isinstance(part, list):
+        return [f"{path}={_item_hash(item)}" for item in part]
+    return []
+
+
+def _item_hash(item: Any) -> str:
+    return hashlib.sha256(json.dumps(item, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+
+
+def _remove(data: dict[str, Any], owned: set[str], path: str = "") -> bool:
+    """Remove each list item whose key is in owned. Return True if one was removed."""
     removed = False
-    for key, value in part.items():
-        kept = keep.get(key) if isinstance(keep, dict) else None
-        if isinstance(value, dict) and isinstance(data.get(key), dict):
-            changed = _remove(data[key], value, kept)
-        elif isinstance(value, list) and isinstance(data.get(key), list):
-            items = [item for item in data[key] if item not in value or item in (kept or [])]
-            changed, data[key] = len(items) < len(data[key]), items
+    for name in list(data):
+        here, value = f"{path}/{name}", data[name]
+        if isinstance(value, dict):
+            changed = _remove(value, owned, here)
+        elif isinstance(value, list):
+            items = [item for item in value if f"{here}={_item_hash(item)}" not in owned]
+            changed, data[name] = len(items) < len(value), items
         else:
             continue
-        if changed and not data[key]:
-            del data[key]  # render made it, and render removed all of it
+        if changed and not data[name]:
+            del data[name]  # render made it, and render removed all of it
         removed |= changed
     return removed
 
 
 def _merge_json(root: Path, path: str, fragment_text: str,
-                owned_before: str = "") -> tuple[bool, str]:
+                owned_before: list[str] | None = None) -> tuple[bool, str]:
     """Return (the file has the fragment, the file text with the fragment merged in).
 
     The merged text keeps the indent and the final newline state of the existing file (D70).
@@ -707,7 +720,7 @@ def _merge_json(root: Path, path: str, fragment_text: str,
     except json.JSONDecodeError as error:
         raise RenderError(f"{path} is not valid JSON: {error}. Fix the file.") from None
     fragment = json.loads(fragment_text)
-    removed = _remove(data, json.loads(owned_before), fragment) if owned_before else False
+    removed = _remove(data, set(owned_before or []) - set(_entry_keys(fragment)))
     present = _contains(data, fragment) and not removed
     _merge(data, fragment)
     newline = "\n" if not text or text.endswith("\n") else ""
@@ -765,7 +778,7 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
         paths = sorted(component.files)
         if component.merge:
             present, merged = _merge_json(root, paths[0], component.files[paths[0]],
-                                          (old or {}).get("owned", ""))
+                                          (old or {}).get("owned") or [])
             write = {paths[0]: merged}
             state = ("skipped" if present
                      else "drift" if old and old["hash"] == component.hash  # entry removed
