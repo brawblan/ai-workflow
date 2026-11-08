@@ -178,15 +178,27 @@ fn refs(place: &Place, conn: &Connection, query: &Query) -> Result<Answer, Strin
 }
 
 fn search(place: &Place, conn: &Connection, query: &Query) -> Result<Answer, String> {
-    let words = search::words(&query.target);
-    if words.is_empty() {
+    let terms = search::terms(&query.target);
+    if terms.is_empty() {
         return Err("the search needs a word".to_string());
     }
     let glob = query.path.as_deref();
-    let hits = search::search(conn, &place.root, &words, glob, query.limit, query.context)
-        .map_err(describe(place))?;
+    let hits = search::search(
+        conn,
+        &place.root,
+        &terms,
+        query.any,
+        glob,
+        query.limit,
+        query.context,
+    )
+    .map_err(describe(place))?;
     let empty = hits.rows.is_empty() && hits.omitted == 0;
-    Ok((search::render(&hits, query.format), empty, None))
+    Ok((
+        search::render(&hits, query.format, query.max_bytes),
+        empty,
+        None,
+    ))
 }
 
 /// Runs a query command. Exit 0 with results, 1 with none, and 2 on an error.

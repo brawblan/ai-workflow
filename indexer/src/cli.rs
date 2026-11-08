@@ -16,6 +16,7 @@ pub const DEFAULT_SHOW_LIMIT: usize = 5;
 
 /// The default of `--max-lines`.
 pub const DEFAULT_MAX_LINES: usize = 80;
+pub const DEFAULT_MAX_BYTES: usize = 4000;
 
 pub const USAGE: &str =
     "usage: stone-index build [--db PATH] [--max-file-size BYTES] [--lang EXT=LANG]
@@ -24,7 +25,7 @@ pub const USAGE: &str =
        stone-index show NAME [--kind KIND] [--max-lines N] [QUERY OPTIONS]
        stone-index outline PATH [QUERY OPTIONS]
        stone-index refs PATH|MODULE [QUERY OPTIONS]
-       stone-index search WORDS [--path GLOB] [--context N] [QUERY OPTIONS]
+       stone-index search WORDS [--any] [--path GLOB] [--context N] [--max-bytes N] [QUERY OPTIONS]
        stone-index --version
 query options: --limit N, --format text|json, --no-update, --db PATH, --max-file-size BYTES,
 --lang EXT=LANG (repeatable, for example h=c),
@@ -62,6 +63,8 @@ pub struct Query {
     pub limit: usize,
     pub max_lines: usize,
     pub context: usize,
+    pub any: bool,
+    pub max_bytes: usize,
     pub format: Format,
     pub update: bool,
     pub index: IndexOptions,
@@ -80,8 +83,13 @@ pub fn parse(args: &[String]) -> Result<Command, String> {
                 .map(Command::Show),
             "outline" => parse_query(rest, true, &[], DEFAULT_LIMIT).map(Command::Outline),
             "refs" => parse_query(rest, true, &[], DEFAULT_LIMIT).map(Command::Refs),
-            "search" => parse_query(rest, true, &["--path", "--context"], DEFAULT_LIMIT)
-                .map(Command::Search),
+            "search" => parse_query(
+                rest,
+                true,
+                &["--path", "--context", "--max-bytes", "--any"],
+                DEFAULT_LIMIT,
+            )
+            .map(Command::Search),
             _ => Err(format!("unknown command or option: {command}")),
         },
         None => Err("no command".to_string()),
@@ -103,6 +111,8 @@ fn parse_query(
         limit: default_limit,
         max_lines: DEFAULT_MAX_LINES,
         context: 0,
+        any: false,
+        max_bytes: DEFAULT_MAX_BYTES,
         format: Format::Text,
         update: true,
         index: IndexOptions {
@@ -133,6 +143,10 @@ fn parse_query(
             "--context" if extra.contains(&"--context") => {
                 query.context = number(value(&mut args, arg)?, arg)?;
             }
+            "--max-bytes" if extra.contains(&"--max-bytes") => {
+                query.max_bytes = number(value(&mut args, arg)?, arg)?;
+            }
+            "--any" if extra.contains(&"--any") => query.any = true,
             "--limit" if is_query => query.limit = number(value(&mut args, arg)?, arg)?,
             "--format" if is_query => query.format = format(value(&mut args, arg)?)?,
             "--no-update" if is_query => query.update = false,

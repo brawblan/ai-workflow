@@ -244,7 +244,7 @@ fn ac5_search_prints_matching_line_in_bm25_order() {
 fn ac5_search_matches_any_word() {
     let fx = built(&[("a.txt", "x\nfoo\n"), ("b.txt", "bar\n")]);
     assert_eq!(
-        run(&fx, &["search", "foo bar"]),
+        run(&fx, &["search", "foo bar", "--any"]),
         (0, "b.txt:1: bar\na.txt:2: foo\n".into())
     );
 }
