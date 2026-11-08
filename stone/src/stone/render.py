@@ -84,6 +84,7 @@ class Component:
     eval: str
     files: dict[str, str]  # target path -> rendered content
     merge: bool = False  # True: a JSON fragment to merge into a shared file
+    owned: str = ""  # JSON of the code index part in the fragment. The next render removes it (D111).
 
     @property
     def hash(self) -> str:
@@ -441,10 +442,10 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
             values.setdefault(block, "")
         if entry.get("steps"):
             values["check_steps"] = render_steps(harness, entry["steps"], profiles, values, config)
-        content = render_entry(harness, entry, values, steps, config)
+        content, owned = render_entry(harness, entry, values, steps, config)
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
-                                    {entry["target"]: content}, entry.get("merge") == "json"))
+                                    {entry["target"]: content}, entry.get("merge") == "json", owned))
     if specialists.listed(config):
         components.append(Component(
             "doc.specialists", "doc", "Specialist reviews: the list, the triggers, and the order.",
@@ -458,26 +459,34 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
 
 
 def render_entry(harness: Path, entry: dict[str, Any], values: dict[str, str],
-                 steps: dict[str, str | None], config: dict[str, Any]) -> str:
-    """Fill the template of one component, with the code index parts that it takes (D111)."""
+                 steps: dict[str, str | None], config: dict[str, Any]) -> tuple[str, str]:
+    """Fill the template of one component, with the code index parts that it takes (D111).
+
+    Return the content and the JSON of the code index part that the content holds, or "".
+    """
     if entry.get("reads_code"):
         values["code_index_rule"] = code_index.role_block(config)
     content = substitute(harness, entry["template"], values, steps, config)
     if entry.get("code_index_part"):
-        content = add_code_index(harness, entry["code_index_part"], content, config)
-    return content
+        return add_code_index(harness, entry["code_index_part"], content, config)
+    return content, ""
 
 
-def add_code_index(harness: Path, part: str, content: str, config: dict[str, Any]) -> str:
-    """Merge the permission and the build hook of the code index into a JSON fragment (D111)."""
+def add_code_index(harness: Path, part: str, content: str,
+                   config: dict[str, Any]) -> tuple[str, str]:
+    """Merge the permission and the build hook of the code index into a JSON fragment (D111).
+
+    Return the fragment and the JSON of the part, or the content and "" with `code_index: none`.
+    """
     index = code_index.settings(config)
     if index is None:
-        return content
+        return content, ""
     values = {f"code_index_{key}_json": json.dumps(value)[1:-1] for key, value in index.items()}
     data = json.loads(content)
-    _merge(data, json.loads(fill((harness / "templates" / part).read_text(encoding="utf-8"),
-                                 part, values, config)))
-    return json.dumps(data, indent=2) + "\n"
+    owned = json.loads(fill((harness / "templates" / part).read_text(encoding="utf-8"),
+                            part, values, config))
+    _merge(data, owned)
+    return json.dumps(data, indent=2) + "\n", json.dumps(owned, sort_keys=True)
 
 
 def trigger_components(framework: Path, harness: Path, registry: list[dict[str, Any]],
@@ -666,10 +675,30 @@ def _json_indent(text: str) -> str:
     return "  "
 
 
-def _merge_json(root: Path, path: str, fragment_text: str) -> tuple[bool, str]:
+def _remove(data: dict[str, Any], part: dict[str, Any], keep: Any) -> bool:
+    """Remove each list item of the part that is not in keep. Return True if one was removed."""
+    removed = False
+    for key, value in part.items():
+        kept = keep.get(key) if isinstance(keep, dict) else None
+        if isinstance(value, dict) and isinstance(data.get(key), dict):
+            changed = _remove(data[key], value, kept)
+        elif isinstance(value, list) and isinstance(data.get(key), list):
+            items = [item for item in data[key] if item not in value or item in (kept or [])]
+            changed, data[key] = len(items) < len(data[key]), items
+        else:
+            continue
+        if changed and not data[key]:
+            del data[key]  # render made it, and render removed all of it
+        removed |= changed
+    return removed
+
+
+def _merge_json(root: Path, path: str, fragment_text: str,
+                owned_before: str = "") -> tuple[bool, str]:
     """Return (the file has the fragment, the file text with the fragment merged in).
 
     The merged text keeps the indent and the final newline state of the existing file (D70).
+    First it removes the entries of `owned_before` that the fragment no longer has (D111).
     """
     target = root / path
     text = target.read_text(encoding="utf-8") if target.exists() else ""
@@ -678,7 +707,8 @@ def _merge_json(root: Path, path: str, fragment_text: str) -> tuple[bool, str]:
     except json.JSONDecodeError as error:
         raise RenderError(f"{path} is not valid JSON: {error}. Fix the file.") from None
     fragment = json.loads(fragment_text)
-    present = _contains(data, fragment)
+    removed = _remove(data, json.loads(owned_before), fragment) if owned_before else False
+    present = _contains(data, fragment) and not removed
     _merge(data, fragment)
     newline = "\n" if not text or text.endswith("\n") else ""
     return present, _short_arrays(json.dumps(data, indent=_json_indent(text))) + newline
@@ -699,7 +729,7 @@ def _manifest_entry(component: Component, old: dict[str, Any] | None, config: di
         "review_by": str(old["review_by"]) if old else add_months(today, REVIEW_MONTHS).isoformat(),
         "files": sorted(component.files),
         "hash": component.hash,
-    }
+    } | ({"owned": component.owned} if component.owned else {})
 
 
 def render(root: Path, framework: Path | None = None, dry_run: bool = False,
@@ -734,7 +764,8 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
         old = old_entries.get(component.id)
         paths = sorted(component.files)
         if component.merge:
-            present, merged = _merge_json(root, paths[0], component.files[paths[0]])
+            present, merged = _merge_json(root, paths[0], component.files[paths[0]],
+                                          (old or {}).get("owned", ""))
             write = {paths[0]: merged}
             state = ("skipped" if present
                      else "drift" if old and old["hash"] == component.hash  # entry removed

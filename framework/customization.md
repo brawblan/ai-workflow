@@ -255,9 +255,9 @@ asks the index before it searches or reads code. Render does not install the ind
 custom `rule` has 1 to 3 lines (P4), and its first line starts with the guard. A custom `build` is
 one command with words and single spaces, and no quotes or shell characters.
 
-Render merges the permission and the hook into the harness settings, and it does not remove an
-entry. If you change `code_index` after a render, remove the old permission and hook from the
-settings by hand.
+Render merges the permission and the hook into the harness settings. The manifest records the
+entries that render added. If you change `code_index`, the next render removes those old entries.
+It keeps each entry that a person added.
 
 ```yaml
 code_index: stone-index   # the default. You can leave the key out.
