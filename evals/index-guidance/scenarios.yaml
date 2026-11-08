@@ -8,12 +8,14 @@
 # and the same tools (Read, Grep, Glob, and `stone-index` in the `reader` list of eval.yaml).
 #   none   no text about the index (the baseline)
 #   rule       the rule in AGENTS.md, 2 lines (P4)
-#   rule-show  the rule and a third line that names `show` and `search --context` (#275)
+#   rule-show  3 lines that name `show` before any read, and `search --context` (#275, #279)
 # X1 to X8 (#259) need 1 file or 2 and use fixtures/shop. M1 to M4 (#275) need code from 3 files
 # or more and use fixtures/market, a larger repo.
 # `rule-show` passes if its mean cost is lower than `rule` by more than 2 standard errors, and its
 # outcome rate is not lower (#275 AC 5).
 # Each check reads the final text. A path check needs only the unique end of the path.
+# The runner runs all trials of a scenario one after the other, so they share the cache state. If a
+# usage limit stops a scenario, run that scenario again in full (--scenario) (#279).
 
 component: guidance.index
 role: reader
@@ -125,7 +127,8 @@ scenarios:
       - {check: matches, path: "@report", pattern: "ledgerStore\\.ts"}
       - {check: matches, path: "@report", pattern: "payoutStore\\.ts"}
       - {check: matches, path: "@report", pattern: "quoteApi\\.ts"}
-      - {check: matches, path: "@report", pattern: "\\bconvert\\b"}
+      # convert must be on the line of ledgerStore or on the next line (#279).
+      - {check: matches, path: "@report", pattern: 'ledgerStore[^\n]*(?:\n[^\n]*)?\bconvert\b|\bconvert\b[^\n]*ledgerStore'}
       - {check: matches, path: "@report", pattern: "\\bpreview\\b"}
       - {check: matches, path: "@report", pattern: "\\bpriceQuote\\b"}
 
@@ -142,6 +145,9 @@ scenarios:
       - {check: matches, path: "@report", pattern: "lib/normalize\\.js"}
       - {check: matches, path: "@report", pattern: "\\bpushToLedger\\b"}
       - {check: matches, path: "@report", pattern: "ledger/migrate\\.js"}
+      # No other .js file, for example tools/vendor/sync.js, which the command does not run (#279).
+      # A line with not, n't, skip, or nothing can name it: it says that the file is not in the chain.
+      - {check: matches, path: "@report", pattern: '\A(?![\s\S]*?^(?![^\n]*(?:\bnot\b|n''t\b|\bskips?\b|\bnothing\b))[^\n]*?(?<![\w/.-])(?!(?:tools/)?(?:vendor/index|vendor/migrate|lib/normalize|ledger/migrate|lib/db|lib/memory-db|lib/log)\.js\b|(?:index|migrate|normalize|db|memory-db|log)\.js\b)[\w/.-]*\.js\b)'}
 
   - id: M4
     title: What a Python method does, and what it calls in other files
