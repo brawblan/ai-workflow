@@ -439,13 +439,9 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
         values["trailers_json"] = json.dumps(commit_settings(config)["trailers"])
         for block in BLOCKS:
             values.setdefault(block, "")
-        if entry.get("reads_code"):
-            values["code_index_rule"] = code_index.role_block(config)
         if entry.get("steps"):
             values["check_steps"] = render_steps(harness, entry["steps"], profiles, values, config)
-        content = substitute(harness, entry["template"], values, steps, config)
-        if entry.get("code_index_part"):
-            content = add_code_index(harness, entry["code_index_part"], content, config)
+        content = render_entry(harness, entry, values, steps, config)
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json"))
@@ -459,6 +455,17 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     except triggers.TriggerError as error:
         raise RenderError(str(error)) from None
     return components
+
+
+def render_entry(harness: Path, entry: dict[str, Any], values: dict[str, str],
+                 steps: dict[str, str | None], config: dict[str, Any]) -> str:
+    """Fill the template of one component, with the code index parts that it takes (D111)."""
+    if entry.get("reads_code"):
+        values["code_index_rule"] = code_index.role_block(config)
+    content = substitute(harness, entry["template"], values, steps, config)
+    if entry.get("code_index_part"):
+        content = add_code_index(harness, entry["code_index_part"], content, config)
+    return content
 
 
 def add_code_index(harness: Path, part: str, content: str, config: dict[str, Any]) -> str:

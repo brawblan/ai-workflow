@@ -42,20 +42,31 @@ def problems(config: dict[str, Any]) -> list[str]:
     if not isinstance(value, dict) or set(value) - {"command", "rule", "build"} \
             or not {"command", "rule"} <= set(value):
         return [f"The code_index value is not valid. {FORMS}"]
-    found = []
-    command, rule, build = value["command"], value["rule"], value.get("build", "")
-    if not isinstance(command, str) or not COMMAND.fullmatch(command):
-        found.append("code_index.command is not valid. Use one command name with no spaces "
-                     "and no shell characters.")
+    return (_command_problems(value["command"]) + _rule_problems(value["command"], value["rule"])
+            + _build_problems(value.get("build", "")))
+
+
+def _command_problems(command: Any) -> list[str]:
+    if isinstance(command, str) and COMMAND.fullmatch(command):
+        return []
+    return ["code_index.command is not valid. Use one command name with no spaces "
+            "and no shell characters."]
+
+
+def _rule_problems(command: Any, rule: Any) -> list[str]:
     lines = rule.strip().splitlines() if isinstance(rule, str) else []
     if not lines or len(lines) > MAX_RULE_LINES:
-        found.append(f"code_index.rule is not valid. Use 1 to {MAX_RULE_LINES} lines (P4).")
-    elif isinstance(command, str) and not lines[0].lstrip("-* ").startswith(_guard(command)):
-        found.append(f"code_index.rule must start with the guard \"{_guard(command)}\".")
-    if not isinstance(build, str) or (build and not BUILD.fullmatch(build)):
-        found.append("code_index.build is not valid. Use one command with words and single "
-                     "spaces, and no quotes or shell characters.")
-    return found
+        return [f"code_index.rule is not valid. Use 1 to {MAX_RULE_LINES} lines (P4)."]
+    if isinstance(command, str) and not lines[0].lstrip("-* ").startswith(_guard(command)):
+        return [f"code_index.rule must start with the guard \"{_guard(command)}\"."]
+    return []
+
+
+def _build_problems(build: Any) -> list[str]:
+    if isinstance(build, str) and (not build or BUILD.fullmatch(build)):
+        return []
+    return ["code_index.build is not valid. Use one command with words and single "
+            "spaces, and no quotes or shell characters."]
 
 
 def role_block(config: dict[str, Any]) -> str:
