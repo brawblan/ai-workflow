@@ -24,6 +24,7 @@ the trigger workflows of each profile. Each guide has two parts:
 | I need to answer one question with throwaway code | [Run a spike](spike.md) | spike | human-centric | Works today |
 | A bot opened a dependency PR, or a package is old | [Upgrade a dependency](dependency-upgrade.md) | dependency-upgrade | agent-centric | Partial |
 | A vendor released a new model or new guidance | [Refresh an adapter](adapter-refresh.md) | adapter-refresh | agent-centric | Partial |
+| I want agents to read fewer files in a large repo | [Use the code index](code-index.md) | (setup) | agent-centric | Works today |
 | A new Cornerstone version came out | [Upgrade Cornerstone](upgrade-cornerstone.md) | (setup) | agent-centric | Works today |
 | I want to change the structure of the code, with the same behavior | [Refactor or migrate](refactor-migration.md) | refactor-migration | hybrid | Works today |
 
