@@ -59,6 +59,9 @@ components:
     files:
       - .claude/settings.json
     hash: a7b10ba69721fe194bb1a3582736033e3d7ca37fd86d4ee7c065ea90ac126a9f
+    owned:
+      - /permissions/allow=58d8cc94439549c9
+      - /hooks/SessionStart=c4249d258f305d42
   - id: role.investigator
     kind: role
     purpose: Read, run, and report. Write only in the reports path, or anywhere on a spike branch.
