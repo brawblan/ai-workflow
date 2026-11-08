@@ -252,7 +252,12 @@ asks the index before it searches or reads code. Render does not install the ind
 | a map with `command`, `rule`, and optional `build` | Another indexer. `build` is `<command> build` by default. |
 
 `stone check` fails on another value. A custom `command` is one name with no shell characters. A
-custom `rule` has 1 to 3 lines (P4), and its first line starts with the guard.
+custom `rule` has 1 to 3 lines (P4), and its first line starts with the guard. A custom `build` is
+one command with words and single spaces, and no quotes or shell characters.
+
+Render merges the permission and the hook into the harness settings, and it does not remove an
+entry. If you change `code_index` after a render, remove the old permission and hook from the
+settings by hand.
 
 ```yaml
 code_index: stone-index   # the default. You can leave the key out.

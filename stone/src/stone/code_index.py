@@ -14,6 +14,7 @@ DEFAULT = {
 }
 MAX_RULE_LINES = 3  # P4: the rule goes in each role file that reads code
 COMMAND = re.compile(r"[A-Za-z0-9][A-Za-z0-9._+-]*")
+BUILD = re.compile(r"[A-Za-z0-9._+/=:@%,-]+( [A-Za-z0-9._+/=:@%,-]+)*")  # one command, no shell syntax
 FORMS = ("Use stone-index, none, or a map with command, rule, and optional build.")
 
 
@@ -51,8 +52,9 @@ def problems(config: dict[str, Any]) -> list[str]:
         found.append(f"code_index.rule is not valid. Use 1 to {MAX_RULE_LINES} lines (P4).")
     elif isinstance(command, str) and not lines[0].lstrip("-* ").startswith(_guard(command)):
         found.append(f"code_index.rule must start with the guard \"{_guard(command)}\".")
-    if not isinstance(build, str) or "\n" in build:
-        found.append("code_index.build is not valid. Use one command line.")
+    if not isinstance(build, str) or (build and not BUILD.fullmatch(build)):
+        found.append("code_index.build is not valid. Use one command with words and single "
+                     "spaces, and no quotes or shell characters.")
     return found
 
 
