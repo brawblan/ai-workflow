@@ -24,8 +24,6 @@
     ]
   },
   "permissions": {
-    "allow": [
-      "Bash(stone-index *)"
-    ]
+    "allow": ["Bash(stone-index *)"]
   }
 }
