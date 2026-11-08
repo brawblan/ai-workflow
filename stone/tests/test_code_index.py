@@ -248,6 +248,100 @@ class BadFormTest(unittest.TestCase):
         self.assertTrue(any("code_index" in f.message for f in findings), findings)
 
 
+class ChangeValueTest(unittest.TestCase):
+    """Render twice in one root. Render removes the entries that it added before (D111)."""
+
+    def setUp(self) -> None:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = Path(tmp.name)
+
+    def go(self, value: object = "absent") -> render.Result:
+        (self.root / ".cornerstone").mkdir(exist_ok=True)
+        (self.root / CFG).write_text(config_text(value), encoding="utf-8")
+        with contextlib.redirect_stderr(io.StringIO()):
+            return render.render(self.root, FRAMEWORK, today=TODAY)
+
+    def data(self) -> dict:
+        return json.loads((self.root / SETTINGS).read_text(encoding="utf-8"))
+
+    def starts(self, data: dict) -> list[str]:
+        return [h["command"] for e in data.get("hooks", {}).get("SessionStart", [])
+                for h in e["hooks"]]
+
+    def owned(self) -> list[str]:
+        manifest = yaml.safe_load((self.root / render.MANIFEST).read_text(encoding="utf-8"))
+        found = [c for c in manifest["components"] if c["id"] == "hook.settings"]
+        return found[0].get("owned") or []
+
+    def test_default_to_none_removes_the_index_entries(self) -> None:
+        self.go()
+        self.go("none")
+        data = self.data()
+        self.assertNotIn("permissions", data)
+        self.assertNotIn("SessionStart", data["hooks"])
+        self.assertNotIn("stone-index", json.dumps(data))
+        self.assertIn("PreToolUse", data["hooks"])
+
+    def test_default_to_custom_keeps_only_the_custom_entries(self) -> None:
+        self.go()
+        self.go(CUSTOM)
+        data = self.data()
+        self.assertEqual(data["permissions"]["allow"], ["Bash(graphify *)"])
+        self.assertEqual(len(self.starts(data)), 1)
+        self.assertIn("graphify update --quiet", self.starts(data)[0])
+        self.assertNotIn("stone-index", json.dumps(data))
+
+    def test_custom_to_default_keeps_only_the_default_entries(self) -> None:
+        self.go(CUSTOM)
+        self.go()
+        data = self.data()
+        self.assertEqual(data["permissions"]["allow"], ["Bash(stone-index *)"])
+        self.assertEqual(len(self.starts(data)), 1)
+        self.assertIn("stone-index build", self.starts(data)[0])
+        self.assertNotIn("graphify", json.dumps(data))
+
+    def test_hand_written_entries_stay_through_all_changes(self) -> None:
+        self.go()
+        data = self.data()
+        mine = {"hooks": [{"type": "command", "command": "echo mine"}]}
+        data["permissions"]["allow"].insert(0, "Read")
+        data["hooks"]["SessionStart"].append(mine)
+        (self.root / SETTINGS).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        for value in ("none", CUSTOM, "absent"):
+            self.go(value)
+            data = self.data()
+            self.assertIn("Read", data["permissions"]["allow"], value)
+            self.assertIn(mine, data["hooks"]["SessionStart"], value)
+        self.assertEqual(data["permissions"]["allow"], ["Read", "Bash(stone-index *)"])
+        self.assertEqual(len(data["hooks"]["SessionStart"]), 2)
+        self.assertNotIn("graphify", json.dumps(data))
+
+    def test_hand_written_entries_stay_when_none_empties_the_index(self) -> None:
+        self.go()
+        data = self.data()
+        data["permissions"]["allow"].append("Read")
+        (self.root / SETTINGS).write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+        self.go("none")
+        self.assertEqual(self.data()["permissions"], {"allow": ["Read"]})
+
+    def test_same_value_twice_changes_nothing(self) -> None:
+        for value in ("absent", "none", CUSTOM):
+            self.go(value)
+            before = (self.root / SETTINGS).read_text(encoding="utf-8")
+            result = self.go(value)
+            self.assertIn(SETTINGS, result.skipped, value)
+            self.assertEqual((self.root / SETTINGS).read_text(encoding="utf-8"), before)
+
+    def test_manifest_owned_is_present_by_default_and_absent_with_none(self) -> None:
+        self.go()
+        self.assertTrue(self.owned())
+        self.go("none")
+        self.assertEqual(self.owned(), [])
+        self.go()
+        self.assertTrue(self.owned())
+
+
 class HookRunTest(RenderedBase):
     def hook(self, value: object = "absent") -> str:
         return self.session_command(self.rendered(value))
