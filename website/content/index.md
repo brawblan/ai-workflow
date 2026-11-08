@@ -32,6 +32,7 @@ The rest of your workflow stays the same.
 | [Hooks](framework/adapters/claude-code.md) | Local guards. For example, a hook stops the implementer when it tries to change a test. |
 | [Adapters and model profiles](framework/adapters/contract.md) | The only place for harness and model details. Claude Code is the first adapter. |
 | [`stone` CLI](stone/README.md) | Writes the roles, hooks, and CI checks into your repo. It also validates the framework and the writing. |
+| [Code index](docs/guides/code-index.md) | `stone-index` is a local index of the files in a repo. An agent asks it where a symbol is, and reads fewer files. The rule cut output tokens by 13 to 30 percent in the D109 eval. It cost 25 percent less on one large multi-file task (M3, 3 trials). Over all scenarios the cost saving is inside the noise ([evidence](docs/guides/code-index.md#result-first)). |
 | [Plugin skills](docs/guides/README.md) | `setup`, `project-setup`, `ticket-delivery`, and `ste-writing`, for use in the agent session. |
 | [Evals and lifecycle review](framework/lifecycle.md) | A test and a review date for each part, so that a part with no evidence leaves. |
 | [Research dossier](docs/research/dossier.md) | The cited evidence for each rule. |
