@@ -17,6 +17,7 @@ Do not change these paths. A hook blocks the file tools (Edit, Write) on these p
 
 If a protected file must change, stop and say why in the decision log.
 
+$code_index_rule
 ## Steps
 
 1. Read the ticket. Use only the ticket, the plan (if there is one), and the code.$ticket_location

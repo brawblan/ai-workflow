@@ -16,7 +16,7 @@ from typing import Any
 
 import yaml
 
-from stone import ci_setup, form, framework_check, overrides, results, specialists, specs, triggers
+from stone import ci_setup, code_index, form, framework_check, overrides, results, specialists, specs, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -68,7 +68,7 @@ K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 K23_SINCE = (1, 5, 0)  # the first framework tag with `stone check-dependencies` (D90)
 K24_SINCE = (1, 5, 0)  # the first framework tag with `stone check-workflows` (D93)
 DEFAULT_PR_LINES = overrides.DEFAULT_PR_LINES  # D4, customization.md
-BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
+BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "code_index_rule", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
 
 class RenderError(Exception):
@@ -84,6 +84,7 @@ class Component:
     eval: str
     files: dict[str, str]  # target path -> rendered content
     merge: bool = False  # True: a JSON fragment to merge into a shared file
+    owned: list[str] = field(default_factory=list)  # keys of the code index entries (D111)
 
     @property
     def hash(self) -> str:
@@ -385,7 +386,7 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     if model_profile.get("status") != "active":
         print(f"warning: model profile {model_profile['id']} has status "
               f"'{model_profile.get('status')}', not 'active'", file=sys.stderr)
-    problems = framework_check.path_pattern_problems(config, harness)
+    problems = framework_check.path_pattern_problems(config, harness) + code_index.problems(config)
     if problems:
         raise RenderError(f"{CONFIG}: {problems[0]}")
     adapter_roles = {entry["role"] for entry in registry if entry["kind"] == "role"}
@@ -441,10 +442,10 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
             values.setdefault(block, "")
         if entry.get("steps"):
             values["check_steps"] = render_steps(harness, entry["steps"], profiles, values, config)
-        content = substitute(harness, entry["template"], values, steps, config)
+        content, owned = render_entry(harness, entry, values, steps, config)
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
-                                    {entry["target"]: content}, entry.get("merge") == "json"))
+                                    {entry["target"]: content}, entry.get("merge") == "json", owned))
     if specialists.listed(config):
         components.append(Component(
             "doc.specialists", "doc", "Specialist reviews: the list, the triggers, and the order.",
@@ -455,6 +456,37 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     except triggers.TriggerError as error:
         raise RenderError(str(error)) from None
     return components
+
+
+def render_entry(harness: Path, entry: dict[str, Any], values: dict[str, str],
+                 steps: dict[str, str | None], config: dict[str, Any]) -> tuple[str, list[str]]:
+    """Fill the template of one component, with the code index parts that it takes (D111).
+
+    Return the content and the keys of the code index entries that it holds.
+    """
+    if entry.get("reads_code"):
+        values["code_index_rule"] = code_index.role_block(config)
+    content = substitute(harness, entry["template"], values, steps, config)
+    if entry.get("code_index_part"):
+        return add_code_index(harness, entry["code_index_part"], content, config)
+    return content, []
+
+
+def add_code_index(harness: Path, part: str, content: str,
+                   config: dict[str, Any]) -> tuple[str, list[str]]:
+    """Merge the permission and the build hook of the code index into a JSON fragment (D111).
+
+    Return the fragment and the keys of the entries of the part, or no keys with `code_index: none`.
+    """
+    index = code_index.settings(config)
+    if index is None:
+        return content, []
+    values = {f"code_index_{key}_json": json.dumps(value)[1:-1] for key, value in index.items()}
+    data = json.loads(content)
+    owned = json.loads(fill((harness / "templates" / part).read_text(encoding="utf-8"),
+                            part, values, config))
+    _merge(data, owned)
+    return json.dumps(data, indent=2) + "\n", _entry_keys(owned)
 
 
 def trigger_components(framework: Path, harness: Path, registry: list[dict[str, Any]],
@@ -620,6 +652,20 @@ def _merge(data: dict[str, Any], fragment: dict[str, Any]) -> None:
             data[key] = value
 
 
+SCALAR_ARRAY = re.compile(r'^([ \t]*)(.*)\[\n((?:[ \t]*(?:"(?:[^"\\\n]|\\.)*"|[-\w.+]+),?\n)+)'
+                          r'[ \t]*\](,?)$', re.M)
+JSON_WIDTH = 80  # the print width of a formatter with default options (D96)
+
+
+def _short_arrays(text: str) -> str:
+    """Put each short array of plain values on one line, as a formatter does (D96)."""
+    def join(match: re.Match[str]) -> str:
+        items = ", ".join(line.strip().rstrip(",") for line in match[3].splitlines())
+        line = f"{match[1]}{match[2]}[{items}]{match[4]}"
+        return line if len(line) <= JSON_WIDTH else match[0]
+    return SCALAR_ARRAY.sub(join, text)
+
+
 def _json_indent(text: str) -> str:
     """Return the indent of the first indented line of a JSON text: a tab, or N spaces."""
     for line in text.splitlines():
@@ -629,10 +675,43 @@ def _json_indent(text: str) -> str:
     return "  "
 
 
-def _merge_json(root: Path, path: str, fragment_text: str) -> tuple[bool, str]:
+def _entry_keys(part: Any, path: str = "") -> list[str]:
+    """Return a key for each list item of a JSON part: its path and a short hash (D111)."""
+    if isinstance(part, dict):
+        return [key for name, value in part.items() for key in _entry_keys(value, f"{path}/{name}")]
+    if isinstance(part, list):
+        return [f"{path}={_item_hash(item)}" for item in part]
+    return []
+
+
+def _item_hash(item: Any) -> str:
+    return hashlib.sha256(json.dumps(item, sort_keys=True).encode("utf-8")).hexdigest()[:16]
+
+
+def _remove(data: dict[str, Any], owned: set[str], path: str = "") -> bool:
+    """Remove each list item whose key is in owned. Return True if one was removed."""
+    removed = False
+    for name in list(data):
+        here, value = f"{path}/{name}", data[name]
+        if isinstance(value, dict):
+            changed = _remove(value, owned, here)
+        elif isinstance(value, list):
+            items = [item for item in value if f"{here}={_item_hash(item)}" not in owned]
+            changed, data[name] = len(items) < len(value), items
+        else:
+            continue
+        if changed and not data[name]:
+            del data[name]  # render made it, and render removed all of it
+        removed |= changed
+    return removed
+
+
+def _merge_json(root: Path, path: str, fragment_text: str,
+                old: dict[str, Any] | None = None) -> tuple[bool, str]:
     """Return (the file has the fragment, the file text with the fragment merged in).
 
     The merged text keeps the indent and the final newline state of the existing file (D70).
+    First it removes the entries that the old manifest entry owns and the fragment no longer has (D111).
     """
     target = root / path
     text = target.read_text(encoding="utf-8") if target.exists() else ""
@@ -641,10 +720,12 @@ def _merge_json(root: Path, path: str, fragment_text: str) -> tuple[bool, str]:
     except json.JSONDecodeError as error:
         raise RenderError(f"{path} is not valid JSON: {error}. Fix the file.") from None
     fragment = json.loads(fragment_text)
-    present = _contains(data, fragment)
+    owned = set((old or {}).get("owned") or []) - set(_entry_keys(fragment))
+    removed = _remove(data, owned)
+    present = _contains(data, fragment) and not removed
     _merge(data, fragment)
     newline = "\n" if not text or text.endswith("\n") else ""
-    return present, json.dumps(data, indent=_json_indent(text)) + newline
+    return present, _short_arrays(json.dumps(data, indent=_json_indent(text))) + newline
 
 
 def _manifest_entry(component: Component, old: dict[str, Any] | None, config: dict[str, Any],
@@ -662,7 +743,7 @@ def _manifest_entry(component: Component, old: dict[str, Any] | None, config: di
         "review_by": str(old["review_by"]) if old else add_months(today, REVIEW_MONTHS).isoformat(),
         "files": sorted(component.files),
         "hash": component.hash,
-    }
+    } | ({"owned": component.owned} if component.owned else {})
 
 
 def render(root: Path, framework: Path | None = None, dry_run: bool = False,
@@ -697,7 +778,7 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
         old = old_entries.get(component.id)
         paths = sorted(component.files)
         if component.merge:
-            present, merged = _merge_json(root, paths[0], component.files[paths[0]])
+            present, merged = _merge_json(root, paths[0], component.files[paths[0]], old)
             write = {paths[0]: merged}
             state = ("skipped" if present
                      else "drift" if old and old["hash"] == component.hash  # entry removed

@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from stone import (__version__, ci_setup, overrides, personas_check, results, specialists, specs,
+from stone import (__version__, ci_setup, code_index, overrides, personas_check, results, specialists, specs,
                    upgrade)
 from stone.findings import Finding
 from stone.markdown import link_file, relative_links, split_frontmatter, table_rows
@@ -526,7 +526,7 @@ def check_config(root: Path, framework: Path) -> list[Finding]:
     for problem in (ticket_folder_problems(config) + protected_path_problems(config)
                     + commit_problems(root, config)
                     + ticket_problems(config) + ci_env_problems(config) + specialists.problems(config)
-                    + ci_setup.problems(config)):
+                    + ci_setup.problems(config) + code_index.problems(config)):
         add(problem)
     for waiver in config.get("waivers", []):
         if waiver.get("gate") in {"G3", "G5"}:

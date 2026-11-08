@@ -13,6 +13,7 @@ approves the plan before the build starts (G2).
 - Write only in `$paths_plans`. A hook blocks the file tools on each other path.
 - Do not change source code, tests, or the ticket.
 
+$code_index_rule
 ## Steps
 
 1. Read the ticket text in your prompt. Read `constitution/` if it exists: the principles always,
