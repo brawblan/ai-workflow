@@ -17,7 +17,7 @@ and a CLI that turns the rules into files for your repo.
   Deliver, and Learn. A shaper, a planner, an implementer, a tester, a reviewer, and an
   investigator do the work.
 - **Gates.** A human approves the ticket, the plan, and the change. Only CI passes the checks gate.
-- **A code index.** `stone-index` is a local index of the files in a repo. An agent asks it where a symbol is, and reads fewer files. The rule cut output tokens by 13 to 30 percent in the D109 eval. It cost 25 percent less on one large multi-file task (M3, 3 trials). Over all scenarios the cost saving is inside the noise ([evidence](docs/guides/code-index.md#result-first)). Guide: [Use the code index](docs/guides/code-index.md).
+- **A code index.** `stone-index` is a local index of the files in a repo. An agent asks it where a symbol is, and reads fewer files. The rule cut output tokens by 13 to 30 percent (D109). On one large multi-file task, M3, it cost 11 to 25 percent less (3 trials, no SE). Over all scenarios the cost saving is inside the noise ([evidence](docs/guides/code-index.md#result-first)). Guide: [Use the code index](docs/guides/code-index.md).
 - **Profiles.** Ten profiles set the plan form and the gates for each type of work, from a spike to
   a full project.
 - **A neutral core.** The core never names a tool. An adapter turns it into files for one harness.

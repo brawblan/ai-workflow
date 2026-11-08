@@ -157,10 +157,10 @@ Add `--format github` to show the findings as annotations in a GitHub Actions ru
     Each run starts the harness, so it costs tokens and time. Use `--scenario <id>` to run one
     scenario. Use `--keep` to keep the workspace of each run for a review.
 
-11. Check the code index, or see how to install it:
+11. Run the code indexer through `stone`. The command passes its arguments to `stone-index`:
 
     ```bash
-    stone index
+    stone index find <name>
     ```
 
     The index is `stone-index`, a local index of the files in a repo (D104). If `stone-index` is not
