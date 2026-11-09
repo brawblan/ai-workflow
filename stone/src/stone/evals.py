@@ -8,6 +8,7 @@ harness with the command in `framework/adapters/<harness>/eval.yaml`, and grades
 from __future__ import annotations
 
 import datetime as dt
+import importlib.util
 import json
 import os
 import re
@@ -23,6 +24,7 @@ from dataclasses import dataclass, field
 from io import StringIO
 from pathlib import Path
 from string import Template
+from types import SimpleNamespace
 from typing import Any
 
 import yaml
@@ -48,6 +50,10 @@ GIT_ENV = {"GIT_AUTHOR_NAME": "stone eval", "GIT_AUTHOR_EMAIL": "eval@example.in
 
 class EvalError(Exception):
     """The eval folder or the run config is not valid. No run started."""
+
+
+class ComponentNotFound(EvalError):
+    """The selected adapter has no component with the requested ID."""
 
 
 @dataclass
@@ -205,7 +211,7 @@ def find_component(framework: Path, harness: str, component_id: str,
     guidance = find_guidance(root, component_id) if root else None
     if guidance:
         return guidance
-    raise EvalError(f"The adapter '{harness}' has no component '{component_id}'.")
+    raise ComponentNotFound(f"The adapter '{harness}' has no component '{component_id}'.")
 
 
 def registered_in(framework: Path, harness: str, target: str) -> list[str]:
@@ -221,6 +227,13 @@ def registered_in(framework: Path, harness: str, target: str) -> list[str]:
     return found
 
 
+def _require_parser(data: dict[str, Any], path: Path) -> None:
+    """Raise if the run config names a parser that is not a file path string."""
+    parser = data.get("parser")
+    if parser is not None and (not isinstance(parser, str) or not parser.strip()):
+        raise EvalError(f"{path}: 'parser' must be a file path string.")
+
+
 def load_run_config(path: Path) -> dict[str, Any]:
     if not path.exists():
         raise EvalError(f"{path}: no file. The harness adapter must give the eval command.")
@@ -233,9 +246,10 @@ def load_run_config(path: Path) -> dict[str, Any]:
     for variant in (*VARIANTS, *(["guidance"] if "guidance" in data["run"] else [])):
         if not isinstance(data["run"].get(variant), list):
             raise EvalError(f"{path}: 'run.{variant}' must be a list of arguments.")
-    for key in ("output", "output_where", "env", "tools"):
+    for key in ("output", "output_where", "env", "tools", "unsupported"):
         if not isinstance(data.get(key) or {}, dict):
             raise EvalError(f"{path}: '{key}' must be a mapping.")
+    _require_parser(data, path)
     return data
 
 
@@ -284,20 +298,37 @@ def _select_profile(path: Path, profile: str) -> None:
     (path / render.CONFIG).write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
 
 
+def _select_adapter(path: Path, harness: str, model_profile: str) -> None:
+    """Use the harness and the model profile of the selected run config in the fixture."""
+    if not (path / render.CONFIG).exists():
+        return
+    config = yaml.safe_load((path / render.CONFIG).read_text(encoding="utf-8")) or {}
+    changed = False
+    if harness and config.get("harness") != harness:
+        config["harness"] = harness
+        changed = True
+    if model_profile and config.get("model_profile") != model_profile:
+        config["model_profile"] = model_profile
+        changed = True
+    if changed:
+        (path / render.CONFIG).write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
+
+
 def prepare(folder: Path, scenario: dict[str, Any], framework: Path, role_file: str,
             variant: str, files: list[dict[str, Any]] | None = None,
-            profile: str = "") -> Workspace:
+            profile: str = "", harness: str = "", model_profile: str = "") -> Workspace:
     """Make the workspace: the fixture, the rendered files, the files of a guidance variant, and
     the change of the scenario. A trigger eval selects only its `profile` in the repo config."""
-    path = Path(tempfile.mkdtemp(prefix=f"stone-eval-{scenario['id']}-")) / "repo"
+    path = Path(tempfile.mkdtemp(prefix=f"stone-eval-{scenario['id']}-")).resolve() / "repo"
     shutil.copytree(folder / scenario["fixture"], path)
     _select_profile(path, profile)
+    _select_adapter(path, harness, model_profile)
     _git(path, "init", "-q", "-b", "main")
     _commit(path, "chore: fixture base")
     _git(path, "checkout", "-q", "-b", WORK_BRANCH)  # an agent does not commit to the default
     if (path / render.CONFIG).exists():
         with redirect_stderr(StringIO()):
-            render.render(path, framework)
+            render.render(path, framework, allow_eval_only=True)
     if variant == "without" and role_file:
         (path / role_file).unlink(missing_ok=True)
         # A shared settings file can still name the file (a hook entry). A missing hook file makes
@@ -355,12 +386,62 @@ def parse_output(stdout: str, fields: dict[str, str],
     return {}
 
 
+def _default_parser() -> Any:
+    """The parser for a run config that names none. It keeps the old behavior."""
+    return SimpleNamespace(parse=parse_output, transcript_stats=eval_metrics.transcript_stats)
+
+
+def _parser_path(run_config: Path, harness: Path, name: str) -> Path:
+    """Return the parser file, from the run config folder first, then the adapter folder."""
+    candidates = [run_config.parent / name, harness / name]
+    path = next((item for item in candidates if item.is_file()), None)
+    if path is None:
+        raise EvalError(f"{run_config}: the parser '{name}' does not exist. "
+                        "Use a file in the adapter folder.")
+    return path
+
+
+def _parser_module(path: Path) -> Any:
+    """Load one parser file as a module."""
+    module_name = f"stone_eval_parser_{path.stem}_{abs(hash(path))}"
+    spec = importlib.util.spec_from_file_location(module_name, path)
+    if spec is None or spec.loader is None:
+        raise EvalError(f"{path}: cannot load the parser.")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except (OSError, ImportError, SyntaxError) as error:
+        raise EvalError(f"{path}: the parser failed to load: {error}") from error
+    if not callable(getattr(module, "parse", None)):
+        raise EvalError(f"{path}: the parser has no 'parse' function.")
+    if not callable(getattr(module, "transcript_stats", None)):
+        raise EvalError(f"{path}: the parser has no 'transcript_stats' function.")
+    return module
+
+
+def load_parser(run_config: Path, harness: Path, config: dict[str, Any]) -> Any:
+    """Load the transcript parser that the run config names, or the default parser.
+
+    A relative parser path is resolved from the run config folder first, then from the harness
+    adapter folder. Thus a copied run config still finds the parser of its adapter.
+    """
+    name = str(config.get("parser") or "").strip()
+    if not name:
+        return _default_parser()
+    return _parser_module(_parser_path(run_config, harness, name))
+
+
 def _harness(argv: list[str], cwd: Path, env: dict[str, str],
              timeout: int) -> tuple[int | None, str, str]:
     """Run the harness in its own process group. Return (exit code or None on timeout, out, err).
 
     On a timeout, the whole group stops, so no tool process writes to the workspace after it.
     """
+    if argv and not os.path.isabs(argv[0]):
+        executable = shutil.which(argv[0], path=env.get("PATH"))
+        if executable:
+            argv = [executable, *argv[1:]]
+    env = {**env, "PWD": str(cwd)}  # a child that uses PWD must see the workspace
     with subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL,
                           stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                           start_new_session=True) as process:
@@ -379,7 +460,8 @@ def _setup(folder: Path, data: dict[str, Any], scenario: dict[str, Any], variant
     """Make the workspace and the harness command. Remove the workspace if the command fails."""
     config = opts["run_config"]
     workspace = prepare(folder, scenario, opts["framework"], opts["role_file"], variant,
-                        opts["variants"].get(variant), opts.get("profile", ""))
+                        opts["variants"].get(variant), opts.get("profile", ""),
+                        opts.get("harness", ""), opts.get("model_profile", ""))
     try:
         # Only a role eval removes the role. For another component, both variants load the same
         # role file, so the hook (or other component) is the only difference (D44).
@@ -400,9 +482,9 @@ def _setup(folder: Path, data: dict[str, Any], scenario: dict[str, Any], variant
     return workspace, argv, env, workflow
 
 
-def _add_tool_stats(run: Run, transcript: Path, has_output: bool) -> None:
+def _add_tool_stats(run: Run, transcript: Path, has_output: bool, parser: Any) -> None:
     """Count the tool calls and result bytes. A run with no output gets no value, not 0."""
-    stats = eval_metrics.transcript_stats(transcript) if has_output else None
+    stats = parser.transcript_stats(transcript) if has_output else None
     if stats:
         run.usage.update(tool_calls=stats[0], tool_bytes=stats[1])
 
@@ -428,7 +510,8 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
     except OSError as error:
         run.error = f"the harness did not start: {error}"
     try:
-        run.usage = parse_output(stdout, config.get("output") or {}, config.get("output_where"))
+        run.usage = opts["parser"].parse(stdout, config.get("output") or {},
+                                         config.get("output_where"))
         run.usage.setdefault("seconds", round(time.monotonic() - start, 1))
         workspace.report = str(run.usage.pop("report", "") or "")
         _trigger_post(run, workspace, workflow, run.usage.pop("structured_output", None), scenario)
@@ -437,7 +520,7 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
         if stderr:
             transcript.with_suffix(".err").write_text(stderr, encoding="utf-8")
         run.usage.update(transcript=str(transcript), workspace=str(workspace.path))
-        _add_tool_stats(run, transcript, bool(stdout))
+        _add_tool_stats(run, transcript, bool(stdout), opts["parser"])
         run.checks = grade(folder, scenario, workspace)
     finally:
         if not opts["keep"]:
@@ -450,7 +533,9 @@ def _trigger_argv(folder: Path, scenario: dict[str, Any], variant: str, workspac
     """Return the command of a trigger run and, for `with`, the rendered workflow (D101)."""
     config = opts["run_config"].get("trigger") or {}
     if not isinstance(config.get(variant), list):
-        raise trigger_eval.TriggerEvalError(f"the harness run file has no 'trigger.{variant}'.")
+        reason = (opts["run_config"].get("unsupported") or {}).get("trigger") or ""
+        raise trigger_eval.TriggerEvalError(
+            f"the harness run file has no 'trigger.{variant}'." + (f" {reason}" if reason else ""))
     runner_temp = workspace.path.parent / "runner-temp"
     event = trigger_eval.write_event(runner_temp, folder / str(scenario["event"]))
     values = {**values, "event_dir": str(event.parent), "tools": config.get("tools") or [],
@@ -643,9 +728,18 @@ def _rate(runs: list[Run], kind: str | None) -> float:
     return sum(r.passed(kind) for r in runs) / len(runs) if runs else 0.0
 
 
-def summary(component: str, model: str, runs: list[Run]) -> str:
+def _summary_head(component: str, model: str, harness: str) -> list[str]:
+    """The title and the metadata lines of the result file."""
+    lines = [f"# Eval results: {component}", ""]
+    if harness:
+        lines.append(f"Harness: `{harness}`.")
+    lines.append(f"Model: `{model}`. Date: {dt.date.today()}.")
+    return lines
+
+
+def summary(component: str, model: str, runs: list[Run], harness: str = "") -> str:
     """Return the result tables in Markdown: each scenario and variant, then each variant."""
-    lines = [f"# Eval results: {component}", "", f"Model: `{model}`. Date: {dt.date.today()}.", "",
+    lines = [*_summary_head(component, model, harness), "",
              *eval_metrics.scenario_table(runs, _rate), "",
              *eval_metrics.variant_table(runs, _rate)]
     names = list(dict.fromkeys(r.variant for r in runs))
@@ -707,6 +801,87 @@ def _select(scenarios: list[dict[str, Any]], ids: list[str] | None,
     return chosen
 
 
+def _harness_from_run_config(path: Path, framework: Path) -> str:
+    """Return the adapter folder name when the run config is inside `framework/adapters/`."""
+    try:
+        relative = path.resolve().relative_to((framework / "adapters").resolve())
+    except ValueError:
+        return ""
+    return relative.parts[0] if len(relative.parts) > 1 else ""
+
+
+def _model_profile(harness: Path, name: str, allow_fallback: bool) -> str:
+    """Use the named profile. Only a changed adapter can fall back to its first profile."""
+    if name and (harness / "models" / f"{name}.yaml").is_file():
+        return name
+    if name and not allow_fallback:
+        raise EvalError(f"The adapter '{harness.name}' has no model profile '{name}'. "
+                        "Add the file, or set model_profile in the repo config.")
+    profiles = sorted((harness / "models").glob("*.yaml"))
+    if not profiles:
+        raise EvalError(f"The adapter '{harness.name}' has no model profile. "
+                        "Add a file in its models folder.")
+    return profiles[0].stem
+
+
+def _run_harness(config: dict[str, Any], framework: Path,
+                 run_config: Path | None) -> tuple[Path, str]:
+    """Return the run config and the adapter name that it selects."""
+    configured = config["harness"]
+    path = run_config or framework / "adapters" / configured / "eval.yaml"
+    return path, _harness_from_run_config(path, framework) or configured
+
+
+def _with_reason(message: str, reason: str) -> str:
+    """Add the adapter's unsupported reason to a message, when there is one."""
+    return message + (f" {reason}" if reason else "")
+
+
+def _print_check_only(scenarios: list[dict[str, Any]], variants: tuple[str, ...],
+                      trials: int) -> None:
+    for scenario in scenarios:
+        print(f"{scenario['id']}: {len(scenario['expect'])} check(s), "
+              f"{len(variants) * trials} run(s)")
+
+
+def _run_options(framework: Path, entry: dict[str, Any], loaded: dict[str, Any],
+                 model: str, budget: str, timeout: int, runs_folder: Path, keep: bool,
+                 data: dict[str, Any], profile_id: str, parser: Any, harness_name: str,
+                 model_profile: str) -> dict[str, Any]:
+    return {"framework": framework.resolve(), "role_file": entry.get("target", ""),
+            "kind": entry.get("kind", ""), "run_config": loaded, "model": model,
+            "budget": budget, "timeout": timeout, "runs": runs_folder, "keep": keep,
+            "variants": data.get("variants") or {}, "profile": profile_id, "parser": parser,
+            "harness": harness_name, "model_profile": model_profile}
+
+
+def _run_all(folder: Path, data: dict[str, Any], scenarios: list[dict[str, Any]],
+             variants: tuple[str, ...], trials: int, opts: dict[str, Any],
+             runs_folder: Path) -> list[Run]:
+    runs: list[Run] = []
+    with (runs_folder / "runs.jsonl").open("w", encoding="utf-8") as handle:
+        for scenario in scenarios:
+            for name in variants:
+                for trial in range(1, trials + 1):
+                    run = run_once(folder, data, scenario, name, trial, opts)
+                    print(f"{run.scenario} {run.variant} {run.trial}: "
+                          f"{'pass' if run.passed() else 'fail'} {run.error}".rstrip())
+                    runs.append(run)
+                    handle.write(json.dumps(run.__dict__) + "\n")  # kept if a later run stops
+                    handle.flush()
+    return runs
+
+
+def _write_result(root: Path, stamp: str, component_id: str, model: str, runs: list[Run],
+                  harness_name: str) -> str:
+    safe_model = re.sub(r"[^\w.-]+", "-", model) or "default"
+    result_path = root / RESULTS / f"{stamp}-{component_id}-{safe_model}.md"
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    result_path.write_text(summary(component_id, model, runs, harness_name),
+                           encoding="utf-8")
+    return str(result_path)
+
+
 def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
              scenario_ids: list[str] | None = None, variant: str = "both", trials: int = 1,
              model: str | None = None, budget: str = "5", timeout: int = 1800,
@@ -715,15 +890,27 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     """Run the eval. Return the runs and the path of the result file ('' for check_only)."""
     framework = framework or root / "framework"
     config = render.load_config(root, framework)
-    entry = find_component(framework, config["harness"], component_id, root)
+    run_config, harness_name = _run_harness(config, framework, run_config)
+    loaded = load_run_config(run_config)
+    try:
+        entry = find_component(framework, harness_name, component_id, root)
+    except ComponentNotFound as error:
+        kind = component_id.split(".", 1)[0]
+        reason = (loaded.get("unsupported") or {}).get(kind) or ""
+        if reason:
+            raise EvalError(f"The harness '{harness_name}' does not support a {kind} eval. "
+                            f"{reason}") from error
+        raise
     folder = root / entry["eval"]
     profile_id = entry.get("profile", "")
     data = load_scenarios(folder, role_required=not profile_id)
     data["role"] = _first_role(framework, entry) if profile_id else data["role"]
     scenarios = _select(data["scenarios"], scenario_ids, profile_id)
-    harness = framework / "adapters" / config["harness"]
-    loaded = load_run_config(run_config or harness / "eval.yaml")
-    profile = yaml.safe_load((harness / "models" / f"{config['model_profile']}.yaml")
+    harness = framework / "adapters" / harness_name
+    parser = load_parser(run_config, harness, loaded)
+    model_profile = _model_profile(harness, config["model_profile"],
+                                   allow_fallback=harness_name != config["harness"])
+    profile = yaml.safe_load((harness / "models" / f"{model_profile}.yaml")
                              .read_text(encoding="utf-8"))
     model = model or profile["defaults"]["role_models"].get(data["role"], "")
     if data.get("variants") and entry.get("kind") != "guidance":
@@ -737,35 +924,19 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     if entry.get("kind") == "guidance" and not model:
         raise EvalError("A guidance eval has no role model. Pass --model.")
     if entry.get("kind") == "guidance" and "guidance" not in loaded["run"]:
-        raise EvalError("The harness run file has no 'run.guidance' command for a guidance eval.")
+        reason = (loaded.get("unsupported") or {}).get("guidance") or ""
+        raise EvalError(_with_reason(
+            "The harness run file has no 'run.guidance' command for a guidance eval.", reason))
     if entry.get("merge") and "without" in variants:
         raise EvalError(f"{component_id} is merged into a shared file. The runner cannot remove "
                         "it for 'without' yet. Use --variant with.")
     if check_only:
-        for scenario in scenarios:
-            print(f"{scenario['id']}: {len(scenario['expect'])} check(s), "
-                  f"{len(variants) * trials} run(s)")
+        _print_check_only(scenarios, variants, trials)
         return [], ""
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
     runs_folder = root / RUNS / f"{stamp}-{entry['eval'].strip('/').split('/')[-1]}"
     runs_folder.mkdir(parents=True, exist_ok=True)
-    opts = {"framework": framework.resolve(), "role_file": entry.get("target", ""), "kind": entry.get("kind", ""),
-            "run_config": loaded, "model": model, "budget": budget, "timeout": timeout,
-            "runs": runs_folder, "keep": keep, "variants": data.get("variants") or {},
-            "profile": profile_id}
-    runs: list[Run] = []
-    with (runs_folder / "runs.jsonl").open("w", encoding="utf-8") as handle:
-        for scenario in scenarios:
-            for name in variants:
-                for trial in range(1, trials + 1):
-                    run = run_once(folder, data, scenario, name, trial, opts)
-                    print(f"{run.scenario} {run.variant} {run.trial}: "
-                          f"{'pass' if run.passed() else 'fail'} {run.error}".rstrip())
-                    runs.append(run)
-                    handle.write(json.dumps(run.__dict__) + "\n")  # kept if a later run stops
-                    handle.flush()
-    safe_model = re.sub(r"[^\w.-]+", "-", model) or "default"
-    result_path = root / RESULTS / f"{stamp}-{component_id}-{safe_model}.md"
-    result_path.parent.mkdir(parents=True, exist_ok=True)
-    result_path.write_text(summary(component_id, model, runs), encoding="utf-8")
-    return runs, str(result_path)
+    opts = _run_options(framework, entry, loaded, model, budget, timeout, runs_folder, keep,
+                        data, profile_id, parser, harness_name, model_profile)
+    runs = _run_all(folder, data, scenarios, variants, trials, opts, runs_folder)
+    return runs, _write_result(root, stamp, component_id, model, runs, harness_name)

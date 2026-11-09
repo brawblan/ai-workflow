@@ -1,0 +1,7 @@
+{"type":"step_start","part":{"type":"step-start"}}
+{"type":"text","part":{"type":"text","messageID":"msg_1","text":"First part"}}
+{"type":"tool_use","part":{"type":"tool","tool":"read","state":{"status":"completed","output":"hello\n"}}}
+{"type":"step_finish","part":{"type":"step-finish","reason":"tool-calls","cost":0.001,"tokens":{"input":10,"output":2,"reasoning":0,"cache":{"read":3,"write":0}}}}
+{"type":"text","part":{"type":"text","messageID":"msg_2","text":"Final "}}
+{"type":"text","part":{"type":"text","messageID":"msg_2","text":"report"}}
+{"type":"step_finish","part":{"type":"step-finish","reason":"stop","cost":0.002,"tokens":{"input":20,"output":4,"reasoning":1,"cache":{"read":7,"write":2}}}}

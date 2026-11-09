@@ -172,6 +172,11 @@ flowchart LR
   not in the map.
 - The runner reads the last JSON object of the harness output. If `eval.yaml` has `output_where`,
   it reads the last object with those keys and values.
+- A run config can name a `parser` file. The parser has `parse` and `transcript_stats`. `parse`
+  returns the usage map, and `transcript_stats` returns the tool calls and the result bytes. Without
+  a parser, the runner reads the last JSON object and the default transcript format.
+- `stone eval --run-config <file>` uses the adapter of that file for the component list, the model
+  profile, and the parser. The fixture config gets that harness and model profile.
 - The setup commits the fixture on `main`. Then the work continues on the branch
   `feature/eval-work`, because a role does not commit to the default branch.
 - Git in the workspace does not read the global or the system git config. Thus each machine gives

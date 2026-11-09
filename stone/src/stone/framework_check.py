@@ -603,6 +603,15 @@ def component_problems(entry: dict[str, Any], is_manifest: bool,
     return problems
 
 
+def _add_adapter_status(findings: list[Finding], doc: dict[str, Any], name: str) -> None:
+    """Add a finding when an adapter component list has an unknown status."""
+    status = str(doc.get("status") or "full")
+    if status not in {"full", "eval-only"}:
+        findings.append(Finding(name, 1, CHECK,
+                                f"The adapter status '{status}' is not valid. "
+                                "Use 'full' or 'eval-only'."))
+
+
 def check_components(root: Path, framework: Path) -> list[Finding]:
     """P5 (D43, D50): test the adapter component lists and, if present, the repo manifest.
 
@@ -618,8 +627,10 @@ def check_components(root: Path, framework: Path) -> list[Finding]:
     findings: list[Finding] = []
     for path, is_manifest in paths:
         text = path.read_text(encoding="utf-8")
+        doc = yaml.safe_load(text) or {}
         name = str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
-        for entry in (yaml.safe_load(text) or {}).get("components") or []:
+        _add_adapter_status(findings, doc, name)
+        for entry in doc.get("components") or []:
             component_id = entry.get("id", "?")
             match = re.search(rf"^\s*- id: {re.escape(str(component_id))}\s*$", text, re.M)
             line = text.count("\n", 0, match.start()) + 1 if match else 1

@@ -5,6 +5,7 @@ from __future__ import annotations
 import calendar
 import datetime as dt
 import hashlib
+import importlib.util
 import json
 import re
 import subprocess
@@ -242,7 +243,8 @@ def all_checks_env(config: dict[str, Any]) -> str:
 
 
 def template_values(config: dict[str, Any], model: str,
-                    harness_dirs: list[str] | None = None) -> dict[str, str]:
+                    harness_dirs: list[str] | None = None,
+                    adapter: Path | None = None) -> dict[str, str]:
     """Return the repo facts that templates can use. TODO values are left out on purpose."""
     # The framework tag. The G3 workflow installs stone from framework_commit, else from the tag (D92).
     version = str(config.get("framework_version", ""))
@@ -289,15 +291,24 @@ def template_values(config: dict[str, Any], model: str,
     if problems:
         raise RenderError(f"{CONFIG}: {problems[0]}")
     values["all_checks_env"] = all_checks_env(config)
+    values.update(_path_values(config, harness_dirs))
+    _merge_adapter_values(values, adapter, config)
+    return {key: value for key, value in values.items() if "TODO(" not in value}
+
+
+def _path_values(config: dict[str, Any], harness_dirs: list[str] | None) -> dict[str, str]:
+    """Return the plan, report, spec, and protected-path values."""
     plans = one_folder(_get(config, "paths.plans"))
     reports = one_folder(_get(config, "paths.reports"), "reports")
     # '{id}' (#146): the role text names the ticket folder, and the hook matches each ticket folder.
-    values["paths_plans"] = plans.replace(specs.TICKET_ID, "<ticket-id>")
-    values["paths_plans_all"] = plans.replace(specs.TICKET_ID, "*")
-    values["paths_specs"] = one_folder(_get(config, "paths.specs"), "specs")
-    values["paths_reports"] = reports.replace(specs.TICKET_ID, "<ticket-id>")
-    values["plans_json"] = json.dumps([plans.replace(specs.TICKET_ID, "*")])
-    values["reports_json"] = json.dumps([reports.replace(specs.TICKET_ID, "*")])
+    values = {
+        "paths_plans": plans.replace(specs.TICKET_ID, "<ticket-id>"),
+        "paths_plans_all": plans.replace(specs.TICKET_ID, "*"),
+        "paths_specs": one_folder(_get(config, "paths.specs"), "specs"),
+        "paths_reports": reports.replace(specs.TICKET_ID, "<ticket-id>"),
+        "plans_json": json.dumps([plans.replace(specs.TICKET_ID, "*")]),
+        "reports_json": json.dumps([reports.replace(specs.TICKET_ID, "*")]),
+    }
     always = list(harness_dirs or []) + CORE_PROTECTED  # harness folders hold its settings (D76)
     values["harness_json"] = json.dumps(always)
     tests = list(_get(config, "paths.tests") or [])
@@ -306,24 +317,54 @@ def template_values(config: dict[str, Any], model: str,
         values["tests_json"] = json.dumps(tests)
         protected = tests + checks + always + [values["paths_specs"]]
         values["protected_json"] = json.dumps(sorted(set(protected)))
-    return {key: value for key, value in values.items() if "TODO(" not in value}
+    return values
+
+
+def adapter_values(harness: Path, config: dict[str, Any]) -> dict[str, str]:
+    """Load the optional template values of an adapter. No values file gives an empty map."""
+    path = harness / "values.py"
+    if not path.is_file():
+        return {}
+    spec = importlib.util.spec_from_file_location(f"stone_adapter_values_{harness.name}", path)
+    if spec is None or spec.loader is None:
+        raise RenderError(f"{path}: cannot load the adapter values.")
+    module = importlib.util.module_from_spec(spec)
+    try:
+        spec.loader.exec_module(module)
+    except (OSError, ImportError, SyntaxError) as error:
+        raise RenderError(f"{path}: the adapter values failed to load: {error}") from error
+    function = getattr(module, "values", None)
+    if not callable(function):
+        raise RenderError(f"{path}: the adapter values file has no callable 'values'.")
+    values = function(config)
+    if not isinstance(values, dict):
+        raise RenderError(f"{path}: 'values' must return a dict.")
+    return {key: str(value) for key, value in values.items()}
+
+
+def _merge_adapter_values(values: dict[str, str], adapter: Path | None,
+                          config: dict[str, Any]) -> None:
+    """Merge adapter-owned values without letting them replace a core value."""
+    extra = adapter_values(adapter, config) if adapter else {}
+    for key, value in extra.items():
+        if key in values:
+            raise RenderError(f"The adapter value '{key}' reuses a core template key. "
+                              "The adapter must use another name.")
+        values[key] = value
 
 
 def ticket_values(config: dict[str, Any]) -> dict[str, str]:
-    """Return the ticket source for the role files and the hook (#137)."""
-    # StructuredOutput (D71): a trigger run with --json-schema returns its report only with it.
+    """Return the neutral ticket source for the role files and the hook (#137)."""
     section = config.get("tickets")
     section = section if isinstance(section, dict) else {}
     if section.get("source") != "file" or not section.get("path"):
         return {"ticket_location": "", "tickets_json": json.dumps(""),
-                "shaper_tools": "Read, Grep, Glob, Bash, StructuredOutput",
                 "shaper_write": "Write the answers into the ticket fields. Do not invent a requirement.",
                 "shaper_end": "Use `Bash` only to read the ticket with the issue CLI. "
                               "Do not change files in the repo."}
     path = str(section["path"])
     return {"ticket_location": f" The ticket is the file `{path}`. `{{id}}` is the ticket ID.",
             "tickets_json": json.dumps(path),
-            "shaper_tools": "Read, Grep, Glob, Bash, Write, Edit, StructuredOutput",
             "shaper_write": "Write the answers into the Definition of Ready section of the ticket "
                             "file. Do not invent a requirement.",
             "shaper_end": "Change only the ticket file. A hook blocks the file tools on other "
@@ -367,14 +408,32 @@ def apply_overrides(root: Path, profiles: list[dict[str, Any]],
             else profile for profile in profiles]
 
 
-def build_components(framework: Path, config: dict[str, Any], root: Path | None = None,
-                     today: dt.date | None = None) -> list[Component]:
+def _registry(framework: Path, config: dict[str, Any]) -> tuple[Path, dict[str, Any]]:
+    """Return the adapter folder and its component list."""
     harness = framework / "adapters" / config["harness"]
-    registry_path = harness / "components.yaml"
-    if not registry_path.exists():
+    path = harness / "components.yaml"
+    if not path.exists():
         raise RenderError(f"The harness '{config['harness']}' has no components.yaml. "
                           "Render supports only adapters with templates.")
-    registry_doc = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+    return harness, yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def _adapter_status(registry_doc: dict[str, Any], harness_name: str,
+                    allow_eval_only: bool) -> None:
+    """Raise when the adapter status is not valid, or when render must refuse it."""
+    status = str(registry_doc.get("status") or "full")
+    if status not in {"full", "eval-only"}:
+        raise RenderError(f"The adapter status '{status}' is not valid. Use 'full' or 'eval-only'.")
+    if status == "eval-only" and not allow_eval_only:
+        raise RenderError(f"The harness '{harness_name}' is eval-only. stone render needs an "
+                          "adapter with templates. Use stone eval.")
+
+
+def build_components(framework: Path, config: dict[str, Any], root: Path | None = None,
+                     today: dt.date | None = None,
+                     allow_eval_only: bool = False) -> list[Component]:
+    harness, registry_doc = _registry(framework, config)
+    _adapter_status(registry_doc, config["harness"], allow_eval_only)
     registry = registry_doc["components"]
     harness_dirs = [str(item) for item in registry_doc.get("protected_dirs") or []]
     instruction_files = [str(item) for item in registry_doc.get("instruction_files") or []]
@@ -416,7 +475,7 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     steps: dict[str, str | None] = {step_name(entry["id"]): None
                                     for entry in registry if entry.get("ci_step")}
     limits_json = json.dumps(size_limits(config, profiles), sort_keys=True)
-    base_values = {**template_values(config, "", harness_dirs), **model_values,
+    base_values = {**template_values(config, "", harness_dirs, harness), **model_values,
                    "size_limits_json": limits_json}
     for entry in registry:
         if entry.get("ci_step") and needed(entry, profiles) and entry["id"] not in off:
@@ -431,7 +490,7 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
         if local and entry["kind"] == "ci-job":
             continue  # delivery: local writes no workflow file
         model = defaults["role_models"].get(entry.get("role", ""), "")
-        values = {**template_values(config, model, harness_dirs), **model_values,
+        values = {**template_values(config, model, harness_dirs, harness), **model_values,
                   "size_limits_json": limits_json,
                   **{name: step for name, step in steps.items() if step is not None}}
         effort = (defaults.get("effort") or {}).get(entry.get("role", ""), "")
@@ -500,7 +559,7 @@ def trigger_components(framework: Path, harness: Path, registry: list[dict[str, 
     components, targets = [], []
     for trigger in triggers.supported(found, set(entries)):
         entry = entries[trigger.key]
-        values = template_values(config, "")
+        values = template_values(config, "", adapter=harness)
         values.update(defaults)
         values.update({key: str(value) for key, value in (entry.get("values") or {}).items()})
         values.update(triggers.values(trigger, found, role_models))
@@ -747,7 +806,7 @@ def _manifest_entry(component: Component, old: dict[str, Any] | None, config: di
 
 
 def render(root: Path, framework: Path | None = None, dry_run: bool = False,
-           today: dt.date | None = None) -> Result:
+           today: dt.date | None = None, allow_eval_only: bool = False) -> Result:
     """Render all components. Raise RenderError before any write if an input is not valid."""
     framework = framework or root / "framework"
     today = today or dt.date.today()
@@ -756,7 +815,7 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
     if findings:
         raise RenderError(f"{findings[0].path}: {findings[0].message}")
     warn_old_framework(config["framework_version"])
-    components = build_components(framework, config, root, today)
+    components = build_components(framework, config, root, today, allow_eval_only)
     warn_no_commit(config, components)
     manifest = load_manifest(root)
     old_entries = {entry["id"]: entry for entry in manifest.get("components", [])}

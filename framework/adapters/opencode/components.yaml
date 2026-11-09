@@ -1,0 +1,73 @@
+# The role files of the OpenCode adapter. `stone eval` reads this list to find the role file of a
+# component and to remove it for the "without" variant.
+# status: eval-only. stone eval uses the list. stone render refuses the adapter until it has a
+# full set of templates (contract.md, "Adapter status").
+# eval: the eval folder (lifecycle.md). The role evals in this repo measure the role text.
+
+status: eval-only
+
+protected_dirs:
+  - .opencode/
+
+instruction_files:
+  - "**/[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]"
+
+components:
+  - id: role.shaper
+    kind: role
+    role: shaper
+    purpose: Interview the human until the ticket meets the Definition of Ready.
+    principle: [P3]
+    template: agents/shaper.md
+    target: .opencode/agents/shaper.md
+    eval: evals/role-shaper/
+
+  - id: role.planner
+    kind: role
+    role: planner
+    reads_code: true
+    purpose: Write the plan artifact and the progress file. A human approves them at G2.
+    principle: [P3, P7]
+    template: agents/planner.md
+    target: .opencode/agents/planner.md
+    eval: evals/role-planner/
+
+  - id: role.implementer
+    kind: role
+    role: implementer
+    reads_code: true
+    purpose: Change the code to meet the ticket. Write the decision log.
+    principle: [P2, P8]
+    template: agents/implementer.md
+    target: .opencode/agents/implementer.md
+    eval: evals/role-implementer/
+
+  - id: role.tester
+    kind: role
+    role: tester
+    reads_code: true
+    purpose: Write independent tests from the ticket and the diff.
+    principle: [P2]
+    template: agents/tester.md
+    target: .opencode/agents/tester.md
+    eval: evals/role-tester/
+
+  - id: role.reviewer
+    kind: role
+    role: reviewer
+    reads_code: true
+    purpose: Find defects and scope drift in a fresh session.
+    principle: [P2, P11]
+    template: agents/reviewer.md
+    target: .opencode/agents/reviewer.md
+    eval: evals/role-reviewer/
+
+  - id: role.investigator
+    kind: role
+    role: investigator
+    reads_code: true
+    purpose: Read, run, and report. Write only in the reports path, or anywhere on a spike branch.
+    principle: [P2, P11]
+    template: agents/investigator.md
+    target: .opencode/agents/investigator.md
+    eval: evals/role-investigator/

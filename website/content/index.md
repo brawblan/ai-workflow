@@ -30,7 +30,7 @@ The rest of your workflow stays the same.
 | [Gates](framework/gates.md) | Five stop points, G1 to G5. A human or CI must pass each one. |
 | [Checks](framework/checks.md) | 24 CI checks, K1 to K24: tests, protected paths, change size, secrets, PR evidence, and more. |
 | [Hooks](framework/adapters/claude-code.md) | Local guards. For example, a hook stops the implementer when it tries to change a test. |
-| [Adapters and model profiles](framework/adapters/contract.md) | The only place for harness and model details. Claude Code is the first adapter. |
+| [Adapters and model profiles](framework/adapters/contract.md) | The only place for harness and model details. Claude Code is the full adapter. OpenCode supports eval runs. |
 | [`stone` CLI](stone/README.md) | Writes the roles, hooks, and CI checks into your repo. It also validates the framework and the writing. |
 | [Code index](docs/guides/code-index.md) | `stone-index` is a local index of the files in a repo. An agent asks it where a symbol is, and reads fewer files. The rule cut output tokens by 13 to 30 percent (D109). On one large multi-file task, M3, it cost 11 to 25 percent less (3 trials, no SE). Over all scenarios the cost saving is inside the noise ([evidence](docs/guides/code-index.md#result-first)). |
 | [Plugin skills](docs/guides/README.md) | `setup`, `project-setup`, `ticket-delivery`, and `ste-writing`, for use in the agent session. |
@@ -97,7 +97,8 @@ Cornerstone puts a check or a human gate at each of these points.
 - A team that wants one process for many types of work.
 - A person who uses Spec Kit, OpenSpec, or BMAD and wants a layer that does not depend on one tool.
 
-It is not a prompt library or an IDE. At this time the only adapter is for Claude Code.
+It is not a prompt library or an IDE. At this time the full adapter is for Claude Code. An adapter
+for OpenCode supports `stone eval` only.
 
 ## How it compares
 
@@ -175,7 +176,7 @@ The table shows the current version. Version 1.0.0 met the exit criteria on 2026
 | --- | --- |
 | Profiles | `stone render` writes every component of all 10 profiles. Each profile has a golden-file test and a guide. |
 | Checks | Each generated check blocks: K6, K7, K14, K15, and K16. K17 blocks in this repo. |
-| Adapters | Claude Code is the only harness adapter. Its model profile for Claude 5 is `active`. |
+| Adapters | Claude Code is the full harness adapter. Its model profile for Claude 5 is `active`. OpenCode supports `stone eval` only. |
 | Evals | There are evals for all six roles, the protected-path hook, the trigger workflows, and the writing guidance. See [evals](evals/README.md). |
 | Open | The first blind A/B rating of STE text, at the end of Q4 2026. See the [roadmap](framework/README.md#roadmap). |
 
