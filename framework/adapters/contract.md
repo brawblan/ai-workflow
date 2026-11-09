@@ -52,6 +52,21 @@ An adapter MAY add `values.py` at its root. It MUST provide `values(config: dict
 The core passes neutral ticket state in `config`. It builds no harness tool names or permission
 schemas. Each value becomes a string for the templates. An adapter key MUST NOT reuse a core key.
 
+### Adapter data files
+
+The commands of `stone` read these files from `framework/adapters/<name>/`. The core holds no
+harness format of its own (P12). An adapter without a file cannot use the command that reads it.
+
+| File | Read by | What it gives |
+| --- | --- | --- |
+| `components.yaml` | `stone render`, `stone eval` | The file of each component, and the adapter `status` |
+| `eval.yaml` | `stone eval` | `run`: the command for each variant. `env`, `tools`, and `trigger` for each role or trigger. `output` and `output_where`: the fields of the harness output. |
+| `eval.yaml`, optional keys | `stone eval` | `parser`: a parser file. `rates`: a rates file (D116). `unsupported`: the reason for each eval kind that the adapter cannot run. |
+| Parser file | `stone eval` | `parse` returns the usage fields. `transcript_stats` returns the tool calls and the result bytes. Without a parser, the runner reads the last JSON object. |
+| Rates file | `stone eval` | The token rates of each model in USD for each 1M tokens, the `source`, the `read` date, and optional peak windows (D116) |
+| `usage.yaml` | `stone usage` | The transcript folders, the record format, and the weights (D114) |
+| `values.py` | `stone render` | The template values (see above) |
+
 ## What a model profile MUST provide
 
 A model profile changes more often than a harness adapter. A new model from the same vendor changes

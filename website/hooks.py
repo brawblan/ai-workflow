@@ -17,7 +17,10 @@ LINK = re.compile(r"(\]\()([^)\s]+)(\))")
 EVALS_MARKER = "<!-- evals-index -->"
 EVALS_PAGE = "evals/README.md"
 RESULT_TITLE = re.compile(r"^# Eval results: (\S+)\s*$")
+RESULT_HARNESS = re.compile(r"^Harness: `([^`]+)`\.\s*$")
 RESULT_MODEL = re.compile(r"^Model: `([^`]+)`\. Date: (\d{4}-\d{2}-\d{2})\.")
+RESULT_STAMP = re.compile(r"^(\d{8}-\d{6})-")
+CONFIG_HARNESS = re.compile(r"^harness:\s*([^\s#]+)", re.MULTILINE)
 EXTERNAL = re.compile(r"^([a-z][a-z0-9+.-]*:|#|/)", re.IGNORECASE)
 
 
@@ -54,22 +57,61 @@ def rewrite_links(markdown: str, page_uri: str, page_repo_path: str, repo_root: 
     return LINK.sub(replace, markdown)
 
 
+def default_harness(evals_dir: Path) -> str:
+    """Return the harness of the repo config, or "" if the config has none.
+
+    A result file from before the "Harness:" line came from the harness of the repo config.
+    """
+    config = evals_dir.parent / ".cornerstone" / "config.yaml"
+    if not config.is_file():
+        return ""
+    found = CONFIG_HARNESS.search(config.read_text(encoding="utf-8"))
+    return found.group(1) if found else ""
+
+
+def read_result(path: Path, fallback_harness: str) -> tuple[str, dict[str, str]] | None:
+    """Return the component and the fields of one result file, or None if it is not a result.
+
+    `stone eval` writes the title, a blank line, an optional "Harness:" line, and the "Model:"
+    line. The body is the rest of the file.
+    """
+    lines = path.read_text(encoding="utf-8").splitlines()
+    title = RESULT_TITLE.match(lines[0]) if lines else None
+    if not title:
+        return None
+    index = 2
+    harness = RESULT_HARNESS.match(lines[index]) if len(lines) > index else None
+    if harness:
+        index += 1
+    model = RESULT_MODEL.match(lines[index]) if len(lines) > index else None
+    if not model:
+        return None
+    stamp = RESULT_STAMP.match(path.name)
+    return title.group(1), {
+        "harness": harness.group(1) if harness else fallback_harness,
+        "model": model.group(1),
+        "date": model.group(2),
+        "stamp": stamp.group(1) if stamp else model.group(2),
+        "name": path.name,
+        "body": "\n".join(lines[index + 1:]).strip(),
+    }
+
+
 def evals_index(evals_dir: Path) -> str:
     """Return Markdown for the evals page: one section for each component, newest run first.
 
     The result files in evals/results/ are the data. Each starts with the "# Eval results: <id>"
-    line and the "Model: `<model>`. Date: <date>." line that `stone eval` writes. The links are
-    relative to evals/README.md.
+    line and the "Model: `<model>`. Date: <date>." line that `stone eval` writes. A run on a
+    harness other than the repo default also has a "Harness:" line. The page shows the latest run
+    of each harness. A run of many models writes one file for each model with the same time stamp,
+    so the page shows each of them. The links are relative to evals/README.md.
     """
-    runs: dict[str, list[tuple[str, str, str, str]]] = {}
-    for path in sorted((evals_dir / "results").glob("*.md"), reverse=True):
-        lines = path.read_text(encoding="utf-8").splitlines()
-        title = RESULT_TITLE.match(lines[0]) if lines else None
-        model = RESULT_MODEL.match(lines[2]) if len(lines) > 2 else None
-        if title and model:
-            body = "\n".join(lines[3:]).strip()
-            runs.setdefault(title.group(1), []).append(
-                (model.group(2), model.group(1), path.name, body))
+    fallback = default_harness(evals_dir)
+    runs: dict[str, list[dict[str, str]]] = {}
+    for path in sorted((evals_dir / "results").glob("*.md")):
+        found = read_result(path, fallback)
+        if found:
+            runs.setdefault(found[0], []).append(found[1])
     if not runs:
         return "No eval results yet."
     out: list[str] = []
@@ -81,12 +123,25 @@ def evals_index(evals_dir: Path) -> str:
             links.insert(0, f"[Scenarios](./{folder}/scenarios.yaml)")
             links.insert(1, f"[Eval folder](./{folder}/)")
         out += [" · ".join(links), ""]
-        date, model, name, body = sorted(runs[component], reverse=True)[0]
-        out += [f"Latest run: {date}, model `{model}`. [Result file](results/{name}).", "", body, ""]
-        earlier = sorted(runs[component], reverse=True)[1:]
+        ordered = sorted(runs[component], reverse=True,
+                         key=lambda r: (r["stamp"], r["date"], r["model"], r["name"]))
+        harnesses = sorted({r["harness"] for r in ordered}, key=lambda h: (h != fallback, h))
+        latest: list[dict[str, str]] = []
+        for harness in harnesses:
+            mine = [r for r in ordered if r["harness"] == harness]
+            latest += sorted((r for r in mine if r["stamp"] == mine[0]["stamp"]),
+                             key=lambda r: r["model"])
+        for run in latest:
+            on = f" on `{run['harness']}`" if len(harnesses) > 1 and run["harness"] else ""
+            out += [f"Latest run{on}: {run['date']}, model `{run['model']}`. "
+                    f"[Result file](results/{run['name']}).", "", run["body"], ""]
+        earlier = [r for r in ordered if r not in latest]
         if earlier:
             out += ["Earlier runs:", ""]
-            out += [f"- {d}, `{m}`: [result file](results/{n})" for d, m, n, _ in earlier]
+            for run in earlier:
+                on = f" on `{run['harness']}`" if len(harnesses) > 1 and run["harness"] else ""
+                out.append(f"- {run['date']}, `{run['model']}`{on}: "
+                           f"[result file](results/{run['name']})")
             out.append("")
     return "\n".join(out)
 

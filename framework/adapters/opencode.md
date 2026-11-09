@@ -10,6 +10,9 @@ The component list [opencode/components.yaml](opencode/components.yaml) maps eac
 parser is [opencode/parsers/opencode.py](opencode/parsers/opencode.py). A target repo selects
 `harness: opencode` and `model_profile: opencode-default`.
 
+To run a role eval on OpenCode, follow the steps in
+[Run on OpenCode](../../evals/README.md#run-on-opencode).
+
 `stone render` refuses this adapter because its status is `eval-only` (see
 [contract.md](contract.md#adapter-status)). It writes no files. `stone eval` uses it. The role
 templates in `opencode/templates/agents/` have the same steps as the reference templates, so a
@@ -33,6 +36,8 @@ later adapter can render them.
 | Hook before the session ends | none | not applicable | none | Gate G3 in CI. |
 | CI trigger | none | not applicable | none | Run the role by hand, or use an adapter that provides a trigger. |
 | Render the role files and the settings | none | not applicable | none | Keep the files by hand in the target repo. |
+| Context guard hook (D115) | none | not applicable | none | Watch the context size by hand. Start a new session after a PR. |
+| Token report (`stone usage`, D114) | none | not applicable | none | No `usage.yaml` yet, so `stone usage` stops with an error. `opencode stats` shows some usage data. |
 
 ## Role files
 
