@@ -17,7 +17,7 @@ from typing import Any
 
 import yaml
 
-from stone import ci_setup, code_index, form, framework_check, overrides, results, specialists, specs, triggers
+from stone import ci_setup, code_index, context_guard, form, framework_check, overrides, results, specialists, specs, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -248,7 +248,8 @@ def template_values(config: dict[str, Any], model: str,
     """Return the repo facts that templates can use. TODO values are left out on purpose."""
     # The framework tag. The G3 workflow installs stone from framework_commit, else from the tag (D92).
     version = str(config.get("framework_version", ""))
-    values = {"model": model, "framework_version": version, "stone_ref": stone_ref(config)}
+    values = {"model": model, "framework_version": version, "stone_ref": stone_ref(config),
+              "limit_session_context_tokens": str(context_guard.limit(config))}  # D115
     for key, value in (config.get("commands") or {}).items():
         if value is not None and str(value).strip():  # an empty command has no value
             values[f"command_{key}"] = str(value)
@@ -429,6 +430,14 @@ def _adapter_status(registry_doc: dict[str, Any], harness_name: str,
                           "adapter with templates. Use stone eval.")
 
 
+def check_config(config: dict[str, Any], harness: Path) -> None:
+    """Raise RenderError for the first problem of the config values that render reads."""
+    problems = (framework_check.path_pattern_problems(config, harness) + code_index.problems(config)
+                + context_guard.problems(config))
+    if problems:
+        raise RenderError(f"{CONFIG}: {problems[0]}")
+
+
 def build_components(framework: Path, config: dict[str, Any], root: Path | None = None,
                      today: dt.date | None = None,
                      allow_eval_only: bool = False) -> list[Component]:
@@ -445,9 +454,7 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     if model_profile.get("status") != "active":
         print(f"warning: model profile {model_profile['id']} has status "
               f"'{model_profile.get('status')}', not 'active'", file=sys.stderr)
-    problems = framework_check.path_pattern_problems(config, harness) + code_index.problems(config)
-    if problems:
-        raise RenderError(f"{CONFIG}: {problems[0]}")
+    check_config(config, harness)
     adapter_roles = {entry["role"] for entry in registry if entry["kind"] == "role"}
     profiles = load_profiles(framework, config["profiles"], adapter_roles)
     if root is not None:
@@ -465,6 +472,7 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
               file=sys.stderr)
     # K22 reads the instruction files, so it renders only with the key on (D89).
     off |= {entry["id"] for entry in registry if entry.get("needs_instruction_files") and not protect}
+    off |= context_guard.off_ids(registry, config)  # D115
     text = config.get("instruction_text") if isinstance(config.get("instruction_text"), dict) else {}
     model_values |= {"instruction_files_json": json.dumps(instruction_files),
                      "instruction_hosts_json": json.dumps(sorted(str(host).lower().rstrip(".")
@@ -526,9 +534,13 @@ def render_entry(harness: Path, entry: dict[str, Any], values: dict[str, str],
     if entry.get("reads_code"):
         values["code_index_rule"] = code_index.role_block(config)
     content = substitute(harness, entry["template"], values, steps, config)
+    owned: list[str] = []
     if entry.get("code_index_part"):
-        return add_code_index(harness, entry["code_index_part"], content, config)
-    return content, []
+        content, owned = add_code_index(harness, entry["code_index_part"], content, config)
+    if entry.get("context_guard_part") and context_guard.limit(config):
+        content, added = add_part(harness, entry["context_guard_part"], content, config)
+        owned += added
+    return content, owned
 
 
 def add_code_index(harness: Path, part: str, content: str,
@@ -544,6 +556,16 @@ def add_code_index(harness: Path, part: str, content: str,
     data = json.loads(content)
     owned = json.loads(fill((harness / "templates" / part).read_text(encoding="utf-8"),
                             part, values, config))
+    _merge(data, owned)
+    return json.dumps(data, indent=2) + "\n", _entry_keys(owned)
+
+
+def add_part(harness: Path, part: str, content: str,
+             config: dict[str, Any]) -> tuple[str, list[str]]:
+    """Merge a fixed JSON fragment into a JSON fragment (D114). Return it and the keys of its entries."""
+    data = json.loads(content)
+    owned = json.loads(fill((harness / "templates" / part).read_text(encoding="utf-8"),
+                            part, {}, config))
     _merge(data, owned)
     return json.dumps(data, indent=2) + "\n", _entry_keys(owned)
 
