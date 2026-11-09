@@ -58,13 +58,17 @@ def _window_problems(window: Any, where: str) -> list[str]:
     if not isinstance(window, dict):
         return [f"{where} must be a mapping with hours and weekdays."]
     found = []
-    hours, days = window.get("hours"), window.get("weekdays")
-    if not isinstance(hours, list) or not hours or any(
-            not isinstance(h, int) or isinstance(h, bool) or not 0 <= h <= 23 for h in hours):
+    if not _hours(window.get("hours")):
         found.append(f"{where}.hours must be a list of UTC hours from 0 to 23.")
+    days = window.get("weekdays")
     if not isinstance(days, list) or not days or any(d not in WEEKDAYS for d in days):
         found.append(f"{where}.weekdays must be a list of {', '.join(WEEKDAYS)}.")
     return found
+
+
+def _hours(hours: Any) -> bool:
+    return isinstance(hours, list) and bool(hours) and all(
+        isinstance(h, int) and not isinstance(h, bool) and 0 <= h <= 23 for h in hours)
 
 
 def _model_problems(model: str, entry: Any) -> list[str]:

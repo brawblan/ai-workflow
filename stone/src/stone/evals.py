@@ -735,19 +735,21 @@ def _rate(runs: list[Run], kind: str | None) -> float:
     return sum(r.passed(kind) for r in runs) / len(runs) if runs else 0.0
 
 
-def _summary_head(component: str, model: str, harness: str) -> list[str]:
+def _summary_head(component: str, model: str, harness: str, cost_note: str = "") -> list[str]:
     """The title and the metadata lines of the result file."""
     lines = [f"# Eval results: {component}", ""]
     if harness:
         lines.append(f"Harness: `{harness}`.")
     lines.append(f"Model: `{model}`. Date: {dt.date.today()}.")
+    if cost_note:
+        lines.append(cost_note)
     return lines
 
 
 def summary(component: str, model: str, runs: list[Run], harness: str = "",
             cost_note: str = "") -> str:
     """Return the result tables in Markdown: each scenario and variant, then each variant."""
-    lines = [*_summary_head(component, model, harness), *([cost_note] if cost_note else []), "",
+    lines = [*_summary_head(component, model, harness, cost_note), "",
              *eval_metrics.scenario_table(runs, _rate), "",
              *eval_metrics.variant_table(runs, _rate)]
     names = list(dict.fromkeys(r.variant for r in runs))
