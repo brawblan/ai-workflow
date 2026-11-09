@@ -39,7 +39,7 @@ jobs:
       # it apart from the repo. The hashes pin PyYAML and the build tool. pip gets no other package.
       - name: Install stone
         env:
-          STONE_REF: 7de8543a3ee830f726be35378343cb8fda23aa84 # v1.6.0
+          STONE_REF: 086bea270fc5f4df2bbf79bce6fb76b5bf71f858 # v1.7.0
         run: |
           python3 -m venv "${RUNNER_TEMP}/stone"
           cat > "${RUNNER_TEMP}/stone-requirements.txt" <<'EOF'
