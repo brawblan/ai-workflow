@@ -9,6 +9,9 @@
 # Tested on OpenCode 2.2.6, 2026-11-08 (#302). See the adapter doc for the limits.
 
 parser: parsers/opencode.py
+# OpenCode reports a cost of 0 on the Go plan. stone eval estimates the cost from these rates,
+# and warns before a run in a peak window (#315).
+rates: rates.yaml
 
 run:
   with: [opencode, --standalone, run, --agent, $role, --model, $model, --format, json, --auto,

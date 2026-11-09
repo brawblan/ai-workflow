@@ -151,6 +151,11 @@ stone eval role.tester --variant with --trials 3 \
 `--model <harness>:<model>` cannot go with `--run-config`. The command checks every model before
 the first run, so a wrong ID stops the command with no cost.
 
+An adapter can give token rates in its `eval.yaml` (`rates`). If the harness reports no cost, or a
+cost of 0, `stone eval` then estimates the cost from the token counts. The result file says so.
+Before the first run, the command warns for each model that is in a peak window of its rates
+(D116).
+
 The table counts the runs of the variants that are not `without`. These are the columns:
 
 | Column | Meaning |
