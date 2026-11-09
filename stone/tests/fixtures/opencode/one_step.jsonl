@@ -1,0 +1,3 @@
+{"type":"step_start","part":{"type":"step-start"}}
+{"type":"text","part":{"type":"text","messageID":"msg_1","text":"REPORT ONE"}}
+{"type":"step_finish","part":{"type":"step-finish","reason":"stop","cost":0.001,"tokens":{"input":10,"output":2,"reasoning":1,"cache":{"read":5,"write":1}}}}
