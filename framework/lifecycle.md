@@ -99,7 +99,7 @@ If the specs do not help, stop the deltas. The applied specs stay as documentati
 | Baseline | Always measure without the component first. | G4 |
 | Grader | Use a code-based grader first. Use a model grader only for judgment, and calibrate it against a human. | G6 |
 | Consistency | Report pass^k (all k trials pass) for roles in CI. | G7 |
-| Cost | Record tokens and time for each run. A component that adds cost with no gain fails. | G3 |
+| Cost | Record tokens and time for each run. A component that adds cost with no gain fails. To measure the tokens of real sessions, run `stone usage` (D114). | G3 |
 | Transcripts | Read some transcripts at each review. A score alone can hide a bad grader. | G6 |
 | Human readers | For a component that changes human-facing text, use a blind A/B rating by a human. See [writing.md](writing.md#evidence-p5). | G8 |
 | Models | Run the eval on each model that the repo uses for that role. | G5 |
@@ -172,6 +172,14 @@ flowchart LR
   not in the map.
 - The runner reads the last JSON object of the harness output. If `eval.yaml` has `output_where`,
   it reads the last object with those keys and values.
+- A run config can name a `parser` file. The parser has `parse` and `transcript_stats`. `parse`
+  returns the usage map, and `transcript_stats` returns the tool calls and the result bytes. Without
+  a parser, the runner reads the last JSON object and the default transcript format.
+- A run config can name a `rates` file. The file gives the token rates of each model, with
+  optional peak rates and UTC windows. If the harness cost is missing or 0, the runner estimates
+  the cost from the token counts. It warns before a run in a peak window (D116).
+- `stone eval --run-config <file>` uses the adapter of that file for the component list, the model
+  profile, and the parser. The fixture config gets that harness and model profile.
 - The setup commits the fixture on `main`. Then the work continues on the branch
   `feature/eval-work`, because a role does not commit to the default branch.
 - Git in the workspace does not read the global or the system git config. Thus each machine gives

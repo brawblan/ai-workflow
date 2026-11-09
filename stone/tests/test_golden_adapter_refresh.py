@@ -50,6 +50,7 @@ SCHEDULE_WORKFLOW = f".github/workflows/cornerstone-{PROFILE}-schedule.yml"  # t
 K6 = ".cornerstone/checks/protected_paths.py"
 K7 = ".cornerstone/checks/change_size.py"
 HOOK = ".cornerstone/hooks/protect-paths.py"
+GUARD = ".cornerstone/hooks/context-guard.py"
 PATH_MATCH = ".cornerstone/lib/path_match.py"  # the match module that the hook and K6 import (D62)
 SETTINGS = ".claude/settings.json"
 ROLES = ["implementer", "investigator", "reviewer", "tester"]  # the profile `roles`, sorted
@@ -57,7 +58,7 @@ COMPONENTS = FRAMEWORK / "adapters" / "claude-code" / "components.yaml"
 # The components that this profile must render at the least. A later sibling component can add to
 # the derived set, but it cannot take one of these out.
 PINNED_IDS = {f"role.{role}" for role in ROLES} | {
-    "check.k6", "check.k7", "ci-job.checks", "hook.path-match", "hook.protect-paths",
+    "check.k6", "check.k7", "ci-job.checks", "hook.context-guard", "hook.path-match", "hook.protect-paths",
     "hook.settings"}
 
 
@@ -322,7 +323,7 @@ class ProfilePinTest(RenderedRepo):
         # profile, the profile text must change too. "The protected-path hook" is the hook, its
         # settings entry, and the match module that it imports (D62).
         want = sorted([f".claude/agents/{role}.md" for role in ROLES]
-                      + [HOOK, PATH_MATCH, SETTINGS, K6, K7, WORKFLOW, SCHEDULE_WORKFLOW,
+                      + [HOOK, GUARD, PATH_MATCH, SETTINGS, K6, K7, WORKFLOW, SCHEDULE_WORKFLOW,
                          MANIFEST])
         self.assertEqual(sorted(self.files), want)
         for path in self.files:

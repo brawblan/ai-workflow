@@ -1,0 +1,39 @@
+# How `stone eval` starts one headless role run in this harness (lifecycle.md, "Eval design").
+# stone fills $role, $model, $budget, and $prompt. The role file is the source of the tools and the
+# permissions in this harness, so the run command lists no tools. For a role eval, the two variants
+# differ in --agent, and the runner removes the role file from the workspace for "without". The
+# "without" run therefore also loses the role permissions and the step cap (see the adapter doc).
+# --standalone gives the run a private server. --format json gives one JSON object on each line.
+# --auto approves each permission that the role file does not deny. --archived keeps the eval
+# sessions out of the session list. --steps in the role file caps the model steps.
+# Tested on OpenCode 2.2.6, 2026-11-08 (#302). See the adapter doc for the limits.
+
+parser: parsers/opencode.py
+# OpenCode reports a cost of 0 on the Go plan. stone eval estimates the cost from these rates,
+# and warns before a run in a peak window (#315).
+rates: rates.yaml
+
+run:
+  with: [opencode, --standalone, run, --agent, $role, --model, $model, --format, json, --auto,
+         --archived, $prompt]
+  without: [opencode, --standalone, run, --model, $model, --format, json, --auto, --archived,
+            $prompt]
+
+# The #302 pilot did not prove a guidance run or a trigger run. stone eval names the reason.
+unsupported:
+  guidance: "The #302 pilot did not prove a guidance run."
+  trigger: "The #302 pilot did not prove a trigger run."
+  hook: "This adapter has no hook, so there is no hook eval."
+
+env:   # Keep the user-level Claude Code files out of the run. The #302 probe saw no difference.
+  with: {OPENCODE_DISABLE_CLAUDE_CODE: "1"}
+  without: {OPENCODE_DISABLE_CLAUDE_CODE: "1"}
+
+# The role files enforce these actions. The run command does not pass them.
+tools:
+  shaper: [read, grep, glob, shell, edit]
+  planner: [read, grep, glob, edit]
+  implementer: [read, grep, glob, edit, shell]
+  tester: [read, grep, glob, edit, shell]
+  reviewer: [read, grep, glob, shell]
+  investigator: [read, grep, glob, edit, shell]

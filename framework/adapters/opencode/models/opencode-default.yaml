@@ -1,0 +1,27 @@
+# Model profile: the default models for the OpenCode adapter.
+# Status is "proposed": no eval proves an idiom for this harness yet.
+
+id: opencode-default
+vendor: opencode-go
+harness: opencode
+models: [opencode-go/beam-free]
+status: proposed
+reviewed: 2026-11-08
+sources:
+  - url: https://opencode.ai/docs/models/
+    read: 2026-11-08
+  - url: https://opencode.ai/docs/agents/
+    read: 2026-11-08
+
+defaults:
+  role_models:
+    shaper: opencode-go/beam-free
+    planner: opencode-go/beam-free
+    implementer: opencode-go/beam-free
+    tester: opencode-go/beam-free
+    reviewer: opencode-go/beam-free
+    investigator: opencode-go/beam-free
+  effort: {}
+  instruction_file_max_lines: 300
+
+idioms: []

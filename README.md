@@ -3,7 +3,7 @@
 **Cornerstone: a framework for agent-assisted software delivery, where checks decide that work is
 done.**
 
-Version 1.6.0. All 10 profiles are supported, and each generated check blocks.
+Version 1.7.0. All 10 profiles are supported, and each generated check blocks.
 
 This repo holds Cornerstone, its `stone` CLI, the `cornerstone` plugin skills, my personal agent
 rules, and tips. Read the docs at [brawblan.github.io/ai-workflow](https://brawblan.github.io/ai-workflow/).
@@ -44,8 +44,9 @@ Each rule cites its evidence in the [research dossier](docs/research/dossier.md)
 - A person who already uses Spec Kit, OpenSpec, or BMAD and wants a layer that does not depend on
   one tool. See [the migration guide](docs/guides/migrate.md).
 
-It is not for you if you want a prompt library or an IDE. It is also not for you if you need a
-harness other than Claude Code today. The only adapter at this time is for Claude Code.
+It is not for you if you want a prompt library or an IDE. It is also not for you if you need full
+`stone render` support for a harness other than Claude Code today. The full adapter is for Claude
+Code. An adapter for OpenCode supports `stone eval` only.
 
 ## How it compares
 
@@ -61,7 +62,7 @@ Draft v0. The framework is complete enough to use on one profile. Other parts ar
 | Part | State |
 | --- | --- |
 | [Framework](framework/README.md): principles, workflow model, gates, checks, modes, 10 profiles | Draft v0 |
-| [Harness adapter](framework/adapters/claude-code.md) and [model profile](framework/adapters/claude-code/models/claude-5.yaml) | First adapter. The model profile evals are not written yet. |
+| [Harness adapter](framework/adapters/claude-code.md) and [model profile](framework/adapters/claude-code/models/claude-5.yaml) | Full adapter. The model profile evals are not written yet. [OpenCode](framework/adapters/opencode.md) supports `stone eval` only. |
 | [`stone`](stone/README.md) 0.9 | `stone check`, `stone check-writing` (K17), `stone check-evidence` (K14), `stone spec apply` and `sync`, `stone render` for the roles of all 10 profiles, and `stone eval`. Some profile checks and the triggers are not rendered yet. |
 | [`cornerstone` plugin](plugins/cornerstone/) 0.8.0 | Four skills. `setup` is the entry skill. |
 | This repo | Uses Cornerstone on itself: [`.cornerstone/config.yaml`](.cornerstone/config.yaml) and CI in [`stone.yml`](.github/workflows/stone.yml) |
@@ -106,7 +107,7 @@ migration from another framework, and the daily work after the setup. This secti
 version.
 
 You need Python 3.11 or later, `git`, the GitHub CLI (`gh`), and Claude Code. Claude Code is the
-only harness adapter at this time.
+only full harness adapter at this time. An adapter for OpenCode supports `stone eval` only.
 
 1. Clone this repo and install the CLI:
 
@@ -148,6 +149,7 @@ writes the planner, tester, and reviewer roles, so the plugin has no skill for t
 | `setup` | Set up a repo for Cornerstone. It runs `project-setup`, writes `.cornerstone/config.yaml`, and runs `stone render` and `stone check`. |
 | `project-setup` | Set up a repo for agents: `constitution/` (with personas and job stories), and `AGENTS.md`. It asks only for facts the repo does not have. |
 | `ticket-delivery` | Collect the tester, reviewer, and check evidence for each acceptance criterion. Then branch, commit, rebase, and open the PR into the integration branch, with the evidence sections. |
+| `release-coordination` | Run a coordinator session that drives a release across child sessions at low token cost. |
 | `ste-writing` | Write with Simplified Technical English rules, and add diagrams. |
 
 `setup` needs the `stone` CLI and a clone of this repo. The other skills need only `git`

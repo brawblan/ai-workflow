@@ -1,0 +1,172 @@
+{
+  "variants": [
+    "with"
+  ],
+  "token_note": "Tokens: compare them only inside one model family. Each family has its own tokenizer.",
+  "rows": [
+    {
+      "component": "role.tester",
+      "model": "claude-code:m-big",
+      "runs": 2,
+      "pass_rate": {
+        "mean": 0.5,
+        "se": 0.5,
+        "n": 2
+      },
+      "cost_per_pass": 0.4,
+      "cost_usd": {
+        "mean": 0.2,
+        "se": 0.09999999999999999,
+        "n": 2
+      },
+      "turns": {
+        "mean": 5.0,
+        "se": 1.0,
+        "n": 2
+      },
+      "tool_bytes": {
+        "mean": 200.0,
+        "se": 100.0,
+        "n": 2
+      },
+      "seconds": {
+        "mean": 15.0,
+        "se": 5.0,
+        "n": 2
+      },
+      "input_tokens": {
+        "mean": 1500.0,
+        "se": 500.0,
+        "n": 2
+      },
+      "output_tokens": {
+        "mean": 200.0,
+        "se": 100.0,
+        "n": 2
+      }
+    },
+    {
+      "component": "role.tester",
+      "model": "claude-code:m-none",
+      "runs": 1,
+      "pass_rate": {
+        "mean": 0.0,
+        "se": null,
+        "n": 1
+      },
+      "cost_per_pass": null,
+      "cost_usd": {
+        "mean": 0.5,
+        "se": null,
+        "n": 1
+      },
+      "turns": {
+        "mean": 3.0,
+        "se": null,
+        "n": 1
+      },
+      "tool_bytes": {
+        "mean": 50.0,
+        "se": null,
+        "n": 1
+      },
+      "seconds": {
+        "mean": 5.0,
+        "se": null,
+        "n": 1
+      },
+      "input_tokens": {
+        "mean": 500.0,
+        "se": null,
+        "n": 1
+      },
+      "output_tokens": {
+        "mean": 50.0,
+        "se": null,
+        "n": 1
+      }
+    },
+    {
+      "component": "role.tester",
+      "model": "opencode:vendor/m-one",
+      "runs": 1,
+      "pass_rate": {
+        "mean": 1.0,
+        "se": null,
+        "n": 1
+      },
+      "cost_per_pass": 0.2,
+      "cost_usd": {
+        "mean": 0.2,
+        "se": null,
+        "n": 1
+      },
+      "turns": {
+        "mean": 2.0,
+        "se": null,
+        "n": 1
+      },
+      "tool_bytes": {
+        "mean": 40.0,
+        "se": null,
+        "n": 1
+      },
+      "seconds": {
+        "mean": 4.0,
+        "se": null,
+        "n": 1
+      },
+      "input_tokens": {
+        "mean": 400.0,
+        "se": null,
+        "n": 1
+      },
+      "output_tokens": {
+        "mean": 40.0,
+        "se": null,
+        "n": 1
+      }
+    },
+    {
+      "component": "role.reviewer",
+      "model": "opencode:vendor/m-one",
+      "runs": 1,
+      "pass_rate": {
+        "mean": 1.0,
+        "se": null,
+        "n": 1
+      },
+      "cost_per_pass": 0.25,
+      "cost_usd": {
+        "mean": 0.25,
+        "se": null,
+        "n": 1
+      },
+      "turns": {
+        "mean": 3.0,
+        "se": null,
+        "n": 1
+      },
+      "tool_bytes": {
+        "mean": 60.0,
+        "se": null,
+        "n": 1
+      },
+      "seconds": {
+        "mean": 6.0,
+        "se": null,
+        "n": 1
+      },
+      "input_tokens": {
+        "mean": 600.0,
+        "se": null,
+        "n": 1
+      },
+      "output_tokens": {
+        "mean": 60.0,
+        "se": null,
+        "n": 1
+      }
+    }
+  ]
+}

@@ -21,6 +21,13 @@ Runs are local. Run `stone eval <component-id>`. The command writes a result fil
 
 ## Coverage
 
+The table below covers the Claude Code adapter. Each result file also names its harness. To run a
+role eval on another harness, pass `--run-config framework/adapters/<harness>/eval.yaml`, or name
+the harness in the model ID (see [Many models](#many-models)). The OpenCode adapter supports role
+evals now. The first OpenCode results and their cost are in
+[the 2026-11-09 report](../docs/reports/2026-11-09-opencode-role-eval-costs.md). The cost cells of
+those result files show 0, because OpenCode reports no cost (#315).
+
 A full render for all 10 profiles writes 22 components. This table lists each one. Facts as of
 2026-10-31.
 
@@ -124,6 +131,51 @@ Notes on the results:
 - **Latest run only.** The sections below show the latest run of each component, as D36 says. A
   later run of one scenario hides the table of an earlier run of other scenarios. Use the links to
   the earlier result files for those.
+
+## Many models
+
+`--model` can repeat. Each model runs every scenario and variant, `--trials` times, and writes its
+own result file.
+
+```bash
+stone eval role.tester --variant with --trials 3 \
+  --model claude-code:claude-opus-5-5 --model opencode:opencode-go/beam-free
+```
+
+| Option | Effect |
+| --- | --- |
+| `--model <model>` | Run the model on the harness of the repo config. |
+| `--model <harness>:<model>` | Run the model on that harness. The harness selects `framework/adapters/<harness>/eval.yaml`. The prefix counts only if the adapter has that file. A model ID can hold a colon. `<harness>:` alone uses the role model of that harness. |
+| `--budget <usd>` | Stop each run at this cost, if the harness has a cost limit. Default: 5. If a harness has no limit, the command says so before the first run. |
+| `--summary <runs.jsonl> --by model` | Print one row for each component and model. Repeat `--summary` to join the runs of more components. Start no run. |
+| `--json` | With `--by model`: print the same data as JSON. |
+
+`--model <harness>:<model>` cannot go with `--run-config`. The command checks every model before
+the first run, so a wrong ID stops the command with no cost.
+
+An adapter can give token rates in its `eval.yaml` (`rates`). If the harness reports no cost, or a
+cost of 0, `stone eval` then estimates the cost from the token counts. The result file says so.
+Before the first run, the command warns for each model that is in a peak window of its rates
+(D116).
+
+The table counts the runs of the variants that are not `without`. These are the columns:
+
+| Column | Meaning |
+| --- | --- |
+| Runs, Pass rate | The runs, and the rate of runs that passed every check. |
+| Cost per pass | The total cost divided by the number of passing runs. "—" if no run passes, or if a run has no cost. A cheap model that fails often can cost more for each result. |
+| Cost, Turns, Tool bytes, Seconds | The mean for each run. |
+| Tokens in, Tokens out | The mean for each run. Compare tokens only inside one model family. Each family has its own tokenizer. |
+
+Each mean shows its standard error, as `mean ±error`. With one run, the error is "—".
+
+After a run of more than one model, the command prints the table. To print it again from the kept
+runs, use the `runs.jsonl` of the run (`.cornerstone/eval-runs/<stamp>-<eval>/runs.jsonl`):
+
+```bash
+stone eval --summary .cornerstone/eval-runs/<stamp>-role-tester/runs.jsonl \
+  --summary .cornerstone/eval-runs/<stamp>-role-implementer/runs.jsonl --by model
+```
 
 ## Guidance evals
 

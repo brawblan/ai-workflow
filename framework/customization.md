@@ -66,6 +66,7 @@ paths:
   reports: docs/reports/            # findings reports. {id} also works here.
 limits:
   pr_changed_lines: 600
+  session_context_tokens: 150000   # optional. The context guard limit. 0 turns it off.
   function_lines: 60
   cyclomatic: 10
   mutation_score_changed_code: 0.6
@@ -274,6 +275,38 @@ code_index:
     - If `my-index` is on PATH, ask it before you search or read code.
     - Use `my-index query "<words>"`.
   build: my-index update .
+```
+
+### Context guard (`limits.session_context_tokens`)
+
+`stone render` adds a context guard hook to the harness settings by default
+([D114](README.md#decisions)). The hook tells the agent when the session context is large. A rule
+in a file does not stop a session when it grows.
+
+- The hook reads the context size of the last call from the session transcript.
+- When the size first passes the limit, the hook adds one short message for the agent. The message
+  tells the agent to give the user the size and to suggest a compact or a new session.
+- The hook gives the message once for each 50k tokens over the limit, not at each prompt.
+- After the agent opens a PR, the hook adds one message. It tells the agent to finish this ticket
+  and to start the next ticket in a new session.
+- The hook never fails the session. If the transcript is missing or cannot be read, it does nothing.
+  It stops after a short time limit.
+- The adapter gives the form of the hook (P12). Render does not compact or end a session.
+- The manifest records the settings entries that render added. After a change of the value, the
+  next render removes those entries and keeps each entry that a person added.
+
+| Value | Effect |
+| --- | --- |
+| absent | The default: the limit is 150000 tokens |
+| a whole number from 1 to 150000 | The limit in tokens |
+| `0` | The guard is off: no hook file and no settings entries |
+
+A later layer can only tighten the limit. `stone check` and `stone render` fail on a value above
+150000. Use `0` to turn the guard off.
+
+```yaml
+limits:
+  session_context_tokens: 100000
 ```
 
 ### Gate steps by base branch (`ci.branches`)

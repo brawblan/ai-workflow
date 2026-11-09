@@ -62,6 +62,33 @@ These rules apply to each stage that an agent drives.
   fans out read-only sub-tasks.
 - A session ends after one unit of work. It writes its state to files before it ends.
 
+### Coordinator session
+
+One session can drive a release: it opens child sessions, answers them, and merges their PRs. It is
+a coordinator. It makes no change of its own, and the session rules above still apply to each
+child. A coordinator has its own cost problem: each call reads the full context again, and the
+context grows. After an idle gap longer than the cache length, the next call writes the full
+context again.
+
+- Keep the release state in the tracking issue or a state file, not only in the context. Update it
+  after each merge and each owner decision.
+- Give each child a short prompt that links to the issue. Do not copy the issue text into it.
+- Ask each child for a report of 10 lines or fewer: the PR link, the check result, and the open
+  questions.
+- Start each child with the model of its work. Use the role model for build work with a clear
+  plan. Use the stronger model for design and eval work.
+- At the end of a wave, update the state, then end the session or compact it. Start the next wave
+  in a new coordinator session that reads the state first.
+- Before an expected idle gap longer than the cache length, compact or end the session.
+
+Evidence (the 1.6.0 release): one coordinator opened 18 child sessions over 38 hours.
+It cost 29.5 percent of the release. Its context grew from 66k to 364k tokens with no compaction. It rebuilt
+the cache 6 times after an idle gap of more than 1 hour, with 125k to 326k tokens each time. 
+The decision is D113.
+
+The plugin skill `release-coordination` gives the steps. The adapter doc gives the harness form
+of each rule.
+
 ## Artifacts
 
 | Artifact | Format | Default path in the target repo | Made by |

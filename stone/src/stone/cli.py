@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from collections.abc import Callable
+from datetime import date
 from pathlib import Path
 from typing import Any
 
-from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, index, ready_check,
-                   render, repo_rules, specialists, specs, upgrade, workflow_check, writing_check)
+import yaml
+
+from stone import (__version__, dependency_check, eval_matrix, evals, evidence_check, framework_check, gate, index, ready_check,
+                   render, repo_rules, specialists, specs, upgrade, usage, workflow_check, writing_check)
 from stone.findings import report
 
 
@@ -35,8 +39,40 @@ def _add_more_commands(commands: argparse._SubParsersAction) -> None:
     """Add check-rules, and index (#258). _parse sends each argument after 'index' to stone-index,
     also --help and --version."""
     _add_check_rules(commands)
+    _add_usage(commands)
     commands.add_parser("index", add_help=False,
                         help="Run stone-index from PATH with the same arguments (#258).")
+
+
+def _add_usage(commands: argparse._SubParsersAction) -> None:
+    """Add the usage command: a token report from the local session transcripts (#297)."""
+    use = commands.add_parser("usage", help="Report the token use of local session transcripts.")
+    use.add_argument("paths", nargs="*", type=Path, metavar="PATH",
+                     help="A transcript file or a folder. Default: the folders of this repo.")
+    use.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    use.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
+    use.add_argument("--harness", help="The adapter. Default: 'harness' in the repo config.")
+    use.add_argument("--since", type=date.fromisoformat, metavar="DATE",
+                     help="Keep only the calls on or after this date (YYYY-MM-DD).")
+    use.add_argument("--rebuild-tokens", type=int, default=usage.DEFAULT_REBUILD_TOKENS,
+                     help="Cache writes above this count make a rebuild. Default: 30000.")
+    use.add_argument("--json", action="store_true", help="Print JSON.")
+
+
+def _usage(args: argparse.Namespace) -> int:
+    try:
+        harness = args.harness or yaml.safe_load(
+            (args.root / ".cornerstone" / "config.yaml").read_text(encoding="utf-8"))["harness"]
+    except (OSError, KeyError, TypeError, yaml.YAMLError):
+        print("stone usage: give --harness, or set 'harness' in .cornerstone/config.yaml.")
+        return 2
+    try:
+        print(usage.run(args.root, args.framework or args.root / "framework", str(harness),
+                        args.paths, args.since, args.rebuild_tokens, args.json), end="")
+    except usage.UsageError as error:
+        print(f"stone usage: {error}")
+        return 2
+    return 0
 
 
 def _parse(argv: list[str] | None) -> argparse.Namespace:
@@ -58,14 +94,22 @@ def _add_eval(commands: Any) -> None:
                      help="'with', 'without', or 'both' (default). A guidance eval takes the names "
                           "in the 'variants' of its scenarios.")
     run.add_argument("--trials", type=int, default=1, help="Runs for each scenario and variant.")
-    run.add_argument("--model", help="Default: the role model in the model profile.")
-    run.add_argument("--budget", default="5", help="The cost limit for each run. Default: 5.")
+    run.add_argument("--model", action="append", metavar="ID",
+                     help="Default: the role model in the model profile. A model ID can name its "
+                          "harness: <harness>:<model>. Repeat to run each model.")
+    run.add_argument("--budget", help="The cost limit for each run. Default: 5. A harness with no "
+                                      "cost limit ignores it, and the command says so.")
     run.add_argument("--timeout", type=int, default=1800, help="Seconds for each run.")
     run.add_argument("--run-config", type=Path,
                      help="The harness command file. Default: the eval.yaml of the adapter.")
     run.add_argument("--keep", action="store_true", help="Keep the workspace of each run.")
-    run.add_argument("--summary", type=Path, metavar="RUNS_JSONL",
-                     help="Print the result tables from a kept runs.jsonl. Start no run.")
+    run.add_argument("--summary", type=Path, action="append", metavar="RUNS_JSONL",
+                     help="Print the result tables from a kept runs.jsonl. Start no run. "
+                          "Repeat to join the runs of more components.")
+    run.add_argument("--by", choices=["model"],
+                     help="With --summary: one row for each component and model.")
+    run.add_argument("--json", action="store_true", dest="as_json",
+                     help="With --by: print the data as JSON.")
     run.add_argument("--check-only", action="store_true",
                      help="Validate the scenarios and list the runs. Start no run.")
 
@@ -402,30 +446,59 @@ def _check_ready(ticket: str, profile: str | None, mode: str, fmt: str) -> int:
     return 1 if blocking else 0
 
 
+def _summary_runs(args: argparse.Namespace) -> list[evals.Run]:
+    runs: list[evals.Run] = []
+    for path in args.summary:
+        found = evals.load_runs(path, args.root)
+        for run in found:
+            run.component = run.component or args.component or path.parent.name
+        runs += found
+    return runs
+
+
 def _eval_summary(args: argparse.Namespace) -> int:
     try:
-        runs = evals.load_runs(args.summary, args.root)
+        runs = _summary_runs(args)
     except evals.EvalError as error:
         print(f"stone eval: {error}")
         return 2
-    print(evals.summary(args.component or args.summary.parent.name, args.model or "unknown", runs),
-          end="")
+    if args.by:
+        print(_matrix(runs, args.as_json), end="")
+        return 0
+    if len(args.summary) > 1 or args.as_json:
+        print("stone eval: give --by model to join runs files or to print JSON.")
+        return 2
+    print(evals.summary(args.component or args.summary[0].parent.name,
+                        (args.model or ["unknown"])[0], runs), end="")
     return 0
+
+
+def _matrix(runs: list[evals.Run], as_json: bool) -> str:
+    found, counted = eval_matrix.rows(runs), eval_matrix.variants(runs)
+    if as_json:
+        return json.dumps(eval_matrix.as_json(found, counted), indent=2) + "\n"
+    return eval_matrix.text(found, counted)
+
+
+def _eval_option_error(args: argparse.Namespace) -> str:
+    """The message for a wrong option mix of a run, or an empty string."""
+    if args.by or args.as_json:
+        return "--by and --json need --summary."
+    if not args.component:
+        return "give a component ID, or use --summary."
+    return "--trials must be 1 or more." if args.trials < 1 else ""
 
 
 def _eval(args: argparse.Namespace) -> int:
     if args.summary:
         return _eval_summary(args)
-    if not args.component:
-        print("stone eval: give a component ID, or use --summary.")
-        return 2
-    if args.trials < 1:
-        print("stone eval: --trials must be 1 or more.")
+    if message := _eval_option_error(args):
+        print(f"stone eval: {message}")
         return 2
     try:
         runs, result = evals.run_eval(
             args.root, args.component, framework=args.framework, scenario_ids=args.scenario,
-            variant=args.variant, trials=args.trials, model=args.model, budget=args.budget,
+            variant=args.variant, trials=args.trials, models=args.model, budget=args.budget,
             timeout=args.timeout, run_config=args.run_config, keep=args.keep,
             check_only=args.check_only)
     except (evals.EvalError, render.RenderError) as error:
@@ -434,9 +507,15 @@ def _eval(args: argparse.Namespace) -> int:
     if args.check_only:
         print("stone eval: the scenarios are valid.")
         return 0
+    return _eval_report(runs, result, len(args.model or []) > 1)
+
+
+def _eval_report(runs: list[evals.Run], result: str, matrix: bool) -> int:
     failed = [run for run in runs if run.variant not in ("without", "none") and not run.passed()]
     print(f"stone eval: {len(runs)} run(s), {len(failed)} failed with the component. "
           f"Results: {result}")
+    if matrix:
+        print(_matrix(runs, False), end="")
     return 1 if failed else 0
 
 
@@ -461,5 +540,6 @@ _HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "check-specialists": _check_specialists,
     "check-rules": _check_rules,
     "eval": _eval,
+    "usage": _usage,
     "index": lambda args: index.run(args.args),
 }

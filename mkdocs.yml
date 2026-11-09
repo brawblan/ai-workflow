@@ -123,6 +123,7 @@ nav:
           - Contract: framework/adapters/contract.md
           - Claude Code: framework/adapters/claude-code.md
           - Claude Code on a developer machine: framework/adapters/claude-code/local-hardening.md
+          - OpenCode: framework/adapters/opencode.md
           - Spec tools: framework/adapters/spec-tools.md
       - Generator: framework/generator/design.md
   - stone CLI: stone/README.md
