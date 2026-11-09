@@ -26,8 +26,13 @@ These come from real mistakes. Each one is a rule that I give my agent.
 6. **One role and one ticket per session.** End the session when the role finishes. Run `/clear`
    before the next ticket. Long sessions and many parallel sessions cost the most. Keep to 2 or 3
    sessions at a time.
-7. **Use the strongest model where reasoning is the job.** Plan, write specs, and review with
+7. **Keep the coordinator session small.** Keep the release state in the tracking issue, not in
+   the session. Give each child session a short prompt with a link, and ask for a report of 10
+   lines or fewer. End or compact the coordinator at the end of a wave and before a long idle gap.
+   The 1.6.0 coordinator cost 29.5 percent of the release. The `release-coordination` skill has
+   the steps.
+8. **Use the strongest model where reasoning is the job.** Plan, write specs, and review with
    Opus. Build and test with Sonnet when the plan is clear. If the checks fail twice, move the
    ticket to an Opus session.
-8. **Show only failures.** Run the checks once at the end, and read only the failures and a short
+9. **Show only failures.** Run the checks once at the end, and read only the failures and a short
    summary. Use `python stone/tests/run_parallel.py -q`.
