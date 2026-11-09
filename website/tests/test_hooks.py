@@ -96,6 +96,33 @@ class EvalsIndexTest(unittest.TestCase):
                       text)
         self.assertEqual(text.count("| T1 | with |"), 1)
 
+    def test_harness_line_is_read(self) -> None:
+        text = RESULT.replace("Model:", "Harness: `h2`.\nModel:")
+        with tempfile.TemporaryDirectory() as root:
+            evals = self.make(root, {
+                "20261109-000000-role.tester-h2-m1.md": text.format(model="m1", date="2026-11-09"),
+            })
+            self.assertIn("Latest run: 2026-11-09, model `m1`", evals_index(evals))
+
+    def test_latest_run_of_each_harness(self) -> None:
+        other = RESULT.replace("Model:", "Harness: `h2`.\nModel:")
+        with tempfile.TemporaryDirectory() as root:
+            evals = self.make(root, {
+                "20261001-000000-role.tester-m1.md": RESULT.format(model="m1", date="2026-10-01"),
+                "20261018-000000-role.tester-m2.md": RESULT.format(model="m2", date="2026-10-18"),
+                "20261109-000000-role.tester-h2-a.md": other.format(model="a", date="2026-11-09"),
+                "20261109-000000-role.tester-h2-b.md": other.format(model="b", date="2026-11-09"),
+            })
+            (Path(root) / ".cornerstone").mkdir()
+            (Path(root) / ".cornerstone" / "config.yaml").write_text("harness: h1\n")
+            text = evals_index(evals)
+        self.assertIn("Latest run on `h1`: 2026-10-18, model `m2`", text)
+        self.assertIn("Latest run on `h2`: 2026-11-09, model `a`", text)
+        self.assertIn("Latest run on `h2`: 2026-11-09, model `b`", text)
+        self.assertLess(text.index("on `h1`"), text.index("on `h2`"))
+        self.assertIn("- 2026-10-01, `m1` on `h1`: [result file]", text)
+        self.assertEqual(text.count("| T1 | with |"), 3)
+
     def test_file_that_is_not_a_result_is_skipped(self) -> None:
         with tempfile.TemporaryDirectory() as root:
             self.assertEqual(evals_index(self.make(root, {"notes.md": "# Notes\n"})),
