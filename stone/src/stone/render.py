@@ -376,21 +376,32 @@ def apply_overrides(root: Path, profiles: list[dict[str, Any]],
             else profile for profile in profiles]
 
 
-def build_components(framework: Path, config: dict[str, Any], root: Path | None = None,
-                     today: dt.date | None = None,
-                     allow_eval_only: bool = False) -> list[Component]:
+def _registry(framework: Path, config: dict[str, Any]) -> tuple[Path, dict[str, Any]]:
+    """Return the adapter folder and its component list."""
     harness = framework / "adapters" / config["harness"]
-    registry_path = harness / "components.yaml"
-    if not registry_path.exists():
+    path = harness / "components.yaml"
+    if not path.exists():
         raise RenderError(f"The harness '{config['harness']}' has no components.yaml. "
                           "Render supports only adapters with templates.")
-    registry_doc = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+    return harness, yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def _adapter_status(registry_doc: dict[str, Any], harness_name: str,
+                    allow_eval_only: bool) -> None:
+    """Raise when the adapter status is not valid, or when render must refuse it."""
     status = str(registry_doc.get("status") or "full")
     if status not in {"full", "eval-only"}:
         raise RenderError(f"The adapter status '{status}' is not valid. Use 'full' or 'eval-only'.")
     if status == "eval-only" and not allow_eval_only:
-        raise RenderError(f"The harness '{config['harness']}' is eval-only. stone render needs an "
+        raise RenderError(f"The harness '{harness_name}' is eval-only. stone render needs an "
                           "adapter with templates. Use stone eval.")
+
+
+def build_components(framework: Path, config: dict[str, Any], root: Path | None = None,
+                     today: dt.date | None = None,
+                     allow_eval_only: bool = False) -> list[Component]:
+    harness, registry_doc = _registry(framework, config)
+    _adapter_status(registry_doc, config["harness"], allow_eval_only)
     registry = registry_doc["components"]
     harness_dirs = [str(item) for item in registry_doc.get("protected_dirs") or []]
     instruction_files = [str(item) for item in registry_doc.get("instruction_files") or []]
