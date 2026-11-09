@@ -882,12 +882,7 @@ def _prepare_target(root: Path, framework: Path, config: dict[str, Any], compone
                     variant: str) -> Target:
     """Check one model and its harness. Raise before any run starts."""
     prefix, model = split_model(framework, spec)
-    if prefix and run_config:
-        raise EvalError(f"--model '{spec}' names the harness '{prefix}'. Remove --run-config, "
-                        "or remove the harness from the model ID.")
-    path, harness_name = _run_harness(config, framework, run_config)
-    if prefix:
-        path, harness_name = framework / "adapters" / prefix / "eval.yaml", prefix
+    path, harness_name = _target_harness(config, framework, prefix, spec, run_config)
     loaded = load_run_config(path)
     try:
         entry = find_component(framework, harness_name, component_id, root)
@@ -915,6 +910,24 @@ def _prepare_target(root: Path, framework: Path, config: dict[str, Any], compone
                   load_parser(path, harness, loaded), model_profile, model, bool(prefix))
 
 
+def _target_harness(config: dict[str, Any], framework: Path, prefix: str, spec: str | None,
+                    run_config: Path | None) -> tuple[Path, str]:
+    """The run file and the adapter name of one model. A harness in the ID wins over the config."""
+    if prefix and run_config:
+        raise EvalError(f"--model '{spec}' names the harness '{prefix}'. Remove --run-config, "
+                        "or remove the harness from the model ID.")
+    if prefix:
+        return framework / "adapters" / prefix / "eval.yaml", prefix
+    return _run_harness(config, framework, run_config)
+
+
+def _chosen_variants(names: tuple[str, ...], variant: str) -> tuple[str, ...]:
+    if variant != "both" and variant not in names:
+        raise EvalError(f"The variant '{variant}' is not known. Use 'both' or one of "
+                        f"{list(names)}.")
+    return names if variant == "both" else (variant,)
+
+
 def _variants(component_id: str, entry: dict[str, Any], data: dict[str, Any],
               loaded: dict[str, Any], variant: str) -> tuple[str, ...]:
     """The variants to run. Raise if the component or the harness cannot run them."""
@@ -922,10 +935,7 @@ def _variants(component_id: str, entry: dict[str, Any], data: dict[str, Any],
         raise EvalError(f"{component_id} is in the adapter component list, so it takes the variants "
                         "'with' and 'without'. Remove 'variants' from its scenarios.")
     names = tuple(data.get("variants") or VARIANTS)
-    if variant != "both" and variant not in names:
-        raise EvalError(f"The variant '{variant}' is not known. Use 'both' or one of "
-                        f"{list(names)}.")
-    variants = names if variant == "both" else (variant,)
+    variants = _chosen_variants(names, variant)
     if entry.get("kind") == "guidance" and "guidance" not in loaded["run"]:
         reason = (loaded.get("unsupported") or {}).get("guidance") or ""
         raise EvalError(_with_reason(

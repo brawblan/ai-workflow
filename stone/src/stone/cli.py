@@ -446,14 +446,19 @@ def _check_ready(ticket: str, profile: str | None, mode: str, fmt: str) -> int:
     return 1 if blocking else 0
 
 
-def _eval_summary(args: argparse.Namespace) -> int:
+def _summary_runs(args: argparse.Namespace) -> list[evals.Run]:
     runs: list[evals.Run] = []
+    for path in args.summary:
+        found = evals.load_runs(path, args.root)
+        for run in found:
+            run.component = run.component or args.component or path.parent.name
+        runs += found
+    return runs
+
+
+def _eval_summary(args: argparse.Namespace) -> int:
     try:
-        for path in args.summary:
-            found = evals.load_runs(path, args.root)
-            for run in found:
-                run.component = run.component or args.component or path.parent.name
-            runs += found
+        runs = _summary_runs(args)
     except evals.EvalError as error:
         print(f"stone eval: {error}")
         return 2
@@ -475,17 +480,20 @@ def _matrix(runs: list[evals.Run], as_json: bool) -> str:
     return eval_matrix.text(found, counted)
 
 
+def _eval_option_error(args: argparse.Namespace) -> str:
+    """The message for a wrong option mix of a run, or an empty string."""
+    if args.by or args.as_json:
+        return "--by and --json need --summary."
+    if not args.component:
+        return "give a component ID, or use --summary."
+    return "--trials must be 1 or more." if args.trials < 1 else ""
+
+
 def _eval(args: argparse.Namespace) -> int:
     if args.summary:
         return _eval_summary(args)
-    if args.by or args.as_json:
-        print("stone eval: --by and --json need --summary.")
-        return 2
-    if not args.component:
-        print("stone eval: give a component ID, or use --summary.")
-        return 2
-    if args.trials < 1:
-        print("stone eval: --trials must be 1 or more.")
+    if message := _eval_option_error(args):
+        print(f"stone eval: {message}")
         return 2
     try:
         runs, result = evals.run_eval(
