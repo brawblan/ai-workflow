@@ -3,6 +3,7 @@
 versions:
   - version: 1.7.0
     kind: minor
+    released: 2026-11-09
     summary: An adapter eval.yaml can have the optional parser key (default none), and an adapter components.yaml can have the optional status key (default full). An existing run config keeps the default parser, and an existing adapter stays full. New optional key limits.session_context_tokens. stone render adds a context guard hook by default (D115). The value 0 turns it off. An adapter eval.yaml can have the optional rates key (default none). stone eval then estimates the cost from the token rates and warns before a run in a peak window (D116).
     config:
       added:
