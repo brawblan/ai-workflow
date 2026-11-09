@@ -1,4 +1,4 @@
-"""Tests for the context guard hook (issue #299, D114): the rendered hook, the key, and the settings."""
+"""Tests for the context guard hook (issue #299, D115): the rendered hook, the key, and the settings."""
 
 from __future__ import annotations
 

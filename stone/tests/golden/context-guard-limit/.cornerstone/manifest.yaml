@@ -57,7 +57,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .cornerstone/hooks/context-guard.py
-    hash: 827221f894468db104de1c281e37ddbb0bb8d8654379298d7231aea9014b3ded
+    hash: fb69233f36368556172c1aff6072a6aceda6e1464546354d2564e0590e341ae4
   - id: hook.path-match
     kind: hook
     purpose: Match a path against paths.tests and paths.checks. The hook and K6 import it.

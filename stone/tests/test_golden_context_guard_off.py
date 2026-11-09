@@ -1,4 +1,4 @@
-"""Golden-file test for `stone render` with the guard off (limit 0) (issue #299, D114).
+"""Golden-file test for `stone render` with the guard off (limit 0) (issue #299, D115).
 
 The compare and the update are in `golden_helpers.py`. A fixture is in `golden/context-guard-off/`
 or, if it is equal to the shared copy, in `golden/_shared/` (D64). See `guard_golden_helpers.py`.

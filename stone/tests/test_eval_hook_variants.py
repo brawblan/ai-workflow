@@ -120,7 +120,7 @@ class OtherSettingsTest(WorkspaceCase):
         # Render keeps the existing permission and adds the default code index permission (D111).
         self.assertEqual(data["permissions"], {"allow": ["Read", "Bash(stone-index *)"]})
         self.assertEqual(data["hooks"]["PreToolUse"], [self.OTHER])
-        # Render keeps the existing entry and adds the context guard entry (#299, D114).
+        # Render keeps the existing entry and adds the context guard entry (#299, D115).
         post = data["hooks"]["PostToolUse"]
         self.assertEqual(post[:1], fixture["hooks"]["PostToolUse"])
         self.assertEqual(len(post), 2)

@@ -1,4 +1,4 @@
-"""Fixtures of the context guard golden tests (issue #299, D114).
+"""Fixtures of the context guard golden tests (issue #299, D115).
 
 These tests render the single-ticket profile with a custom limit and with the guard off. A few
 files (the hook and the settings) differ from the shared fixtures of `golden/_shared/`. So the
