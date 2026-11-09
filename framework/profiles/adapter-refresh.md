@@ -35,6 +35,8 @@ version (step 10).
 - A vendor releases a new model or a new model version.
 - A vendor changes its published best practices for prompts, skills, tools, or its harness.
 - The lifecycle review finds a model profile past its `reviewed` date plus 6 months.
+- A vendor changes the published token rates or the peak windows of a model that an adapter
+  `rates` file lists. See [Token rates](#token-rates).
 
 ## Do not use when
 
@@ -73,6 +75,17 @@ version (step 10).
 All vendor adapters and model profiles stay in the repo. A target repo selects one in its config:
 `harness` and `model_profile`. To switch, change those two lines and run `stone render`. To compare
 vendors, run the same evals with each profile.
+
+## Token rates
+
+An adapter `eval.yaml` can name a `rates` file (D116). `stone eval` uses it to estimate the cost of a
+run when the harness reports no cost. The rates are vendor facts, so they can go out of date:
+
+1. Read the `source` page of the rates file.
+2. Update the rates and the peak windows of each listed model. Add a new model that an eval runs.
+3. Set `read` to the date that you read the page.
+4. A result file keeps the cost that `stone eval` estimated at the time of the run. Do not change
+   it. If the new rates change a model pick, run the eval again.
 
 ## Exit criteria
 

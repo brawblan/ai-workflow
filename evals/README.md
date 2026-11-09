@@ -21,12 +21,15 @@ Runs are local. Run `stone eval <component-id>`. The command writes a result fil
 
 ## Coverage
 
-The table below covers the Claude Code adapter. Each result file also names its harness. To run a
-role eval on another harness, pass `--run-config framework/adapters/<harness>/eval.yaml`, or name
-the harness in the model ID (see [Many models](#many-models)). The OpenCode adapter supports role
-evals now. The first OpenCode results and their cost are in
-[the 2026-11-09 report](../docs/reports/2026-11-09-opencode-role-eval-costs.md). The cost cells of
-those result files show 0, because OpenCode reports no cost (#315).
+The table below covers the Claude Code adapter. A result file from another harness names that
+harness. To run a role eval on another harness, pass
+`--run-config framework/adapters/<harness>/eval.yaml`, or name the harness in the model ID (see
+[Many models](#many-models)).
+
+The OpenCode adapter supports role evals only (D112). It has results for `role.implementer` and
+`role.tester`. To run them, see [Run on OpenCode](#run-on-opencode). The first OpenCode result
+files show a cost of 0. These runs came before the cost estimate of D116. The estimated cost is in
+[the 2026-11-09 report](../docs/reports/2026-11-09-opencode-role-eval-costs.md).
 
 A full render for all 10 profiles writes 22 components. This table lists each one. Facts as of
 2026-10-31.
@@ -130,7 +133,9 @@ Notes on the results:
   1.00 for an empty set. Read it as "not applicable".
 - **Latest run only.** The sections below show the latest run of each component, as D36 says. A
   later run of one scenario hides the table of an earlier run of other scenarios. Use the links to
-  the earlier result files for those.
+  the earlier result files for those. If a component has runs on more than one harness, the
+  section shows the latest run of each harness. A run of many models shows the file of each
+  model (D117).
 
 ## Many models
 
@@ -176,6 +181,35 @@ runs, use the `runs.jsonl` of the run (`.cornerstone/eval-runs/<stamp>-<eval>/ru
 stone eval --summary .cornerstone/eval-runs/<stamp>-role-tester/runs.jsonl \
   --summary .cornerstone/eval-runs/<stamp>-role-implementer/runs.jsonl --by model
 ```
+
+## Run on OpenCode
+
+The OpenCode adapter is eval-only (D112). It runs the role evals. It has no guidance, trigger, or
+hook eval, and `stone eval` gives the reason. The harness facts are in
+[the adapter doc](../framework/adapters/opencode.md). The runs are local only. Do not put the plan
+key in CI.
+
+1. Install OpenCode. The #302 pilot tested the adapter on version 2.2.6. Run `opencode --version` to see your
+   version.
+2. Log in to your plan with `opencode auth login`.
+3. Keep the global OpenCode config empty. A run also reads `~/.config/opencode`.
+4. If your system has no `python` command, put one first on PATH. The eval fixtures call `python`.
+5. Run the eval. Put `opencode:` before each model ID:
+
+```bash
+stone eval role.tester --variant with --trials 3 \
+  --model opencode:opencode-go/glm-5.3-flash --model opencode:opencode-go/deepseek-v4.1-flash
+```
+
+6. If the command warns that a model is in a peak window, stop it and run it later. The cost
+   estimate then uses the off-peak rate (D116).
+7. Commit the result files. Run `stone render` to add each new model to `models_tested` (D50).
+
+OpenCode reports no cost on the Go plan. `stone eval` estimates the cost from the token counts and
+the rates in `framework/adapters/opencode/rates.yaml`. A model with no rates shows "—".
+
+> WARNING: The `without` variant has no role file. OpenCode then allows each action, and `--auto`
+> approves it. Run it only on a machine where no secret is in reach.
 
 ## Guidance evals
 
