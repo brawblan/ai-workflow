@@ -21,6 +21,10 @@ Runs are local. Run `stone eval <component-id>`. The command writes a result fil
 
 ## Coverage
 
+The table below covers the Claude Code adapter. Each result file also names its harness. To run a
+role eval on another harness, pass `--run-config framework/adapters/<harness>/eval.yaml`. The
+OpenCode adapter supports role evals now. It has no results yet.
+
 A full render for all 10 profiles writes 22 components. This table lists each one. Facts as of
 2026-10-31.
 

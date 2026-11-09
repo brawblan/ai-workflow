@@ -309,6 +309,13 @@ def template_values(config: dict[str, Any], model: str,
     return {key: value for key, value in values.items() if "TODO(" not in value}
 
 
+def _shaper_permissions(*actions: str) -> str:
+    """The permissions list for the shaper: deny all, then allow these actions."""
+    rules = [{"action": "*", "resource": "*", "effect": "deny"}]
+    rules += [{"action": action, "resource": "*", "effect": "allow"} for action in actions]
+    return json.dumps(rules)
+
+
 def ticket_values(config: dict[str, Any]) -> dict[str, str]:
     """Return the ticket source for the role files and the hook (#137)."""
     # StructuredOutput (D71): a trigger run with --json-schema returns its report only with it.
@@ -317,6 +324,7 @@ def ticket_values(config: dict[str, Any]) -> dict[str, str]:
     if section.get("source") != "file" or not section.get("path"):
         return {"ticket_location": "", "tickets_json": json.dumps(""),
                 "shaper_tools": "Read, Grep, Glob, Bash, StructuredOutput",
+                "shaper_permissions": _shaper_permissions("read", "grep", "glob", "shell"),
                 "shaper_write": "Write the answers into the ticket fields. Do not invent a requirement.",
                 "shaper_end": "Use `Bash` only to read the ticket with the issue CLI. "
                               "Do not change files in the repo."}
@@ -324,6 +332,7 @@ def ticket_values(config: dict[str, Any]) -> dict[str, str]:
     return {"ticket_location": f" The ticket is the file `{path}`. `{{id}}` is the ticket ID.",
             "tickets_json": json.dumps(path),
             "shaper_tools": "Read, Grep, Glob, Bash, Write, Edit, StructuredOutput",
+            "shaper_permissions": _shaper_permissions("read", "grep", "glob", "shell", "edit"),
             "shaper_write": "Write the answers into the Definition of Ready section of the ticket "
                             "file. Do not invent a requirement.",
             "shaper_end": "Change only the ticket file. A hook blocks the file tools on other "
@@ -368,13 +377,20 @@ def apply_overrides(root: Path, profiles: list[dict[str, Any]],
 
 
 def build_components(framework: Path, config: dict[str, Any], root: Path | None = None,
-                     today: dt.date | None = None) -> list[Component]:
+                     today: dt.date | None = None,
+                     allow_eval_only: bool = False) -> list[Component]:
     harness = framework / "adapters" / config["harness"]
     registry_path = harness / "components.yaml"
     if not registry_path.exists():
         raise RenderError(f"The harness '{config['harness']}' has no components.yaml. "
                           "Render supports only adapters with templates.")
     registry_doc = yaml.safe_load(registry_path.read_text(encoding="utf-8"))
+    status = str(registry_doc.get("status") or "full")
+    if status not in {"full", "eval-only"}:
+        raise RenderError(f"The adapter status '{status}' is not valid. Use 'full' or 'eval-only'.")
+    if status == "eval-only" and not allow_eval_only:
+        raise RenderError(f"The harness '{config['harness']}' is eval-only. stone render needs an "
+                          "adapter with templates. Use stone eval.")
     registry = registry_doc["components"]
     harness_dirs = [str(item) for item in registry_doc.get("protected_dirs") or []]
     instruction_files = [str(item) for item in registry_doc.get("instruction_files") or []]
@@ -747,7 +763,7 @@ def _manifest_entry(component: Component, old: dict[str, Any] | None, config: di
 
 
 def render(root: Path, framework: Path | None = None, dry_run: bool = False,
-           today: dt.date | None = None) -> Result:
+           today: dt.date | None = None, allow_eval_only: bool = False) -> Result:
     """Render all components. Raise RenderError before any write if an input is not valid."""
     framework = framework or root / "framework"
     today = today or dt.date.today()
@@ -756,7 +772,7 @@ def render(root: Path, framework: Path | None = None, dry_run: bool = False,
     if findings:
         raise RenderError(f"{findings[0].path}: {findings[0].message}")
     warn_old_framework(config["framework_version"])
-    components = build_components(framework, config, root, today)
+    components = build_components(framework, config, root, today, allow_eval_only)
     warn_no_commit(config, components)
     manifest = load_manifest(root)
     old_entries = {entry["id"]: entry for entry in manifest.get("components", [])}

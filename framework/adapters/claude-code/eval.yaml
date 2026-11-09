@@ -4,6 +4,9 @@
 # also removed from the workspace for "without". The hook and the tools stay the same in both
 # variants. For any other component (a hook), the runner uses `with` for both variants, so both
 # load the same role file, and "without" removes only the component (D44).
+# The parser reads the `result` event of the stream.
+
+parser: parsers/claude_code.py
 
 run:
   with: [claude, -p, --agent, $role, --model, $model, --output-format, stream-json, --verbose,

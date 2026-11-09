@@ -11,6 +11,19 @@ to write files. The core does not change when an adapter changes (P12).
 | Spec-tool adapter | Plan artifact, progress file, plan approval | [spec-tools.md](spec-tools.md) (plain) |
 | Model profile | The idioms of one model family inside one harness: prompt style, plan use, effort, role models, limits | [claude-code/models/claude-5.yaml](claude-code/models/claude-5.yaml) |
 
+## Adapter status
+
+The component list of an adapter can set `status`:
+
+| Value | Meaning |
+| --- | --- |
+| `full` (default) | The adapter gives templates, and `stone render` writes the files. |
+| `eval-only` | The adapter gives `eval.yaml` and the role file paths. `stone eval` uses it. `stone render` refuses it. |
+
+An `eval-only` adapter gives the role file paths and the role templates that `stone eval` renders.
+It needs no templates for a full render of hooks, CI, or settings. It must still give a target and
+an eval for each component. The status is in `components.yaml`, so the core names no harness.
+
 ## What a harness adapter MUST provide
 
 1. A mapping table with one row for each concept below.

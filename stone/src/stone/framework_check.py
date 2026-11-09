@@ -618,8 +618,14 @@ def check_components(root: Path, framework: Path) -> list[Finding]:
     findings: list[Finding] = []
     for path, is_manifest in paths:
         text = path.read_text(encoding="utf-8")
+        doc = yaml.safe_load(text) or {}
         name = str(path.relative_to(root)) if path.is_relative_to(root) else str(path)
-        for entry in (yaml.safe_load(text) or {}).get("components") or []:
+        status = str(doc.get("status") or "full")
+        if status not in {"full", "eval-only"}:
+            findings.append(Finding(name, 1, CHECK,
+                                    f"The adapter status '{status}' is not valid. "
+                                    "Use 'full' or 'eval-only'."))
+        for entry in doc.get("components") or []:
             component_id = entry.get("id", "?")
             match = re.search(rf"^\s*- id: {re.escape(str(component_id))}\s*$", text, re.M)
             line = text.count("\n", 0, match.start()) + 1 if match else 1
