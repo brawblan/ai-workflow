@@ -30,6 +30,14 @@ MODEL_PROFILE = ADAPTER / "models" / "opencode-default.yaml"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "opencode"
 ROLE_FILE = ".opencode/agents/tester.md"
 EXPECTED_ROLES = {"shaper", "planner", "implementer", "tester", "reviewer", "investigator"}
+EXPECTED_TOOLS = {
+    "shaper": ["read", "grep", "glob", "shell", "edit"],
+    "planner": ["read", "grep", "glob", "edit"],
+    "implementer": ["read", "grep", "glob", "edit", "shell"],
+    "tester": ["read", "grep", "glob", "edit", "shell"],
+    "reviewer": ["read", "grep", "glob", "shell"],
+    "investigator": ["read", "grep", "glob", "edit", "shell"],
+}
 
 CONFIG = """framework_version: 1.6.0
 harness: opencode
@@ -123,6 +131,18 @@ class OpenCodeAdapterTest(unittest.TestCase):
                              *args])
         return code, out.getvalue()
 
+    def component(self, component: str, *args: str) -> tuple[int, str]:
+        """Run a named component with the OpenCode run config."""
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
+            code = cli.main(["eval", component, "--root", str(self.root),
+                             "--framework", str(FRAMEWORK), "--run-config", str(EVAL_YAML),
+                             "--check-only", *args])
+        return code, out.getvalue()
+
+    def no_harness_started(self) -> None:
+        self.assertFalse((self.state / "calls.jsonl").exists())
+
     def calls(self) -> list[dict]:
         path = self.state / "calls.jsonl"
         return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
@@ -146,8 +166,27 @@ class OpenCodeAdapterTest(unittest.TestCase):
         self.assertIn("--standalone", config["run"]["with"])
         self.assertNotIn("--agent", config["run"]["without"])
         self.assertEqual(config["parser"], "parsers/opencode.py")
-        self.assertEqual(config["tools"]["reviewer"], ["read", "grep", "glob", "shell"])
+        self.assertEqual(config["tools"], EXPECTED_TOOLS)
         self.assertIn("guidance", config["unsupported"])
+
+    def test_adapter_owns_the_shaper_permissions(self) -> None:
+        file_values = render.adapter_values(ADAPTER, {
+            "tickets": {"source": "file", "path": "tickets/{id}.md"}})
+        file_rules = json.loads(file_values["shaper_permissions"])
+        self.assertEqual(file_rules[0], {"action": "*", "resource": "*", "effect": "deny"})
+        self.assertEqual([rule["action"] for rule in file_rules[1:]], EXPECTED_TOOLS["shaper"])
+        plain_values = render.adapter_values(ADAPTER, {})
+        plain_rules = json.loads(plain_values["shaper_permissions"])
+        expected = [action for action in EXPECTED_TOOLS["shaper"] if action != "edit"]
+        self.assertEqual([rule["action"] for rule in plain_rules[1:]], expected)
+
+    def test_core_has_no_harness_tool_or_permission_values(self) -> None:
+        values = render.ticket_values({})
+        self.assertNotIn("shaper_tools", values)
+        self.assertNotIn("shaper_permissions", values)
+        source = (REPO / "stone/src/stone/render.py").read_text(encoding="utf-8")
+        self.assertNotIn('"effect"', source)
+        self.assertNotIn('"resource"', source)
 
     def test_component_list_maps_each_role_to_its_agent_file(self) -> None:
         data = yaml.safe_load(COMPONENTS.read_text(encoding="utf-8"))
@@ -181,6 +220,16 @@ class OpenCodeAdapterTest(unittest.TestCase):
                 self.assertEqual(front["steps"], 60)
                 self.assertIn("permissions", front)
                 self.assertNotIn("tools", front)
+                permissions = front["permissions"]
+                if role == "shaper":
+                    values = render.adapter_values(ADAPTER, {
+                        "tickets": {"source": "file", "path": "tickets/{id}.md"}})
+                    permissions = json.loads(values["shaper_permissions"])
+                self.assertEqual(permissions[0],
+                                 {"action": "*", "resource": "*", "effect": "deny"})
+                actions = [rule["action"] for rule in permissions[1:]
+                           if rule["effect"] == "allow"]
+                self.assertEqual(actions, EXPECTED_TOOLS[role])
 
     def test_eval_runs_the_role_with_agent_and_removes_the_role_file_without(self) -> None:
         code, out = self.eval()
@@ -231,16 +280,76 @@ class OpenCodeAdapterTest(unittest.TestCase):
         self.assertEqual(usage["cache_write_tokens"], 2)
         self.assertEqual(parser.transcript_stats(FIXTURES / "many_steps.jsonl"), (1, 6))
 
-    def test_parser_leaves_out_a_cost_that_is_missing_or_zero(self) -> None:
-        parser = self.parser()
-        missing = parser.parse((FIXTURES / "missing_cost.jsonl").read_text(encoding="utf-8"),
-                               {}, None)
+    def test_parser_leaves_out_a_cost_that_is_missing(self) -> None:
+        missing = self.parser().parse(
+            (FIXTURES / "missing_cost.jsonl").read_text(encoding="utf-8"), {}, None)
         self.assertEqual(missing["report"], "NO COST")
         self.assertNotIn("cost_usd", missing)
-        zero = parser.parse((FIXTURES / "bad_line.jsonl").read_text(encoding="utf-8"), {}, None)
+
+    def test_parser_keeps_a_zero_cost(self) -> None:
+        zero = self.parser().parse((FIXTURES / "bad_line.jsonl").read_text(encoding="utf-8"),
+                                   {}, None)
         self.assertEqual(zero["report"], "STILL PARSED")
-        self.assertNotIn("cost_usd", zero)
+        self.assertEqual(zero["cost_usd"], 0.0)
         self.assertEqual(zero["input_tokens"], 2)
+
+    def test_transcript_counts_a_tool_with_no_output(self) -> None:
+        stats = self.parser().transcript_stats(FIXTURES / "tool_no_output.jsonl")
+        self.assertEqual(stats, (1, 0))
+
+    def test_unsupported_evals_print_the_adapter_reason_and_start_no_harness(self) -> None:
+        cases = {
+            "guidance.writing": "did not prove a guidance run",
+            "trigger.issue-opened.single-ticket": "did not prove a trigger run",
+        }
+        for component, reason in cases.items():
+            with self.subTest(component=component):
+                code, out = self.component(component)
+                self.assertEqual(code, 2, out)
+                self.assertIn(reason, out)
+                self.no_harness_started()
+
+    def test_same_adapter_does_not_fall_back_from_a_missing_model_profile(self) -> None:
+        self.write(".cornerstone/config.yaml", CONFIG.replace(
+            "model_profile: opencode-default", "model_profile: nope"))
+        code, out = self.component("role.tester")
+        self.assertEqual(code, 2, out)
+        self.assertIn("nope", out)
+        self.no_harness_started()
+        with self.assertRaises(evals.EvalError) as caught:
+            evals._model_profile(ADAPTER, "nope", allow_fallback=False)
+        message = str(caught.exception)
+        self.assertIn("opencode", message)
+        self.assertIn("nope", message)
+        self.assertIn("set model_profile", message)
+
+    def test_load_parser_rejects_a_missing_file(self) -> None:
+        with self.assertRaises(evals.EvalError) as caught:
+            evals.load_parser(EVAL_YAML, ADAPTER, {"parser": "parsers/nope.py"})
+        self.assertIn("does not exist", str(caught.exception))
+
+    def test_load_parser_rejects_a_file_with_no_parse(self) -> None:
+        run_config = self.write("parser-errors/eval.yaml", "")
+        self.write("parser-errors/no_parse.py", "def transcript_stats(path):\n    return None\n")
+        with self.assertRaises(evals.EvalError) as caught:
+            evals.load_parser(run_config, ADAPTER, {"parser": "no_parse.py"})
+        self.assertIn("no 'parse' function", str(caught.exception))
+
+    def test_load_parser_rejects_a_file_with_no_transcript_stats(self) -> None:
+        run_config = self.write("parser-errors/eval.yaml", "")
+        self.write("parser-errors/no_stats.py", "def parse(stdout, fields, where):\n    return {}\n")
+        with self.assertRaises(evals.EvalError) as caught:
+            evals.load_parser(run_config, ADAPTER, {"parser": "no_stats.py"})
+        self.assertIn("no 'transcript_stats' function", str(caught.exception))
+
+    def test_missing_parser_exits_2_and_starts_no_harness(self) -> None:
+        config = evals.load_run_config(EVAL_YAML)
+        config["parser"] = "parsers/nope.py"
+        path = self.write("missing-parser.yaml", yaml.safe_dump(config, sort_keys=False))
+        code, out = self.eval("--check-only", "--run-config", str(path))
+        self.assertEqual(code, 2, out)
+        self.assertIn("does not exist", out)
+        self.no_harness_started()
 
     def test_run_config_selects_the_adapter_and_its_model_profile(self) -> None:
         claude = CONFIG.replace("harness: opencode", "harness: claude-code").replace(
