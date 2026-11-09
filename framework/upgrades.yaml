@@ -1,6 +1,15 @@
 # The record of each release. `stone upgrade` reads it, and `stone check` validates it.
 # Newest first. Rules and the form: framework/versioning.md.
 versions:
+  - version: 1.7.0
+    kind: minor
+    summary: An adapter eval.yaml can have the optional parser key (default none), and an adapter components.yaml can have the optional status key (default full). An existing run config keeps the default parser, and an existing adapter stays full.
+    config:
+      added: []
+      renamed: []
+      removed: []
+    files: []
+    steps: []
   - version: 1.6.0
     kind: minor
     released: 2026-11-08

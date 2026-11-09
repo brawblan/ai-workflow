@@ -17,22 +17,22 @@ later adapter can render them.
 
 ## Mapping
 
-| Concept | Target | Support | Fallback |
-| --- | --- | --- | --- |
-| Instruction file (repo) | `AGENTS.md` in the repo root | full | none. OpenCode reads `CLAUDE.md` only if `AGENTS.md` is absent. |
-| Instruction file (user) | `~/.config/opencode/AGENTS.md` | full | none. |
-| Skill | `.opencode/skills/<name>/SKILL.md` | full | Linked docs that `AGENTS.md` names. |
-| Role | `.opencode/agents/<role>.md` with `description`, `mode`, `model`, `permissions`, and `steps` | partial | Separate `opencode run` sessions with a role prompt, plus CI checks. A role file limits tools, not paths. |
-| Fresh session for each role | One `opencode run` for each role | full | none. P2 needs it. |
-| Headless run | `opencode run "<prompt>"` | full | none. CI needs it. |
-| Eval run | [opencode/eval.yaml](opencode/eval.yaml): the argv for each variant, the env, the parser, and the role tool list | full for a role | No guidance or trigger command yet. `stone eval` names the reason. |
-| Select the role for a headless run | `opencode run --agent <role>` loads `.opencode/agents/<role>.md` | full | none. Tested on 2.2.6 (2026-11-08). |
-| Model for each role | `--model <provider>/<model>[#variant]`, or `model` in the role file | full | One model for all roles. |
-| Permissions | The ordered `permissions` list in the role file, or the global list | partial | Run in a container with no secrets. The K6 check is the control for a protected path. |
-| Hook before a file edit | none | none | Check K6 in CI. |
-| Hook before the session ends | none | none | Gate G3 in CI. |
-| CI trigger | none | none | Run the role by hand, or use an adapter that provides a trigger. |
-| Render the role files and the settings | none | none | Keep the files by hand in the target repo. |
+| Concept | Target | Format | Support | Fallback |
+| --- | --- | --- | --- | --- |
+| Instruction file (repo) | `AGENTS.md` in the repo root | Markdown | full | none. OpenCode reads `CLAUDE.md` only if `AGENTS.md` is absent. |
+| Instruction file (user) | `~/.config/opencode/AGENTS.md` | Markdown | full | none. |
+| Skill | `.opencode/skills/<name>/SKILL.md` | Markdown | full | Linked docs that `AGENTS.md` names. |
+| Role | `.opencode/agents/<role>.md` with `description`, `mode`, `model`, `permissions`, and `steps` | Markdown with YAML frontmatter | partial | Separate `opencode run` sessions with a role prompt, plus CI checks. A role file limits tools, not paths. |
+| Fresh session for each role | One `opencode run` for each role | process or command | full | none. P2 needs it. |
+| Headless run | `opencode run "<prompt>"` | process or command | full | none. CI needs it. |
+| Eval run | [opencode/eval.yaml](opencode/eval.yaml): the argv for each variant, the env, the parser, and the role tool list | YAML | full for a role | No guidance or trigger command yet. `stone eval` names the reason. |
+| Select the role for a headless run | `opencode run --agent <role>` loads `.opencode/agents/<role>.md` | process or command | full | none. Tested on 2.2.6 (2026-11-08). |
+| Model for each role | `--model <provider>/<model>[#variant]`, or `model` in the role file | process or command | full | One model for all roles. |
+| Permissions | The ordered `permissions` list in the role file, or the global list | Markdown with YAML frontmatter | partial | Run in a container with no secrets. The K6 check is the control for a protected path. |
+| Hook before a file edit | none | not applicable | none | Check K6 in CI. |
+| Hook before the session ends | none | not applicable | none | Gate G3 in CI. |
+| CI trigger | none | not applicable | none | Run the role by hand, or use an adapter that provides a trigger. |
+| Render the role files and the settings | none | not applicable | none | Keep the files by hand in the target repo. |
 
 ## Role files
 
@@ -82,13 +82,14 @@ The parser reads the JSONL events:
 | Field | Source |
 | --- | --- |
 | Report | The text parts of the last assistant message, joined. |
-| Cost | The sum of the `step_finish` cost. If each cost is 0, the table shows "—". |
+| Cost | The sum of the `step_finish` cost. OpenCode reports 0 on the Go plan, so the table shows 0.0000. A missing cost shows "—". |
 | Turns | The count of `step_finish` events. |
 | Input, output, reasoning, cache tokens | The sum of the `step_finish` token counts. |
 | Tool calls, tool bytes | The `tool_use` events and the bytes of their output. |
 
-A field that the harness does not give shows "—". The #302 pilot found no `cost` value and no
-`opencode.allowance` field. Use the published token rates for a cost estimate.
+A field that the harness does not give shows "—". The #302 pilot found that the 0 on the Go plan is
+not the billed cost, and found no `opencode.allowance` field. Use the published token rates for a
+cost estimate.
 
 Limits of this eval run:
 

@@ -31,8 +31,7 @@ def parse(stdout: str, fields: dict[str, str],
     """Read the report and the metrics from the JSONL events.
 
     The report joins the text parts of the last assistant message. A message is the `messageID` of
-    the part. The cost is left out when each event gives 0, because the Go plan does not bill in the
-    stream.
+    the part. A numeric cost is summed even when it is 0. A missing cost stays unknown.
     """
     texts: dict[str, list[str]] = {}
     order: list[str] = []
@@ -40,7 +39,7 @@ def parse(stdout: str, fields: dict[str, str],
               "cache_read_tokens": 0, "cache_write_tokens": 0}
     seen: set[str] = set()
     cost = 0.0
-    have_cost = False
+    cost_present = False
     turns = 0
     for event in _events(stdout):
         kind = event.get("type")
@@ -57,7 +56,7 @@ def parse(stdout: str, fields: dict[str, str],
             turns += 1
             if _number(part.get("cost")):
                 cost += float(part["cost"])
-                have_cost = have_cost or float(part["cost"]) > 0
+                cost_present = True
             tokens = part.get("tokens") if isinstance(part.get("tokens"), dict) else {}
             pairs = (("input", "input_tokens"), ("output", "output_tokens"),
                      ("reasoning", "reasoning_tokens"))
@@ -75,7 +74,7 @@ def parse(stdout: str, fields: dict[str, str],
         usage["report"] = "".join(texts[order[-1]])
     if turns:
         usage["turns"] = turns
-    if have_cost:
+    if cost_present:
         usage["cost_usd"] = cost
     for key in seen:
         usage[key] = totals[key]

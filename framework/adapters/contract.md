@@ -46,6 +46,12 @@ an eval for each component. The status is in `components.yaml`, so the core name
 | Permission allowlist and sandbox | partial or better | Run in a container with no secrets |
 | CI trigger (issue label, PR event, schedule) | full | none |
 
+### Adapter template values
+
+An adapter MAY add `values.py` at its root. It MUST provide `values(config: dict) -> dict[str, str]`.
+The core passes neutral ticket state in `config`. It builds no harness tool names or permission
+schemas. Each value becomes a string for the templates. An adapter key MUST NOT reuse a core key.
+
 ## What a model profile MUST provide
 
 A model profile changes more often than a harness adapter. A new model from the same vendor changes

@@ -52,6 +52,10 @@ class EvalError(Exception):
     """The eval folder or the run config is not valid. No run started."""
 
 
+class ComponentNotFound(EvalError):
+    """The selected adapter has no component with the requested ID."""
+
+
 @dataclass
 class Workspace:
     path: Path
@@ -207,7 +211,7 @@ def find_component(framework: Path, harness: str, component_id: str,
     guidance = find_guidance(root, component_id) if root else None
     if guidance:
         return guidance
-    raise EvalError(f"The adapter '{harness}' has no component '{component_id}'.")
+    raise ComponentNotFound(f"The adapter '{harness}' has no component '{component_id}'.")
 
 
 def registered_in(framework: Path, harness: str, target: str) -> list[str]:
@@ -806,10 +810,13 @@ def _harness_from_run_config(path: Path, framework: Path) -> str:
     return relative.parts[0] if len(relative.parts) > 1 else ""
 
 
-def _model_profile(harness: Path, name: str) -> str:
-    """Use the named model profile if it exists, else the first profile of the adapter."""
+def _model_profile(harness: Path, name: str, allow_fallback: bool) -> str:
+    """Use the named profile. Only a changed adapter can fall back to its first profile."""
     if name and (harness / "models" / f"{name}.yaml").is_file():
         return name
+    if name and not allow_fallback:
+        raise EvalError(f"The adapter '{harness.name}' has no model profile '{name}'. "
+                        "Add the file, or set model_profile in the repo config.")
     profiles = sorted((harness / "models").glob("*.yaml"))
     if not profiles:
         raise EvalError(f"The adapter '{harness.name}' has no model profile. "
@@ -884,16 +891,25 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     framework = framework or root / "framework"
     config = render.load_config(root, framework)
     run_config, harness_name = _run_harness(config, framework, run_config)
-    entry = find_component(framework, harness_name, component_id, root)
+    loaded = load_run_config(run_config)
+    try:
+        entry = find_component(framework, harness_name, component_id, root)
+    except ComponentNotFound as error:
+        kind = component_id.split(".", 1)[0]
+        reason = (loaded.get("unsupported") or {}).get(kind) or ""
+        if reason:
+            raise EvalError(f"The harness '{harness_name}' does not support a {kind} eval. "
+                            f"{reason}") from error
+        raise
     folder = root / entry["eval"]
     profile_id = entry.get("profile", "")
     data = load_scenarios(folder, role_required=not profile_id)
     data["role"] = _first_role(framework, entry) if profile_id else data["role"]
     scenarios = _select(data["scenarios"], scenario_ids, profile_id)
     harness = framework / "adapters" / harness_name
-    loaded = load_run_config(run_config)
     parser = load_parser(run_config, harness, loaded)
-    model_profile = _model_profile(harness, config["model_profile"])
+    model_profile = _model_profile(harness, config["model_profile"],
+                                   allow_fallback=harness_name != config["harness"])
     profile = yaml.safe_load((harness / "models" / f"{model_profile}.yaml")
                              .read_text(encoding="utf-8"))
     model = model or profile["defaults"]["role_models"].get(data["role"], "")
