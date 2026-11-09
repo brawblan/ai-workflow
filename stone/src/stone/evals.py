@@ -29,7 +29,7 @@ from typing import Any
 
 import yaml
 
-from stone import eval_metrics, render, results, specs, trigger_eval, triggers
+from stone import eval_metrics, eval_rates, render, results, specs, trigger_eval, triggers
 from stone.markdown import split_frontmatter
 
 VARIANTS = ("with", "without")
@@ -232,10 +232,11 @@ def registered_in(framework: Path, harness: str, target: str) -> list[str]:
 
 
 def _require_parser(data: dict[str, Any], path: Path) -> None:
-    """Raise if the run config names a parser that is not a file path string."""
-    parser = data.get("parser")
-    if parser is not None and (not isinstance(parser, str) or not parser.strip()):
-        raise EvalError(f"{path}: 'parser' must be a file path string.")
+    """Raise if the run config names a parser or a rates file that is not a file path string."""
+    for key in ("parser", "rates"):
+        value = data.get(key)
+        if value is not None and (not isinstance(value, str) or not value.strip()):
+            raise EvalError(f"{path}: '{key}' must be a file path string.")
 
 
 def load_run_config(path: Path) -> dict[str, Any]:
@@ -503,7 +504,7 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
             yaml.YAMLError) as error:
         run.error = f"the setup failed: {error}"  # the harness does not start
         return run
-    start = time.monotonic()
+    start, started = time.monotonic(), dt.datetime.now(dt.timezone.utc)
     stdout = stderr = ""
     try:
         code, stdout, stderr = _harness(argv, workspace.path, env, opts["timeout"])
@@ -517,6 +518,8 @@ def run_once(folder: Path, data: dict[str, Any], scenario: dict[str, Any], varia
         run.usage = opts["parser"].parse(stdout, config.get("output") or {},
                                          config.get("output_where"))
         run.usage.setdefault("seconds", round(time.monotonic() - start, 1))
+        if opts.get("rates"):
+            eval_rates.apply(run.usage, opts["rates"], opts["model"], started)
         workspace.report = str(run.usage.pop("report", "") or "")
         _trigger_post(run, workspace, workflow, run.usage.pop("structured_output", None), scenario)
         transcript = opts["runs"] / f"{scenario['id']}-{variant}-{trial}.out"
@@ -732,18 +735,21 @@ def _rate(runs: list[Run], kind: str | None) -> float:
     return sum(r.passed(kind) for r in runs) / len(runs) if runs else 0.0
 
 
-def _summary_head(component: str, model: str, harness: str) -> list[str]:
+def _summary_head(component: str, model: str, harness: str, cost_note: str = "") -> list[str]:
     """The title and the metadata lines of the result file."""
     lines = [f"# Eval results: {component}", ""]
     if harness:
         lines.append(f"Harness: `{harness}`.")
     lines.append(f"Model: `{model}`. Date: {dt.date.today()}.")
+    if cost_note:
+        lines.append(cost_note)
     return lines
 
 
-def summary(component: str, model: str, runs: list[Run], harness: str = "") -> str:
+def summary(component: str, model: str, runs: list[Run], harness: str = "",
+            cost_note: str = "") -> str:
     """Return the result tables in Markdown: each scenario and variant, then each variant."""
-    lines = [*_summary_head(component, model, harness), "",
+    lines = [*_summary_head(component, model, harness, cost_note), "",
              *eval_metrics.scenario_table(runs, _rate), "",
              *eval_metrics.variant_table(runs, _rate)]
     names = list(dict.fromkeys(r.variant for r in runs))
@@ -862,6 +868,8 @@ class Target:
     model_profile: str
     model: str
     prefixed: bool  # the ID named its harness, as in `<harness>:<model>`
+    rates: dict[str, Any] | None = None  # the token rates of the adapter, if it has them (#315)
+    rates_file: str = ""
 
     @property
     def label(self) -> str:
@@ -906,8 +914,25 @@ def _prepare_target(root: Path, framework: Path, config: dict[str, Any], compone
     if entry.get("kind") == "guidance" and not model:
         raise EvalError("A guidance eval has no role model. Pass --model.")
     variants = _variants(component_id, entry, data, loaded, variant)
+    rates, rates_file = _load_rates(root, path, harness, loaded)
     return Target(harness_name, path, loaded, entry, data, scenarios, variants,
-                  load_parser(path, harness, loaded), model_profile, model, bool(prefix))
+                  load_parser(path, harness, loaded), model_profile, model, bool(prefix),
+                  rates, rates_file)
+
+
+def _load_rates(root: Path, run_config: Path, harness: Path,
+                loaded: dict[str, Any]) -> tuple[dict[str, Any] | None, str]:
+    """The rates of the run config and their file path, or (None, '') with no `rates` key."""
+    name = str(loaded.get("rates") or "").strip()
+    if not name:
+        return None, ""
+    try:
+        file = eval_rates.path(run_config, harness, name)
+        shown = file.resolve().relative_to(root.resolve()) if file.resolve().is_relative_to(
+            root.resolve()) else file
+        return eval_rates.load(file), shown.as_posix()
+    except eval_rates.RatesError as error:
+        raise EvalError(str(error)) from None
 
 
 def _target_harness(config: dict[str, Any], framework: Path, prefix: str, spec: str | None,
@@ -963,6 +988,13 @@ def budget_notes(targets: list[Target], budget: str | None) -> list[str]:
                 t.harness for t in targets if not has_budget_limit(t))]
 
 
+def peak_warnings(targets: list[Target], moment: dt.datetime | None = None) -> list[str]:
+    """One warning for each model that is in a peak window of its rates now (#315)."""
+    moment = moment or dt.datetime.now(dt.timezone.utc)
+    found = [eval_rates.warning(t.model, t.rates, moment) for t in targets if t.rates]
+    return list(dict.fromkeys(line for line in found if line))
+
+
 def _run_options(framework: Path, entry: dict[str, Any], target: Target, budget: str,
                  timeout: int, runs_folder: Path, keep: bool, profile_id: str) -> dict[str, Any]:
     return {"framework": framework.resolve(), "role_file": entry.get("target", ""),
@@ -970,7 +1002,7 @@ def _run_options(framework: Path, entry: dict[str, Any], target: Target, budget:
             "budget": budget, "timeout": timeout, "runs": runs_folder, "keep": keep,
             "variants": target.data.get("variants") or {}, "profile": profile_id,
             "parser": target.parser, "harness": target.harness,
-            "model_profile": target.model_profile}
+            "model_profile": target.model_profile, "rates": target.rates}
 
 
 def _run_all(folder: Path, component_id: str, target: Target, trials: int, opts: dict[str, Any],
@@ -994,7 +1026,8 @@ def _write_result(root: Path, stamp: str, component_id: str, target: Target,
     safe_model = re.sub(r"[^\w.-]+", "-", target.label) or "default"
     result_path = root / RESULTS / f"{stamp}-{component_id}-{safe_model}.md"
     result_path.parent.mkdir(parents=True, exist_ok=True)
-    result_path.write_text(summary(component_id, target.model, runs, target.harness),
+    cost_note = eval_rates.note(target.rates, runs, target.rates_file) if target.rates else ""
+    result_path.write_text(summary(component_id, target.model, runs, target.harness, cost_note),
                            encoding="utf-8")
     return str(result_path)
 
@@ -1010,7 +1043,7 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     config = render.load_config(root, framework)
     targets = [_prepare_target(root, framework, config, component_id, spec, run_config,
                                scenario_ids, variant) for spec in (models or [None])]
-    for note in budget_notes(targets, budget):
+    for note in budget_notes(targets, budget) + peak_warnings(targets):
         print(note)
     if check_only:
         for target in targets:

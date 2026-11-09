@@ -82,14 +82,23 @@ The parser reads the JSONL events:
 | Field | Source |
 | --- | --- |
 | Report | The text parts of the last assistant message, joined. |
-| Cost | The sum of the `step_finish` cost. OpenCode reports 0 on the Go plan, so the table shows 0.0000. A missing cost shows "—". |
+| Cost | The sum of the `step_finish` cost. OpenCode reports 0 on the Go plan. Then `stone eval` estimates the cost from the token counts and `rates.yaml` (D116). A model with no rates shows "—". |
 | Turns | The count of `step_finish` events. |
 | Input, output, reasoning, cache tokens | The sum of the `step_finish` token counts. |
 | Tool calls, tool bytes | The `tool_use` events and the bytes of their output. |
 
 A field that the harness does not give shows "—". The #302 pilot found that the 0 on the Go plan is
-not the billed cost, and found no `opencode.allowance` field. Use the published token rates for a
-cost estimate.
+not the billed cost, and found no `opencode.allowance` field.
+
+`rates.yaml` gives the published token rates of each model, the source, and the read date (D116):
+
+- The cost of a run uses the token counts. Reasoning tokens use the output rate.
+- The start of a run selects the peak or the off-peak rate. DeepSeek V4.1 Flash has a peak rate
+  from 01:00 to 04:00 and from 06:00 to 10:00 UTC, Monday to Friday.
+- Before the first run, `stone eval` warns for each model that is in a peak window. It then
+  continues.
+- Each result file says that the cost is an estimate, and how many runs used the peak rate.
+- When the plan page changes, update the rates and the read date.
 
 Limits of this eval run:
 

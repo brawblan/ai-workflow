@@ -9,7 +9,7 @@ from typing import Any
 
 import yaml
 
-from stone import (__version__, ci_setup, code_index, context_guard, overrides, personas_check, results, specialists, specs,
+from stone import (__version__, ci_setup, code_index, context_guard, eval_rates, overrides, personas_check, results, specialists, specs,
                    upgrade)
 from stone.findings import Finding
 from stone.markdown import link_file, relative_links, split_frontmatter, table_rows
@@ -650,6 +650,23 @@ def check_upgrades(root: Path, framework: Path) -> list[Finding]:
     return [Finding(label, 1, CHECK, message) for message in upgrade.problems(framework)]
 
 
+def check_eval_rates(root: Path, framework: Path) -> list[Finding]:
+    """Each rates file that an adapter eval.yaml names must be valid (#315)."""
+    findings = []
+    for config in sorted((framework / "adapters").glob("*/eval.yaml")):
+        name = (yaml.safe_load(config.read_text(encoding="utf-8")) or {}).get("rates")
+        if not name:
+            continue
+        file = config.parent / str(name)
+        label = str(file.relative_to(root)) if file.is_relative_to(root) else str(file)
+        try:
+            found = eval_rates.problems(yaml.safe_load(file.read_text(encoding="utf-8")))
+        except (OSError, yaml.YAMLError) as error:
+            found = [f"cannot read the rates file ({error})."]
+        findings += [Finding(label, 1, CHECK, message) for message in found]
+    return findings
+
+
 def check_version(root: Path) -> list[Finding]:
     """Warn if framework_version in the repo config is not the version of the installed stone."""
     path = root / ".cornerstone" / "config.yaml"
@@ -685,5 +702,5 @@ def run(root: Path, framework: Path | None = None, links: str = "default") -> li
             + check_neutral_code(root / "stone" / "src" / "stone")
             + check_config(root, framework) + check_overrides(root, framework)
             + check_components(root, framework)
-            + check_upgrades(root, framework) + check_version(root)
+            + check_upgrades(root, framework) + check_eval_rates(root, framework) + check_version(root)
             + personas_check.run(root) + specs.check(root))

@@ -175,6 +175,9 @@ flowchart LR
 - A run config can name a `parser` file. The parser has `parse` and `transcript_stats`. `parse`
   returns the usage map, and `transcript_stats` returns the tool calls and the result bytes. Without
   a parser, the runner reads the last JSON object and the default transcript format.
+- A run config can name a `rates` file. The file gives the token rates of each model, with
+  optional peak rates and UTC windows. If the harness cost is missing or 0, the runner estimates
+  the cost from the token counts. It warns before a run in a peak window (D116).
 - `stone eval --run-config <file>` uses the adapter of that file for the component list, the model
   profile, and the parser. The fixture config gets that harness and model profile.
 - The setup commits the fixture on `main`. Then the work continues on the branch

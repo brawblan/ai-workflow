@@ -1,0 +1,21 @@
+# The token rates of the OpenCode Go models, in USD for each 1M tokens (issue #315).
+# OpenCode reports a cost of 0 on the Go plan, so stone eval estimates the cost from these rates.
+# Reasoning tokens use the output rate. The start of a run selects the peak or the off-peak rate.
+# The docs give no cache write rate for the two flash models, so their cache_write is 0.
+# A window gives the UTC start hours of the peak: hour 1 is 01:00 to 01:59.
+
+source: https://opencode.ai/docs/go
+read: 2026-11-09
+
+models:
+  opencode-go/glm-5.3-flash:
+    rates: {input: 0.15, output: 0.50, cache_read: 0.03, cache_write: 0}
+  opencode-go/deepseek-v4.1-flash:
+    rates: {input: 0.15, output: 0.60, cache_read: 0.003, cache_write: 0}
+    peak:   # 01:00 to 04:00 and 06:00 to 10:00 UTC, Monday to Friday
+      rates: {input: 0.30, output: 1.20, cache_read: 0.006, cache_write: 0}
+      windows:
+        - {weekdays: [mon, tue, wed, thu, fri], hours: [1, 2, 3]}
+        - {weekdays: [mon, tue, wed, thu, fri], hours: [6, 7, 8, 9]}
+  opencode-go/kimi-k3.1-pro:
+    rates: {input: 2.00, output: 10.00, cache_read: 0.20, cache_write: 2.00}
