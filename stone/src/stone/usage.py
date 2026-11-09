@@ -198,12 +198,14 @@ def _session_row(session: Session, fmt: dict[str, Any], limit: int) -> tuple[dic
         for part, value in cost(call, fmt["weights"]).items():
             parts[part] += value
     calls = session.calls
+    ext = _extent(calls)
     row = {
         "session": session.name, "kind": session.kind,
         "model": _label([c.model for c in calls]), "effort": _label([c.effort for c in calls]),
         "calls": len(calls), "cache_read": sum(c.cache_read for c in calls),
+        "cache_write": ext["cache_write"],
         "output": sum(c.output for c in calls), "thinking": sum(c.thinking for c in calls),
-        **_extent(calls),
+        "context": ext["context"],
         "rebuilds": rebuilds(calls, fmt["cache_seconds"], limit),
         "cost": round(sum(parts.values()), 2)}
     return row, parts
