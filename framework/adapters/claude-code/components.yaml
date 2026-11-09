@@ -113,7 +113,17 @@ components:
     target: .claude/settings.json
     merge: json
     code_index_part: hooks/code-index.json   # the index permission and build hook, unless code_index: none
+    context_guard_part: hooks/context-guard.json   # the guard hooks, unless limits.session_context_tokens is 0 (D115)
     eval: evals/hook-protect-paths/
+
+  - id: hook.context-guard
+    kind: hook
+    purpose: Tell the agent when the session context passes the limit, and after it opens a PR.
+    principle: [P4]
+    needs_context_guard: true                # not rendered if limits.session_context_tokens is 0 (D115)
+    template: hooks/context-guard.py
+    target: .cornerstone/hooks/context-guard.py
+    eval: evals/hook-context-guard/        # planned (D115)
 
   - id: check.k6
     kind: check

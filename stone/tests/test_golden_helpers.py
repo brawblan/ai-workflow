@@ -12,6 +12,7 @@ from golden_helpers import (SHARED, UPDATE_ENV, golden_differences, golden_rende
                             shared_folder, tree_files, update_golden, updating, write_tree)
 
 SHARED_PATHS = {".cornerstone/lib/path_match.py", ".claude/settings.json",
+                ".cornerstone/hooks/context-guard.py",
                 *(f".claude/agents/{role}.md" for role in (
                     "implementer", "investigator", "planner", "reviewer", "shaper", "tester"))}
 
@@ -124,7 +125,7 @@ class RealFixtureTest(unittest.TestCase):
         if updating():
             self.skipTest("the fixtures are being rewritten")
 
-    def test_shared_holds_exactly_the_8_files_that_each_render_writes_equal(self) -> None:
+    def test_shared_holds_exactly_the_9_files_that_each_render_writes_equal(self) -> None:
         self.assertEqual(set(tree_files(SHARED)), SHARED_PATHS)
 
     def test_shared_is_the_set_of_files_that_2_or_more_golden_tests_render_equal(self) -> None:

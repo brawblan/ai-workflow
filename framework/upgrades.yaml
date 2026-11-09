@@ -3,13 +3,19 @@
 versions:
   - version: 1.7.0
     kind: minor
-    summary: An adapter eval.yaml can have the optional parser key (default none), and an adapter components.yaml can have the optional status key (default full). An existing run config keeps the default parser, and an existing adapter stays full.
+    summary: An adapter eval.yaml can have the optional parser key (default none), and an adapter components.yaml can have the optional status key (default full). An existing run config keeps the default parser, and an existing adapter stays full. New optional key limits.session_context_tokens. stone render adds a context guard hook by default (D115). The value 0 turns it off.
     config:
-      added: []
+      added:
+        - {key: limits.session_context_tokens, default: 150000, note: "The context guard limit in tokens. 0 turns the guard off. A value above 150000 is not valid (D115)."}
       renamed: []
       removed: []
-    files: []
-    steps: []
+    files:
+      - {path: .cornerstone/hooks/context-guard.py, change: added, note: "The context guard hook script, unless limits.session_context_tokens is 0 (D115)."}
+      - {path: .claude/settings.json, change: changed, note: "A UserPromptSubmit hook and a PostToolUse hook for the context guard, unless limits.session_context_tokens is 0 (D115)."}
+      - {path: .cornerstone/manifest.yaml, change: changed, note: "A hook.context-guard component, and the owned: keys of the new settings entries (D115)."}
+    steps:
+      - "Optional: set limits.session_context_tokens in .cornerstone/config.yaml. Commit the config change alone, with the trailer Role human."
+      - "Then run stone render. Commit the generated files alone, with the trailers Role generator and Actor agent."
   - version: 1.6.0
     kind: minor
     released: 2026-11-08

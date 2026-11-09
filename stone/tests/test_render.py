@@ -40,7 +40,8 @@ ROLE_FILES = [".claude/agents/implementer.md", ".claude/agents/reviewer.md",
               ".claude/agents/shaper.md", ".claude/agents/tester.md"]
 OTHER_FILES = [".claude/settings.json", ".cornerstone/checks/change_size.py",
                ".cornerstone/checks/protected_paths.py",
-               ".cornerstone/hooks/protect-paths.py", ".cornerstone/lib/path_match.py",
+               ".cornerstone/hooks/context-guard.py", ".cornerstone/hooks/protect-paths.py",
+               ".cornerstone/lib/path_match.py",
                ".cornerstone/manifest.yaml", ".github/workflows/cornerstone-checks.yml"]
 PLANNER = ".claude/agents/planner.md"
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
