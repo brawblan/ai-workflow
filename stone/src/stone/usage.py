@@ -184,36 +184,40 @@ def _label(values: list[str]) -> str:
     return ", ".join(sorted(counts)) or "-"
 
 
+def _session_row(session: Session, fmt: dict[str, Any], limit: int) -> tuple[dict[str, Any],
+                                                                              dict[str, float]]:
+    """Return the report row of one session, and its weighted cost by part."""
+    parts = dict.fromkeys(PARTS, 0.0)
+    for call in session.calls:
+        for part, value in cost(call, fmt["weights"]).items():
+            parts[part] += value
+    calls = session.calls
+    row = {
+        "session": session.name, "kind": session.kind,
+        "model": _label([c.model for c in calls]), "effort": _label([c.effort for c in calls]),
+        "calls": len(calls), "cache_read": sum(c.cache_read for c in calls),
+        "cache_write": {n: sum(c.cache_write[n] for c in calls) for n in LENGTHS},
+        "output": sum(c.output for c in calls), "thinking": sum(c.thinking for c in calls),
+        "context": max(c.input + c.cache_read + sum(c.cache_write.values()) for c in calls),
+        "rebuilds": rebuilds(calls, fmt["cache_seconds"], limit),
+        "cost": round(sum(parts.values()), 2)}
+    return row, parts
+
+
 def report(sessions: list[Session], fmt: dict[str, Any], limit: int) -> dict[str, Any]:
-    weights, seconds = fmt["weights"], fmt["cache_seconds"]
     rows, totals = [], dict.fromkeys(PARTS, 0.0)
     for session in sessions:
-        parts = dict.fromkeys(PARTS, 0.0)
-        for call in session.calls:
-            for part, value in cost(call, weights).items():
-                parts[part] += value
+        row, parts = _session_row(session, fmt, limit)
+        rows.append(row)
         for part in PARTS:
             totals[part] += parts[part]
-        rows.append({
-            "session": session.name, "kind": session.kind,
-            "model": _label([c.model for c in session.calls]),
-            "effort": _label([c.effort for c in session.calls]),
-            "calls": len(session.calls),
-            "cache_read": sum(c.cache_read for c in session.calls),
-            "cache_write": {n: sum(c.cache_write[n] for c in session.calls) for n in LENGTHS},
-            "output": sum(c.output for c in session.calls),
-            "thinking": sum(c.thinking for c in session.calls),
-            "context": max(c.input + c.cache_read + sum(c.cache_write.values())
-                           for c in session.calls),
-            "rebuilds": rebuilds(session.calls, seconds, limit),
-            "cost": round(sum(parts.values()), 2)})
     whole = sum(totals.values())
     for row in rows:
         row["share"] = round(row["cost"] / whole, 4) if whole else 0.0
+    shares = {p: round(totals[p] / whole, 4) if whole else 0.0 for p in PARTS}
     return {"unit_note": UNIT_NOTE, "rebuild_tokens": limit, "sessions": rows,
             "totals": {"calls": sum(r["calls"] for r in rows), "cost": round(whole, 2),
-                       "shares": {p: round(totals[p] / whole, 4) if whole else 0.0
-                                  for p in PARTS}}}
+                       "shares": shares}}
 
 
 def _k(value: int) -> str:
