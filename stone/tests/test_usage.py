@@ -161,6 +161,17 @@ class DuplicateTest(unittest.TestCase):
         self.assertEqual(data(str(MAIN))["sessions"][0]["output"], 195)
 
 
+class NoRequestIdTest(unittest.TestCase):
+    def test_records_without_request_id_get_line_ids_and_count_once_per_line(self) -> None:
+        record = json.loads(SUB.read_text().splitlines()[0])
+        del record["requestId"]
+        spec = usage.load_format(FRAMEWORK, "claude-code")["transcript"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "s.jsonl"
+            path.write_text((json.dumps(record) + "\n") * 2)
+            self.assertEqual(len(usage.read_transcript(path, spec)), 2)
+
+
 class RebuildTest(unittest.TestCase):
     def test_default_counts_idle_gap_with_large_write(self) -> None:
         # r3 (gap 29 min, write 50k) and r5 (gap 22 h, 1h write 40k)
@@ -283,6 +294,21 @@ class ExitCodeTest(unittest.TestCase):
         code, text = run("/no/such/transcript-folder")
         self.assertEqual(code, 2)
         self.assertIn("no file or folder", text)
+
+    @unittest.skipIf(hasattr(os, "geteuid") and os.geteuid() == 0, "root reads any file")
+    def test_unreadable_file_exits_2(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "s.jsonl"
+            shutil.copy(MAIN, path)
+            path.chmod(0)
+            try:
+                spec = usage.load_format(FRAMEWORK, "claude-code")["transcript"]
+                with self.assertRaises(usage.UsageError):
+                    usage.read_transcript(path, spec)
+                code, _ = run(str(path))
+            finally:
+                path.chmod(0o600)
+        self.assertEqual(code, 2)
 
     def test_missing_harness_adapter_exits_2(self) -> None:
         code, text = run("--harness", "no-such-harness", str(PROJECT))
