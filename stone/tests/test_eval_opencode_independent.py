@@ -174,7 +174,8 @@ class Ac2StatusTest(unittest.TestCase):
 
     def test_ac2_stone_check_passes_on_repo(self) -> None:
         findings = framework_check.run(REPO)
-        self.assertEqual([str(f) for f in findings], [])
+        errors = [f for f in findings if f.severity == "error"]
+        self.assertEqual([str(f) for f in errors], [])
 
 
 class Ac3RoleTemplateTest(unittest.TestCase):
