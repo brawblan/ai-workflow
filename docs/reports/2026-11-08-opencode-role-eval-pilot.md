@@ -118,7 +118,7 @@ Each row is one run. Cost is in USD.
 
 Role totals:
 
-| Role | Model | Runs | Pass | Mean cost | Mean steps | Mean tools | Mean tool bytes | Mean wall s |
+| Role | Model | Runs | Pass | Total cost | Mean steps | Mean tools | Mean tool bytes | Mean wall s |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | Implementer | `deepseek-v4.1-flash` | 3 | 3 | 0.0122 | 9.7 | 11.7 | 7008 | 29.4 |
 | Implementer | `glm-5.3-flash` | 3 | 3 | 0.0072 | 7.7 | 7.7 | 2412 | 27.4 |
