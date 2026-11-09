@@ -249,7 +249,7 @@ class RunVariantsTest(VariantCase):
     def test_ac3_run_eval_raises_eval_error_for_unknown_variant(self) -> None:
         with self.assertRaises(evals.EvalError) as caught:
             evals.run_eval(self.root, GUIDANCE, framework=FRAMEWORK, run_config=self.run_yaml,
-                           model="m", variant="zzz")
+                           models=["m"], variant="zzz")
         for name in ("none", "a", "b"):
             self.assertIn(name, str(caught.exception))
 
@@ -290,7 +290,7 @@ class RunVariantsTest(VariantCase):
         self.write_guidance_run_config(guidance=False)
         with self.assertRaises(evals.EvalError) as caught:
             evals.run_eval(self.root, GUIDANCE, framework=FRAMEWORK, run_config=self.run_yaml,
-                           model="m")
+                           models=["m"])
         self.assertIn("run.guidance", str(caught.exception))
         self.assertEqual(self.calls(), [])
         self.assertFalse((self.root / ".cornerstone/eval-runs").exists())
@@ -318,7 +318,7 @@ class RunVariantsTest(VariantCase):
         self.scenarios(variants={"none": [], "a": [dict(CLAUDE)]})
         with self.assertRaises(evals.EvalError):
             evals.run_eval(self.root, base.COMPONENT, framework=FRAMEWORK, run_config=self.run_yaml,
-                           model="m")
+                           models=["m"])
         self.assertEqual(self.calls(), [])
         code, out = self.eval()
         self.assertNotEqual(code, 0)

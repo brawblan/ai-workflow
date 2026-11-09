@@ -308,7 +308,7 @@ class EndToEnd(unittest.TestCase):
 
     def run_eval(self, component: str = "trigger.label.single-ticket") -> tuple[list, str]:
         with mock.patch("sys.stdout"):
-            return evals.run_eval(self.root, component, run_config=self.run_yaml, model="m1")
+            return evals.run_eval(self.root, component, run_config=self.run_yaml, models=["m1"])
 
     def test_with_and_without_variants(self) -> None:
         runs, result = self.run_eval()
