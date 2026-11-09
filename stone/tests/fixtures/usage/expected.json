@@ -1,0 +1,52 @@
+{
+  "unit_note": "Cost is in relative units that follow the price ratios. It is not money.",
+  "rebuild_tokens": 30000,
+  "sessions": [
+    {
+      "session": "sess1/agent-a",
+      "kind": "subagent",
+      "model": "model-b",
+      "effort": "-",
+      "calls": 1,
+      "cache_read": 500,
+      "cache_write": {
+        "5m": 0,
+        "1h": 0
+      },
+      "output": 20,
+      "thinking": 5,
+      "context": 520,
+      "rebuilds": 0,
+      "cost": 170.0,
+      "share": 0.0006
+    },
+    {
+      "session": "sess1",
+      "kind": "main",
+      "model": "model-a",
+      "effort": "high",
+      "calls": 6,
+      "cache_read": 3000,
+      "cache_write": {
+        "5m": 90600,
+        "1h": 80000
+      },
+      "output": 195,
+      "thinking": 40,
+      "context": 50001,
+      "rebuilds": 2,
+      "cost": 274541.0,
+      "share": 0.9994
+    }
+  ],
+  "totals": {
+    "calls": 7,
+    "cost": 274711.0,
+    "shares": {
+      "cache_read": 0.0013,
+      "cache_write": 0.9947,
+      "output": 0.0039,
+      "input": 0.0001
+    }
+  }
+}
