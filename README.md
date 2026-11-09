@@ -149,6 +149,7 @@ writes the planner, tester, and reviewer roles, so the plugin has no skill for t
 | `setup` | Set up a repo for Cornerstone. It runs `project-setup`, writes `.cornerstone/config.yaml`, and runs `stone render` and `stone check`. |
 | `project-setup` | Set up a repo for agents: `constitution/` (with personas and job stories), and `AGENTS.md`. It asks only for facts the repo does not have. |
 | `ticket-delivery` | Collect the tester, reviewer, and check evidence for each acceptance criterion. Then branch, commit, rebase, and open the PR into the integration branch, with the evidence sections. |
+| `release-coordination` | Run a coordinator session that drives a release across child sessions at low token cost. |
 | `ste-writing` | Write with Simplified Technical English rules, and add diagrams. |
 
 `setup` needs the `stone` CLI and a clone of this repo. The other skills need only `git`
