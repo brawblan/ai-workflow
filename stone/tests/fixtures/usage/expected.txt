@@ -1,0 +1,6 @@
+Session        Kind      Model    Effort  Calls  Cache read  Cache write 5m/1h  Output (think)  Context  Rebuilds  Share
+sess1/agent-a  subagent  model-b  -       1      500         0/0                20 (5)          520      0         0.1%
+sess1          main      model-a  high    6      3.0k        90.6k/80.0k        195 (40)        50.0k    2         99.9%
+
+Totals: 7 calls. Share of cost: cache read 0.1%, cache write 99.5%, output 0.4%, input 0.0%.
+Cost is in relative units that follow the price ratios. It is not money.

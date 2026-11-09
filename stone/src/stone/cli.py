@@ -6,11 +6,14 @@ import argparse
 import subprocess
 import sys
 from collections.abc import Callable
+from datetime import date
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, index, ready_check,
-                   render, repo_rules, specialists, specs, upgrade, workflow_check, writing_check)
+                   render, repo_rules, specialists, specs, upgrade, usage, workflow_check, writing_check)
 from stone.findings import report
 
 
@@ -35,8 +38,40 @@ def _add_more_commands(commands: argparse._SubParsersAction) -> None:
     """Add check-rules, and index (#258). _parse sends each argument after 'index' to stone-index,
     also --help and --version."""
     _add_check_rules(commands)
+    _add_usage(commands)
     commands.add_parser("index", add_help=False,
                         help="Run stone-index from PATH with the same arguments (#258).")
+
+
+def _add_usage(commands: argparse._SubParsersAction) -> None:
+    """Add the usage command: a token report from the local session transcripts (#297)."""
+    use = commands.add_parser("usage", help="Report the token use of local session transcripts.")
+    use.add_argument("paths", nargs="*", type=Path, metavar="PATH",
+                     help="A transcript file or a folder. Default: the folders of this repo.")
+    use.add_argument("--root", type=Path, default=Path("."), help="Repo root. Default: '.'.")
+    use.add_argument("--framework", type=Path, help="Framework folder. Default: <root>/framework.")
+    use.add_argument("--harness", help="The adapter. Default: 'harness' in the repo config.")
+    use.add_argument("--since", type=date.fromisoformat, metavar="DATE",
+                     help="Keep only the calls on or after this date (YYYY-MM-DD).")
+    use.add_argument("--rebuild-tokens", type=int, default=usage.DEFAULT_REBUILD_TOKENS,
+                     help="Cache writes above this count make a rebuild. Default: 30000.")
+    use.add_argument("--json", action="store_true", help="Print JSON.")
+
+
+def _usage(args: argparse.Namespace) -> int:
+    try:
+        harness = args.harness or yaml.safe_load(
+            (args.root / ".cornerstone" / "config.yaml").read_text(encoding="utf-8"))["harness"]
+    except (OSError, KeyError, TypeError, yaml.YAMLError):
+        print("stone usage: give --harness, or set 'harness' in .cornerstone/config.yaml.")
+        return 2
+    try:
+        print(usage.run(args.root, args.framework or args.root / "framework", str(harness),
+                        args.paths, args.since, args.rebuild_tokens, args.json), end="")
+    except usage.UsageError as error:
+        print(f"stone usage: {error}")
+        return 2
+    return 0
 
 
 def _parse(argv: list[str] | None) -> argparse.Namespace:
@@ -461,5 +496,6 @@ _HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "check-specialists": _check_specialists,
     "check-rules": _check_rules,
     "eval": _eval,
+    "usage": _usage,
     "index": lambda args: index.run(args.args),
 }

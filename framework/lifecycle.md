@@ -99,7 +99,7 @@ If the specs do not help, stop the deltas. The applied specs stay as documentati
 | Baseline | Always measure without the component first. | G4 |
 | Grader | Use a code-based grader first. Use a model grader only for judgment, and calibrate it against a human. | G6 |
 | Consistency | Report pass^k (all k trials pass) for roles in CI. | G7 |
-| Cost | Record tokens and time for each run. A component that adds cost with no gain fails. | G3 |
+| Cost | Record tokens and time for each run. A component that adds cost with no gain fails. To measure the tokens of real sessions, run `stone usage` (D114). | G3 |
 | Transcripts | Read some transcripts at each review. A score alone can hide a bad grader. | G6 |
 | Human readers | For a component that changes human-facing text, use a blind A/B rating by a human. See [writing.md](writing.md#evidence-p5). | G8 |
 | Models | Run the eval on each model that the repo uses for that role. | G5 |
