@@ -507,10 +507,14 @@ def _eval(args: argparse.Namespace) -> int:
     if args.check_only:
         print("stone eval: the scenarios are valid.")
         return 0
+    return _eval_report(runs, result, len(args.model or []) > 1)
+
+
+def _eval_report(runs: list[evals.Run], result: str, matrix: bool) -> int:
     failed = [run for run in runs if run.variant not in ("without", "none") and not run.passed()]
     print(f"stone eval: {len(runs)} run(s), {len(failed)} failed with the component. "
           f"Results: {result}")
-    if len(args.model or []) > 1:
+    if matrix:
         print(_matrix(runs, False), end="")
     return 1 if failed else 0
 
