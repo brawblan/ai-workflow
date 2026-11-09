@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from collections.abc import Callable
@@ -12,7 +13,7 @@ from typing import Any
 
 import yaml
 
-from stone import (__version__, dependency_check, evals, evidence_check, framework_check, gate, index, ready_check,
+from stone import (__version__, dependency_check, eval_matrix, evals, evidence_check, framework_check, gate, index, ready_check,
                    render, repo_rules, specialists, specs, upgrade, usage, workflow_check, writing_check)
 from stone.findings import report
 
@@ -93,14 +94,22 @@ def _add_eval(commands: Any) -> None:
                      help="'with', 'without', or 'both' (default). A guidance eval takes the names "
                           "in the 'variants' of its scenarios.")
     run.add_argument("--trials", type=int, default=1, help="Runs for each scenario and variant.")
-    run.add_argument("--model", help="Default: the role model in the model profile.")
-    run.add_argument("--budget", default="5", help="The cost limit for each run. Default: 5.")
+    run.add_argument("--model", action="append", metavar="ID",
+                     help="Default: the role model in the model profile. A model ID can name its "
+                          "harness: <harness>:<model>. Repeat to run each model.")
+    run.add_argument("--budget", help="The cost limit for each run. Default: 5. A harness with no "
+                                      "cost limit ignores it, and the command says so.")
     run.add_argument("--timeout", type=int, default=1800, help="Seconds for each run.")
     run.add_argument("--run-config", type=Path,
                      help="The harness command file. Default: the eval.yaml of the adapter.")
     run.add_argument("--keep", action="store_true", help="Keep the workspace of each run.")
-    run.add_argument("--summary", type=Path, metavar="RUNS_JSONL",
-                     help="Print the result tables from a kept runs.jsonl. Start no run.")
+    run.add_argument("--summary", type=Path, action="append", metavar="RUNS_JSONL",
+                     help="Print the result tables from a kept runs.jsonl. Start no run. "
+                          "Repeat to join the runs of more components.")
+    run.add_argument("--by", choices=["model"],
+                     help="With --summary: one row for each component and model.")
+    run.add_argument("--json", action="store_true", dest="as_json",
+                     help="With --by: print the data as JSON.")
     run.add_argument("--check-only", action="store_true",
                      help="Validate the scenarios and list the runs. Start no run.")
 
@@ -438,19 +447,40 @@ def _check_ready(ticket: str, profile: str | None, mode: str, fmt: str) -> int:
 
 
 def _eval_summary(args: argparse.Namespace) -> int:
+    runs: list[evals.Run] = []
     try:
-        runs = evals.load_runs(args.summary, args.root)
+        for path in args.summary:
+            found = evals.load_runs(path, args.root)
+            for run in found:
+                run.component = run.component or args.component or path.parent.name
+            runs += found
     except evals.EvalError as error:
         print(f"stone eval: {error}")
         return 2
-    print(evals.summary(args.component or args.summary.parent.name, args.model or "unknown", runs),
-          end="")
+    if args.by:
+        print(_matrix(runs, args.as_json), end="")
+        return 0
+    if len(args.summary) > 1 or args.as_json:
+        print("stone eval: give --by model to join runs files or to print JSON.")
+        return 2
+    print(evals.summary(args.component or args.summary[0].parent.name,
+                        (args.model or ["unknown"])[0], runs), end="")
     return 0
+
+
+def _matrix(runs: list[evals.Run], as_json: bool) -> str:
+    found, counted = eval_matrix.rows(runs), eval_matrix.variants(runs)
+    if as_json:
+        return json.dumps(eval_matrix.as_json(found, counted), indent=2) + "\n"
+    return eval_matrix.text(found, counted)
 
 
 def _eval(args: argparse.Namespace) -> int:
     if args.summary:
         return _eval_summary(args)
+    if args.by or args.as_json:
+        print("stone eval: --by and --json need --summary.")
+        return 2
     if not args.component:
         print("stone eval: give a component ID, or use --summary.")
         return 2
@@ -460,7 +490,7 @@ def _eval(args: argparse.Namespace) -> int:
     try:
         runs, result = evals.run_eval(
             args.root, args.component, framework=args.framework, scenario_ids=args.scenario,
-            variant=args.variant, trials=args.trials, model=args.model, budget=args.budget,
+            variant=args.variant, trials=args.trials, models=args.model, budget=args.budget,
             timeout=args.timeout, run_config=args.run_config, keep=args.keep,
             check_only=args.check_only)
     except (evals.EvalError, render.RenderError) as error:
@@ -472,6 +502,8 @@ def _eval(args: argparse.Namespace) -> int:
     failed = [run for run in runs if run.variant not in ("without", "none") and not run.passed()]
     print(f"stone eval: {len(runs)} run(s), {len(failed)} failed with the component. "
           f"Results: {result}")
+    if len(args.model or []) > 1:
+        print(_matrix(runs, False), end="")
     return 1 if failed else 0
 
 

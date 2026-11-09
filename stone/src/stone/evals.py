@@ -41,6 +41,7 @@ POSTED_ENV = "STONE_EVAL_POSTED"  # grade.py reads the posted text here (D101)
 GH_CALLS_ENV = "STONE_EVAL_GH_CALLS"  # and each call of the forge CLI, one on each line
 RUNS = Path(".cornerstone/eval-runs")
 RESULTS = results.RESULTS
+DEFAULT_BUDGET = "5"  # the cost limit of a run if --budget is not set
 WORK_BRANCH = "feature/eval-work"
 GIT_ENV = {"GIT_AUTHOR_NAME": "stone eval", "GIT_AUTHOR_EMAIL": "eval@example.invalid",
            "GIT_COMMITTER_NAME": "stone eval", "GIT_COMMITTER_EMAIL": "eval@example.invalid",
@@ -73,6 +74,9 @@ class Run:
     checks: list[dict[str, Any]] = field(default_factory=list)
     usage: dict[str, Any] = field(default_factory=dict)
     error: str = ""
+    component: str = ""  # the three keys that follow name the cell of a model matrix (#304)
+    harness: str = ""
+    model: str = ""
 
     def passed(self, kind: str | None = None) -> bool:
         return not self.error and all(c["pass"] for c in self.checks
@@ -844,54 +848,47 @@ def _print_check_only(scenarios: list[dict[str, Any]], variants: tuple[str, ...]
               f"{len(variants) * trials} run(s)")
 
 
-def _run_options(framework: Path, entry: dict[str, Any], loaded: dict[str, Any],
-                 model: str, budget: str, timeout: int, runs_folder: Path, keep: bool,
-                 data: dict[str, Any], profile_id: str, parser: Any, harness_name: str,
-                 model_profile: str) -> dict[str, Any]:
-    return {"framework": framework.resolve(), "role_file": entry.get("target", ""),
-            "kind": entry.get("kind", ""), "run_config": loaded, "model": model,
-            "budget": budget, "timeout": timeout, "runs": runs_folder, "keep": keep,
-            "variants": data.get("variants") or {}, "profile": profile_id, "parser": parser,
-            "harness": harness_name, "model_profile": model_profile}
+@dataclass
+class Target:
+    """One model of the run, with the harness and the checked scenarios that it needs."""
+    harness: str
+    run_config: Path
+    loaded: dict[str, Any]
+    entry: dict[str, Any]
+    data: dict[str, Any]
+    scenarios: list[dict[str, Any]]
+    variants: tuple[str, ...]
+    parser: Any
+    model_profile: str
+    model: str
+    prefixed: bool  # the ID named its harness, as in `<harness>:<model>`
+
+    @property
+    def label(self) -> str:
+        return f"{self.harness}:{self.model}" if self.prefixed else self.model
 
 
-def _run_all(folder: Path, data: dict[str, Any], scenarios: list[dict[str, Any]],
-             variants: tuple[str, ...], trials: int, opts: dict[str, Any],
-             runs_folder: Path) -> list[Run]:
-    runs: list[Run] = []
-    with (runs_folder / "runs.jsonl").open("w", encoding="utf-8") as handle:
-        for scenario in scenarios:
-            for name in variants:
-                for trial in range(1, trials + 1):
-                    run = run_once(folder, data, scenario, name, trial, opts)
-                    print(f"{run.scenario} {run.variant} {run.trial}: "
-                          f"{'pass' if run.passed() else 'fail'} {run.error}".rstrip())
-                    runs.append(run)
-                    handle.write(json.dumps(run.__dict__) + "\n")  # kept if a later run stops
-                    handle.flush()
-    return runs
+def split_model(framework: Path, spec: str | None) -> tuple[str, str]:
+    """Split `<harness>:<model>`. The prefix counts only if it is an adapter folder, because a
+    model ID can hold a colon. Return ("", model) with no harness."""
+    prefix, colon, rest = (spec or "").partition(":")
+    if colon and prefix and (framework / "adapters" / prefix / "eval.yaml").is_file():
+        return prefix, rest
+    return "", spec or ""
 
 
-def _write_result(root: Path, stamp: str, component_id: str, model: str, runs: list[Run],
-                  harness_name: str) -> str:
-    safe_model = re.sub(r"[^\w.-]+", "-", model) or "default"
-    result_path = root / RESULTS / f"{stamp}-{component_id}-{safe_model}.md"
-    result_path.parent.mkdir(parents=True, exist_ok=True)
-    result_path.write_text(summary(component_id, model, runs, harness_name),
-                           encoding="utf-8")
-    return str(result_path)
-
-
-def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
-             scenario_ids: list[str] | None = None, variant: str = "both", trials: int = 1,
-             model: str | None = None, budget: str = "5", timeout: int = 1800,
-             run_config: Path | None = None, keep: bool = False,
-             check_only: bool = False) -> tuple[list[Run], str]:
-    """Run the eval. Return the runs and the path of the result file ('' for check_only)."""
-    framework = framework or root / "framework"
-    config = render.load_config(root, framework)
-    run_config, harness_name = _run_harness(config, framework, run_config)
-    loaded = load_run_config(run_config)
+def _prepare_target(root: Path, framework: Path, config: dict[str, Any], component_id: str,
+                    spec: str | None, run_config: Path | None, scenario_ids: list[str] | None,
+                    variant: str) -> Target:
+    """Check one model and its harness. Raise before any run starts."""
+    prefix, model = split_model(framework, spec)
+    if prefix and run_config:
+        raise EvalError(f"--model '{spec}' names the harness '{prefix}'. Remove --run-config, "
+                        "or remove the harness from the model ID.")
+    path, harness_name = _run_harness(config, framework, run_config)
+    if prefix:
+        path, harness_name = framework / "adapters" / prefix / "eval.yaml", prefix
+    loaded = load_run_config(path)
     try:
         entry = find_component(framework, harness_name, component_id, root)
     except ComponentNotFound as error:
@@ -901,18 +898,26 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
             raise EvalError(f"The harness '{harness_name}' does not support a {kind} eval. "
                             f"{reason}") from error
         raise
-    folder = root / entry["eval"]
     profile_id = entry.get("profile", "")
-    data = load_scenarios(folder, role_required=not profile_id)
+    data = load_scenarios(root / entry["eval"], role_required=not profile_id)
     data["role"] = _first_role(framework, entry) if profile_id else data["role"]
     scenarios = _select(data["scenarios"], scenario_ids, profile_id)
     harness = framework / "adapters" / harness_name
-    parser = load_parser(run_config, harness, loaded)
     model_profile = _model_profile(harness, config["model_profile"],
                                    allow_fallback=harness_name != config["harness"])
     profile = yaml.safe_load((harness / "models" / f"{model_profile}.yaml")
                              .read_text(encoding="utf-8"))
     model = model or profile["defaults"]["role_models"].get(data["role"], "")
+    if entry.get("kind") == "guidance" and not model:
+        raise EvalError("A guidance eval has no role model. Pass --model.")
+    variants = _variants(component_id, entry, data, loaded, variant)
+    return Target(harness_name, path, loaded, entry, data, scenarios, variants,
+                  load_parser(path, harness, loaded), model_profile, model, bool(prefix))
+
+
+def _variants(component_id: str, entry: dict[str, Any], data: dict[str, Any],
+              loaded: dict[str, Any], variant: str) -> tuple[str, ...]:
+    """The variants to run. Raise if the component or the harness cannot run them."""
     if data.get("variants") and entry.get("kind") != "guidance":
         raise EvalError(f"{component_id} is in the adapter component list, so it takes the variants "
                         "'with' and 'without'. Remove 'variants' from its scenarios.")
@@ -921,8 +926,6 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
         raise EvalError(f"The variant '{variant}' is not known. Use 'both' or one of "
                         f"{list(names)}.")
     variants = names if variant == "both" else (variant,)
-    if entry.get("kind") == "guidance" and not model:
-        raise EvalError("A guidance eval has no role model. Pass --model.")
     if entry.get("kind") == "guidance" and "guidance" not in loaded["run"]:
         reason = (loaded.get("unsupported") or {}).get("guidance") or ""
         raise EvalError(_with_reason(
@@ -930,13 +933,93 @@ def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
     if entry.get("merge") and "without" in variants:
         raise EvalError(f"{component_id} is merged into a shared file. The runner cannot remove "
                         "it for 'without' yet. Use --variant with.")
+    return variants
+
+
+def has_budget_limit(target: Target) -> bool:
+    """True if the run command of a selected variant passes the cost limit ($budget)."""
+    launch = {"role": target.variants, "guidance": ("guidance",)}.get(
+        target.entry.get("kind", ""), ("with",))
+    return any("$budget" in str(item) for name in launch
+               for item in target.loaded["run"].get(name, []))
+
+
+def budget_notes(targets: list[Target], budget: str | None) -> list[str]:
+    """One line for each harness that has no cost limit. Give none if --budget is not set."""
+    if budget is None:
+        return []
+    return [f"stone eval: the harness '{name}' has no cost limit, so --budget {budget} has no "
+            "effect on its runs." for name in dict.fromkeys(
+                t.harness for t in targets if not has_budget_limit(t))]
+
+
+def _run_options(framework: Path, entry: dict[str, Any], target: Target, budget: str,
+                 timeout: int, runs_folder: Path, keep: bool, profile_id: str) -> dict[str, Any]:
+    return {"framework": framework.resolve(), "role_file": entry.get("target", ""),
+            "kind": entry.get("kind", ""), "run_config": target.loaded, "model": target.model,
+            "budget": budget, "timeout": timeout, "runs": runs_folder, "keep": keep,
+            "variants": target.data.get("variants") or {}, "profile": profile_id,
+            "parser": target.parser, "harness": target.harness,
+            "model_profile": target.model_profile}
+
+
+def _run_all(folder: Path, component_id: str, target: Target, trials: int, opts: dict[str, Any],
+             handle: Any) -> list[Run]:
+    runs: list[Run] = []
+    for scenario in target.scenarios:
+        for name in target.variants:
+            for trial in range(1, trials + 1):
+                run = run_once(folder, target.data, scenario, name, trial, opts)
+                run.component, run.harness, run.model = component_id, target.harness, target.model
+                print(f"{target.label + ' ' if target.label else ''}{run.scenario} {run.variant} "
+                      f"{run.trial}: {'pass' if run.passed() else 'fail'} {run.error}".rstrip())
+                runs.append(run)
+                handle.write(json.dumps(run.__dict__) + "\n")  # kept if a later run stops
+                handle.flush()
+    return runs
+
+
+def _write_result(root: Path, stamp: str, component_id: str, target: Target,
+                  runs: list[Run]) -> str:
+    safe_model = re.sub(r"[^\w.-]+", "-", target.label) or "default"
+    result_path = root / RESULTS / f"{stamp}-{component_id}-{safe_model}.md"
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    result_path.write_text(summary(component_id, target.model, runs, target.harness),
+                           encoding="utf-8")
+    return str(result_path)
+
+
+def run_eval(root: Path, component_id: str, *, framework: Path | None = None,
+             scenario_ids: list[str] | None = None, variant: str = "both", trials: int = 1,
+             models: list[str] | None = None, budget: str | None = None, timeout: int = 1800,
+             run_config: Path | None = None, keep: bool = False,
+             check_only: bool = False) -> tuple[list[Run], str]:
+    """Run the eval on each model. Return the runs and the result file paths, joined with ", "
+    ('' for check_only). Every model is checked before the first run starts."""
+    framework = framework or root / "framework"
+    config = render.load_config(root, framework)
+    targets = [_prepare_target(root, framework, config, component_id, spec, run_config,
+                               scenario_ids, variant) for spec in (models or [None])]
+    for note in budget_notes(targets, budget):
+        print(note)
     if check_only:
-        _print_check_only(scenarios, variants, trials)
+        for target in targets:
+            _print_check_only(target.scenarios, target.variants, trials)
         return [], ""
     stamp = dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    runs_folder = root / RUNS / f"{stamp}-{entry['eval'].strip('/').split('/')[-1]}"
+    runs_folder = root / RUNS / f"{stamp}-{targets[0].entry['eval'].strip('/').split('/')[-1]}"
     runs_folder.mkdir(parents=True, exist_ok=True)
-    opts = _run_options(framework, entry, loaded, model, budget, timeout, runs_folder, keep,
-                        data, profile_id, parser, harness_name, model_profile)
-    runs = _run_all(folder, data, scenarios, variants, trials, opts, runs_folder)
-    return runs, _write_result(root, stamp, component_id, model, runs, harness_name)
+    runs: list[Run] = []
+    results: list[str] = []
+    with (runs_folder / "runs.jsonl").open("w", encoding="utf-8") as handle:
+        for target in targets:
+            own = runs_folder
+            if len(targets) > 1:  # a transcript name has no model, so each model gets a folder
+                own = runs_folder / (re.sub(r"[^\w.-]+", "-", target.label) or "default")
+                own.mkdir(parents=True, exist_ok=True)
+            opts = _run_options(framework, target.entry, target, budget or DEFAULT_BUDGET,
+                                timeout, own, keep, target.entry.get("profile", ""))
+            found = _run_all(root / target.entry["eval"], component_id, target, trials, opts, handle)
+            runs += found
+            results.append(_write_result(root, stamp, component_id, target, found))
+    return runs, ", ".join(results)
