@@ -1,0 +1,36 @@
+# How `stone usage` reads the session transcripts of this harness (issue #297, D114).
+# The core reads this file and holds no format of its own (P12). The weights are relative units,
+# not money. They follow the ratio of the public price list: input 1, cache read 0.1, cache write
+# for 5 minutes 1.25, cache write for 1 hour 2, output 5.
+
+# A folder name is the repo path with each "/" and "." changed to "-". {key} is that name.
+# A folder pattern may have a "*". A repo with linked worktrees has one folder for each worktree.
+folders:
+  - ~/.claude/projects/{key}
+  - ~/.claude/projects/{key}-*
+
+transcript:
+  glob: "*.jsonl"            # one transcript for each session. Subagent files are under `subagents`.
+  subagent_folder: subagents
+  record: {field: type, value: assistant}   # only these records have usage data
+  call_id: requestId         # one API call can write more than one record
+  time: timestamp
+  model: message.model
+  effort: effort
+  usage:
+    input: message.usage.input_tokens
+    cache_read: message.usage.cache_read_input_tokens
+    cache_write_total: message.usage.cache_creation_input_tokens   # used if no split is given
+    cache_write_5m: message.usage.cache_creation.ephemeral_5m_input_tokens
+    cache_write_1h: message.usage.cache_creation.ephemeral_1h_input_tokens
+    output: message.usage.output_tokens
+    thinking: message.usage.output_tokens_details.thinking_tokens
+
+cache_seconds: {5m: 300, 1h: 3600}
+
+weights:
+  input: 1
+  cache_read: 0.1
+  cache_write_5m: 1.25
+  cache_write_1h: 2
+  output: 5
