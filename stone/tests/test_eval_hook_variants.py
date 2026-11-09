@@ -63,7 +63,7 @@ class HookWorkspaceTest(WorkspaceCase):
         data = json.loads(text)
         self.assertIsInstance(data, dict)
         self.assertEqual(entries(data), [])
-        self.assertNotIn("matcher", text)
+        self.assertNotIn(MATCHER, text)  # the context guard (#299) has its own PostToolUse matcher
 
     def test_without_keeps_the_implementer_role_file(self) -> None:
         self.assertTrue((self.workspace("without") / IMPLEMENTER).is_file())
@@ -120,7 +120,11 @@ class OtherSettingsTest(WorkspaceCase):
         # Render keeps the existing permission and adds the default code index permission (D111).
         self.assertEqual(data["permissions"], {"allow": ["Read", "Bash(stone-index *)"]})
         self.assertEqual(data["hooks"]["PreToolUse"], [self.OTHER])
-        self.assertEqual(data["hooks"]["PostToolUse"], fixture["hooks"]["PostToolUse"])
+        # Render keeps the existing entry and adds the context guard entry (#299, D114).
+        post = data["hooks"]["PostToolUse"]
+        self.assertEqual(post[:1], fixture["hooks"]["PostToolUse"])
+        self.assertEqual(len(post), 2)
+        self.assertIn("context-guard", json.dumps(post[1]))
         self.assertEqual(git_status(ws), "")
 
     def test_with_keeps_the_other_entry_and_adds_the_hook_entry(self) -> None:

@@ -52,11 +52,11 @@ LABEL_WORKFLOW = f".github/workflows/cornerstone-{PROFILE}-label.yml"
 FILES = [".claude/agents/implementer.md", ".claude/agents/reviewer.md",
          ".claude/agents/shaper.md", ".claude/agents/tester.md", ".claude/settings.json",
          ".cornerstone/checks/change_size.py", ".cornerstone/checks/protected_paths.py",
-         ".cornerstone/hooks/protect-paths.py", ".cornerstone/lib/path_match.py", MANIFEST,
+         ".cornerstone/hooks/context-guard.py", ".cornerstone/hooks/protect-paths.py", ".cornerstone/lib/path_match.py", MANIFEST,
          WORKFLOW, LABEL_WORKFLOW]
 NOT_WRITTEN = [".claude/agents/planner.md", ".claude/agents/investigator.md",
                ".cornerstone/checks/instruction_size.py", ".github/workflows/cornerstone-k16.yml"]
-COMPONENTS = ["check.k6", "check.k7", "ci-job.checks", "hook.path-match", "hook.protect-paths",
+COMPONENTS = ["check.k6", "check.k7", "ci-job.checks", "hook.context-guard", "hook.path-match", "hook.protect-paths",
               "hook.settings", "role.implementer", "role.reviewer", "role.shaper", "role.tester",
               f"trigger.label.{PROFILE}"]
 

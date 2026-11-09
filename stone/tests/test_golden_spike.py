@@ -43,11 +43,11 @@ MANIFEST = ".cornerstone/manifest.yaml"
 
 # Pins from framework/profiles/spike.md: roles [shaper, investigator], G3 skip, K16 in checks.
 FILES = [".claude/agents/investigator.md", ".claude/agents/shaper.md", ".claude/settings.json",
-         ".cornerstone/hooks/protect-paths.py", ".cornerstone/lib/path_match.py", MANIFEST,
+         ".cornerstone/hooks/context-guard.py", ".cornerstone/hooks/protect-paths.py", ".cornerstone/lib/path_match.py", MANIFEST,
          ".github/workflows/cornerstone-k16.yml"]
 NOT_WRITTEN = [".github/workflows/cornerstone-checks.yml",
                ".cornerstone/checks/protected_paths.py"]
-COMPONENTS = ["check.k16", "hook.path-match", "hook.protect-paths", "hook.settings",
+COMPONENTS = ["check.k16", "hook.context-guard", "hook.path-match", "hook.protect-paths", "hook.settings",
               "role.investigator", "role.shaper"]
 
 

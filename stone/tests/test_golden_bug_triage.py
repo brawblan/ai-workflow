@@ -45,13 +45,13 @@ MANIFEST = ".cornerstone/manifest.yaml"
 # triggers [ci:issue-opened, schedule:daily, command]. D31: render writes one workflow for each
 # trigger that is not `command`, so render writes the issue-opened and the schedule workflows.
 FILES = [".claude/agents/investigator.md", ".claude/settings.json",
-         ".cornerstone/hooks/protect-paths.py", ".cornerstone/lib/path_match.py", MANIFEST,
+         ".cornerstone/hooks/context-guard.py", ".cornerstone/hooks/protect-paths.py", ".cornerstone/lib/path_match.py", MANIFEST,
          f".github/workflows/cornerstone-{PROFILE}-issue-opened.yml",
          f".github/workflows/cornerstone-{PROFILE}-schedule.yml"]
 NOT_WRITTEN = [".github/workflows/cornerstone-checks.yml",
                ".github/workflows/cornerstone-k16.yml",
                ".cornerstone/checks/protected_paths.py"]
-COMPONENTS = ["hook.path-match", "hook.protect-paths", "hook.settings", "role.investigator",
+COMPONENTS = ["hook.context-guard", "hook.path-match", "hook.protect-paths", "hook.settings", "role.investigator",
               f"trigger.issue-opened.{PROFILE}", f"trigger.schedule.{PROFILE}"]
 
 

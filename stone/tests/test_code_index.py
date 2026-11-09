@@ -163,7 +163,9 @@ class OptOutTest(RenderedBase):
 
     def test_ac6_none_settings_equal_the_protect_paths_fragment(self) -> None:
         golden = json.loads((SHARED / SETTINGS).read_text(encoding="utf-8"))
-        old = {"hooks": {"PreToolUse": golden["hooks"]["PreToolUse"]}}
+        # The context guard (#299) adds its own entries. This test is about the code index only.
+        old = {"hooks": {key: golden["hooks"][key]
+                         for key in ("PreToolUse", "UserPromptSubmit", "PostToolUse")}}
         self.assertEqual(self.settings(self.rendered("none")), old)
 
     def test_ac6_none_role_files_equal_the_default_without_the_section(self) -> None:
@@ -272,7 +274,9 @@ class ChangeValueTest(unittest.TestCase):
     def owned(self) -> list[str]:
         manifest = yaml.safe_load((self.root / render.MANIFEST).read_text(encoding="utf-8"))
         found = [c for c in manifest["components"] if c["id"] == "hook.settings"]
-        return found[0].get("owned") or []
+        # The context guard (#299) owns its own entries. This class tests the code index only.
+        return [o for o in found[0].get("owned") or []
+                if "/UserPromptSubmit" not in o and "/PostToolUse" not in o]
 
     def test_default_to_none_removes_the_index_entries(self) -> None:
         self.go()

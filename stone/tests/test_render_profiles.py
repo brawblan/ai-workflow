@@ -52,7 +52,8 @@ K15 = ".cornerstone/checks/instruction_size.py"
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
 K16_WORKFLOW = ".github/workflows/cornerstone-k16.yml"
 MANIFEST = ".cornerstone/manifest.yaml"
-ALWAYS = [HOOK, PATH_MATCH, SETTINGS, MANIFEST]
+GUARD = ".cornerstone/hooks/context-guard.py"  # #299
+ALWAYS = [GUARD, HOOK, PATH_MATCH, SETTINGS, MANIFEST]
 REPORT_PROFILES = ["bug-triage", "code-audit", "spike"]
 
 

@@ -44,6 +44,20 @@ components:
     files:
       - .github/workflows/cornerstone-checks.yml
     hash: 5269ce6c63cdf626905d69dbe3057b3675a66094c30602163b999c75ea290c09
+  - id: hook.context-guard
+    kind: hook
+    purpose: Tell the agent when the session context passes the limit, and after it opens a PR.
+    principle:
+      - P4
+    source: framework
+    owner: octocat
+    eval: evals/hook-context-guard/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/hooks/context-guard.py
+    hash: 3e0f4a8fdc70f032e8e4f175bb7f81e952020423fd0c571852ce0754eb3c1f36
   - id: hook.path-match
     kind: hook
     purpose: Match a path against paths.tests and paths.checks. The hook and K6 import it.
@@ -87,10 +101,12 @@ components:
     review_by: "2027-04-18"
     files:
       - .claude/settings.json
-    hash: a7b10ba69721fe194bb1a3582736033e3d7ca37fd86d4ee7c065ea90ac126a9f
+    hash: 2fe50bef1b105515e1018f44384261e6be465fff63895b47674ef1a96a03d8fd
     owned:
       - /permissions/allow=58d8cc94439549c9
       - /hooks/SessionStart=c4249d258f305d42
+      - /hooks/UserPromptSubmit=dd6271ad27bc99b8
+      - /hooks/PostToolUse=e735ec2e03349149
   - id: role.implementer
     kind: role
     purpose: Change the code to meet the ticket. Write the decision log.
