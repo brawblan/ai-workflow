@@ -26,14 +26,11 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | Task | Command |
 | --- | --- |
 | Install the CLI | `pip install ./stone` |
-| Unit tests | `python -m unittest discover -s stone/tests` |
-| Unit tests, in parallel (about 3 times faster). Add `-q` to show only failures and the summary | `python stone/tests/run_parallel.py` |
+| Unit tests. Add `-q` to show only failures. The parallel runner is about 3 times faster | `python stone/tests/run_parallel.py` (or `python -m unittest discover -s stone/tests`) |
 | Validate the framework | `stone check` |
 | Writing check (K17) on your changes | `stone check-writing --diff origin/dev` |
 | Action pins, plugin version bump, event text in `env`, and commit message format (R1 to R4, D78, D97, D98) | `stone check-rules --base origin/dev` |
-| Rust format check (in `indexer/`) | `cargo fmt --check` |
-| Rust lint (in `indexer/`) | `cargo clippy --locked --all-targets -- -D warnings` |
-| Rust tests (in `indexer/`) | `cargo test --locked` |
+| Rust checks (in `indexer/`) | `cargo fmt --check`, `cargo clippy --locked --all-targets -- -D warnings`, `cargo test --locked` |
 | Validate the plugin | `claude plugin validate .` |
 | Preview the docs site | `pip install -r website/requirements.txt && mkdocs serve` |
 | Try a skill before you push | `claude --plugin-dir plugins/cornerstone` |
@@ -83,12 +80,9 @@ tool-neutral, and `stone check` fails on a vendor name in it.
   GitHub repo is still `main`.
 - Branch from `dev`. Name branches `feature/<slug>`, `fix/<slug>`, or `chore/<slug>`.
 - Open each PR into `dev`. Never push to `dev` or `main` directly. Never force-push a shared branch.
-- A release is a PR from `dev` into `main`. Merge it, then tag the merge commit `vX.Y.Z`. The tag
-  deploys the docs site. A push to `dev` or `main` does not. Steps:
-  [versioning.md](framework/versioning.md#release-checklist).
-- A docs change between releases: if `dev` has no unreleased code, merge `dev` into `main` with no
-  tag, then run the `pages` workflow by hand on `main`. Steps:
-  [versioning.md](framework/versioning.md#a-docs-change-between-releases).
+- A release is a PR from `dev` into `main`, then a tag `vX.Y.Z` on the merge commit. The tag deploys
+  the docs site. Steps: [versioning.md](framework/versioning.md#release-checklist). A docs change
+  between releases: [versioning.md](framework/versioning.md#a-docs-change-between-releases).
 - Commit messages: `type(scope): summary` (for example `feat(stone): ...`, `docs(framework): ...`).
   Explain why in the body.
 - Role trailers: a commit that changes a protected path (`.cornerstone/`, `.claude/`, `.github/workflows/`,
