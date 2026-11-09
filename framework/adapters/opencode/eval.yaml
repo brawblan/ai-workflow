@@ -1,8 +1,8 @@
 # How `stone eval` starts one headless role run in this harness (lifecycle.md, "Eval design").
 # stone fills $role, $model, $budget, and $prompt. The role file is the source of the tools and the
 # permissions in this harness, so the run command lists no tools. For a role eval, the two variants
-# differ only in --agent: the runner also removes the role file from the workspace for "without"
-# (D44).
+# differ in --agent, and the runner removes the role file from the workspace for "without". The
+# "without" run therefore also loses the role permissions and the step cap (see the adapter doc).
 # --standalone gives the run a private server. --format json gives one JSON object on each line.
 # --auto approves each permission that the role file does not deny. --archived keeps the eval
 # sessions out of the session list. --steps in the role file caps the model steps.
@@ -20,6 +20,7 @@ run:
 unsupported:
   guidance: "The #302 pilot did not prove a guidance run."
   trigger: "The #302 pilot did not prove a trigger run."
+  hook: "This adapter has no hook, so there is no hook eval."
 
 env:   # Keep the user-level Claude Code files out of the run. The #302 probe saw no difference.
   with: {OPENCODE_DISABLE_CLAUDE_CODE: "1"}

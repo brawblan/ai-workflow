@@ -93,6 +93,11 @@ cost estimate.
 
 Limits of this eval run:
 
+- The `without` variant has no role file. OpenCode then uses its default agent, which allows all
+  actions, and `--auto` approves each one. The step cap is also absent. So the lift between `with`
+  and `without` mixes the role text, the permissions, and the step cap. It is not comparable to the
+  reference adapter (D44). Run it only in a clean workspace with no secrets.
+
 - There is no `--setting-sources project` flag. `OPENCODE_DISABLE_CLAUDE_CODE=1` made no difference
   in the pilot. Start the run in a clean workspace and keep the global OpenCode config empty.
 - A guidance eval needs `run.guidance`, and a trigger eval needs `run.trigger`. This adapter has
@@ -114,6 +119,11 @@ Limits of this eval run:
 
 Unproven facts:
 
+- `[TO CONFIRM]` the repo and user instruction file paths, and that OpenCode reads `CLAUDE.md` only
+  if `AGENTS.md` is absent. The pilot did not test them.
+- `[TO CONFIRM]` the skill path `.opencode/skills/<name>/SKILL.md`.
+- `[TO CONFIRM]` the action names `read`, `grep`, `glob`, and `edit`. The pilot proved only `*` and
+  the shell rule.
 - `[TO CONFIRM]` that a clean global config removes each user-level rule from a run.
 - `[TO CONFIRM]` that the published token rates stay fixed.
 
