@@ -14,6 +14,14 @@ If your tool does not load skills, paste the `SKILL.md` text into the chat. Then
 
 Not all tools load all parts of a skill in the same way. Test a skill before you depend on it.
 
+## OpenCode
+
+[TO CONFIRM] OpenCode reads `AGENTS.md` in the repo root and `~/.config/opencode/AGENTS.md`.
+
+[TO CONFIRM] Copy a skill folder to `.opencode/skills/<name>/`.
+
+See the [OpenCode adapter](../../framework/adapters/opencode.md) for its support status and other unproven facts.
+
 ## Instructions file (AGENTS.md)
 
 [`global/AGENTS.md`](../../global/AGENTS.md) has my writing and visuals rules. Many tools read an

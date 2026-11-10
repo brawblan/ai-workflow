@@ -201,7 +201,8 @@ framework/principles.md:68: error: K17: Rule 8: The sentence has 26 words. The l
 - In `--diff` mode, K17 tests each line of an untracked Markdown file. It skips a file that git ignores.
 - The tense test (rule 2) and the passive test (rule 11) are warnings, because they also match some adjectives.
 - K14 finds a section by a heading (`## Evidence`) or a line with only bold text (`**Evidence**`). It does not judge if the content is true. The reviewer and the human do that.
-- `render` supports only the `claude-code` harness. It skips a profile with a role that the adapter has no file for, with a log line.
+- `render` supports only the `claude-code` harness. It refuses an adapter with `status: eval-only`, such as `opencode`.
+- `usage` reads only an adapter that has a `usage.yaml`. Today only `claude-code` has one.
 - K7 counts the added and deleted lines from the merge base to `HEAD`. A binary file counts 0. A
   generated file and a lock file count too. Add a `Waiver (P10)` section for them.
 - `render` does not check `framework_version` against the framework folder. Check out the tag yourself.
