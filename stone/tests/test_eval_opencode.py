@@ -119,6 +119,24 @@ class OpenCodeAdapterTest(unittest.TestCase):
                 ],
             }],
         }, sort_keys=False))
+        self.write("evals/trigger-issue-opened/fixtures/issue.json", "{}\n")
+        self.write("evals/trigger-issue-opened/fixtures/repo/README.md", "Notes.\n")
+        self.write("evals/trigger-issue-opened/fixtures/repo/.cornerstone/config.yaml",
+                   CONFIG.replace("profiles: [single-ticket]",
+                                  "profiles: [single-ticket, bug-triage]"))
+        self.write("evals/trigger-issue-opened/scenarios.yaml", yaml.safe_dump({
+            "component": "trigger.issue-opened",
+            "task": "Triage the issue in $event_file.",
+            "scenarios": [{
+                "id": "O1",
+                "profiles": ["bug-triage"],
+                "fixture": "fixtures/repo",
+                "event": "fixtures/issue.json",
+                "number": 1,
+                "prompt": "Issue 1.",
+                "expect": [{"check": "file_exists", "path": "README.md"}],
+            }],
+        }, sort_keys=False))
         fake = self.bin / "opencode"
         fake.write_text(FAKE_OPENCODE, encoding="utf-8")
         fake.chmod(fake.stat().st_mode | stat.S_IXUSR)
@@ -143,13 +161,13 @@ class OpenCodeAdapterTest(unittest.TestCase):
                              *args])
         return code, out.getvalue()
 
-    def component(self, component: str, *args: str) -> tuple[int, str]:
+    def component(self, component: str, *args: str, check_only: bool = True) -> tuple[int, str]:
         """Run a named component with the OpenCode run config."""
         out = io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
             code = cli.main(["eval", component, "--root", str(self.root),
                              "--framework", str(FRAMEWORK), "--run-config", str(EVAL_YAML),
-                             "--check-only", *args])
+                             *(["--check-only"] if check_only else []), *args])
         return code, out.getvalue()
 
     def no_harness_started(self) -> None:
@@ -319,14 +337,20 @@ class OpenCodeAdapterTest(unittest.TestCase):
         self.assertEqual(stats, (1, 0))
 
     def test_unsupported_evals_print_the_adapter_reason_and_start_no_harness(self) -> None:
+        # The OpenCode adapter has a trigger component now (#327). So the trigger case needs a
+        # profile with the trigger and a real run (not --check-only). The run then fails at the
+        # setup, with exit code 1, because the harness run file has no 'trigger.with'.
         cases = {
-            "guidance.writing": "did not prove a guidance run",
-            "trigger.issue-opened.single-ticket": "did not prove a trigger run",
+            "guidance.writing": ("did not prove a guidance run", 2),
+            "trigger.issue-opened.bug-triage": ("did not prove a trigger run", 1),
         }
-        for component, reason in cases.items():
+        self.write(".cornerstone/config.yaml", CONFIG.replace(
+            "profiles: [single-ticket]", "profiles: [single-ticket, bug-triage]"))
+        for component, (reason, exit_code) in cases.items():
             with self.subTest(component=component):
-                code, out = self.component(component)
-                self.assertEqual(code, 2, out)
+                code, out = self.component(component, "--model", "opencode-go/beam-free",
+                                           check_only=not component.startswith("trigger."))
+                self.assertEqual(code, exit_code, out)
                 self.assertIn(reason, out)
                 self.no_harness_started()
 
