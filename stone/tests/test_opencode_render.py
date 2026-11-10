@@ -205,7 +205,8 @@ class OpenCodeRenderTest(unittest.TestCase):
                      "AGENTS.MD", "agents.MD"):
             self.assertIn(form, forms)
         self.assertEqual(len(forms), len(set(forms)))
-        self.assertEqual(sorted(values.case_forms("[Aa][Bb]")), ["AB", "Ab", "aB", "ab"])
+        self.assertEqual(sorted(values.case_forms("[Aa][Bb]")), ["AB", "ab"])  # one word
+        self.assertEqual(sorted(values.case_forms("[Aa].[Bb]")), ["A.B", "A.b", "a.B", "a.b"])
         self.assertEqual(set(values.case_forms("[Aa]x")), {"Ax", "ax"})
 
     def test_path_conversion_gives_no_agents_rule_when_not_protected(self) -> None:
