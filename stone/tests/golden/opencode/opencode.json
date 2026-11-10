@@ -1,0 +1,119 @@
+{
+  "permissions": [
+    {
+      "action": "external_directory",
+      "resource": "*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": ".opencode",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": ".opencode/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "opencode.json",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "opencode.json/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": ".cornerstone",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": ".cornerstone/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "AGENTS.MD",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "AGENTS.MD/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/AGENTS.MD",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/AGENTS.MD/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "AGENTS.md",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "AGENTS.md/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/AGENTS.md",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/AGENTS.md/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "agents.MD",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "agents.MD/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/agents.MD",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/agents.MD/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "agents.md",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "agents.md/*",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/agents.md",
+      "effect": "deny"
+    },
+    {
+      "action": "edit",
+      "resource": "*/agents.md/*",
+      "effect": "deny"
+    }
+  ]
+}

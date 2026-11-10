@@ -11,6 +11,7 @@ import io
 import json
 import os
 import re
+import shutil
 import stat
 import tempfile
 import unittest
@@ -30,6 +31,7 @@ MODEL_PROFILE = ADAPTER / "models" / "opencode-default.yaml"
 FIXTURES = Path(__file__).resolve().parent / "fixtures" / "opencode"
 ROLE_FILE = ".opencode/agents/tester.md"
 EXPECTED_ROLES = {"shaper", "planner", "implementer", "tester", "reviewer", "investigator"}
+ROLE_PROFILES = "[single-ticket, spike, full-project]"
 EXPECTED_TOOLS = {
     "shaper": ["read", "grep", "glob", "shell", "edit"],
     "planner": ["read", "grep", "glob", "edit"],
@@ -78,6 +80,16 @@ print(json.dumps({"type": "step_finish",
                   "part": {"type": "step-finish", "reason": "stop", "cost": 0.0,
                            "tokens": {"input": 1, "output": 1}}}))
 '''
+
+
+def eval_only_framework(target: Path) -> Path:
+    """Copy the framework and mark the OpenCode adapter `eval-only`, to test the refusal."""
+    shutil.copytree(FRAMEWORK, target, ignore=shutil.ignore_patterns("__pycache__"))
+    path = target / "adapters" / "opencode" / "components.yaml"
+    text = re.sub(r"^status: full$", "status: eval-only", path.read_text(encoding="utf-8"),
+                  count=1, flags=re.M)
+    path.write_text(text, encoding="utf-8")
+    return target
 
 
 class OpenCodeAdapterTest(unittest.TestCase):
@@ -190,7 +202,7 @@ class OpenCodeAdapterTest(unittest.TestCase):
 
     def test_component_list_maps_each_role_to_its_agent_file(self) -> None:
         data = yaml.safe_load(COMPONENTS.read_text(encoding="utf-8"))
-        self.assertEqual(data["status"], "eval-only")
+        self.assertEqual(data["status"], "full")
         roles = {entry["role"]: entry for entry in data["components"]
                  if entry.get("kind") == "role"}
         self.assertEqual(set(roles), EXPECTED_ROLES)
@@ -205,8 +217,21 @@ class OpenCodeAdapterTest(unittest.TestCase):
         self.assertEqual(profile["harness"], "opencode")
         self.assertEqual(set(profile["defaults"]["role_models"]), EXPECTED_ROLES)
 
+    def rendered_front(self, role: str, config: str) -> dict:
+        """Render all roles into a temp repo and return the parsed frontmatter of one role file."""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            (root / ".cornerstone").mkdir(parents=True)
+            (root / ".cornerstone" / "config.yaml").write_text(
+                config.replace("[single-ticket]", ROLE_PROFILES), encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()):
+                render.render(root, FRAMEWORK)
+            text = (root / ".opencode" / "agents" / f"{role}.md").read_text(encoding="utf-8")
+        return yaml.safe_load(text.split("---\n", 2)[1])
+
     def test_role_templates_keep_the_steps_and_add_the_permissions(self) -> None:
         path_rule = re.compile(r"(A hook blocks the file tools[^\n]*|The role text[^\n]*)")
+        config = CONFIG + "tickets: {source: file, path: 'tickets/{id}.md'}\n"
         for role in EXPECTED_ROLES:
             with self.subTest(role=role):
                 reference = (FRAMEWORK / "adapters" / "claude-code" / "templates" / "agents"
@@ -216,19 +241,15 @@ class OpenCodeAdapterTest(unittest.TestCase):
                 reference_body = path_rule.sub("<PATH_RULE>", reference.split("---\n", 2)[2])
                 template_body = path_rule.sub("<PATH_RULE>", template.split("---\n", 2)[2])
                 self.assertEqual(template_body, reference_body)
-                front = yaml.safe_load(template.split("---\n", 2)[1])
+                front = self.rendered_front(role, config)
                 self.assertEqual(front["steps"], 60)
                 self.assertIn("permissions", front)
                 self.assertNotIn("tools", front)
                 permissions = front["permissions"]
-                if role == "shaper":
-                    values = render.adapter_values(ADAPTER, {
-                        "tickets": {"source": "file", "path": "tickets/{id}.md"}})
-                    permissions = json.loads(values["shaper_permissions"])
                 self.assertEqual(permissions[0],
                                  {"action": "*", "resource": "*", "effect": "deny"})
-                actions = [rule["action"] for rule in permissions[1:]
-                           if rule["effect"] == "allow"]
+                actions = list(dict.fromkeys(rule["action"] for rule in permissions[1:]
+                                             if rule["effect"] == "allow"))
                 self.assertEqual(actions, EXPECTED_TOOLS[role])
 
     def test_eval_runs_the_role_with_agent_and_removes_the_role_file_without(self) -> None:
@@ -376,12 +397,14 @@ class OpenCodeAdapterTest(unittest.TestCase):
 
     def test_render_refuses_an_eval_only_adapter(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
+            framework = eval_only_framework(Path(tmp) / "fw")
             root = Path(tmp) / "repo"
             (root / ".cornerstone").mkdir(parents=True)
             (root / ".cornerstone" / "config.yaml").write_text(CONFIG, encoding="utf-8")
             with self.assertRaises(render.RenderError) as caught:
-                render.render(root, FRAMEWORK)
+                render.render(root, framework)
             self.assertIn("eval-only", str(caught.exception))
+            self.assertFalse((root / ".opencode").exists())
 
     def test_eval_renders_the_role_file_for_an_eval_only_adapter(self) -> None:
         self.write("evals/role-tester/fixtures/rendered/.cornerstone/config.yaml", CONFIG)

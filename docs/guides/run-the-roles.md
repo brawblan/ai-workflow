@@ -6,8 +6,9 @@ files into your repo.
 
 Checked with Claude Code 2.1.302. The `--agent` flag loads one role file from `.claude/agents/`.
 
-The OpenCode adapter is eval-only, so `stone render` writes no OpenCode role files. To compare models
-on OpenCode, see [Compare models with evals](compare-models.md).
+`stone render` also writes the OpenCode role files to `.opencode/agents/`, if the repo config has
+`harness: opencode`. This guide shows the Claude Code steps. To compare models on OpenCode, see
+[Compare models with evals](compare-models.md).
 
 ## Before you start
 

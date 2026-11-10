@@ -19,6 +19,7 @@ from unittest import mock
 import yaml
 
 from stone import cli, evals, framework_check, render
+from test_eval_opencode import eval_only_framework
 
 REPO = Path(__file__).resolve().parents[2]
 FRAMEWORK = REPO / "framework"
@@ -113,6 +114,7 @@ class Ac2StatusTest(unittest.TestCase):
         self.root = Path(self.tmp.name) / "repo"
         (self.root / ".cornerstone").mkdir(parents=True)
         (self.root / ".cornerstone" / "config.yaml").write_text(CONFIG, encoding="utf-8")
+        self.eval_only = eval_only_framework(Path(self.tmp.name) / "eval-only-fw")
 
     def test_ac2_contract_documents_eval_only(self) -> None:
         contract = (FRAMEWORK / "adapters" / "contract.md").read_text(encoding="utf-8")
@@ -120,7 +122,7 @@ class Ac2StatusTest(unittest.TestCase):
 
     def test_ac2_render_api_refuses_with_clear_message_and_writes_nothing(self) -> None:
         with self.assertRaises(render.RenderError) as caught:
-            render.render(self.root, FRAMEWORK)
+            render.render(self.root, self.eval_only)
         message = str(caught.exception)
         self.assertIn("eval-only", message)
         self.assertIn("opencode", message)
@@ -132,7 +134,7 @@ class Ac2StatusTest(unittest.TestCase):
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
             try:
                 code = cli.main(["render", "--root", str(self.root),
-                                 "--framework", str(FRAMEWORK)])
+                                 "--framework", str(self.eval_only)])
             except SystemExit as exit_:
                 code = exit_.code
         self.assertNotEqual(code, 0)
@@ -140,7 +142,7 @@ class Ac2StatusTest(unittest.TestCase):
 
     def test_ac2_render_check_mode_also_refuses(self) -> None:
         with self.assertRaises(render.RenderError):
-            render.build_components(FRAMEWORK, {"harness": "opencode",
+            render.build_components(self.eval_only, {"harness": "opencode",
                                                 "model_profile": "opencode-default"})
 
     def test_ac2_full_adapter_still_renders(self) -> None:
@@ -211,16 +213,16 @@ class Ac3RoleTemplateTest(unittest.TestCase):
             self.assertEqual(oc["description"], cc["description"], role)
 
     def _allowed_actions(self, role: str) -> set[str]:
-        front, _ = split_frontmatter(
-            (OC / "templates" / "agents" / f"{role}.md").read_text(encoding="utf-8"))
-        if "$shaper_permissions" in front:
-            import importlib.util
-            spec = importlib.util.spec_from_file_location("ocv", OC / "values.py")
-            module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(module)
-            rules = json.loads(module.values({})["shaper_permissions"])
-        else:
-            rules = yaml.safe_load(front.replace("$model", "m"))["permissions"]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "repo"
+            (root / ".cornerstone").mkdir(parents=True)
+            (root / ".cornerstone" / "config.yaml").write_text(
+                CONFIG.replace("[single-ticket]", "[single-ticket, spike, full-project]"),
+                encoding="utf-8")
+            with contextlib.redirect_stderr(io.StringIO()):
+                render.render(root, FRAMEWORK)
+            text = (root / ".opencode" / "agents" / f"{role}.md").read_text(encoding="utf-8")
+        rules = yaml.safe_load(split_frontmatter(text)[0])["permissions"]
         self.assertEqual(rules[0]["effect"], "deny", f"{role}: must deny by default first")
         self.assertEqual(rules[0]["action"], "*")
         return {r["action"] for r in rules if r["effect"] == "allow"}

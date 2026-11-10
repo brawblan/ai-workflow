@@ -1,0 +1,105 @@
+framework_version: 0.8.0
+components:
+  - id: config.permissions
+    kind: config
+    purpose: Deny an edit of a harness path and a read outside the repo, for a session with no role.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: evals/config-opencode-permissions/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - opencode.json
+    hash: a82b6707952d4abd968cb3fb52dc8f1c1d2f8a2e7dd71bbed150d3ce7e9590eb
+  - id: role.implementer
+    kind: role
+    purpose: Change the code to meet the ticket. Write the decision log.
+    principle:
+      - P2
+      - P8
+    source: framework
+    owner: octocat
+    eval: evals/role-implementer/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .opencode/agents/implementer.md
+    hash: 44fe78fc980afc49096b43df14fa656a62cb8f65163b97b9b2498379cf6e3fec
+  - id: role.investigator
+    kind: role
+    purpose: Read, run, and report. Write only in the reports path, or anywhere on a spike branch.
+    principle:
+      - P2
+      - P11
+    source: framework
+    owner: octocat
+    eval: evals/role-investigator/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .opencode/agents/investigator.md
+    hash: 6b271f7e9cc194bd0b12e21bfb741cb16587c088b39d9ecb9b86cc39944e2f41
+  - id: role.planner
+    kind: role
+    purpose: Write the plan artifact and the progress file. A human approves them at G2.
+    principle:
+      - P3
+      - P7
+    source: framework
+    owner: octocat
+    eval: evals/role-planner/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .opencode/agents/planner.md
+    hash: 30dd076c76d599655b44825d002f6a61275e37e7dff3caf771dcd2173d031f05
+  - id: role.reviewer
+    kind: role
+    purpose: Find defects and scope drift in a fresh session.
+    principle:
+      - P2
+      - P11
+    source: framework
+    owner: octocat
+    eval: evals/role-reviewer/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .opencode/agents/reviewer.md
+    hash: 2d999240cb92f6e722ebd70f6c2b10266583230b5c30c7e8b17bcfc5b837e9e4
+  - id: role.shaper
+    kind: role
+    purpose: Interview the human until the ticket meets the Definition of Ready.
+    principle:
+      - P3
+    source: framework
+    owner: octocat
+    eval: evals/role-shaper/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .opencode/agents/shaper.md
+    hash: e9de095386277ee8fcb495905502735757e8ec1c69763b53e260c76aaa4fabb8
+  - id: role.tester
+    kind: role
+    purpose: Write independent tests from the ticket and the diff.
+    principle:
+      - P2
+    source: framework
+    owner: octocat
+    eval: evals/role-tester/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .opencode/agents/tester.md
+    hash: 79fe672fb6c1ccded690a6de888a6a26a548cbcc6025fd19139e790bcd50cfca
