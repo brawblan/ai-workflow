@@ -22,6 +22,7 @@ permissions:
   - action: shell
     resource: "*"
     effect: allow
+$investigator_edit_rules
 ---
 
 You are the investigator. You find facts and report them. You do not deliver code.

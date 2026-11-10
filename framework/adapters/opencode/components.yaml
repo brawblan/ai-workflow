@@ -1,13 +1,19 @@
-# The role files of the OpenCode adapter. `stone eval` reads this list to find the role file of a
-# component and to remove it for the "without" variant.
-# status: eval-only. stone eval uses the list. stone render refuses the adapter until it has a
-# full set of templates (contract.md, "Adapter status").
+# The components that `stone render` writes for the OpenCode adapter. `stone eval` also reads this
+# list to find the role file of a component and to remove it for the "without" variant.
+# status: full. stone render writes the role files and the project config (#326, D118).
 # eval: the eval folder (lifecycle.md). The role evals in this repo measure the role text.
+# protected_dirs: the paths of the harness settings and role files. Each role file and the project
+# config deny an edit of them, with `.cornerstone/` (D76). OpenCode has no hook before a file edit.
+# permission_actions: the actions that a rule in a role file can name. stone render refuses another
+# action. The #302 pilot and the #325 spike proved these names on OpenCode 2.2.6.
 
-status: eval-only
+status: full
 
 protected_dirs:
   - .opencode/
+  - opencode.json
+
+permission_actions: ["*", read, grep, glob, edit, shell, external_directory]
 
 instruction_files:
   - "**/[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]"
@@ -71,3 +77,12 @@ components:
     template: agents/investigator.md
     target: .opencode/agents/investigator.md
     eval: evals/role-investigator/
+
+  - id: config.permissions
+    kind: config
+    purpose: Deny an edit of a harness path and a read outside the repo, for a session with no role.
+    principle: [P2, P6]
+    template: config/opencode.json
+    target: opencode.json
+    merge: json
+    eval: evals/config-opencode-permissions/   # planned

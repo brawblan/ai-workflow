@@ -1,7 +1,9 @@
 # Adapter: OpenCode
 
-Status: eval-only v0. The #302 pilot tested the facts below on OpenCode 2.2.6 on 2026-11-08
-([dossier S58](../../docs/research/dossier.md#6-sources)). A fact marked `[TO CONFIRM]` is not proven.
+Status: full v1 (D118). The #302 pilot tested the facts below on OpenCode 2.2.6 on 2026-11-08
+([dossier S58](../../docs/research/dossier.md#6-sources)). The #325 spike
+([report](../../docs/reports/2026-11-10-opencode-adapter-ci-spike.md)) and the #326 probes tested
+the other facts on the same version. A fact marked `[TO CONFIRM]` is not proven.
 
 Model profiles: [opencode/models/opencode-default.yaml](opencode/models/opencode-default.yaml).
 
@@ -13,29 +15,29 @@ parser is [opencode/parsers/opencode.py](opencode/parsers/opencode.py). A target
 To run a role eval on OpenCode, follow the steps in
 [Run on OpenCode](../../evals/README.md#run-on-opencode).
 
-`stone render` refuses this adapter because its status is `eval-only` (see
-[contract.md](contract.md#adapter-status)). It writes no files. `stone eval` uses it. The role
-templates in `opencode/templates/agents/` have the same steps as the reference templates, so a
-later adapter can render them.
+`stone render` writes the role file of each role that a selected profile uses, and the project
+config `opencode.json`. It writes no hook, check, or workflow yet. Without K6 in CI, the permission
+rules are the only control on a protected path. A later issue adds the checks and the G3 workflow,
+and #327 adds the CI triggers. `stone eval` also uses the adapter.
 
 ## Mapping
 
 | Concept | Target | Format | Support | Fallback |
 | --- | --- | --- | --- | --- |
-| Instruction file (repo) | `AGENTS.md` in the repo root | Markdown | full | none. OpenCode reads `CLAUDE.md` only if `AGENTS.md` is absent. |
+| Instruction file (repo) | `AGENTS.md` in the repo root | Markdown | full | none. OpenCode does not read `CLAUDE.md`. |
 | Instruction file (user) | `~/.config/opencode/AGENTS.md` | Markdown | full | none. |
-| Skill | `.opencode/skills/<name>/SKILL.md` | Markdown | full | Linked docs that `AGENTS.md` names. |
-| Role | `.opencode/agents/<role>.md` with `description`, `mode`, `model`, `permissions`, and `steps` | Markdown with YAML frontmatter | partial | Separate `opencode run` sessions with a role prompt, plus CI checks. A role file limits tools, not paths. |
+| Skill | `.opencode/skills/<name>/SKILL.md`. OpenCode also loads `.claude/skills/<name>/SKILL.md`, unless `OPENCODE_DISABLE_CLAUDE_CODE_SKILLS=1`. | Markdown | full | Linked docs that `AGENTS.md` names. |
+| Role | `.opencode/agents/<role>.md` with `description`, `mode`, `model`, `permissions`, and `steps` | Markdown with YAML frontmatter | partial | Separate `opencode run` sessions with a role prompt. A path rule limits the file tools, not the shell (D39). |
 | Fresh session for each role | One `opencode run` for each role | process or command | full | none. P2 needs it. |
 | Headless run | `opencode run "<prompt>"` | process or command | full | none. CI needs it. |
 | Eval run | [opencode/eval.yaml](opencode/eval.yaml): the argv for each variant, the env, the parser, and the role tool list | YAML | full for a role | No guidance or trigger command yet. `stone eval` names the reason. |
 | Select the role for a headless run | `opencode run --agent <role>` loads `.opencode/agents/<role>.md` | process or command | full | none. Tested on 2.2.6 (2026-11-08). |
 | Model for each role | `--model <provider>/<model>[#variant]`, or `model` in the role file | process or command | full | One model for all roles. |
-| Permissions | The ordered `permissions` list in the role file, or the global list | Markdown with YAML frontmatter | partial | Run in a container with no secrets. The K6 check is the control for a protected path. |
-| Hook before a file edit | none | not applicable | none | Check K6 in CI. |
+| Permissions | The ordered `permissions` list in the role file, and the list in `opencode.json` | Markdown with YAML frontmatter, JSON | partial | Run in a container with no secrets. The role file rules come after the config rules, so they win. |
+| Hook before a file edit | none | not applicable | none | The `edit` path rules in each role file. Check K6 in CI is not rendered yet. |
 | Hook before the session ends | none | not applicable | none | Gate G3 in CI. |
 | CI trigger | none | not applicable | none | Run the role by hand, or use an adapter that provides a trigger. |
-| Render the role files and the settings | none | not applicable | none | Keep the files by hand in the target repo. |
+| Render the role files and the settings | `stone render` writes `.opencode/agents/<role>.md` and merges `opencode.json` | Markdown, JSON | full | none. |
 | Context guard hook (D115) | none | not applicable | none | Watch the context size by hand. Start a new session after a PR. |
 | Token report (`stone usage`, D114) | none | not applicable | none | No `usage.yaml` yet, so `stone usage` stops with an error. `opencode stats` shows some usage data. |
 
@@ -68,6 +70,47 @@ limits a file tool. It does not limit a shell command, as in the reference adapt
 
 `steps: 60` caps the model steps. OpenCode has no cost limit. At the cap, the run stops and adds a
 "Maximum steps" message.
+
+The allowed actions are in `permission_actions` of [components.yaml](opencode/components.yaml).
+`stone render` refuses a role file with another action.
+
+### Protected paths
+
+OpenCode has no hook before a file edit. So render puts `edit` rules at the end of each role file.
+They give the same paths as the protect-paths hook of the reference adapter:
+
+| Role | `edit` rules |
+| --- | --- |
+| implementer | Deny `paths.tests`, `paths.checks`, `paths.specs`, and the harness paths. |
+| tester | Deny all. Allow `paths.tests`. Deny the harness paths. |
+| planner | Deny all. Allow `paths.plans`. Deny the implementer paths. |
+| investigator | Deny all. Allow `paths.reports`. Deny the harness paths. |
+| shaper | No `edit`. Allow the ticket file if `tickets.source` is `file`. |
+| reviewer | No `edit`. |
+
+The harness paths are `.opencode/`, `opencode.json`, and `.cornerstone/`. With
+`protect_instruction_files: true`, they also include each `AGENTS.md` file (D87).
+
+How render writes a path as a rule:
+
+- A rule resource is relative to the repo root. `*` matches any text, also `/`. So a folder
+  `tests/` gives the rules `tests` and `tests/*`.
+- OpenCode has no `[...]` class. A word of one-letter classes, such as `[Aa][Gg][Ee][Nn][Tt][Ss]`,
+  gives the upper-case and the lower-case word. A mixed case such as `Agents.md` is not covered.
+- A `**/` start gives the path at the root and the path in any folder.
+- A glob rule can cover more paths than the core match (D62), because `*` also matches `/`.
+- On a spike branch, the hook lets the investigator write anywhere. A role file cannot see the
+  branch. So on OpenCode, the investigator writes only in `paths.reports` on each branch.
+
+The #326 probes ran each role on OpenCode 2.2.6 and tried a write to each type of path. Each
+allowed path was written, and each denied path gave `Permission denied: edit`.
+
+### Project config
+
+Render merges a `permissions` list into `opencode.json`. Other keys stay as they are. The list
+denies `external_directory` and an `edit` of the harness paths. These rules apply to a session with
+no role, for example a person who starts `opencode` in the repo. A role file starts with a deny-all
+rule, and its rules come after the config rules, so the role file rules win.
 
 ## Eval run
 
@@ -131,24 +174,36 @@ Limits of this eval run:
 | Effort | **Yes.** `#high` and `#low` work on each pilot model. `#bogus` fails with `provider.no-route`. |
 | Limits | **Partial.** There is no cost limit. `steps` caps the model steps. |
 
+The #325 spike and the #326 probes tested these facts on OpenCode 2.2.6:
+
+| Fact | Result |
+| --- | --- |
+| Repo instruction file `AGENTS.md` | **Yes.** |
+| User instruction file `~/.config/opencode/AGENTS.md` | **Yes.** It follows `XDG_CONFIG_HOME`, only with `--standalone`. |
+| `CLAUDE.md` fallback | **No.** OpenCode did not read `CLAUDE.md`, with or without `AGENTS.md`. |
+| Skill path `.opencode/skills/<name>/SKILL.md` | **Yes.** `.claude/skills/<name>/SKILL.md` also loads. |
+| Action names `read`, `grep`, `glob`, `edit` | **Yes.** A denied tool is not offered to the model. The `write` tool uses the `edit` action. |
+| Action `external_directory` | **Yes.** The deny-all rule also denies it. |
+| A clean global config removes each user-level rule | **Partial.** A clean `XDG_CONFIG_HOME` removes `~/.config/opencode`. The skills in `~/.agents/skills` still load. On a CI runner, `HOME` is clean. |
+| An `edit` path rule | **Yes.** A relative resource such as `tests/*` denies a path at any depth. |
+| A `[...]` class in a rule | **No.** `[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]` did not match `AGENTS.md`. |
+| Config rules and role rules | **Yes.** The role file rules come after the config rules. |
+
 Unproven facts:
 
-- `[TO CONFIRM]` the repo and user instruction file paths, and that OpenCode reads `CLAUDE.md` only
-  if `AGENTS.md` is absent. The pilot did not test them.
-- `[TO CONFIRM]` the skill path `.opencode/skills/<name>/SKILL.md`.
-- `[TO CONFIRM]` the action names `read`, `grep`, `glob`, and `edit`. The pilot proved only `*` and
-  the shell rule.
-- `[TO CONFIRM]` that a clean global config removes each user-level rule from a run.
 - `[TO CONFIRM]` that the published token rates stay fixed.
+- `[TO CONFIRM]` that the read tool refuses `/proc/self/environ`. Only a binary-file check stopped
+  it in the spike, and the read tool follows a symlink in the repo to a path outside it.
 
 ## Decision record
 
 | Field | Value |
 | --- | --- |
-| Date | 2026-11-08 |
-| Status | eval-only v0 |
-| Reason | #301 needs a second harness to compare models. The #302 pilot proved only the role eval. |
-| Options | A full adapter with render (later), an eval-only adapter (chosen), or a wrapper script (rejected: it hides the harness commands). |
-| Risks | The adapter has no render, hook, trigger, or cost limit. The pilot has one trial and saturated scenarios. |
-| Review | 2027-05-08 |
-| Framework decision | D112 |
+| Date | 2026-11-10 |
+| Status | full v1. It replaces eval-only v0 of 2026-11-08 (D112). |
+| Reason | The #325 spike proved the instruction, skill, and action facts. A target repo needs the role files from render, not by hand. |
+| Options | The role files and the project config (chosen). The same with the shared checks and the G3 workflow (a later issue). A copy of the reference checks (rejected: two copies to keep the same). |
+| Risks | No K6 in CI yet, so the path rules are the only control. A path rule does not limit the shell. A glob rule can cover more or fewer paths than K6. No trigger and no cost limit. |
+| Eval plan | The adapter unit tests, the golden files of a render, and a probe of each role on OpenCode. |
+| Review | 2027-05-10 |
+| Framework decision | D118 |

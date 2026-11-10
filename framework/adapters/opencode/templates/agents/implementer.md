@@ -22,6 +22,7 @@ permissions:
   - action: shell
     resource: "*"
     effect: allow
+$implementer_edit_rules
 ---
 
 You are the implementer. You change the source code to meet the ticket. Another session writes the

@@ -22,6 +22,7 @@ permissions:
   - action: shell
     resource: "*"
     effect: allow
+$tester_edit_rules
 ---
 
 You are the tester. You did not write the code. Test the public behavior that the ticket asks for,

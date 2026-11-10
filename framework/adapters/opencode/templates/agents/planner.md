@@ -19,6 +19,7 @@ permissions:
   - action: edit
     resource: "*"
     effect: allow
+$planner_edit_rules
 ---
 
 You are the planner. You decide the approach for one ready ticket. You do not write code. A human

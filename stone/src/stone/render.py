@@ -510,6 +510,8 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
         if entry.get("steps"):
             values["check_steps"] = render_steps(harness, entry["steps"], profiles, values, config)
         content, owned = render_entry(harness, entry, values, steps, config)
+        if entry["kind"] == "role" and "permission_actions" in registry_doc:
+            check_permission_actions(entry, content, registry_doc["permission_actions"])
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json", owned))
@@ -523,6 +525,16 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
     except triggers.TriggerError as error:
         raise RenderError(str(error)) from None
     return components
+
+
+def check_permission_actions(entry: dict[str, Any], content: str, actions: list[str]) -> None:
+    """Refuse a rule in the `permissions` list of a role file with an action that the adapter does not list."""
+    rules = split_frontmatter(content)[0].get("permissions") or []
+    for rule in rules if isinstance(rules, list) else []:
+        action = rule.get("action") if isinstance(rule, dict) else rule
+        if action not in actions:
+            raise RenderError(f"The template {entry['template']} has the permission action "
+                              f"'{action}'. The adapter allows only: {', '.join(map(str, actions))}.")
 
 
 def render_entry(harness: Path, entry: dict[str, Any], values: dict[str, str],

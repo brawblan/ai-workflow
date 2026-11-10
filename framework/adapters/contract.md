@@ -22,8 +22,9 @@ The component list of an adapter can set `status`:
 
 The repo has two harness adapters:
 
-- `claude-code` is the full adapter.
-- `opencode` is eval-only (D112): `stone eval` uses it, and `stone render` refuses it.
+- `claude-code` is the reference adapter. It renders the roles, the hooks, the checks, and the CI.
+- `opencode` is full (D118). It renders the role files and the project config. It has no CI trigger
+  yet, so it does not meet the CI trigger row below. Issue #327 adds the triggers.
 
 An `eval-only` adapter gives the role file paths and the role templates that `stone eval` renders.
 It needs no templates for a full render of hooks, CI, or settings. It must still give a target and
@@ -56,6 +57,12 @@ an eval for each component. The status is in `components.yaml`, so the core name
 An adapter MAY add `values.py` at its root. It MUST provide `values(config: dict) -> dict[str, str]`.
 The core passes neutral ticket state in `config`. It builds no harness tool names or permission
 schemas. Each value becomes a string for the templates. An adapter key MUST NOT reuse a core key.
+
+### Permission actions
+
+A component list MAY set `permission_actions`: the actions that a rule in the `permissions`
+frontmatter list of a role file can name. `stone render` refuses a role file with another action, so
+a wrong name in a template fails before a write. Without the key, render does not test the rules.
 
 ### Adapter data files
 

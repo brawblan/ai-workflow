@@ -184,8 +184,8 @@ stone eval --summary .cornerstone/eval-runs/<stamp>-role-tester/runs.jsonl \
 
 ## Run on OpenCode
 
-The OpenCode adapter is eval-only (D112). It runs the role evals. It has no guidance, trigger, or
-hook eval, and `stone eval` gives the reason. The harness facts are in
+The OpenCode adapter runs the role evals (D112, D118). It has no guidance, trigger, or hook eval,
+and `stone eval` gives the reason. The harness facts are in
 [the adapter doc](../framework/adapters/opencode.md). The runs are local only. Do not put the plan
 key in CI.
 
