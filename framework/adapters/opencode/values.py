@@ -10,6 +10,7 @@ from __future__ import annotations
 import itertools
 import json
 import re
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -21,7 +22,8 @@ from stone.specs import TICKET_ID
 COMPONENTS = Path(__file__).resolve().parent / "components.yaml"
 
 
-CASE_WORD = re.compile(r"(?:\[[A-Za-z]{2}\])+")
+CASE_WORD = re.compile(r"(?:\[(?:A[a]|B[b]|C[c]|D[d]|E[e]|F[f]|G[g]|H[h]|I[i]|J[j]|K[k]|L[l]|M[m]|N[n]|"
+                       r"O[o]|P[p]|Q[q]|R[r]|S[s]|T[t]|U[u]|V[v]|W[w]|X[x]|Y[y]|Z[z])\])+")
 
 
 def case_forms(path: str) -> list[str]:
@@ -47,6 +49,10 @@ def variants(path: str) -> list[str]:
     upper-case and the lower-case word. A `**/` start gives the root form and the form in any folder.
     """
     forms = case_forms(path.replace(TICKET_ID, "*").rstrip("/"))
+    if any("[" in form for form in forms):
+        print(f"warning: the path '{path}' has a [...] class that OpenCode cannot match. "
+              "Its OpenCode rule keeps the class as text, so it can cover fewer paths.",
+              file=sys.stderr)
     if forms[0].startswith("**/"):
         forms = [form for item in forms for form in (item[3:], "*/" + item[3:])]
     return forms
