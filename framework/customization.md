@@ -25,6 +25,8 @@ A later layer wins over an earlier layer, with these limits:
 
 ## Repo config (`.cornerstone/config.yaml`)
 
+For the harness adapters and their statuses, see [Adapter status](adapters/contract.md#adapter-status).
+
 ```yaml
 framework_version: 1.2.0           # tag of brawblan/ai-workflow. G3 installs stone from it. See versioning.md.
 framework_commit: "<40-hex SHA>"   # optional. The commit of that tag. G3 installs stone from it (see below).

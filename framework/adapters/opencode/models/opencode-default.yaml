@@ -1,5 +1,7 @@
 # Model profile: the default models for the OpenCode adapter.
 # Status is "proposed": no eval proves an idiom for this harness yet.
+# No eval covers opencode-go/beam-free yet. rates.yaml has no rates for it, so its cost shows "—".
+# Issue #305 picks the role models.
 
 id: opencode-default
 vendor: opencode-go

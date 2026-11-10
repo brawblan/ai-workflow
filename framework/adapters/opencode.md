@@ -1,7 +1,7 @@
 # Adapter: OpenCode
 
-Status: eval-only v0. The #302 pilot tested the facts below on OpenCode 2.2.6 on 2026-11-08. A fact
-marked `[TO CONFIRM]` is not proven.
+Status: eval-only v0. The #302 pilot tested the facts below on OpenCode 2.2.6 on 2026-11-08
+([dossier S58](../../docs/research/dossier.md#6-sources)). A fact marked `[TO CONFIRM]` is not proven.
 
 Model profiles: [opencode/models/opencode-default.yaml](opencode/models/opencode-default.yaml).
 

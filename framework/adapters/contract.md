@@ -20,6 +20,11 @@ The component list of an adapter can set `status`:
 | `full` (default) | The adapter gives templates, and `stone render` writes the files. |
 | `eval-only` | The adapter gives `eval.yaml` and the role file paths. `stone eval` uses it. `stone render` refuses it. |
 
+The repo has two harness adapters:
+
+- `claude-code` is the full adapter.
+- `opencode` is eval-only (D112): `stone eval` uses it, and `stone render` refuses it.
+
 An `eval-only` adapter gives the role file paths and the role templates that `stone eval` renders.
 It needs no templates for a full render of hooks, CI, or settings. It must still give a target and
 an eval for each component. The status is in `components.yaml`, so the core names no harness.
