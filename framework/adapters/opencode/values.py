@@ -21,6 +21,12 @@ from stone.specs import TICKET_ID
 
 COMPONENTS = Path(__file__).resolve().parent / "components.yaml"
 
+# The pinned OpenCode build that the CI triggers install (#327). The SHA-256 is the digest of the
+# `opencode-linux-x64.tar.gz` release asset, and was checked by a download on 2026-11-10. To update,
+# change both values together, and run a trigger once.
+OPENCODE_VERSION = "2.2.6"
+OPENCODE_SHA256 = "08bb21d6326ce740d91cce7ebe88a6536933f6e1e30353b91a06b01f25da306c"
+
 
 CASE_WORD = re.compile(r"(?:\[(?:A[a]|B[b]|C[c]|D[d]|E[e]|F[f]|G[g]|H[h]|I[i]|J[j]|K[k]|L[l]|M[m]|N[n]|"
                        r"O[o]|P[p]|Q[q]|R[r]|S[s]|T[t]|U[u]|V[v]|W[w]|X[x]|Y[y]|Z[z])\])+")
@@ -136,4 +142,6 @@ def values(config: dict[str, Any]) -> dict[str, str]:
            for role, rules in role_edit_rules(config).items()}
     out["shaper_permissions"] = json.dumps(shaper_rules(config))
     out["config_permissions_json"] = json.dumps(config_rules(config))
+    out["opencode_version"] = OPENCODE_VERSION
+    out["opencode_sha256"] = OPENCODE_SHA256
     return out

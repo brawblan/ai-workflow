@@ -12,6 +12,10 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+import yaml
+
+from stone import eval_rates
+
 SCHEDULES = {"daily": "0 6 * * *", "weekly": "0 6 * * 1", "monthly": "0 6 1 * *"}
 CRON = re.compile(r"^[0-9A-Za-z*/,-]+( [0-9A-Za-z*/,-]+){4}$")
 LABEL = re.compile(r"^[A-Za-z0-9._:/-]+$")
@@ -138,3 +142,90 @@ def check_targets(targets: list[tuple[str, str]]) -> None:
             raise TriggerError(f"The triggers {seen[target]} and {trigger_text} write the same "
                                f"file {target}. Keep one trigger of each type in a profile.")
         seen[target] = trigger_text
+
+
+NAMES = {name: index for index, name in enumerate(eval_rates.WEEKDAYS)}  # mon=0 ... sun=6
+
+
+def _cron_field(text: str, low: int, high: int, names: dict[str, int] | None = None) -> set[int] | None:
+    """Return the values that one cron field gives, or None if the field is not plain cron."""
+    found: set[int] = set()
+    for item in text.lower().split(","):
+        base, _, step = item.partition("/")
+        if step and not step.isdigit():
+            return None
+        size = int(step) if step else 1
+        if size < 1:
+            return None
+        if base == "*":
+            start, end = low, high
+        else:
+            first, _, last = base.partition("-")
+            try:
+                start = names[first] if names and first in names else int(first)
+                end = (names[last] if names and last in names else int(last)) if last else (
+                    high if step else start)
+            except ValueError:
+                return None
+        if start < low or end > high or start > end:
+            return None
+        found.update(range(start, end + 1, size))
+    return found
+
+
+def fire_times(cron_line: str) -> set[tuple[int, int]] | None:
+    """Return the (weekday, hour) pairs at which a cron line can fire, in UTC. Monday is 0.
+
+    The day of the month and the month are not read, so the result can have more pairs than the
+    real fire times. A line that this function cannot read gives None.
+    """
+    fields = cron_line.split()
+    if len(fields) != 5:
+        return None
+    hours = _cron_field(fields[1], 0, 23)
+    days = _cron_field(fields[4], 0, 7, {**{name: (index + 1) % 7 for name, index in NAMES.items()}})
+    if hours is None or days is None:
+        return None
+    # cron: 0 and 7 are Sunday, 1 is Monday. The rates file: 0 is Monday.
+    weekdays = {(day - 1) % 7 for day in days}
+    return {(day, hour) for day in weekdays for hour in hours}
+
+
+def peak_times(cron_line: str, model: str, rates: dict[str, Any] | None) -> list[str]:
+    """Return the fire times of a cron line that are in a peak window of the model, as 'mon 06:00 UTC'."""
+    entry = ((rates or {}).get("models") or {}).get(model.partition("#")[0])
+    times = fire_times(cron_line)
+    if not entry or times is None:
+        return []
+    windows = (entry.get("peak") or {}).get("windows") or []
+    return [f"{eval_rates.WEEKDAYS[day]} {hour:02d}:00 UTC" for day, hour in sorted(times)
+            if any(eval_rates.WEEKDAYS[day] in window["weekdays"] and hour in window["hours"]
+                   for window in windows)]
+
+
+def peak_notice(cron_line: str, model: str, rates: dict[str, Any] | None) -> str:
+    """Return the text for the workflow comment: a warning, or the result of the peak check (item 8)."""
+    if rates is None:
+        return "Peak check: the adapter has no token rates, so render did not check the peak windows."
+    entry = (rates.get("models") or {}).get(model.partition("#")[0])
+    if not entry or not entry.get("peak"):
+        return f"Peak check: the model {model} has no peak window in the rates file."
+    if fire_times(cron_line) is None:
+        return (f"Peak check: render cannot read the cron line '{cron_line}', so it did not check "
+                f"the peak windows of {model}.")
+    peaks = peak_times(cron_line, model, rates)
+    if not peaks:
+        return f"Peak check: no fire time of '{cron_line}' is in a peak window of {model}."
+    shown = ", ".join(peaks[:3]) + (f", and {len(peaks) - 3} more" if len(peaks) > 3 else "")
+    return (f"WARNING: the schedule '{cron_line}' can run in a peak window of {model} ({shown}). "
+            "Peak runs cost more. Change the schedule, or the model.")
+
+
+def load_rates(harness: Path) -> dict[str, Any] | None:
+    """Return the token rates that the adapter names in its eval.yaml, or None if it has none."""
+    try:
+        run = yaml.safe_load((harness / "eval.yaml").read_text(encoding="utf-8")) or {}
+        name = run.get("rates") if isinstance(run, dict) else None
+        return eval_rates.load(eval_rates.path(harness / "eval.yaml", harness, name)) if name else None
+    except (OSError, yaml.YAMLError, eval_rates.RatesError) as error:
+        raise TriggerError(f"The peak check cannot read the token rates of the adapter: {error}") from None

@@ -23,8 +23,9 @@ The component list of an adapter can set `status`:
 The repo has two harness adapters:
 
 - `claude-code` is the reference adapter. It renders the roles, the hooks, the checks, and the CI.
-- `opencode` is full (D118). It renders the role files and the project config. It has no CI trigger
-  yet, so it does not meet the CI trigger row below. Issue #327 adds the triggers.
+- `opencode` is full (D118). It renders the role files, the project config, and the CI triggers for
+  a label, `ci:issue-opened`, and a schedule (D119). Its CI roles are read-only, and it has no
+  `ci:dependency-pr` trigger. So its CI trigger row below is partial.
 
 An `eval-only` adapter gives the role file paths and the role templates that `stone eval` renders.
 It needs no templates for a full render of hooks, CI, or settings. It must still give a target and

@@ -16,9 +16,11 @@ To run a role eval on OpenCode, follow the steps in
 [Run on OpenCode](../../evals/README.md#run-on-opencode).
 
 `stone render` writes the role file of each role that a selected profile uses, and the project
-config `opencode.json`. It writes no hook, check, or workflow yet. Without K6 in CI, the permission
-rules are the only control on a protected path. A later issue adds the checks and the G3 workflow,
-and #327 adds the CI triggers. `stone eval` also uses the adapter.
+config `opencode.json`. A profile can have a label, `ci:issue-opened`, or schedule trigger. For each
+one, render also writes a CI workflow and a read-only CI copy of the role file (see
+[CI triggers](#ci-triggers)). It writes no hook or check yet. Without K6 in CI, the permission rules
+are the only control on a protected path. A later issue adds the checks and the G3 workflow.
+`stone eval` also uses the adapter.
 
 ## Mapping
 
@@ -36,7 +38,7 @@ and #327 adds the CI triggers. `stone eval` also uses the adapter.
 | Permissions | The ordered `permissions` list in the role file, and the list in `opencode.json` | Markdown with YAML frontmatter, JSON | partial | Run in a container with no secrets. The role file rules come after the config rules, so they win. |
 | Hook before a file edit | none | not applicable | none | The `edit` path rules in each role file. Check K6 in CI is not rendered yet. |
 | Hook before the session ends | none | not applicable | none | Gate G3 in CI. |
-| CI trigger | none | not applicable | none | Run the role by hand, or use an adapter that provides a trigger. |
+| CI trigger | Workflows `.github/workflows/cornerstone-<profile>-<trigger>.yml` for the label, `ci:issue-opened`, and schedule triggers. Each runs `opencode run --agent <role>-ci` | YAML (GitHub Actions) | partial | Run the role by hand. There is no `ci:dependency-pr` trigger. A role that needs the shell does not run in CI. |
 | Render the role files and the settings | `stone render` writes `.opencode/agents/<role>.md` and merges `opencode.json` | Markdown, JSON | full | none. |
 | Context guard hook (D115) | none | not applicable | none | Watch the context size by hand. Start a new session after a PR. |
 | Token report (`stone usage`, D114) | none | not applicable | none | No `usage.yaml` yet, so `stone usage` stops with an error. `opencode stats` shows some usage data. |
@@ -111,6 +113,47 @@ Render merges a `permissions` list into `opencode.json`. Other keys stay as they
 denies `external_directory` and an `edit` of the harness paths. These rules apply to a session with
 no role, for example a person who starts `opencode` in the repo. A role file starts with a deny-all
 rule, and its rules come after the config rules, so the role file rules win.
+
+## CI triggers
+
+`stone render` writes one workflow for each profile trigger of the type label, `ci:issue-opened`,
+or schedule (D119). The inputs, the job split, and the report framing are the same as in the
+reference adapter ([claude-code.md](claude-code.md#trigger-workflows)). A `ci:dependency-pr` trigger
+gives no file, and render prints a notice. The plan key is the repo secret `OPENCODE_API_KEY`. The
+#325 spike tested these facts on OpenCode 2.2.6 ([report](../../docs/reports/2026-11-10-opencode-adapter-ci-spike.md)).
+
+| Item | What the workflow does |
+| --- | --- |
+| Install | Downloads the `opencode-linux-x64.tar.gz` asset of the pinned version 2.2.6 from the release page. `sha256sum -c` checks it. npm has no 2.x build, so the workflow does not use npm. The version and the SHA-256 are in [values.py](opencode/values.py). |
+| Role file | Runs `.opencode/agents/<role>-ci.md`, a copy of the role file with the step cap 30 and the rules `deny *`, then `allow read`, `grep`, and `glob`. It has no shell, `execute`, `webfetch`, or `edit`. |
+| Run | `opencode --standalone run --agent <role>-ci --format json --archived "<prompt>"`. The prompt marks the event text as untrusted. |
+| Event text | The job saves the issue or the issue list as `.cornerstone-event/event.json` in the checkout. The deny-all rule also denies a read outside the checkout. |
+| Plan key | `OPENCODE_API_KEY` comes from the secret, and only as an env variable of the one step that runs OpenCode. No step writes it to a file. |
+| Symlink | A step before the run fails the job on any symlink in the checkout. The read tool follows a symlink out of the checkout (spike). |
+| Report | The role ends its last message with a JSON object `{"report": "..."}`. A step reads the text parts of the last message, then the last JSON object, with or without a code fence. If no object has a `report`, the job fails. |
+| Post job | A second job has its own token. It frames the report and posts it, as in the reference adapter (D31, D38). The run job has no write token. |
+| Limits | The role stops at 30 steps, and the job stops at 20 minutes (D38). |
+
+`stone render` refuses a trigger in two cases. The first case is a CI copy that would allow `shell`,
+`execute`, `webfetch`, `edit`, or `external_directory`. The second case is a first rule that does
+not deny all actions. A role with the shell can read the plan key from the env of the process
+(D39). The rules are in `ci_role` of [components.yaml](opencode/components.yaml).
+
+A schedule workflow has a comment line with the result of the peak check. Render reads the peak
+windows of the model of the first role in [rates.yaml](opencode/rates.yaml), and compares them with
+the cron line in UTC. If a fire time is in a peak window, the comment starts with `WARNING`, and
+render prints the same warning. The check does not read the day of the month or the month, so it can
+warn about a time that never runs.
+
+Limits of the CI triggers:
+
+- A role that needs the shell, such as the implementer in CI, does not run. The read-only copy
+  only reads. A profile step that needs the shell cannot run, and the role says so in the report.
+- The CI roles cannot use the code index. `stone-index` has no MCP mode (spike).
+- The run job reads the event text, and the role could write it into the report. The post job frames
+  the report as quoted text, as in the reference adapter.
+- Anyone can start the `ci:issue-opened` trigger, and each run costs plan usage. The step cap and
+  the time limit are the only cost controls (D38).
 
 ## Eval run
 
@@ -189,8 +232,22 @@ The #325 spike and the #326 probes tested these facts on OpenCode 2.2.6:
 | A `[...]` class in a rule | **No.** `[Aa][Gg][Ee][Nn][Tt][Ss].[Mm][Dd]` did not match `AGENTS.md`. |
 | Config rules and role rules | **Yes.** The role file rules come after the config rules. |
 
+The #325 spike tested these facts in a private test repo on a GitHub runner (3 of 3 runs):
+
+| Fact | Result |
+| --- | --- |
+| A pinned install from the release asset, with the SHA-256 check | **Yes.** |
+| The plan key from the env variable `OPENCODE_API_KEY` | **Yes.** GitHub masks it in the log. |
+| A report as a bare JSON object at the end of the last message | **Yes.** The model did not use a code fence in CI. |
+| The read tool and a symlink in the checkout | **Follows it** to a text file outside the checkout. The workflow fails on a symlink. |
+
 Unproven facts:
 
+- `[TO CONFIRM]` the rendered trigger workflows on a GitHub runner. The unit tests and the golden
+  files check the text. The spike workflow has the same install, run command, and key, but it is
+  not a rendered workflow.
+- `[TO CONFIRM]` that a role in the CI copy reads `.cornerstone-event/event.json` through the
+  deny-all rule. The spike role read a file in the checkout.
 - `[TO CONFIRM]` that the published token rates stay fixed.
 - `[TO CONFIRM]` that the read tool refuses `/proc/self/environ`. Only a binary-file check stopped
   it in the spike, and the read tool follows a symlink in the repo to a path outside it.
@@ -203,7 +260,20 @@ Unproven facts:
 | Status | full v1. It replaces eval-only v0 of 2026-11-08 (D112). |
 | Reason | The #325 spike proved the instruction, skill, and action facts. A target repo needs the role files from render, not by hand. |
 | Options | The role files and the project config (chosen). The same with the shared checks and the G3 workflow (a later issue). A copy of the reference checks (rejected: two copies to keep the same). |
-| Risks | No K6 in CI yet, so the path rules are the only control. A path rule does not limit the shell. A glob rule can cover more or fewer paths than K6. No trigger and no cost limit. |
+| Risks | No K6 in CI yet, so the path rules are the only control. A path rule does not limit the shell. A glob rule can cover more or fewer paths than K6. No cost limit. The CI triggers are in D119. |
 | Eval plan | The adapter unit tests, the golden files of a render, and a probe of each role on OpenCode. |
 | Review | 2027-05-10 |
 | Framework decision | D118 |
+
+### CI triggers (D119)
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-11-10 |
+| Status | partial: label, `ci:issue-opened`, and schedule. Read-only roles. |
+| Reason | A private target repo needs to start a role from a GitHub event (issue #327). |
+| Options | A read-only CI copy of the role file (chosen). A refusal for each role that has the shell (rejected: no shipped profile could use a trigger). The normal role file (rejected: it has the shell or `edit`). |
+| Risks | The plan key is in the env of the process, and a symlink or a shell could expose it. The controls are the symlink check, the deny-all rule, and no shell. The rendered workflow has not run on a runner. |
+| Eval plan | The unit tests of the render, the refusal, the report step, and the peak check. The golden files of each trigger. Run one rendered workflow in a private test repo before a release. |
+| Review | 2027-05-10 |
+| Framework decision | D119 |
