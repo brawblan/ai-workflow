@@ -144,60 +144,80 @@ def check_targets(targets: list[tuple[str, str]]) -> None:
         seen[target] = trigger_text
 
 
-NAMES = {name: index for index, name in enumerate(eval_rates.WEEKDAYS)}  # mon=0 ... sun=6
+# Cron names: mon=1 ... sat=6, sun=0. The rates file counts mon=0 ... sun=6.
+DAY_NAMES = {name: (index + 1) % 7 for index, name in enumerate(eval_rates.WEEKDAYS)}
+MONTH_NAMES = {name: number for number, name in enumerate(
+    ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
+
+
+def _cron_value(text: str, names: dict[str, int] | None) -> int:
+    return names[text] if names and text in names else int(text)
+
+
+def _cron_bounds(base: str, step: str, low: int, high: int,
+                 names: dict[str, int] | None) -> tuple[int, int] | None:
+    """Return the first and last value of a cron range, or None if the range is not plain cron."""
+    if base == "*":
+        return low, high
+    first, _, last = base.partition("-")
+    try:
+        start = _cron_value(first, names)
+        end = _cron_value(last, names) if last else (high if step else start)
+    except ValueError:
+        return None
+    return (start, end) if low <= start <= end <= high else None
+
+
+def _cron_item(item: str, low: int, high: int, names: dict[str, int] | None) -> range | None:
+    """Return the values of one comma item of a cron field, or None if it is not plain cron."""
+    base, _, step = item.partition("/")
+    if step and (not step.isdigit() or int(step) < 1):
+        return None
+    bounds = _cron_bounds(base, step, low, high, names)
+    return range(bounds[0], bounds[1] + 1, int(step) if step else 1) if bounds else None
 
 
 def _cron_field(text: str, low: int, high: int, names: dict[str, int] | None = None) -> set[int] | None:
     """Return the values that one cron field gives, or None if the field is not plain cron."""
     found: set[int] = set()
     for item in text.lower().split(","):
-        base, _, step = item.partition("/")
-        if step and not step.isdigit():
+        values = _cron_item(item, low, high, names)
+        if values is None:
             return None
-        size = int(step) if step else 1
-        if size < 1:
-            return None
-        if base == "*":
-            start, end = low, high
-        else:
-            first, _, last = base.partition("-")
-            try:
-                start = names[first] if names and first in names else int(first)
-                end = (names[last] if names and last in names else int(last)) if last else (
-                    high if step else start)
-            except ValueError:
-                return None
-        if start < low or end > high or start > end:
-            return None
-        found.update(range(start, end + 1, size))
+        found.update(values)
     return found
 
 
 def fire_times(cron_line: str) -> set[tuple[int, int]] | None:
     """Return the (weekday, hour) pairs at which a cron line can fire, in UTC. Monday is 0.
 
-    The day of the month and the month are not read, so the result can have more pairs than the
-    real fire times. A line that this function cannot read gives None.
+    The day of the month and the month must be plain cron, but they do not narrow the result. So the
+    result can have more pairs than the real fire times. A line that this function cannot read
+    gives None.
     """
     fields = cron_line.split()
     if len(fields) != 5:
         return None
     hours = _cron_field(fields[1], 0, 23)
-    days = _cron_field(fields[4], 0, 7, {**{name: (index + 1) % 7 for name, index in NAMES.items()}})
-    if hours is None or days is None:
+    days = _cron_field(fields[4], 0, 7, DAY_NAMES)
+    others = (_cron_field(fields[0], 0, 59), _cron_field(fields[2], 1, 31),
+              _cron_field(fields[3], 1, 12, MONTH_NAMES))
+    if hours is None or days is None or None in others:
         return None
     # cron: 0 and 7 are Sunday, 1 is Monday. The rates file: 0 is Monday.
     weekdays = {(day - 1) % 7 for day in days}
     return {(day, hour) for day in weekdays for hour in hours}
 
 
+def _peak_entry(model: str, rates: dict[str, Any] | None) -> dict[str, Any]:
+    """Return the rates entry of a model, without its #variant suffix, or an empty mapping."""
+    return ((rates or {}).get("models") or {}).get(model.partition("#")[0]) or {}
+
+
 def peak_times(cron_line: str, model: str, rates: dict[str, Any] | None) -> list[str]:
     """Return the fire times of a cron line that are in a peak window of the model, as 'mon 06:00 UTC'."""
-    entry = ((rates or {}).get("models") or {}).get(model.partition("#")[0])
-    times = fire_times(cron_line)
-    if not entry or times is None:
-        return []
-    windows = (entry.get("peak") or {}).get("windows") or []
+    windows = (_peak_entry(model, rates).get("peak") or {}).get("windows") or []
+    times = fire_times(cron_line) or set()
     return [f"{eval_rates.WEEKDAYS[day]} {hour:02d}:00 UTC" for day, hour in sorted(times)
             if any(eval_rates.WEEKDAYS[day] in window["weekdays"] and hour in window["hours"]
                    for window in windows)]
@@ -207,8 +227,7 @@ def peak_notice(cron_line: str, model: str, rates: dict[str, Any] | None) -> str
     """Return the text for the workflow comment: a warning, or the result of the peak check (item 8)."""
     if rates is None:
         return "Peak check: the adapter has no token rates, so render did not check the peak windows."
-    entry = (rates.get("models") or {}).get(model.partition("#")[0])
-    if not entry or not entry.get("peak"):
+    if not _peak_entry(model, rates).get("peak"):
         return f"Peak check: the model {model} has no peak window in the rates file."
     if fire_times(cron_line) is None:
         return (f"Peak check: render cannot read the cron line '{cron_line}', so it did not check "

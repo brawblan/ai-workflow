@@ -34,28 +34,33 @@ class _Dumper(yaml.SafeDumper):
         return super().increase_indent(flow, False)
 
 
+def _whole_number(value: Any) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= 1
+
+
+def _rules_valid(rules: Any) -> bool:
+    return isinstance(rules, list) and all(
+        isinstance(rule, dict) and {"action", "resource", "effect"} <= rule.keys() for rule in rules)
+
+
 def settings(registry_doc: dict[str, Any]) -> dict[str, Any] | None:
     """Return the checked `ci_role` settings of an adapter, or None if it has none."""
     value = registry_doc.get("ci_role")
     if value is None:
         return None
+    problem = ""
     if not isinstance(value, dict):
-        raise TriggerError("ci_role in the component list must be a mapping.")
-    target = value.get("target")
-    if not isinstance(target, str) or "$role" not in target:
-        raise TriggerError("ci_role.target must be a path that holds '$role'.")
-    steps = value.get("steps")
-    if not isinstance(steps, int) or isinstance(steps, bool) or steps < 1:
-        raise TriggerError("ci_role.steps must be a whole number of 1 or more.")
-    rules = value.get("permissions")
-    if not isinstance(rules, list) or not all(
-            isinstance(rule, dict) and {"action", "resource", "effect"} <= rule.keys()
-            for rule in rules):
-        raise TriggerError("ci_role.permissions must be a list of rules with action, resource, "
-                           "and effect.")
-    forbidden = value.get("forbidden")
-    if not isinstance(forbidden, list) or not forbidden:
-        raise TriggerError("ci_role.forbidden must be a list of actions.")
+        problem = "ci_role in the component list must be a mapping."
+    elif not isinstance(value.get("target"), str) or "$role" not in value["target"]:
+        problem = "ci_role.target must be a path that holds '$role'."
+    elif not _whole_number(value.get("steps")):
+        problem = "ci_role.steps must be a whole number of 1 or more."
+    elif not _rules_valid(value.get("permissions")):
+        problem = "ci_role.permissions must be a list of rules with action, resource, and effect."
+    elif not isinstance(value.get("forbidden"), list) or not value["forbidden"]:
+        problem = "ci_role.forbidden must be a list of actions."
+    if problem:
+        raise TriggerError(problem)
     return value
 
 

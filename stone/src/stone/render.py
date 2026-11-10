@@ -612,25 +612,38 @@ def trigger_components(framework: Path, harness: Path, registry_doc: dict[str, A
             values["ci_agent"] = ci_role.agent_id(ci, role)
             if role not in copies:
                 copies[role] = _ci_role_component(ci, role, rendered)
-        if trigger.key == "schedule":
-            values["peak_notice"] = triggers.peak_notice(values["cron"], values["model"], rates)
-            if values["peak_notice"].startswith("WARNING"):
-                print(f"warning: profile {trigger.profile['id']}: {values['peak_notice'][9:]}",
-                      file=sys.stderr)
-        text = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
-        for name, part in (entry.get("parts") or {}).items():
-            text = triggers.insert_block(
-                text, name, (harness / "templates" / part).read_text(encoding="utf-8"))
-        steps = triggers.prompt_steps(framework, trigger).replace("$", "$$")
-        text = triggers.insert_block(text, "profile_steps", steps)
+        values["peak_notice"] = _peak_notice(trigger, values, rates)
         component_id = f"{entry['id']}.{trigger.profile['id']}"
         target = fill(entry["target"], entry["template"], values, config)
         targets.append((trigger.text, target))
         components.append(Component(component_id, entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
-                                    {target: fill(text, entry["template"], values, config)}))
+                                    {target: fill(_trigger_text(framework, harness, entry, trigger),
+                                                  entry["template"], values, config)}))
     triggers.check_targets(targets)
     return components + list(copies.values())
+
+
+def _trigger_text(framework: Path, harness: Path, entry: dict[str, Any],
+                  trigger: triggers.Trigger) -> str:
+    """Return the template of one trigger workflow with its parts and the profile steps."""
+    text = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
+    for name, part in (entry.get("parts") or {}).items():
+        text = triggers.insert_block(
+            text, name, (harness / "templates" / part).read_text(encoding="utf-8"))
+    steps = triggers.prompt_steps(framework, trigger).replace("$", "$$")
+    return triggers.insert_block(text, "profile_steps", steps)
+
+
+def _peak_notice(trigger: triggers.Trigger, values: dict[str, str],
+                 rates: dict[str, Any] | None) -> str:
+    """Return the peak check line of a schedule workflow. Print a warning if a fire time is in a peak."""
+    if trigger.key != "schedule":
+        return ""
+    notice = triggers.peak_notice(values["cron"], values["model"], rates)
+    if notice.startswith("WARNING"):
+        print(f"warning: profile {trigger.profile['id']}: {notice[len('WARNING: '):]}", file=sys.stderr)
+    return notice
 
 
 def _ci_role_component(ci: dict[str, Any], role: str, rendered: list[Component]) -> Component:
