@@ -509,9 +509,7 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
             values.setdefault(block, "")
         if entry.get("steps"):
             values["check_steps"] = render_steps(harness, entry["steps"], profiles, values, config)
-        content, owned = render_entry(harness, entry, values, steps, config)
-        if entry["kind"] == "role" and "permission_actions" in registry_doc:
-            check_permission_actions(entry, content, registry_doc["permission_actions"])
+        content, owned = render_entry(harness, entry, values, steps, config, registry_doc.get("permission_actions"))
         components.append(Component(entry["id"], entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
                                     {entry["target"]: content}, entry.get("merge") == "json", owned))
@@ -538,14 +536,18 @@ def check_permission_actions(entry: dict[str, Any], content: str, actions: list[
 
 
 def render_entry(harness: Path, entry: dict[str, Any], values: dict[str, str],
-                 steps: dict[str, str | None], config: dict[str, Any]) -> tuple[str, list[str]]:
+                 steps: dict[str, str | None], config: dict[str, Any],
+                 actions: list[str] | None = None) -> tuple[str, list[str]]:
     """Fill the template of one component, with the code index parts that it takes (D111).
 
-    Return the content and the keys of the code index entries that it holds.
+    Return the content and the keys of the code index entries that it holds. With `actions`, refuse
+    a role file rule with another permission action (D118).
     """
     if entry.get("reads_code"):
         values["code_index_rule"] = code_index.role_block(config)
     content = substitute(harness, entry["template"], values, steps, config)
+    if actions is not None and entry["kind"] == "role":
+        check_permission_actions(entry, content, actions)
     owned: list[str] = []
     if entry.get("code_index_part"):
         content, owned = add_code_index(harness, entry["code_index_part"], content, config)
