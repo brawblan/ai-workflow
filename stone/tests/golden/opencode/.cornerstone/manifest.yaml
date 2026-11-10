@@ -15,6 +15,36 @@ components:
     files:
       - opencode.json
     hash: a82b6707952d4abd968cb3fb52dc8f1c1d2f8a2e7dd71bbed150d3ce7e9590eb
+  - id: role-ci.investigator
+    kind: role
+    purpose: Run the investigator in a CI job with read, grep, and glob only (D119).
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .opencode/agents/investigator-ci.md
+    hash: 23f04444c866c1dc0aedf69d2f96d157023f3a6f7226dd78f2fe248e0ebf842c
+  - id: role-ci.shaper
+    kind: role
+    purpose: Run the shaper in a CI job with read, grep, and glob only (D119).
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .opencode/agents/shaper-ci.md
+    hash: 14a3dcb7322fcd21c2efe48d4b6d14e79bb616ca31e906c5edb897e41e8129ba
   - id: role.implementer
     kind: role
     purpose: Change the code to meet the ticket. Write the decision log.
@@ -103,3 +133,48 @@ components:
     files:
       - .opencode/agents/tester.md
     hash: 79fe672fb6c1ccded690a6de888a6a26a548cbcc6025fd19139e790bcd50cfca
+  - id: trigger.issue-opened.bug-triage
+    kind: ci-job
+    purpose: Start the first role of the profile on each new issue. Post its report on the issue.
+    principle:
+      - P6
+      - P9
+    source: framework
+    owner: octocat
+    eval: evals/trigger-issue-opened/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .github/workflows/cornerstone-bug-triage-issue-opened.yml
+    hash: 542301fd1f081c198cd9016f4e969944a42adc1c9d42b7e80aab83ed4b2ced9e
+  - id: trigger.label.single-ticket
+    kind: ci-job
+    purpose: Start the first role of the profile when a human adds the trigger label to an issue.
+    principle:
+      - P6
+      - P9
+    source: framework
+    owner: octocat
+    eval: evals/trigger-label/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .github/workflows/cornerstone-single-ticket-label.yml
+    hash: a69624894a56b7480187846758df1c71bf58cecf1c4da888f511f6802d3072d1
+  - id: trigger.schedule.bug-triage
+    kind: ci-job
+    purpose: Start the first role of the profile on its schedule. Post its report as an issue.
+    principle:
+      - P6
+      - P9
+    source: framework
+    owner: octocat
+    eval: evals/trigger-schedule/
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .github/workflows/cornerstone-bug-triage-schedule.yml
+    hash: 90b1c9c19102db21127e6896bda622df23422f78c48e04c062f8ec0c57486c7d
