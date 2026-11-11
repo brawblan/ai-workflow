@@ -45,6 +45,7 @@ STEPS = {"K4": ("K4 integration tests", "test_integration"),
 K20_STEP = "K20 specialist findings"  # no command key: it renders only with a specialists section (D66)
 K23_STEP = "K23 new dependencies"  # no command key; it renders from framework 1.5.0 (D90)
 K24_STEP = "K24 unpinned tools"  # no command key; it renders from framework 1.5.0 (D93)
+K25_STEP = "K25 state machines"  # no command key; it renders from framework 1.8.0 (D120)
 STEP_NAMES = {name for name, _ in STEPS.values()} | {K20_STEP}
 LIMIT = "limits.mutation_score_changed_code"
 CHECK_WARNING = re.compile(r"\bK(4|5|8|10|11|12)\b|commands\.")
@@ -493,7 +494,8 @@ class K23GateTest(FrameworkCopy):
     def test_k23_step_renders_from_1_5_0(self) -> None:
         for version in ("1.5.0", "1.10.0", "2.0.0"):
             with self.subTest(version=version):
-                self.assertEqual(self.names_with(version)[-2:], [self.STEP, K24_STEP])
+                tail = [self.STEP, K24_STEP] + ([K25_STEP] if version != "1.5.0" else [])
+                self.assertEqual(self.names_with(version)[-len(tail):], tail)
                 step = self.step(self.STEP)
                 self.assertIn("check-dependencies", step["run"])
                 self.assertIn("--mode warn", step["run"])
@@ -560,16 +562,43 @@ class K24GateTest(FrameworkCopy):
                     self.assertIn("K24", match.group(1))
 
 
+# K25 renders only from framework 1.8.0, the first tag with `stone check-states` (D120).
+
+class K25GateTest(FrameworkCopy):
+    names_with = K23GateTest.names_with
+
+    def test_k25_step_renders_from_1_8_0_with_the_command(self) -> None:
+        self.add_profile("with-k25", ["K4", "K5", "K6", "K14", "K25"])
+        for version in ("1.8.0", "1.10.0", "2.0.0"):
+            with self.subTest(version=version):
+                self.assertIn(K25_STEP, self.names_with(version, ["with-k25"]))
+                run = self.step(K25_STEP)["run"]
+                self.assertIn("check-states", " ".join(run.replace("\\\n", " ").split()))
+
+    def test_k25_step_does_not_render_below_1_8_0_or_for_a_bad_version(self) -> None:
+        self.add_profile("with-k25", ["K4", "K5", "K6", "K14", "K25"])
+        for version in ("1.7.9", "1.5.0", "0.8.0", "banana", "1.x"):
+            with self.subTest(version=version):
+                self.assertNotIn(K25_STEP, self.names_with(version, ["with-k25"]))
+
+    def test_k25_step_does_not_render_for_a_profile_without_k25(self) -> None:
+        self.add_profile("no-k25", ["K4", "K5", "K6", "K14", "K24"])
+        self.assertNotIn(K25_STEP, self.names_with("1.8.0", ["no-k25"]))
+
+    def test_k25_gate_version_is_1_8_0(self) -> None:
+        self.assertEqual(render.K25_SINCE, (1, 8, 0))
+
+
 # AC7: valid YAML, the order of components.yaml, and warn mode.
 
 class AllStepsTest(FrameworkCopy):
     def setUp(self) -> None:
         super().setUp()
         self.add_profile("every-check",
-                         ["K4", "K5", "K6", "K8", "K10", "K11", "K12", "K14", "K20", "K23", "K24"])
+                         ["K4", "K5", "K6", "K8", "K10", "K11", "K12", "K14", "K20", "K23", "K24", "K25"])
         self.configure(["every-check"], CHECK_COMMANDS, {"mutation_score_changed_code": 0.6})
-        config = self.root / ".cornerstone" / "config.yaml"  # K23 needs framework 1.5.0 (D90)
-        config.write_text(config.read_text(encoding="utf-8").replace("0.8.0", "1.5.0"),
+        config = self.root / ".cornerstone" / "config.yaml"  # K23 needs 1.5.0 (D90), K25 needs 1.8.0 (D120)
+        config.write_text(config.read_text(encoding="utf-8").replace("0.8.0", "1.8.0"),
                           encoding="utf-8")
         with (self.root / ".cornerstone" / "config.yaml").open("a", encoding="utf-8") as config:
             config.write("specialists:\n  - id: security\n    run: /security-review\n")
@@ -586,7 +615,7 @@ class AllStepsTest(FrameworkCopy):
             self.assertIsInstance(step, dict)
 
     def test_ac7_steps_have_the_order_of_components_yaml(self) -> None:
-        names = [name for name in self.step_names() if name in STEP_NAMES | {K23_STEP, K24_STEP}]
+        names = [name for name in self.step_names() if name in STEP_NAMES | {K23_STEP, K24_STEP, K25_STEP}]
         self.assertEqual(names, registry_step_names())
 
     def test_ac7_k20_is_the_first_optional_step(self) -> None:
