@@ -567,6 +567,34 @@ class CheckPermissionsTest(unittest.TestCase):
         self.refuses([{"action": "*", "resource": "*", "effect": "allow"}] + self.SHIPPED[1:])
 
 
+class CheckPermissionsPatternTest(unittest.TestCase):
+    SHIPPED = CheckPermissionsTest.SHIPPED
+
+    def rule(self, action: str, effect: str) -> list[dict]:
+        return self.SHIPPED + [{"action": action, "resource": "*", "effect": effect}]
+
+    def test_ac6_an_allow_rule_of_a_pattern_or_a_tool_action_is_refused(self) -> None:
+        for action in ("s*", "*", "e*", "task", "bash", "mcp_server_tool"):
+            with self.subTest(action=action):
+                with self.assertRaises(triggers.TriggerError) as caught:
+                    ci_role.check_permissions(self.rule(action, "allow"), FORBIDDEN, "shaper")
+                self.assertIn(action, str(caught.exception))
+
+    def test_ac6_an_ask_rule_of_task_is_refused(self) -> None:
+        with self.assertRaises(triggers.TriggerError):
+            ci_role.check_permissions(self.rule("task", "ask"), FORBIDDEN, "shaper")
+
+    def test_ac6_an_allow_rule_of_read_grep_glob_passes(self) -> None:
+        for action in ("read", "grep", "glob"):
+            with self.subTest(action=action):
+                ci_role.check_permissions(self.rule(action, "allow"), FORBIDDEN, "shaper")
+
+    def test_ac6_a_deny_rule_of_any_action_passes(self) -> None:
+        for action in ("s*", "task", "*", "shell", "bash", "e*"):
+            with self.subTest(action=action):
+                ci_role.check_permissions(self.rule(action, "deny"), FORBIDDEN, "shaper")
+
+
 class SettingsTest(unittest.TestCase):
     GOOD = {"target": ".opencode/agents/$role-ci.md", "steps": 30,
             "permissions": [{"action": "*", "resource": "*", "effect": "deny"}],
@@ -663,6 +691,16 @@ class RefusalEndToEndTest(unittest.TestCase):
     def test_ac6_a_missing_deny_all_rule_stops_render(self) -> None:
         self.edit(lambda ci: ci["permissions"].pop(0))
         self.assertIn("denies all", self.refused())
+
+    def test_ac6_a_task_allow_rule_stops_render_and_writes_no_file(self) -> None:
+        self.edit(lambda ci: ci["permissions"].append(
+            {"action": "task", "resource": "*", "effect": "allow"}))
+        self.assertIn("task", self.refused())
+
+    def test_ac6_a_pattern_allow_rule_stops_render(self) -> None:
+        self.edit(lambda ci: ci["permissions"].append(
+            {"action": "s*", "resource": "*", "effect": "allow"}))
+        self.assertIn("s*", self.refused())
 
     def test_the_unchanged_copy_of_the_framework_renders(self) -> None:
         result, log = render_into(self.root, CONFIG, self.framework)
@@ -778,6 +816,40 @@ class ReportStepTest(unittest.TestCase):
         import json
         self.ok([text_event(json.dumps({"report": hard}))], hard)
 
+    LINE_BREAKS = ("\u2028", "\u2029", "\u0085", "\u000b", "\u000c", "\u001c")
+
+    def raw_event(self, text: str, message: str = "m1") -> str:
+        import json
+        return json.dumps({"type": "text", "part": {"type": "text", "messageID": message,
+                                                    "text": text}}, ensure_ascii=False)
+
+    def test_a_unicode_line_break_in_the_text_keeps_the_report(self) -> None:
+        for char in self.LINE_BREAKS:
+            with self.subTest(char=hex(ord(char))):
+                line = self.raw_event('Before' + char + 'after.\n{"report": "kept"}')
+                if ord(char) > 0x1f:  # json.dumps must escape a control character
+                    self.assertIn(char, line)
+                self.out.unlink(missing_ok=True)
+                self.ok([line], "kept")
+
+    def test_a_unicode_line_break_inside_the_report_stays_in_the_report(self) -> None:
+        import json
+        for char in self.LINE_BREAKS:
+            with self.subTest(char=hex(ord(char))):
+                body = "one" + char + "two"
+                line = self.raw_event(json.dumps({"report": body}, ensure_ascii=False))
+                if ord(char) > 0x1f:  # json.dumps must escape a control character
+                    self.assertIn(char, line)
+                self.out.unlink(missing_ok=True)
+                self.ok([line], body)
+
+    def test_a_unicode_line_break_in_an_earlier_text_part_is_fine(self) -> None:
+        for char in self.LINE_BREAKS:
+            with self.subTest(char=hex(ord(char))):
+                self.out.unlink(missing_ok=True)
+                self.ok([self.raw_event("Intro" + char + " "),
+                         self.raw_event('{"report": "after break"}')], "after break")
+
     def test_a_nested_object_after_the_report(self) -> None:
         self.ok([text_event('{"report":"x","findings":[{"a":1}]}')], "x")
 
@@ -820,6 +892,25 @@ class FireTimesTest(unittest.TestCase):
         self.assertEqual(triggers.fire_times("0 6 * * MON"), {(0, 6)})
         self.assertEqual(triggers.fire_times("0 6 * * Sun"), {(6, 6)})
 
+    def test_a_day_of_the_month_gives_every_weekday(self) -> None:
+        self.assertEqual(triggers.fire_times("0 7 1 * 6"), {(d, 7) for d in range(7)})
+        self.assertEqual(triggers.fire_times("0 6 15 * *"), {(d, 6) for d in range(7)})
+
+    def test_a_range_that_ends_on_sunday(self) -> None:
+        self.assertEqual(triggers.fire_times("0 7 * * fri-sun"), {(4, 7), (5, 7), (6, 7)})
+        self.assertEqual(triggers.fire_times("0 6 * * mon-sun"), {(d, 6) for d in range(7)})
+        self.assertEqual(len(triggers.fire_times("0 6 * * mon-sun")), 7)
+
+    def test_sunday_forms_are_equal(self) -> None:
+        want = {(6, 6)}
+        for line in ("0 6 * * sun", "0 6 * * 0", "0 6 * * 7"):
+            with self.subTest(line=line):
+                self.assertEqual(triggers.fire_times(line), want)
+
+    def test_a_star_day_of_the_month_does_not_widen_the_weekdays(self) -> None:
+        self.assertEqual(triggers.fire_times("0 6 * * 1"), {(0, 6)})
+        self.assertEqual(triggers.fire_times("0 6 * * 1,3"), {(0, 6), (2, 6)})
+
     def test_a_line_that_is_not_plain_cron(self) -> None:
         for line in ("bad", "1 2 3", "0 25 * * *", "0 6 * * 8", "*/0 * * * *", "", "0 6 * * xyz",
                      "0 5-2 * * *"):
@@ -842,6 +933,20 @@ class PeakTimesTest(unittest.TestCase):
         text = (FRAMEWORK / "adapters" / "claude-code" / "eval.yaml").read_text(encoding="utf-8")
         self.assertNotIn("\nrates:", text)
         self.assertIsNone(triggers.load_rates(FRAMEWORK / "adapters" / "claude-code"))
+
+    def test_load_rates_is_none_when_the_adapter_has_no_eval_yaml(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            self.assertIsNone(triggers.load_rates(Path(folder)))
+
+    def test_a_day_of_the_month_line_peaks_on_every_weekday(self) -> None:
+        self.assertEqual(self.peaks("0 7 1 * 6"),
+                         [f"{d} 07:00 UTC" for d in ("mon", "tue", "wed", "thu", "fri")])
+
+    def test_a_dom_only_line_peaks_on_deepseek(self) -> None:
+        self.assertTrue(self.peaks("0 6 15 * *"))
+
+    def test_a_range_to_sunday_peaks_on_friday_only(self) -> None:
+        self.assertEqual(self.peaks("0 7 * * fri-sun"), ["fri 07:00 UTC"])
 
     def test_monday_06_is_in_the_peak(self) -> None:
         self.assertEqual(self.peaks("0 6 * * 1"), ["mon 06:00 UTC"])
@@ -897,6 +1002,10 @@ class PeakNoticeTest(unittest.TestCase):
         self.assertIn("mon 06:00 UTC, tue 06:00 UTC, wed 06:00 UTC", text)
         self.assertNotIn("and 0 more", text)
         self.assertNotRegex(text, r", and \d+ more")
+
+    def test_a_day_of_the_month_line_warns(self) -> None:
+        self.assertTrue(self.notice("0 7 1 * 6").startswith("WARNING"))
+        self.assertTrue(self.notice("0 6 15 * *").startswith("WARNING"))
 
     def test_no_peak_fire_time(self) -> None:
         self.assertTrue(self.notice("0 12 * * *").startswith("Peak check: no fire time"))
@@ -968,6 +1077,12 @@ class PeakEndToEndTest(unittest.TestCase):
             "# Peak check: the model opencode-go/beam-free has no peak window in the rates file.")
         self.assertNotIn("peak window", log)
         self.assertNotIn("warning: profile", log)
+
+    def test_a_framework_without_eval_yaml_still_renders_the_triggers(self) -> None:
+        (self.framework / "adapters" / "opencode" / "eval.yaml").unlink()
+        result, log = render_into(self.root, CONFIG, self.framework)
+        self.assertEqual(result.exit_code, 0, log)
+        self.assertIn("no token rates", self.comment_lines(SCHEDULE)[2])
 
     def test_ac8_the_workflow_with_a_warning_still_passes_k24(self) -> None:
         self.set_model(RATES_MODEL)
