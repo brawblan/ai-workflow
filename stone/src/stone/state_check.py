@@ -18,9 +18,11 @@ TS_ENUM = re.compile(rf"^\s*(?:export\s+)?(?:declare\s+)?(?:const\s+)?enum\s+(?P
 TS_UNION = re.compile(rf"^\s*(?:export\s+)?type\s+(?P<name>{SUFFIX})\s*=")
 LITERAL = re.compile(r"""(["'])[^"'\n]+\1""")
 MEMBER = re.compile(r"^\s*[A-Za-z_]\w*\s*=")
-# A name that holds the allowed moves. A CSS "transition:" or "transition-delay" does not count.
+# A line that defines a name for the allowed moves: a table, a map, or a function. A call, a CSS
+# "transition:" property, and a hook such as useTransition do not count.
 TABLE = re.compile(
-    r"(?i)(?<![-\w])(?:\w*transitions?\w*(?![-\w])(?!\s*:\s*[\"'`\d])|next_?states?|allowed_?(?:next|moves)\w*)")
+    r"(?im)^\s*(?:(?:export|const|let|var|def|function|async|static|readonly|private|public)\s+)*"
+    r"(?P<name>\w*(?:transition|next_?states?|allowed_?(?:next|moves))\w*)\s*[:=(<]")
 SOURCE = (".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".mts")
 SKIP_PARTS = {"node_modules", "vendor", "dist", "build", "__pycache__", "tests", "test", "__tests__"}
 SKIP_NAMES = re.compile(r"(?:^test_.*\.py$|_test\.py$|\.(?:test|spec)\.[mc]?[jt]sx?$)")
@@ -38,50 +40,64 @@ def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
                           encoding="utf-8", errors="replace")
 
 
-def _members_py(lines: list[str], index: int, indent: str) -> int:
-    count = 0
-    for line in lines[index + 1:]:
-        if line.strip() and not line.startswith(indent + " ") and not line.startswith(indent + "\t"):
+def _members_py(lines: list[str], index: int, indent: str) -> tuple[int, int]:
+    """Return (member count, last line index). Only the first member indent counts."""
+    count, end, member_indent = 0, index, None
+    for number in range(index + 1, len(lines)):
+        line = lines[number]
+        if line.strip() and not line.startswith((indent + " ", indent + "\t")):
             break
-        count += bool(MEMBER.match(line))
-    return count
+        found = MEMBER.match(line)
+        if found and member_indent in (None, len(line) - len(line.lstrip())):
+            member_indent = len(line) - len(line.lstrip())
+            count, end = count + 1, number
+    return count, end
 
 
-def _members_ts_enum(lines: list[str], index: int) -> int:
+def _members_ts_enum(lines: list[str], index: int) -> tuple[int, int]:
     body = "\n".join(lines[index:index + 200])
     body = re.sub(r"//[^\n]*|/\*.*?\*/", "", body, flags=re.DOTALL)
     start, end = body.find("{"), body.find("}")
     if start < 0 or end < start:
-        return 0
-    return len([item for item in body[start + 1:end].split(",") if item.strip()])
+        return 0, index
+    items = [item for item in body[start + 1:end].split(",") if item.strip()]
+    return len(items), index + body[:end].count("\n")
 
 
-def _members_ts_union(lines: list[str], index: int) -> int:
-    body = []
-    for line in lines[index:index + 30]:
-        body.append(line)
-        if ";" in line or (len(body) > 1 and line.strip() and not line.lstrip().startswith("|")):
+def _members_ts_union(lines: list[str], index: int) -> tuple[int, int]:
+    """Count the string literals of a union. An object type or the next statement does not count."""
+    body, end = [lines[index].split("=", 1)[1]], index
+    if body[0].strip().startswith("{"):
+        return 0, index
+    for number in range(index + 1, min(index + 30, len(lines))):
+        if ";" in body[-1] or not (lines[number].lstrip().startswith("|") or body[-1].rstrip().endswith("|") or not body[-1].strip()):
             break
-    return len(LITERAL.findall("\n".join(body)))
+        body.append(lines[number])
+        end = number
+    return len(LITERAL.findall("\n".join(body))), end
 
 
-def state_types(text: str) -> list[tuple[int, str, int]]:
-    """Return (line number, name, member count) for each state type that the text declares."""
+def state_types(text: str) -> list[tuple[int, int, str, int]]:
+    """Return (first line, last line, name, member count) for each state type in the text."""
     lines = text.splitlines()
     found = []
     for index, line in enumerate(lines):
         py, ts_enum, union = PY_ENUM.match(line), TS_ENUM.match(line), TS_UNION.match(line)
         if py:
-            found.append((index + 1, py.group("name"), _members_py(lines, index, py.group("indent"))))
+            count, end = _members_py(lines, index, py.group("indent"))
+            found.append((index + 1, end + 1, py.group("name"), count))
         elif ts_enum:
-            found.append((index + 1, ts_enum.group("name"), _members_ts_enum(lines, index)))
+            count, end = _members_ts_enum(lines, index)
+            found.append((index + 1, end + 1, ts_enum.group("name"), count))
         elif union:
-            found.append((index + 1, union.group("name"), _members_ts_union(lines, index)))
+            count, end = _members_ts_union(lines, index)
+            found.append((index + 1, end + 1, union.group("name"), count))
     return found
 
 
 def has_table(text: str) -> bool:
-    return bool(TABLE.search(text))
+    return any(not found.group("name").lower().startswith(("use", "start")) and found.group("name").lower() != "transition"
+               for found in TABLE.finditer(text))
 
 
 def added_lines(root: Path, base: str, path: str) -> set[int]:
@@ -126,8 +142,8 @@ def file_findings(root: Path, path: str, base: str | None) -> list[Finding]:
         return []
     text = file.read_text(encoding="utf-8", errors="replace")
     new = added_lines(root, base, path) if base is not None else None
-    types = [item for item in state_types(text)
-             if item[2] >= MIN_STATES and (new is None or item[0] in new)]
+    types = [(first, name, count) for first, last, name, count in state_types(text)
+             if count >= MIN_STATES and (new is None or new.intersection(range(first, last + 1)))]
     if not types or _folder_has_table(root, path, text):
         return []
     return [Finding(path, number, CHECK,
