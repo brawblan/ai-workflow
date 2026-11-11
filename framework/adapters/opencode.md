@@ -142,8 +142,9 @@ not deny all actions. A role with the shell can read the plan key from the env o
 A schedule workflow has a comment line with the result of the peak check. Render reads the peak
 windows of the model of the first role in [rates.yaml](opencode/rates.yaml), and compares them with
 the cron line in UTC. If a fire time is in a peak window, the comment starts with `WARNING`, and
-render prints the same warning. The check does not read the day of the month or the month, so it can
-warn about a time that never runs.
+render prints the same warning. The check does not narrow the fire times by the
+month. If the cron line sets the day of the month, the check counts every weekday. So it can warn about
+a time that never runs.
 
 Limits of the CI triggers:
 

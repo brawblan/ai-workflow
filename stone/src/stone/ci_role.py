@@ -25,6 +25,7 @@ from stone.markdown import split_frontmatter
 from stone.triggers import TriggerError
 
 DENY_ALL = {"action": "*", "resource": "*", "effect": "deny"}
+READ_ONLY = ("read", "grep", "glob")  # the only actions that a rule of the CI copy can allow
 
 
 class _Dumper(yaml.SafeDumper):
@@ -75,12 +76,19 @@ def check_permissions(rules: list[dict[str, Any]], forbidden: list[str], role: s
         raise TriggerError(f"The CI copy of the {role} must start with a rule that denies all "
                            "actions. Fix ci_role.permissions in the component list.")
     for rule in rules[1:]:
-        action = rule.get("action")
-        if rule.get("effect") != "deny" and (action in forbidden or action == "*"):
+        action = str(rule.get("action"))
+        if rule.get("effect") == "deny":
+            continue
+        if action in forbidden or "*" in action:
             raise TriggerError(
                 f"The CI copy of the {role} would allow the action '{action}'. A CI role with "
                 f"'{action}' can read the plan key or change the repo. Remove the rule from "
                 "ci_role.permissions in the component list.")
+        if action not in READ_ONLY:
+            raise TriggerError(
+                f"The CI copy of the {role} would allow the action '{action}'. A CI copy can allow "
+                f"only {', '.join(READ_ONLY)}. Remove the rule from ci_role.permissions in the "
+                "component list.")
 
 
 def derive(config: dict[str, Any], role: str, text: str) -> tuple[str, str]:

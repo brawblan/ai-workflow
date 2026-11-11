@@ -144,8 +144,8 @@ def check_targets(targets: list[tuple[str, str]]) -> None:
         seen[target] = trigger_text
 
 
-# Cron names: mon=1 ... sat=6, sun=0. The rates file counts mon=0 ... sun=6.
-DAY_NAMES = {name: (index + 1) % 7 for index, name in enumerate(eval_rates.WEEKDAYS)}
+# Cron names: mon=1 ... sat=6, sun=7 (0 is also Sunday). The rates file counts mon=0 ... sun=6.
+DAY_NAMES = {name: index + 1 for index, name in enumerate(eval_rates.WEEKDAYS)}  # sun=7, so a range can end on it
 MONTH_NAMES = {name: number for number, name in enumerate(
     ("jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"), 1)}
 
@@ -191,8 +191,8 @@ def _cron_field(text: str, low: int, high: int, names: dict[str, int] | None = N
 def fire_times(cron_line: str) -> set[tuple[int, int]] | None:
     """Return the (weekday, hour) pairs at which a cron line can fire, in UTC. Monday is 0.
 
-    The day of the month and the month must be plain cron, but they do not narrow the result. So the
-    result can have more pairs than the real fire times. A line that this function cannot read
+    The month must be plain cron, but it does not narrow the result. If the day of the month is
+    set, every weekday can fire. So the result can have more pairs than the real fire times. A line that this function cannot read
     gives None.
     """
     fields = cron_line.split()
@@ -205,7 +205,8 @@ def fire_times(cron_line: str) -> set[tuple[int, int]] | None:
     if hours is None or days is None or None in others:
         return None
     # cron: 0 and 7 are Sunday, 1 is Monday. The rates file: 0 is Monday.
-    weekdays = {(day - 1) % 7 for day in days}
+    # If the day of the month is set, cron fires on it OR on the weekday, so any weekday can fire.
+    weekdays = set(range(7)) if fields[2] != "*" else {(day - 1) % 7 for day in days}
     return {(day, hour) for day in weekdays for hour in hours}
 
 
@@ -242,6 +243,8 @@ def peak_notice(cron_line: str, model: str, rates: dict[str, Any] | None) -> str
 
 def load_rates(harness: Path) -> dict[str, Any] | None:
     """Return the token rates that the adapter names in its eval.yaml, or None if it has none."""
+    if not (harness / "eval.yaml").is_file():
+        return None  # eval.yaml is for stone eval, so an adapter can omit it
     try:
         run = yaml.safe_load((harness / "eval.yaml").read_text(encoding="utf-8")) or {}
         name = run.get("rates") if isinstance(run, dict) else None
