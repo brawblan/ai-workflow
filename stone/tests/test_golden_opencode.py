@@ -1,6 +1,6 @@
 """Golden-file test for `stone render` with the OpenCode adapter and all six roles (issue #326).
 
-The test renders three profiles into a temporary repo and compares each written file, byte for
+The test renders four profiles into a temporary repo and compares each written file, byte for
 byte, with its fixture. The compare and the update are in `golden_helpers.py`. The fixtures are in
 `golden/opencode/`. The OpenCode files are not shared with other golden tests (D64).
 """
@@ -25,7 +25,7 @@ ROLES = ["shaper", "planner", "implementer", "tester", "reviewer", "investigator
 CONFIG = """framework_version: 0.8.0
 harness: opencode
 model_profile: opencode-default
-profiles: [single-ticket, spike, full-project]
+profiles: [single-ticket, spike, full-project, bug-triage]
 protect_instruction_files: true
 branches: {integration: dev, main: main}
 commands:
@@ -40,8 +40,17 @@ owners: {default: octocat}
 """
 CONFIG_PATH = ".cornerstone/config.yaml"
 MANIFEST = ".cornerstone/manifest.yaml"
-FILES = sorted([f".opencode/agents/{role}.md" for role in ROLES] + ["opencode.json", MANIFEST])
-COMPONENTS = ["config.permissions"] + [f"role.{role}" for role in sorted(ROLES)]
+CI_ROLES = ["shaper", "investigator"]  # the first role of a profile with a trigger (#327)
+WORKFLOWS = [".github/workflows/cornerstone-single-ticket-label.yml",
+             ".github/workflows/cornerstone-bug-triage-issue-opened.yml",
+             ".github/workflows/cornerstone-bug-triage-schedule.yml"]
+FILES = sorted([f".opencode/agents/{role}.md" for role in ROLES]
+               + [f".opencode/agents/{role}-ci.md" for role in CI_ROLES]
+               + WORKFLOWS + ["opencode.json", MANIFEST])
+COMPONENTS = sorted(["config.permissions"] + [f"role.{role}" for role in ROLES]
+                    + [f"role-ci.{role}" for role in CI_ROLES]
+                    + ["trigger.label.single-ticket", "trigger.issue-opened.bug-triage",
+                       "trigger.schedule.bug-triage"])
 
 
 class GoldenOpenCodeTest(unittest.TestCase):
@@ -79,7 +88,8 @@ class GoldenOpenCodeTest(unittest.TestCase):
             with self.subTest(component=component["id"]):
                 self.assertEqual(str(component["added"]), TODAY.isoformat())
                 self.assertEqual(str(component["review_by"]), REVIEW_BY)
-                self.assertTrue(component["eval"])
+                if not component["id"].startswith("role-ci."):  # a derived copy has no eval
+                    self.assertTrue(component["eval"])
 
     def test_golden_opencode_each_role_file_denies_all_first(self) -> None:
         for role in ROLES:

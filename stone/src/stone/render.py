@@ -17,7 +17,7 @@ from typing import Any
 
 import yaml
 
-from stone import ci_setup, code_index, context_guard, form, framework_check, overrides, results, specialists, specs, triggers
+from stone import ci_role, ci_setup, code_index, context_guard, form, framework_check, overrides, results, specialists, specs, triggers
 from stone.markdown import split_frontmatter
 
 CONFIG = Path(".cornerstone/config.yaml")
@@ -518,8 +518,8 @@ def build_components(framework: Path, config: dict[str, Any], root: Path | None 
             "doc.specialists", "doc", "Specialist reviews: the list, the triggers, and the order.",
             ["P2"], "", {specialists.DOC: specialists.document(config)}))
     try:
-        components.extend([] if local else trigger_components(framework, harness, registry, profiles, config,
-                                             defaults["role_models"]))
+        components.extend([] if local else trigger_components(framework, harness, registry_doc, profiles, config,
+                                             defaults["role_models"], components))
     except triggers.TriggerError as error:
         raise RenderError(str(error)) from None
     return components
@@ -584,35 +584,78 @@ def add_part(harness: Path, part: str, content: str,
     return json.dumps(data, indent=2) + "\n", _entry_keys(owned)
 
 
-def trigger_components(framework: Path, harness: Path, registry: list[dict[str, Any]],
+def trigger_components(framework: Path, harness: Path, registry_doc: dict[str, Any],
                        profiles: list[dict[str, Any]], config: dict[str, Any],
-                       role_models: dict[str, str]) -> list[Component]:
-    """Return one workflow for each profile trigger that is not `command` (D31)."""
-    entries = {entry["trigger"]: entry for entry in registry if "trigger" in entry}
+                       role_models: dict[str, str], rendered: list[Component]) -> list[Component]:
+    """Return one workflow for each profile trigger that is not `command` (D31).
+
+    If the adapter sets `ci_role`, each workflow runs a read-only copy of the role file, and render
+    also returns that copy once for each role (D119). A schedule workflow holds the result of the
+    peak check of the model rates.
+    """
+    entries = {entry["trigger"]: entry for entry in registry_doc["components"] if "trigger" in entry}
     found = triggers.profile_triggers(profiles)
+    ci = ci_role.settings(registry_doc)
+    rates = triggers.load_rates(harness)
     # A value that one entry sets is empty in the others, so each template can use it.
     defaults = {key: "" for entry in entries.values() for key in (entry.get("values") or {})}
-    components, targets = [], []
+    defaults |= {"ci_agent": "", "peak_notice": ""}
+    components, targets, copies = [], [], {}
     for trigger in triggers.supported(found, set(entries)):
         entry = entries[trigger.key]
         values = template_values(config, "", adapter=harness)
         values.update(defaults)
         values.update({key: str(value) for key, value in (entry.get("values") or {}).items()})
         values.update(triggers.values(trigger, found, role_models))
-        text = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
-        for name, part in (entry.get("parts") or {}).items():
-            text = triggers.insert_block(
-                text, name, (harness / "templates" / part).read_text(encoding="utf-8"))
-        steps = triggers.prompt_steps(framework, trigger).replace("$", "$$")
-        text = triggers.insert_block(text, "profile_steps", steps)
+        role = trigger.profile["roles"][0]
+        if ci:
+            values["ci_agent"] = ci_role.agent_id(ci, role)
+            if role not in copies:
+                copies[role] = _ci_role_component(ci, role, rendered)
+        values["peak_notice"] = _peak_notice(trigger, values, rates)
         component_id = f"{entry['id']}.{trigger.profile['id']}"
         target = fill(entry["target"], entry["template"], values, config)
         targets.append((trigger.text, target))
         components.append(Component(component_id, entry["kind"], entry["purpose"],
                                     entry["principle"], entry["eval"],
-                                    {target: fill(text, entry["template"], values, config)}))
+                                    {target: fill(_trigger_text(framework, harness, entry, trigger),
+                                                  entry["template"], values, config)}))
     triggers.check_targets(targets)
-    return components
+    return components + list(copies.values())
+
+
+def _trigger_text(framework: Path, harness: Path, entry: dict[str, Any],
+                  trigger: triggers.Trigger) -> str:
+    """Return the template of one trigger workflow with its parts and the profile steps."""
+    text = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
+    for name, part in (entry.get("parts") or {}).items():
+        text = triggers.insert_block(
+            text, name, (harness / "templates" / part).read_text(encoding="utf-8"))
+    steps = triggers.prompt_steps(framework, trigger).replace("$", "$$")
+    return triggers.insert_block(text, "profile_steps", steps)
+
+
+def _peak_notice(trigger: triggers.Trigger, values: dict[str, str],
+                 rates: dict[str, Any] | None) -> str:
+    """Return the peak check line of a schedule workflow. Print a warning if a fire time is in a peak."""
+    if trigger.key != "schedule":
+        return ""
+    notice = triggers.peak_notice(values["cron"], values["model"], rates)
+    if notice.startswith("WARNING"):
+        print(f"warning: profile {trigger.profile['id']}: {notice[len('WARNING: '):]}", file=sys.stderr)
+    return notice
+
+
+def _ci_role_component(ci: dict[str, Any], role: str, rendered: list[Component]) -> Component:
+    """Return the read-only CI copy of the role file that render made for a role (D119)."""
+    source = next((item for item in rendered if item.id == f"role.{role}"), None)
+    if source is None or len(source.files) != 1:
+        raise triggers.TriggerError(f"The trigger needs the role file of the {role}, and render "
+                                    "made none. Check the roles of the profile.")
+    target, content = ci_role.derive(ci, role, next(iter(source.files.values())))
+    return Component(f"role-ci.{role}", "role",
+                     f"Run the {role} in a CI job with read, grep, and glob only (D119).",
+                     ["P2", "P6"], "", {target: content})
 
 
 def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict[str, Any]],

@@ -1,0 +1,17 @@
+# Install the pinned OpenCode build from the release page, not from npm: npm has no 2.x build.
+# The SHA-256 check fails the job if the file changes (spike #325). The job pins the version, as
+# K24 requires. To update, change the version and the SHA-256 in the adapter values.py together.
+- name: Install OpenCode $opencode_version
+  env:
+    OPENCODE_VERSION: "$opencode_version"
+    OPENCODE_SHA256: "$opencode_sha256"
+  run: |
+    install_dir="$${RUNNER_TEMP}/opencode"
+    mkdir -p "$${install_dir}"
+    curl --fail --silent --show-error --location --retry 3 \
+      --output "$${install_dir}/opencode-linux-x64.tar.gz" \
+      "https://github.com/anomalyco/opencode/releases/download/v$${OPENCODE_VERSION}/opencode-linux-x64.tar.gz"
+    echo "$${OPENCODE_SHA256}  $${install_dir}/opencode-linux-x64.tar.gz" | sha256sum -c -
+    tar -xzf "$${install_dir}/opencode-linux-x64.tar.gz" -C "$${install_dir}"
+    echo "$${install_dir}" >> "$${GITHUB_PATH}"
+    "$${install_dir}/opencode" --version
