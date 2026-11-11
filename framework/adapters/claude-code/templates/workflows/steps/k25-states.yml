@@ -1,0 +1,9 @@
+      # K25 warns in 1.x (D120). A new state type with 3 or more states needs a transition table. A Waiver (K25) section passes it.
+      - name: $step_name
+$gate_if
+        env:
+          BASE_REF: $${{ github.base_ref }}
+          PR_BODY: $${{ github.event.pull_request.body }}
+        run: |
+          printf '%s\n' "$${PR_BODY}" | "$${RUNNER_TEMP}/stone/bin/stone" check-states - \
+            --base "origin/$${BASE_REF}" --mode warn --format github

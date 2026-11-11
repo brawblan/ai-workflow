@@ -68,6 +68,8 @@ CORE_PROTECTED = [".cornerstone/"]  # the hook and the check; the adapter adds i
 K14_SINCE = (0, 5, 0)  # the first framework tag with `stone check-evidence`
 K23_SINCE = (1, 5, 0)  # the first framework tag with `stone check-dependencies` (D90)
 K24_SINCE = (1, 5, 0)  # the first framework tag with `stone check-workflows` (D93)
+K25_SINCE = (1, 8, 0)  # the first framework tag with `stone check-states` (D120)
+STEP_SINCE = {"k23": K23_SINCE, "k24": K24_SINCE, "k25": K25_SINCE}
 DEFAULT_PR_LINES = overrides.DEFAULT_PR_LINES  # D4, customization.md
 BLOCKS = ["all_checks_env", "check_steps", "ci_setup", "code_index_rule", "gate_if", "marker_if", "marker_step", "pr_types"]  # placeholders that hold whole lines; render removes an empty one (D29)
 
@@ -671,10 +673,9 @@ def render_steps(harness: Path, steps: list[dict[str, Any]], profiles: list[dict
         need = profiles_that_need(step, profiles)
         if not need or (step.get("needs") == "specialists" and not specialists.listed(config)):
             continue
-        if step["id"] == "k23" and not framework_at_least(config.get("framework_version"), K23_SINCE):
-            continue  # the installed stone has no check-dependencies (D90)
-        if step["id"] == "k24" and not framework_at_least(config.get("framework_version"), K24_SINCE):
-            continue  # the installed stone has no check-workflows (D93)
+        since = STEP_SINCE.get(step["id"])  # the installed stone must have the command (D90, D93, D120)
+        if since and not framework_at_least(config.get("framework_version"), since):
+            continue
         step_values = dict(values, step_name=step.get("name", step["id"]))
         command = step.get("command")
         if command:

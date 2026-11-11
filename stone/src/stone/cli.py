@@ -14,7 +14,7 @@ from typing import Any
 import yaml
 
 from stone import (__version__, dependency_check, eval_matrix, evals, evidence_check, framework_check, gate, index, ready_check,
-                   render, repo_rules, specialists, specs, upgrade, usage, workflow_check, writing_check)
+                   render, repo_rules, specialists, specs, state_check, upgrade, usage, workflow_check, writing_check)
 from stone.findings import report
 
 
@@ -112,6 +112,18 @@ def _add_eval(commands: Any) -> None:
                      help="With --by: print the data as JSON.")
     run.add_argument("--check-only", action="store_true",
                      help="Validate the scenarios and list the runs. Start no run.")
+
+
+def _add_scoped_check(commands: Any, name: str, help_text: str, base_help: str, all_help: str) -> None:
+    """Add a check command that reads the PR body and the files of a PR (K24, K25)."""
+    command = commands.add_parser(name, help=help_text)
+    command.add_argument("body", help="The PR body file. Use '-' to read standard input.")
+    scope = command.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--base", help=f"The base ref. {base_help}")
+    scope.add_argument("--all", action="store_true", help=all_help)
+    command.add_argument("--mode", choices=["warn", "block"], default="warn",
+                         help="warn: report only (1.x). block: fail on findings.")
+    command.add_argument("--format", choices=["text", "github"], default="text")
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -218,15 +230,10 @@ def _parser() -> argparse.ArgumentParser:
                       help="warn: report only (1.x). block: fail on findings.")
     deps.add_argument("--format", choices=["text", "github"], default="text")
 
-    workflows = commands.add_parser("check-workflows",
-                                    help="K24: report an unpinned tool in a CI workflow.")
-    workflows.add_argument("body", help="The PR body file. Use '-' to read standard input.")
-    scope = workflows.add_mutually_exclusive_group(required=True)
-    scope.add_argument("--base", help="The base ref. Read the workflows that the PR changes.")
-    scope.add_argument("--all", action="store_true", help="Read each tracked workflow.")
-    workflows.add_argument("--mode", choices=["warn", "block"], default="warn",
-                           help="warn: report only (1.x). block: fail on findings.")
-    workflows.add_argument("--format", choices=["text", "github"], default="text")
+    _add_scoped_check(commands, "check-workflows", "K24: report an unpinned tool in a CI workflow.",
+                      "Read the workflows that the PR changes.", "Read each tracked workflow.")
+    _add_scoped_check(commands, "check-states", "K25: report a state type that has no transition table.",
+                      "Read the source files that the PR changes.", "Read each tracked source file.")
 
     ready = commands.add_parser("check-ready",
                                 help="K21: report a Definition of Ready field that is missing or "
@@ -425,6 +432,28 @@ def _check_workflows(body: str, base: str | None, mode: str, fmt: str) -> int:
     return 1 if blocking else 0
 
 
+def _check_states(body: str, base: str | None, mode: str, fmt: str) -> int:
+    if body == "-":
+        text = sys.stdin.read()
+    else:
+        try:
+            text = Path(body).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError) as error:
+            reason = error.reason if isinstance(error, UnicodeDecodeError) else error.strerror
+            print(f"check-states: cannot read {body}: {reason}")
+            return 2
+    try:
+        findings = state_check.check(Path("."), base, text)
+    except RuntimeError as error:
+        print(f"check-states: {error}")
+        return 2
+    blocking = report(findings, fmt, warn_only=mode == "warn")
+    if state_check.has_waiver(text):
+        print("K25: notice: the PR body has a Waiver (K25) section. A human reviews each finding.")
+    print(f"K25: {len(findings)} finding(s), mode {mode}.")
+    return 1 if blocking else 0
+
+
 def _check_ready(ticket: str, profile: str | None, mode: str, fmt: str) -> int:
     if ticket == "-":
         text = sys.stdin.read()
@@ -542,4 +571,6 @@ _HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "eval": _eval,
     "usage": _usage,
     "index": lambda args: index.run(args.args),
+    "check-states": lambda args: _check_states(args.body, None if args.all else args.base,
+                                               args.mode, args.format),
 }

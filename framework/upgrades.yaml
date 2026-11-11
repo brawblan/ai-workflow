@@ -1,6 +1,18 @@
 # The record of each release. `stone upgrade` reads it, and `stone check` validates it.
 # Newest first. Rules and the form: framework/versioning.md.
 versions:
+  - version: 1.8.0
+    kind: minor
+    released: null
+    summary: New command stone check-states (K25) warns on a new state type with 3 or more states and no transition table (D120). It is a warning in 1.x.
+    config:
+      added: []
+      renamed: []
+      removed: []
+    files:
+      - {path: .github/workflows/cornerstone-checks.yml, change: changed, note: "A K25 step, as a warning, for each profile with K25 (D120)."}
+    steps:
+      - "Then run stone render. Commit the generated files alone, with the trailers Role generator and Actor agent."
   - version: 1.7.0
     kind: minor
     released: 2026-11-09
