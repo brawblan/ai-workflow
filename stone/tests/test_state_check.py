@@ -162,6 +162,51 @@ class ScopeTest(RepoCase):
             state_check.check(self.root, "no-such-ref", "")
 
 
+class RegressionTest(RepoCase):
+    def test_h1_member_added_to_python_enum_is_reported(self) -> None:
+        for before, after in ((PY2, PY3), (PY3, PY3 + "    LOST = 4\n")):
+            with self.subTest(after=after):
+                self.setUp()
+                found = self.findings({"o.py": after}, base={"o.py": before})
+                self.assertEqual(len(found), 1)
+
+    def test_h1_changed_line_below_the_type_is_not_reported(self) -> None:
+        found = self.findings({"o.py": PY3 + "y = 2\n"}, base={"o.py": PY3 + "y = 1\n"})
+        self.assertEqual(found, [])
+
+    def test_m1_union_without_semicolon_ignores_the_next_code(self) -> None:
+        for tail in ("const greeting = 'hi'\n", "\nimport x from 'y'\n"):
+            with self.subTest(tail=tail):
+                text = "type JobPhase = 'a' | 'b'\n" + tail
+                self.assertEqual([t[3] for t in state_check.state_types(text)], [2])
+
+    def test_m1_union_starting_on_the_next_line_is_found(self) -> None:
+        text = "type JobPhase =\n  | 'a'\n  | 'b'\n  | 'c'\n\nconst x = 'q'\n"
+        self.assertEqual([t[3] for t in state_check.state_types(text)], [3])
+
+    def test_m1_object_type_with_a_union_field_is_not_found(self) -> None:
+        text = "type FormState = {\n  status: 'idle' | 'loading' | 'error';\n}\n"
+        self.assertEqual(self.findings({"f.ts": text}), [])
+
+    def test_m2_method_body_is_not_a_member(self) -> None:
+        text = PY2 + "\n    def label(self):\n        text = self.name\n        return text\n"
+        self.assertEqual(self.findings({"o.py": text}), [])
+
+    def test_m3_names_that_are_not_tables(self) -> None:
+        for text in ("transition: opacity 0.2s ease;", "transition: var(--x)",
+                     "theme.transitions.create('x')", "const t = useTransition()",
+                     "startTransition(() => 1)", "# transition table here"):
+            with self.subTest(text=text):
+                self.assertFalse(state_check.has_table(text + "\n"))
+
+    def test_m3_names_that_are_tables(self) -> None:
+        for text in ("TRANSITIONS = {}", "TRANSITIONS: dict[str, list[str]] = {}",
+                     "def can_transition(a, b):", "export const transitions = {",
+                     "next_states = {}"):
+            with self.subTest(text=text):
+                self.assertTrue(state_check.has_table(text + "\n"))
+
+
 class WaiverTest(RepoCase):
     def test_r5_waiver_with_text_turns_findings_into_warnings(self) -> None:
         found = self.findings({"order.py": PY3}, body(WAIVER))
