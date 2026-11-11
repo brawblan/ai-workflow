@@ -114,6 +114,18 @@ def _add_eval(commands: Any) -> None:
                      help="Validate the scenarios and list the runs. Start no run.")
 
 
+def _add_scoped_check(commands: Any, name: str, help_text: str, base_help: str, all_help: str) -> None:
+    """Add a check command that reads the PR body and the files of a PR (K24, K25)."""
+    command = commands.add_parser(name, help=help_text)
+    command.add_argument("body", help="The PR body file. Use '-' to read standard input.")
+    scope = command.add_mutually_exclusive_group(required=True)
+    scope.add_argument("--base", help=f"The base ref. {base_help}")
+    scope.add_argument("--all", action="store_true", help=all_help)
+    command.add_argument("--mode", choices=["warn", "block"], default="warn",
+                         help="warn: report only (1.x). block: fail on findings.")
+    command.add_argument("--format", choices=["text", "github"], default="text")
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="stone", description="Cornerstone CLI.")
     parser.add_argument("--version", action="version", version=f"stone {__version__}")
@@ -218,25 +230,10 @@ def _parser() -> argparse.ArgumentParser:
                       help="warn: report only (1.x). block: fail on findings.")
     deps.add_argument("--format", choices=["text", "github"], default="text")
 
-    workflows = commands.add_parser("check-workflows",
-                                    help="K24: report an unpinned tool in a CI workflow.")
-    workflows.add_argument("body", help="The PR body file. Use '-' to read standard input.")
-    scope = workflows.add_mutually_exclusive_group(required=True)
-    scope.add_argument("--base", help="The base ref. Read the workflows that the PR changes.")
-    scope.add_argument("--all", action="store_true", help="Read each tracked workflow.")
-    workflows.add_argument("--mode", choices=["warn", "block"], default="warn",
-                           help="warn: report only (1.x). block: fail on findings.")
-    workflows.add_argument("--format", choices=["text", "github"], default="text")
-
-    states = commands.add_parser("check-states",
-                                 help="K25: report a state type that has no transition table.")
-    states.add_argument("body", help="The PR body file. Use '-' to read standard input.")
-    state_scope = states.add_mutually_exclusive_group(required=True)
-    state_scope.add_argument("--base", help="The base ref. Read the source files that the PR changes.")
-    state_scope.add_argument("--all", action="store_true", help="Read each tracked source file.")
-    states.add_argument("--mode", choices=["warn", "block"], default="warn",
-                        help="warn: report only (1.x). block: fail on findings.")
-    states.add_argument("--format", choices=["text", "github"], default="text")
+    _add_scoped_check(commands, "check-workflows", "K24: report an unpinned tool in a CI workflow.",
+                      "Read the workflows that the PR changes.", "Read each tracked workflow.")
+    _add_scoped_check(commands, "check-states", "K25: report a state type that has no transition table.",
+                      "Read the source files that the PR changes.", "Read each tracked source file.")
 
     ready = commands.add_parser("check-ready",
                                 help="K21: report a Definition of Ready field that is missing or "
@@ -276,8 +273,6 @@ def main(argv: list[str] | None = None) -> int:
         return _check_dependencies(args.body, args.base, args.mode, args.format)
     if args.command == "check-workflows":
         return _check_workflows(args.body, None if args.all else args.base, args.mode, args.format)
-    if args.command == "check-states":
-        return _check_states(args.body, None if args.all else args.base, args.mode, args.format)
     if args.command == "check-ready":
         return _check_ready(args.ticket, args.profile, args.mode, args.format)
 
@@ -576,4 +571,6 @@ _HANDLERS: dict[str, Callable[[argparse.Namespace], int]] = {
     "eval": _eval,
     "usage": _usage,
     "index": lambda args: index.run(args.args),
+    "check-states": lambda args: _check_states(args.body, None if args.all else args.base,
+                                               args.mode, args.format),
 }
