@@ -20,7 +20,7 @@ LITERAL = re.compile(r"""(["'])[^"'\n]+\1""")
 MEMBER = re.compile(r"^\s*[A-Za-z_]\w*\s*=")
 # A name that holds the allowed moves. A CSS "transition:" or "transition-delay" does not count.
 TABLE = re.compile(
-    r"(?i)(?<![-\w])(?:\w*transitions?\w*(?!\s*:\s*[\"'`\d])|next_?states?|allowed_?(?:next|moves)\w*)")
+    r"(?i)(?<![-\w])(?:\w*transitions?\w*(?![-\w])(?!\s*:\s*[\"'`\d])|next_?states?|allowed_?(?:next|moves)\w*)")
 SOURCE = (".py", ".ts", ".tsx", ".js", ".jsx", ".mjs", ".mts")
 SKIP_PARTS = {"node_modules", "vendor", "dist", "build", "__pycache__", "tests", "test", "__tests__"}
 SKIP_NAMES = re.compile(r"(?:^test_.*\.py$|_test\.py$|\.(?:test|spec)\.[mc]?[jt]sx?$)")
