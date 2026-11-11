@@ -188,6 +188,10 @@ components:
         name: K24 unpinned tools
         when: {check: K24}
         template: workflows/steps/k24-workflows.yml
+      - id: k25
+        name: K25 state machines
+        when: {check: K25}
+        template: workflows/steps/k25-states.yml
       - id: k4
         name: K4 integration tests
         when: {check: K4}
