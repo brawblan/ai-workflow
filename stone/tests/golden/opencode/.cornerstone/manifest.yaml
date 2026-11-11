@@ -147,7 +147,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .github/workflows/cornerstone-bug-triage-issue-opened.yml
-    hash: 542301fd1f081c198cd9016f4e969944a42adc1c9d42b7e80aab83ed4b2ced9e
+    hash: 594929e3f1027fb3ab4db3e26803cdcc65502a8e4f955170e994594b837a36bf
   - id: trigger.label.single-ticket
     kind: ci-job
     purpose: Start the first role of the profile when a human adds the trigger label to an issue.
@@ -162,7 +162,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .github/workflows/cornerstone-single-ticket-label.yml
-    hash: a69624894a56b7480187846758df1c71bf58cecf1c4da888f511f6802d3072d1
+    hash: 3f30fc226f8b041aa7ac84ac02cf48145012ff8ecf2f5201926c95216efa99f5
   - id: trigger.schedule.bug-triage
     kind: ci-job
     purpose: Start the first role of the profile on its schedule. Post its report as an issue.
@@ -177,4 +177,4 @@ components:
     review_by: "2027-04-18"
     files:
       - .github/workflows/cornerstone-bug-triage-schedule.yml
-    hash: 90b1c9c19102db21127e6896bda622df23422f78c48e04c062f8ec0c57486c7d
+    hash: d59038c130af32669257b900182a4c33c482db7ce54fa6b42984b243734a606b

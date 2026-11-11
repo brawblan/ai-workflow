@@ -113,7 +113,7 @@ jobs:
           def last_message(path):
               """Join the text parts of the last message in the JSONL events."""
               messages, order = {}, []
-              for line in path.read_text(encoding="utf-8").splitlines():
+              for line in path.read_text(encoding="utf-8").split("\n"):  # splitlines() also splits at U+2028
                   try:
                       event = json.loads(line)
                   except ValueError:
