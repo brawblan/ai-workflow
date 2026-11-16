@@ -440,5 +440,171 @@ class CheckModelProfilesTest(unittest.TestCase):
         self.assertEqual(found, [])
 
 
+class BaselineScenariosTest(unittest.TestCase):
+    """The fixes of the review: a model counts only on the scenarios of the baseline."""
+
+    def picks(self, runs: list[evals.Run], harness: str = "h") -> dict:
+        return by_role(eval_picks.picks(runs, harness, {"tester": BASELINE}))["tester"]
+
+    def two_scenario_baseline(self) -> list[evals.Run]:
+        return (runs_of(BASELINE, "S1", flags(2, 3), 0.1) + runs_of(BASELINE, "S2", flags(2, 3), 0.1))
+
+    def test_model_with_only_some_baseline_scenarios_is_skipped(self) -> None:
+        """1: `cheap` ran S1 only, so it is not a pick. It is in skipped."""
+        runs = self.two_scenario_baseline() + runs_of("cheap", "S1", [True] * 3, 0.001)
+        entry = self.picks(runs)
+        self.assertEqual(pick_models(entry), (f"h:{BASELINE}", f"h:{BASELINE}"))
+        self.assertEqual(entry["skipped"], ["h:cheap"])
+
+    def test_model_with_two_runs_of_one_scenario_is_skipped(self) -> None:
+        """1: 3 runs of S1 and 2 runs of S2 is 2 trials."""
+        runs = (self.two_scenario_baseline() + runs_of("m", "S1", [True] * 3, 0.001)
+                + runs_of("m", "S2", [True] * 2, 0.001))
+        entry = self.picks(runs)
+        self.assertEqual(entry["skipped"], ["h:m"])
+        self.assertEqual(pick_models(entry), (f"h:{BASELINE}", f"h:{BASELINE}"))
+
+    def test_model_with_three_runs_of_each_scenario_is_picked(self) -> None:
+        """1: 3 runs of S1 and of S2 counts."""
+        runs = (self.two_scenario_baseline() + runs_of("m", "S1", [True] * 3, 0.001)
+                + runs_of("m", "S2", [True] * 3, 0.001))
+        entry = self.picks(runs)
+        self.assertEqual(pick_models(entry), ("h:m", "h:m"))
+        self.assertEqual(entry["skipped"], [])
+        self.assertEqual(entry["economy"]["trials"], 3)
+
+    def test_baseline_that_passes_no_run_gives_way_to_a_passing_model(self) -> None:
+        """2: the baseline passes 0 of 3. A model `good` that passes 3 of 3 is both picks."""
+        runs = runs_of(BASELINE, "S1", [False] * 3, 0.1) + runs_of("good", "S1", [True] * 3, 0.5)
+        entry = self.picks(runs)
+        self.assertEqual(pick_models(entry), ("h:good", "h:good"))
+        self.assertFalse(entry["quality"]["baseline"])
+
+    def test_baseline_with_passes_but_no_rate_stays_the_quality_pick(self) -> None:
+        """2: the baseline passes some runs and has no cost. Quality is the baseline."""
+        entry = self.picks(runs_of(BASELINE, "S1", flags(2, 3), None)
+                           + runs_of("o", "S1", [True] * 3, 0.01))
+        self.assertEqual(entry["quality"]["model"], f"h:{BASELINE}")
+
+    def test_quality_with_zero_pass_baseline_picks_highest_rate(self) -> None:
+        """2: with a baseline of no cost and no pass, the best pass rate wins, then the cost."""
+        base = eval_picks.Candidate("b", 0.0, 0.0, None, 3, baseline=True)
+        low = eval_picks.Candidate("low", 0.5, 0.1, 0.1, 3)
+        high = eval_picks.Candidate("high", 1.0, 0.0, 9.0, 3)
+        self.assertEqual(eval_picks.quality([base, low, high], base).model, "high")
+
+
+class HarnessFilterTest(unittest.TestCase):
+    def picks(self, runs: list[evals.Run]) -> dict:
+        return by_role(eval_picks.picks(runs, "h", {"tester": BASELINE}))["tester"]
+
+    def test_run_of_another_harness_is_never_a_pick(self) -> None:
+        """3: `other:x` is cheap and perfect, but it is not a candidate."""
+        entry = self.picks(baseline_runs() + runs_of("x", "S1", [True] * 3, 0.0001, harness="other"))
+        self.assertEqual(pick_models(entry), (f"h:{BASELINE}", f"h:{BASELINE}"))
+        self.assertEqual(entry["skipped"], [])
+
+    def test_role_with_only_other_harness_runs_has_no_pick(self) -> None:
+        """3: no run of the baseline model, so the reason says it."""
+        entry = self.picks(runs_of("x", "S1", [True] * 3, 0.01, harness="other")
+                           + runs_of(BASELINE, "S1", [True] * 3, 0.01, harness="other"))
+        self.assertEqual(pick_models(entry), (None, None))
+        self.assertIn("no run of the baseline model", entry["reason"])
+
+    def test_bare_model_label_is_still_a_candidate(self) -> None:
+        """3: an old run has no harness prefix. It can be a pick."""
+        runs = (baseline_runs() + runs_of("old", "S1", [True] * 3, 0.001, harness=""))
+        entry = self.picks(runs)
+        self.assertEqual(pick_models(entry), ("old", "old"))
+
+    def test_in_harness(self) -> None:
+        self.assertTrue(eval_picks._in_harness("h:m", "h"))
+        self.assertTrue(eval_picks._in_harness("m", "h"))
+        self.assertFalse(eval_picks._in_harness("other:m", "h"))
+
+
+class BadProfileDataTest(unittest.TestCase):
+    def load(self, text: str) -> object:
+        return yaml.safe_load(text)
+
+    def test_timestamp_review_gives_a_finding(self) -> None:
+        """4: YAML loads a timestamp as a datetime. That is not a date."""
+        text = yaml.safe_dump(valid_profile()).replace("2027-02-01", "2027-05-01T00:00:00", 1)
+        data = self.load(text)
+        self.assertIsInstance(data["recommendations"]["tester"]["economy"]["review"], dt.datetime)
+        found = eval_picks.problems(data)
+        self.assertEqual(len(found), 1, found)
+        self.assertIn("review", found[0])
+
+    def test_defaults_not_a_mapping_gives_findings(self) -> None:
+        """4: `defaults` as a list: the role is unknown."""
+        data = self.load("defaults: [a, b]\nrecommendations:\n  tester: {}\n")
+        found = eval_picks.problems(data)
+        self.assertEqual(len(found), 1)
+        self.assertIn("tester", found[0])
+        self.assertIn("role model", found[0])
+
+    def test_role_models_a_list_gives_findings(self) -> None:
+        """4: `role_models: [x]` is not a mapping."""
+        data = self.load("defaults: {role_models: [x]}\nrecommendations:\n  tester: {}\n")
+        found = eval_picks.problems(data)
+        self.assertEqual(len(found), 1)
+        self.assertIn("role model", found[0])
+
+    def test_check_model_profiles_gives_a_finding_not_a_traceback(self) -> None:
+        for text in ("defaults: [a]\nrecommendations:\n  tester: {}\n",
+                     "defaults: {role_models: [x]}\nrecommendations:\n  tester: {}\n"):
+            with tempfile.TemporaryDirectory() as tmp:
+                framework = Path(tmp) / "framework"
+                models = framework / "adapters" / "h" / "models"
+                models.mkdir(parents=True)
+                (models / "m.yaml").write_text(text)
+                found = framework_check.check_model_profiles(Path(tmp), framework)
+            self.assertEqual(len(found), 1, text)
+            self.assertIn("m.yaml", found[0].path)
+
+    def test_check_model_profiles_timestamp_gives_a_finding(self) -> None:
+        text = yaml.safe_dump(valid_profile()).replace("2027-02-01", "2027-05-01T00:00:00", 1)
+        with tempfile.TemporaryDirectory() as tmp:
+            framework = Path(tmp) / "framework"
+            models = framework / "adapters" / "h" / "models"
+            models.mkdir(parents=True)
+            (models / "m.yaml").write_text(text)
+            found = framework_check.check_model_profiles(Path(tmp), framework)
+        self.assertEqual(len(found), 1)
+        self.assertIn("review", found[0].message)
+
+    def test_load_baselines_defaults_not_a_mapping_raises_picks_error(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "p.yaml"
+            for text in ("defaults: [a]\n", "defaults: {role_models: [x]}\n"):
+                path.write_text(text)
+                with self.assertRaises(eval_picks.PicksError):
+                    eval_picks.load_baselines(path)
+
+
+class CountsTest(unittest.TestCase):
+    def runs(self) -> list[evals.Run]:
+        base = [dataclasses.replace(r, variant="without") for r in runs_of("m", "S1", [True] * 9, 0.1)]
+        return (base + runs_of("m", "S1", [True] * 5, 0.1) + runs_of("m", "S2", [True] * 3, 0.1)
+                + runs_of("n", "S1", [True] * 4, 0.1))
+
+    def test_scenario_counts_leave_out_the_base_variant(self) -> None:
+        """5: the 9 runs of `without` do not count."""
+        counts = eval_picks.scenario_counts(self.runs())
+        self.assertEqual(counts[(COMPONENT, "h:m")], {"S1": 5, "S2": 3})
+        self.assertEqual(counts[(COMPONENT, "h:n")], {"S1": 4})
+
+    def test_trial_counts_is_the_fewest_runs_of_one_scenario(self) -> None:
+        """5: the old meaning stays."""
+        self.assertEqual(eval_picks.trial_counts(self.runs()),
+                         {(COMPONENT, "h:m"): 3, (COMPONENT, "h:n"): 4})
+
+    def test_base_variant_only_has_no_counts(self) -> None:
+        base = [dataclasses.replace(r, variant="without") for r in runs_of("m", "S1", [True] * 3, 0.1)]
+        self.assertEqual(eval_picks.scenario_counts(base), {})
+        self.assertEqual(eval_picks.trial_counts(base), {})
+
+
 if __name__ == "__main__":
     unittest.main()
