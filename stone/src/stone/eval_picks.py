@@ -45,6 +45,7 @@ class Candidate:
     cost: float | None  # the cost for each passing run
     trials: int  # the fewest runs of one scenario
     baseline: bool = False
+    scenarios: dict[str, int] | None = None  # the runs of each scenario
 
 
 # The baseline ------------------------------------------------------------------------------
@@ -56,10 +57,17 @@ def load_baselines(path: Path) -> tuple[str, dict[str, str]]:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, yaml.YAMLError) as error:
         raise PicksError(f"cannot read the model profile {path} ({error}).") from None
-    roles = ((data or {}).get("defaults") or {}).get("role_models") if isinstance(data, dict) else None
-    if not isinstance(roles, dict) or not roles:
+    roles = _role_models(data)
+    if not roles:
         raise PicksError(f"{path} has no defaults.role_models.")
-    return str((data or {}).get("harness") or ""), {str(k): str(v) for k, v in roles.items() if v}
+    return str(data.get("harness") or ""), {str(k): str(v) for k, v in roles.items() if v}
+
+
+def _role_models(data: Any) -> dict[str, Any]:
+    """The `defaults.role_models` of a loaded model profile, or an empty mapping."""
+    defaults = data.get("defaults") if isinstance(data, dict) else None
+    roles = defaults.get("role_models") if isinstance(defaults, dict) else None
+    return roles if isinstance(roles, dict) else {}
 
 
 # The two rules -----------------------------------------------------------------------------
@@ -78,32 +86,43 @@ def economy(candidates: list[Candidate], base: Candidate) -> Candidate:
 
 def quality(candidates: list[Candidate], base: Candidate) -> Candidate:
     """The highest pass rate among the models that cost no more than the baseline."""
-    if base.cost is None:
+    # A baseline that passes no run costs "infinity" for each passing run. A baseline with no rate
+    # has an unknown cost, so no other model can be compared with it.
+    limit = math.inf if base.cost is None and base.pass_rate == 0 else base.cost
+    if limit is None:
         return base
-    cheap = [c for c in candidates if c.cost is not None and c.cost <= base.cost + EPSILON]
+    cheap = [c for c in candidates if c.cost is not None and c.cost <= limit + EPSILON]
     return min(cheap, key=lambda c: (-round(c.pass_rate, 9), _cost(c), c.model), default=base)
 
 
 # The matrix --------------------------------------------------------------------------------
 
 
-def trial_counts(runs: list[Any]) -> dict[tuple[str, str], int]:
-    """The fewest runs of one scenario, for each component and model. The base variant is left out."""
-    counts: dict[tuple[str, str, str], int] = {}
+def scenario_counts(runs: list[Any]) -> dict[tuple[str, str], dict[str, int]]:
+    """The runs of each scenario, for each component and model. The base variant is left out."""
+    counts: dict[tuple[str, str], dict[str, int]] = {}
     for run in runs:
         if run.variant not in eval_metrics.BASE_NAMES:
-            key = (getattr(run, "component", "") or "unknown", eval_matrix.model_label(run),
-                   run.scenario)
-            counts[key] = counts.get(key, 0) + 1
-    fewest: dict[tuple[str, str], int] = {}
-    for (component, model, _), count in counts.items():
-        fewest[(component, model)] = min(count, fewest.get((component, model), count))
-    return fewest
+            key = (getattr(run, "component", "") or "unknown", eval_matrix.model_label(run))
+            found = counts.setdefault(key, {})
+            found[run.scenario] = found.get(run.scenario, 0) + 1
+    return counts
+
+
+def trial_counts(runs: list[Any]) -> dict[tuple[str, str], int]:
+    """The fewest runs of one scenario, for each component and model."""
+    return {key: min(found.values()) for key, found in scenario_counts(runs).items()}
 
 
 def _candidate(row: dict[str, Any], trials: int) -> Candidate:
     rate = row["pass_rate"] or {"mean": 0.0, "se": None}
     return Candidate(row["model"], rate["mean"], rate["se"] or 0.0, row["cost_per_pass"], trials)
+
+
+def _in_harness(model: str, harness: str) -> bool:
+    """A model of another harness cannot go in the role models of this profile. An old run has no
+    harness in its label, so it stays."""
+    return not harness or ":" not in model or model.startswith(f"{harness}:")
 
 
 def _is_baseline(model: str, harness: str, baseline: str) -> bool:
@@ -114,6 +133,14 @@ def _entry(candidate: Candidate) -> dict[str, Any]:
     return {"model": candidate.model, "pass_rate": candidate.pass_rate,
             "cost_per_pass": candidate.cost, "trials": candidate.trials,
             "baseline": candidate.baseline}
+
+
+def _count_baseline_scenarios(base: Candidate, found: list[Candidate]) -> None:
+    """Count the trials of each model on the scenarios of the baseline. A scenario that a model
+    did not run counts 0, so the pass rates of all models come from the same scenarios."""
+    for candidate in found:
+        if base.scenarios and candidate.scenarios is not None:
+            candidate.trials = min(candidate.scenarios.get(s, 0) for s in base.scenarios)
 
 
 def _role_entry(role: str, baseline: str, found: list[Candidate]) -> dict[str, Any]:
@@ -127,6 +154,7 @@ def _role_entry(role: str, baseline: str, found: list[Candidate]) -> dict[str, A
         entry["reason"] = (f"the baseline has {base.trials} trial(s) for a scenario. "
                            f"A pick needs {MIN_TRIALS} or more.")
     else:
+        _count_baseline_scenarios(base, found)
         enough = [c for c in found if c.trials >= MIN_TRIALS]
         entry["skipped"] = [c.model for c in found if c.trials < MIN_TRIALS]
         entry["economy"], entry["quality"] = (_entry(economy(enough, base)),
@@ -137,14 +165,19 @@ def _role_entry(role: str, baseline: str, found: list[Candidate]) -> dict[str, A
 def picks(runs: list[Any], harness: str, baselines: dict[str, str]) -> list[dict[str, Any]]:
     """One entry for each role that the runs cover: its baseline, its two picks, and a reason if
     the entry has no pick. `baselines` maps each role to its role model in the model profile."""
-    counts = trial_counts(runs)
+    counts = scenario_counts(runs)
     roles: dict[str, list[Candidate]] = {}
     for row in eval_matrix.rows(runs):
-        if row["component"].startswith(ROLE_PREFIX):
-            role = row["component"][len(ROLE_PREFIX):]
-            candidate = _candidate(row, counts.get((row["component"], row["model"]), 0))
+        if not row["component"].startswith(ROLE_PREFIX):
+            continue
+        role = row["component"][len(ROLE_PREFIX):]
+        roles.setdefault(role, [])
+        if _in_harness(row["model"], harness):
+            found = counts.get((row["component"], row["model"]), {})
+            candidate = _candidate(row, min(found.values(), default=0))
+            candidate.scenarios = found
             candidate.baseline = _is_baseline(row["model"], harness, baselines.get(role, ""))
-            roles.setdefault(role, []).append(candidate)
+            roles[role].append(candidate)
     return [_role_entry(role, baselines[role], found) if role in baselines
             else {"role": role, "baseline": "", "economy": None, "quality": None, "skipped": [],
                   "reason": "the model profile has no role model for this role."}
@@ -203,8 +236,8 @@ def _number(value: Any) -> bool:
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
 
-def _value_problems(pick: dict[str, Any]) -> list[str]:
-    """The problems of the values of one pick."""
+def _result_problems(pick: dict[str, Any]) -> list[str]:
+    """The problems of the model and the numbers of one pick."""
     found = []
     if not (isinstance(pick["model"], str) and pick["model"]):
         found.append("'model' must be a model ID.")
@@ -213,6 +246,12 @@ def _value_problems(pick: dict[str, Any]) -> list[str]:
     cost = pick["cost_per_pass"]
     if cost is not None and not (_number(cost) and cost >= 0):
         found.append("'cost_per_pass' must be a number of 0 or more, or null if no rate is known.")
+    return found
+
+
+def _source_problems(pick: dict[str, Any]) -> list[str]:
+    """The problems of the trials and the eval version of one pick."""
+    found = []
     if not (isinstance(pick["trials"], int) and not isinstance(pick["trials"], bool)
             and pick["trials"] >= MIN_TRIALS):
         found.append(f"'trials' must be a whole number of {MIN_TRIALS} or more.")
@@ -221,9 +260,14 @@ def _value_problems(pick: dict[str, Any]) -> list[str]:
     return found
 
 
+def _is_date(value: Any) -> bool:
+    """A date, not a timestamp. YAML loads `2027-05-01T00:00:00` as a datetime."""
+    return isinstance(value, dt.date) and not isinstance(value, dt.datetime)
+
+
 def _date_problems(pick: dict[str, Any]) -> list[str]:
     found = [f"'{key}' must be a date, as YYYY-MM-DD." for key in ("date", "review")
-             if not isinstance(pick[key], dt.date)]
+             if not _is_date(pick[key])]
     if not found and pick["review"] <= pick["date"]:
         found.append("'review' must be later than 'date'.")
     return found
@@ -236,7 +280,7 @@ def pick_problems(pick: Any) -> list[str]:
     missing = [key for key in PICK_KEYS if key not in pick]
     if missing:
         return [f"has no {', '.join(missing)}."]
-    return _value_problems(pick) + _date_problems(pick)
+    return _result_problems(pick) + _source_problems(pick) + _date_problems(pick)
 
 
 def _role_problems(role: str, block: Any, roles: dict[str, Any]) -> list[str]:
@@ -255,6 +299,6 @@ def problems(data: Any) -> list[str]:
     block = data["recommendations"]
     if not isinstance(block, dict):
         return ["recommendations must map each role to its economy pick and quality pick."]
-    roles = (data.get("defaults") or {}).get("role_models") or {}
+    roles = _role_models(data)
     return [problem for role, value in block.items()
             for problem in _role_problems(str(role), value, roles)]
