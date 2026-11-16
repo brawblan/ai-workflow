@@ -316,6 +316,16 @@ tag. If a release is bad, do not move its tag. Release a new patch version.
 - `[TO CONFIRM]` that `actor_id` 5 is the admin repository role. The docs do not list the IDs.
   Checked: https://docs.github.com/en/rest/repos/rules?apiVersion=2022-11-28
 
+## Model picks (D120)
+
+`stone eval --summary <runs.jsonl> --by model --picks <model profile>` marks two picks for each role.
+The baseline of a role is its role model in the model profile. A pick needs 3 trials or more for
+each scenario. The picks change no role model.
+
+| Role | Economy pick | Quality pick | Date |
+| --- | --- | --- | --- |
+| None yet | The model profile has no `recommendations` block. | The model profile has no `recommendations` block. | None |
+
 ## Modes
 
 | Driver | How it runs in Claude Code |

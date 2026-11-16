@@ -13,7 +13,7 @@ from typing import Any
 
 import yaml
 
-from stone import (__version__, dependency_check, eval_matrix, evals, evidence_check, framework_check, gate, index, ready_check,
+from stone import (__version__, dependency_check, eval_matrix, eval_picks, evals, evidence_check, framework_check, gate, index, ready_check,
                    render, repo_rules, specialists, specs, upgrade, usage, workflow_check, writing_check)
 from stone.findings import report
 
@@ -110,6 +110,9 @@ def _add_eval(commands: Any) -> None:
                      help="With --summary: one row for each component and model.")
     run.add_argument("--json", action="store_true", dest="as_json",
                      help="With --by: print the data as JSON.")
+    run.add_argument("--picks", type=Path, metavar="MODEL_PROFILE",
+                     help="With --summary and --by: mark the economy pick and the quality pick of "
+                          "each role. The baseline is the role model in this model profile file.")
     run.add_argument("--check-only", action="store_true",
                      help="Validate the scenarios and list the runs. Start no run.")
 
@@ -462,9 +465,11 @@ def _eval_summary(args: argparse.Namespace) -> int:
     except evals.EvalError as error:
         print(f"stone eval: {error}")
         return 2
+    if args.picks and not args.by:
+        print("stone eval: --picks needs --by model.")
+        return 2
     if args.by:
-        print(_matrix(runs, args.as_json), end="")
-        return 0
+        return _print_matrix(runs, args)
     if len(args.summary) > 1 or args.as_json:
         print("stone eval: give --by model to join runs files or to print JSON.")
         return 2
@@ -473,17 +478,32 @@ def _eval_summary(args: argparse.Namespace) -> int:
     return 0
 
 
-def _matrix(runs: list[evals.Run], as_json: bool) -> str:
+def _print_matrix(runs: list[evals.Run], args: argparse.Namespace) -> int:
+    try:
+        print(_matrix(runs, args.as_json, args.picks), end="")
+    except eval_picks.PicksError as error:
+        print(f"stone eval: {error}")
+        return 2
+    return 0
+
+
+def _matrix(runs: list[evals.Run], as_json: bool, profile: Path | None = None) -> str:
     found, counted = eval_matrix.rows(runs), eval_matrix.variants(runs)
+    chosen = None
+    if profile:
+        harness, baselines = eval_picks.load_baselines(profile)
+        chosen = eval_picks.picks(runs, harness, baselines)
     if as_json:
-        return json.dumps(eval_matrix.as_json(found, counted), indent=2) + "\n"
-    return eval_matrix.text(found, counted)
+        return json.dumps(eval_matrix.as_json(found, counted, chosen), indent=2) + "\n"
+    if chosen is None:
+        return eval_matrix.text(found, counted)
+    return eval_matrix.text(found, counted, eval_picks.marks(chosen)) + eval_picks.text(chosen)
 
 
 def _eval_option_error(args: argparse.Namespace) -> str:
     """The message for a wrong option mix of a run, or an empty string."""
-    if args.by or args.as_json:
-        return "--by and --json need --summary."
+    if args.by or args.as_json or args.picks:
+        return "--by, --json, and --picks need --summary."
     if not args.component:
         return "give a component ID, or use --summary."
     return "--trials must be 1 or more." if args.trials < 1 else ""
