@@ -77,7 +77,7 @@ harness format of its own (P12). An adapter without a file cannot use the comman
 | `eval.yaml`, optional keys | `stone eval` | `parser`: a parser file. `rates`: a rates file (D116). `unsupported`: the reason for each eval kind that the adapter cannot run. |
 | Parser file | `stone eval` | `parse` returns the usage fields. `transcript_stats` returns the tool calls and the result bytes. Without a parser, the runner reads the last JSON object. |
 | Rates file | `stone eval` | The token rates of each model in USD for each 1M tokens, the `source`, the `read` date, and optional peak windows (D116) |
-| `usage.yaml` | `stone usage` | The transcript folders, the record format, and the weights (D114) |
+| `usage.yaml` | `stone usage` | The transcript folders, the record format, and the weights (D114), or a `reader` (a parser file and default session databases) with a `rates` file (D122) |
 | `values.py` | `stone render` | The template values (see above) |
 
 ## What a model profile MUST provide
