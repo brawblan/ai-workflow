@@ -258,7 +258,8 @@ Unproven facts:
 
 `stone eval --summary <runs.jsonl> --by model --picks <model profile>` marks two picks for each role.
 The baseline of a role is its role model in the model profile. A pick needs 3 trials or more for
-each scenario. The picks change no role model.
+each scenario. The picks change no role model. The candidate models come from
+[the OpenCode Go model research](../../docs/research/opencode-go-models.md).
 
 | Role | Economy pick | Quality pick | Date |
 | --- | --- | --- | --- |
