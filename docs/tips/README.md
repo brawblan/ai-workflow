@@ -7,6 +7,7 @@ How I work with AI coding agents, and why. Take what helps you.
 | [spec-driven-development.md](spec-driven-development.md) | Plan a change as a spec first. Then build it. |
 | [writing-with-ste.md](writing-with-ste.md) | Make agents write short, clear text. |
 | [other-tools.md](other-tools.md) | Use these skills in Copilot, Cursor, Codex, Gemini CLI, or claude.ai. |
+| [model-matrix-runbook.md](model-matrix-runbook.md) | Run the 3-trial OpenCode model matrix and write the picks (#305). |
 
 ## Habits that help
 
