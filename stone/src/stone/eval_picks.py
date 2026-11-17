@@ -101,19 +101,20 @@ def economy(candidates: list[Candidate], base: Candidate) -> Candidate:
     return min(near, key=lambda c: (_cost(c), -c.pass_rate, c.model), default=base)
 
 
+def _best_within(candidates: list[Candidate], base: Candidate, limit: float) -> Candidate:
+    cheap = [c for c in candidates if c.cost is not None and c.cost <= limit + EPSILON]
+    return min(cheap, key=lambda c: (-round(c.pass_rate, 9), _cost(c), c.model), default=base)
+
+
 def quality(candidates: list[Candidate], base: Candidate, ceiling: float | None = None) -> Candidate:
     """The highest pass rate among the models that cost no more than the limit. The limit is the
     ceiling, if there is one, and if not, the cost of the baseline."""
     if ceiling is not None:
-        cheap = [c for c in candidates if c.cost is not None and c.cost <= ceiling + EPSILON]
-        return min(cheap, key=lambda c: (-round(c.pass_rate, 9), _cost(c), c.model), default=base)
+        return _best_within(candidates, base, ceiling)
     # A baseline that passes no run costs "infinity" for each passing run. A baseline with no rate
     # has an unknown cost, so no other model can be compared with it.
     limit = math.inf if base.cost is None and base.pass_rate == 0 else base.cost
-    if limit is None:
-        return base
-    cheap = [c for c in candidates if c.cost is not None and c.cost <= limit + EPSILON]
-    return min(cheap, key=lambda c: (-round(c.pass_rate, 9), _cost(c), c.model), default=base)
+    return base if limit is None else _best_within(candidates, base, limit)
 
 
 # The matrix --------------------------------------------------------------------------------
