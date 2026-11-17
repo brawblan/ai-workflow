@@ -208,6 +208,9 @@ stone eval role.tester --variant with --trials 3 \
 OpenCode reports no cost on the Go plan. `stone eval` estimates the cost from the token counts and
 the rates in `framework/adapters/opencode/rates.yaml`. A model with no rates shows "—".
 
+To choose which models to test, read [the OpenCode Go model research](../docs/research/opencode-go-models.md).
+It lists each model, its variants, and the tests that only an eval can answer.
+
 > WARNING: The `without` variant has no role file. OpenCode then allows each action, and `--auto`
 > approves it. Run it only on a machine where no secret is in reach.
 
