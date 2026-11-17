@@ -13,6 +13,7 @@ from stone import (__version__, ci_setup, code_index, context_guard, eval_picks,
                    upgrade)
 from stone.findings import Finding
 from stone.markdown import link_file, relative_links, split_frontmatter, table_rows
+from stone.template_path import template_file
 
 CHECK = "stone check"
 GATE_VALUES: dict[str, set[str]] = {
@@ -275,7 +276,7 @@ def path_compiler(harness: Path) -> Any:
     for entry in (yaml.safe_load(registry.read_text(encoding="utf-8")) or {}).get("components", []):
         if entry.get("provides") == "path_match":
             namespace: dict[str, Any] = {}
-            exec((harness / "templates" / entry["template"]).read_text(encoding="utf-8"), namespace)
+            exec(template_file(harness, entry["template"]).read_text(encoding="utf-8"), namespace)
             return namespace["compile_path"]
     return None
 

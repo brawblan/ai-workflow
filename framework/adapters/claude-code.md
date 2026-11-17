@@ -4,7 +4,8 @@ Status: draft v0. Facts marked `[TO CONFIRM]` must be tested on the current Clau
 
 Model profiles for this harness: [claude-code/models/](claude-code/models/claude-5.yaml).
 
-Templates: `claude-code/templates/`. The component list
+Templates: `claude-code/templates/`, and `shared/templates/` for the checks and the G3 workflow that
+name no harness (D122). The component list
 [claude-code/components.yaml](claude-code/components.yaml) names the template and the target path of
 each component that `stone render` writes.
 
@@ -64,7 +65,7 @@ The protected paths are `paths.tests` and `paths.checks` from the repo config, p
 lists them, with a class of both cases for each letter. With the key on, K22
 (`.cornerstone/checks/instruction_text.py`) also tests the text of each tracked instruction file (D89). A value can
 be a glob. The hook and K6 import one match module, `.cornerstone/lib/path_match.py`, from the
-template `claude-code/templates/lib/path_match.py` (D62). If the module is missing or broken, the
+template `shared/templates/lib/path_match.py` (D62). If the module is missing or broken, the
 hook blocks each edit. `stone specialists` uses the same module for `when.paths` (D65).
 
 The hook makes the target path relative to the git work tree that holds the file. This is

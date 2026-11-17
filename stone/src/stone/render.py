@@ -19,6 +19,7 @@ import yaml
 
 from stone import ci_role, ci_setup, code_index, context_guard, form, framework_check, overrides, results, specialists, specs, triggers
 from stone.markdown import split_frontmatter
+from stone.template_path import template_file
 
 CONFIG = Path(".cornerstone/config.yaml")
 MANIFEST = Path(".cornerstone/manifest.yaml")
@@ -568,7 +569,7 @@ def add_code_index(harness: Path, part: str, content: str,
         return content, []
     values = {f"code_index_{key}_json": json.dumps(value)[1:-1] for key, value in index.items()}
     data = json.loads(content)
-    owned = json.loads(fill((harness / "templates" / part).read_text(encoding="utf-8"),
+    owned = json.loads(fill(template_file(harness, part).read_text(encoding="utf-8"),
                             part, values, config))
     _merge(data, owned)
     return json.dumps(data, indent=2) + "\n", _entry_keys(owned)
@@ -578,7 +579,7 @@ def add_part(harness: Path, part: str, content: str,
              config: dict[str, Any]) -> tuple[str, list[str]]:
     """Merge a fixed JSON fragment into a JSON fragment (D114). Return it and the keys of its entries."""
     data = json.loads(content)
-    owned = json.loads(fill((harness / "templates" / part).read_text(encoding="utf-8"),
+    owned = json.loads(fill(template_file(harness, part).read_text(encoding="utf-8"),
                             part, {}, config))
     _merge(data, owned)
     return json.dumps(data, indent=2) + "\n", _entry_keys(owned)
@@ -627,10 +628,10 @@ def trigger_components(framework: Path, harness: Path, registry_doc: dict[str, A
 def _trigger_text(framework: Path, harness: Path, entry: dict[str, Any],
                   trigger: triggers.Trigger) -> str:
     """Return the template of one trigger workflow with its parts and the profile steps."""
-    text = (harness / "templates" / entry["template"]).read_text(encoding="utf-8")
+    text = template_file(harness, entry["template"]).read_text(encoding="utf-8")
     for name, part in (entry.get("parts") or {}).items():
         text = triggers.insert_block(
-            text, name, (harness / "templates" / part).read_text(encoding="utf-8"))
+            text, name, template_file(harness, part).read_text(encoding="utf-8"))
     steps = triggers.prompt_steps(framework, trigger).replace("$", "$$")
     return triggers.insert_block(text, "profile_steps", steps)
 
@@ -711,7 +712,7 @@ def step_name(component_id: str) -> str:
 def substitute(harness: Path, template_name: str, values: dict[str, str],
                steps: dict[str, str | None], config: dict[str, Any]) -> str:
     """Fill one template. Remove the line of each step that is not rendered, or empty block."""
-    template = (harness / "templates" / template_name).read_text(encoding="utf-8")
+    template = template_file(harness, template_name).read_text(encoding="utf-8")
     for name, step in steps.items():
         if step is None:
             template = template.replace(f"${name}\n", "").replace(f"${{{name}}}\n", "")
