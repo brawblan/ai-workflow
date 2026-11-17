@@ -14,7 +14,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from golden_helpers import TODAY, golden_differences, tree_files, update_golden, updating
+from golden_helpers import (SHARED, TODAY, golden_differences, tree_files, update_golden,
+                            updating)
 from stone import render
 
 PROFILE = "full-project"
@@ -65,7 +66,8 @@ class GoldenFullProjectTest(unittest.TestCase):
         self.assertEqual(differences, [], "\n".join(differences))
         fixtures = tree_files(GOLDEN)
         self.assertIn(".cornerstone/manifest.yaml", fixtures)
-        self.assertIn(".cornerstone/checks/instruction_size.py", fixtures)
+        self.assertNotIn(".cornerstone/checks/instruction_size.py", fixtures)  # in golden/_shared
+        self.assertIn(".cornerstone/checks/instruction_size.py", tree_files(SHARED))
         self.assertNotIn(CONFIG_PATH, fixtures)
 
 

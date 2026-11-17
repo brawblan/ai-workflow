@@ -37,6 +37,9 @@ an eval for each component. The status is in `components.yaml`, so the core name
 2. For each row, give the target path, the file format, and the support level (full, partial, none).
    If the support is not full, give the fallback.
 3. A template folder: `framework/adapters/<name>/templates/`. The generator renders these files.
+   A template that names no harness can be in `framework/adapters/shared/templates/`. A component
+   list names it as it names its own template. If both folders have a file of that name, the
+   adapter file wins (D123).
 4. A list of the facts that can change with harness versions. Mark each one `[TO CONFIRM]` until a
    test proves it.
 
