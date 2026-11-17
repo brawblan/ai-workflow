@@ -76,7 +76,7 @@ components:
     hash: a133325ea1bfc3492816944f0827c4d77f013a599c0f62e46b95313e5465a795
   - id: check.path-match
     kind: check
-    purpose: Match a path against paths.tests and paths.checks. K6 imports it (D62). No hook uses it here.
+    purpose: Match a path against paths.tests and paths.checks. K6, K22, and the specialists import it (D62). No hook uses it here.
     principle:
       - P2
       - P6
