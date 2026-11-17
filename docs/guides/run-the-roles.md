@@ -7,7 +7,8 @@ files into your repo.
 Checked with Claude Code 2.1.302. The `--agent` flag loads one role file from `.claude/agents/`.
 
 `stone render` also writes the OpenCode role files to `.opencode/agents/`, if the repo config has
-`harness: opencode`. This guide shows the Claude Code steps. To compare models on OpenCode, see
+`harness: opencode`. This guide shows the Claude Code steps. For OpenCode, see
+[Set up Cornerstone with OpenCode](set-up-opencode.md). To compare models, see
 [Compare models with evals](compare-models.md).
 
 ## Before you start
