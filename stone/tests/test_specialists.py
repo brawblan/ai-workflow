@@ -15,7 +15,7 @@ from stone import cli, framework_check, render, specialists
 from test_render import CONFIG, FRAMEWORK
 
 TODAY = dt.date(2026, 10, 17)
-TEMPLATE = FRAMEWORK / "adapters" / "claude-code" / "templates" / "lib" / "path_match.py"
+TEMPLATE = FRAMEWORK / "adapters" / "shared" / "templates" / "lib" / "path_match.py"
 HARNESS = FRAMEWORK / "adapters" / "claude-code"
 BAD_GLOB = {"id": "a", "run": "x", "when": {"paths": ["src/[a"]}}
 

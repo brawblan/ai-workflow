@@ -22,7 +22,7 @@ from stone import cli, render
 
 FRAMEWORK = Path(__file__).resolve().parents[2] / "framework"
 COMPONENTS = FRAMEWORK / "adapters" / "claude-code" / "components.yaml"
-TEMPLATE = "adapters/claude-code/templates/workflows/cornerstone-checks.yml"
+TEMPLATE = "adapters/shared/templates/workflows/cornerstone-checks.yml"
 TODAY = dt.date(2026, 10, 18)
 WORKFLOW = ".github/workflows/cornerstone-checks.yml"
 MANIFEST = ".cornerstone/manifest.yaml"

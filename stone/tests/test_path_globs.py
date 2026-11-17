@@ -41,7 +41,7 @@ from path_match_helpers import FRAMEWORK, HOOK, K6, PATH_MATCH, REPO, prefix_onl
 from stone import cli, framework_check, render
 
 TODAY = dt.date(2026, 10, 22)
-TEMPLATE = FRAMEWORK / "adapters" / "claude-code" / "templates" / "lib" / "path_match.py"
+TEMPLATE = FRAMEWORK / "adapters" / "shared" / "templates" / "lib" / "path_match.py"
 GOLDEN = Path(__file__).resolve().parent / "golden"
 GIT_ENV = {"GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@example.com",
            "GIT_COMMITTER_NAME": "t", "GIT_COMMITTER_EMAIL": "t@example.com",
@@ -942,7 +942,7 @@ class BotWaiverTest(RenderedRepo):
         self.assertEqual(run.returncode, 0, run.stdout)
 
     def test_d83_k6_step_passes_event_text_through_env(self) -> None:
-        step = (FRAMEWORK / "adapters/claude-code/templates/workflows/steps/k6.yml").read_text(
+        step = (FRAMEWORK / "adapters/shared/templates/workflows/steps/k6.yml").read_text(
             encoding="utf-8")
         workflow = (self.root / ".github/workflows/cornerstone-checks.yml").read_text(
             encoding="utf-8")

@@ -41,13 +41,20 @@ owners: {default: octocat}
 CONFIG_PATH = ".cornerstone/config.yaml"
 MANIFEST = ".cornerstone/manifest.yaml"
 CI_ROLES = ["shaper", "investigator"]  # the first role of a profile with a trigger (#327)
+# Shared checks (#332): K6 and K7 and the match module (single-ticket), K15 (full-project),
+# K22 (protect_instruction_files), K16 (spike), and the G3 workflow (single-ticket).
+CHECKS = [f".cornerstone/checks/{name}.py" for name in (
+    "change_size", "instruction_size", "instruction_text", "protected_paths")]
+CHECKS += [".cornerstone/lib/path_match.py", ".github/workflows/cornerstone-checks.yml",
+           ".github/workflows/cornerstone-k16.yml"]
 WORKFLOWS = [".github/workflows/cornerstone-single-ticket-label.yml",
              ".github/workflows/cornerstone-bug-triage-issue-opened.yml",
              ".github/workflows/cornerstone-bug-triage-schedule.yml"]
 FILES = sorted([f".opencode/agents/{role}.md" for role in ROLES]
                + [f".opencode/agents/{role}-ci.md" for role in CI_ROLES]
-               + WORKFLOWS + ["opencode.json", MANIFEST])
-COMPONENTS = sorted(["config.permissions"] + [f"role.{role}" for role in ROLES]
+               + WORKFLOWS + CHECKS + ["opencode.json", MANIFEST])
+COMPONENTS = sorted(["config.permissions", "check.path-match", "check.k6", "check.k7",
+                     "check.k15", "check.k16", "check.k22", "ci-job.checks"] + [f"role.{role}" for role in ROLES]
                     + [f"role-ci.{role}" for role in CI_ROLES]
                     + ["trigger.label.single-ticket", "trigger.issue-opened.bug-triage",
                        "trigger.schedule.bug-triage"])
@@ -88,7 +95,9 @@ class GoldenOpenCodeTest(unittest.TestCase):
             with self.subTest(component=component["id"]):
                 self.assertEqual(str(component["added"]), TODAY.isoformat())
                 self.assertEqual(str(component["review_by"]), REVIEW_BY)
-                if not component["id"].startswith("role-ci."):  # a derived copy has no eval
+                # A derived copy has no eval. A check and the G3 job have none: the unit tests
+                # are the eval (D99, D102).
+                if not component["id"].startswith(("role-ci.", "check.", "ci-job.")):
                     self.assertTrue(component["eval"])
 
     def test_golden_opencode_each_role_file_denies_all_first(self) -> None:
