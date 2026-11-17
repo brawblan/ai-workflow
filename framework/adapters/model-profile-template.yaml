@@ -30,3 +30,22 @@ idioms:
     source: <url>
     affects: [<component ids or kinds>]
     eval: <evals/<id>/ or empty>   # empty = not measured yet
+
+recommendations:                   # optional (D120). The picks of `stone eval --summary ... --by model --picks`.
+  <role>:                          # a role of defaults.role_models
+    economy:                       # the lowest cost for each passing run, with a pass rate near the baseline
+      model: <model-id>
+      pass_rate: <0 to 1>
+      cost_per_pass: <USD for each passing run, or null if no rate is known>
+      trials: <the fewest runs of one scenario, 3 or more>
+      eval_version: <the version that ran the eval>
+      date: <YYYY-MM-DD>           # the date of the matrix
+      review: <YYYY-MM-DD>         # later than date
+    quality:                       # the highest pass rate at a cost not higher than the baseline
+      model: <model-id>
+      pass_rate: <0 to 1>
+      cost_per_pass: <USD, or null>
+      trials: <3 or more>
+      eval_version: <the version that ran the eval>
+      date: <YYYY-MM-DD>
+      review: <YYYY-MM-DD>

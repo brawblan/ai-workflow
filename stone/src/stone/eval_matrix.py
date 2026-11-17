@@ -74,22 +74,29 @@ def _cell(value: dict[str, Any] | None, digits: int) -> str:
     return f"{value['mean']:.{digits}f} ±{error}"
 
 
-def text(found: list[dict[str, Any]], counted: list[str]) -> str:
-    """The Markdown table, then the variant line and the token note."""
+def text(found: list[dict[str, Any]], counted: list[str],
+         marks: dict[tuple[str, str], str] | None = None) -> str:
+    """The Markdown table, then the variant line and the token note. `marks` adds a Pick column."""
     head = ["Component", "Model", "Runs", "Pass rate", "Cost per pass",
-            *(title for title, _, _ in MEANS)]
+            *(title for title, _, _ in MEANS), *(["Pick"] if marks is not None else [])]
     lines = ["| " + " | ".join(head) + " |", "| " + " | ".join("---" for _ in head) + " |"]
     for row in found:
         per_pass = row["cost_per_pass"]
         cells = [row["component"], row["model"], str(row["runs"]), _cell(row["pass_rate"], 2),
                  MISSING if per_pass is None else f"{per_pass:.4f}",
                  *(_cell(row[key], digits) for _, key, digits in MEANS)]
+        if marks is not None:
+            cells.append(marks.get((row["component"], row["model"]), ""))
         lines.append("| " + " | ".join(cells) + " |")
     lines += ["", "Each mean shows ±standard error. The error is — for one run. Cost is in USD.",
               f"Variants counted: {', '.join(counted) or MISSING}.", TOKEN_NOTE]
     return "\n".join(lines) + "\n"
 
 
-def as_json(found: list[dict[str, Any]], counted: list[str]) -> dict[str, Any]:
-    """The same data as `text`, for `--json`."""
-    return {"variants": counted, "token_note": TOKEN_NOTE, "rows": found}
+def as_json(found: list[dict[str, Any]], counted: list[str],
+            picks: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """The same data as `text`, for `--json`. `picks` adds the picks of each role."""
+    data: dict[str, Any] = {"variants": counted, "token_note": TOKEN_NOTE, "rows": found}
+    if picks is not None:
+        data["picks"] = picks
+    return data

@@ -93,6 +93,12 @@ only its model profile. Use [model-profile-template.yaml](model-profile-template
    target repo. A profile becomes `active` when the [adapter-refresh](../profiles/adapter-refresh.md)
    evals support it. An `active` profile can have idioms with no eval yet. Such an idiom is not
    proven (D37 in the [framework decisions](../README.md)).
+5. Optional: a `recommendations` block (D120). For each role it holds an `economy` pick and a
+   `quality` pick. `stone eval --summary ... --by model --picks <profile>` prints the picks. A human
+   writes them into the block. A pick has the model, the pass rate, the cost for each passing run, and the trials (3 or more). It also has
+   the eval version, the date, and a review date. A pick never changes `defaults.role_models`.
+   A change of that key needs a human decision at G4, in its own PR. `stone check` validates the
+   block. A new profile for a new model family has `status: proposed`.
 
 Path: `framework/adapters/<harness>/models/<model-family>.yaml`. All vendor adapters and model
 profiles stay in the repo. A target repo selects one of each in its config.
