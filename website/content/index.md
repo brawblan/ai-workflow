@@ -97,8 +97,7 @@ Cornerstone puts a check or a human gate at each of these points.
 - A team that wants one process for many types of work.
 - A person who uses Spec Kit, OpenSpec, or BMAD and wants a layer that does not depend on one tool.
 
-It is not a prompt library or an IDE. At this time the full adapter is for Claude Code. An adapter
-for OpenCode supports `stone eval` only.
+It is not a prompt library or an IDE. Claude Code and OpenCode have a full adapter.
 
 ## How it compares
 
@@ -176,7 +175,7 @@ The table shows the current version. Version 1.0.0 met the exit criteria on 2026
 | --- | --- |
 | Profiles | `stone render` writes every component of all 10 profiles. Each profile has a golden-file test and a guide. |
 | Checks | Each generated check blocks: K6, K7, K14, K15, and K16. K17 blocks in this repo. |
-| Adapters | Claude Code is the full harness adapter. Its model profile for Claude 5 is `active`. OpenCode supports `stone eval` only. |
+| Adapters | Claude Code is the full harness adapter. Its model profile for Claude 5 is `active`. OpenCode is a full adapter (v1). |
 | Evals | There are evals for all six roles, the protected-path hook, the trigger workflows, and the writing guidance. See [evals](evals/README.md). |
 | Open | The first blind A/B rating of STE text, at the end of Q4 2026. See the [roadmap](framework/README.md#roadmap). |
 

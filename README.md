@@ -45,8 +45,8 @@ Each rule cites its evidence in the [research dossier](docs/research/dossier.md)
   one tool. See [the migration guide](docs/guides/migrate.md).
 
 It is not for you if you want a prompt library or an IDE. It is also not for you if you need full
-`stone render` support for a harness other than Claude Code today. The full adapter is for Claude
-Code. An adapter for OpenCode supports `stone eval` only.
+`stone render` support for a harness other than Claude Code and OpenCode. Both have a full adapter.
+The [OpenCode adapter](framework/adapters/opencode.md) is full v1.
 
 ## How it compares
 
@@ -62,7 +62,7 @@ Draft v0. The framework is complete enough to use on one profile. Other parts ar
 | Part | State |
 | --- | --- |
 | [Framework](framework/README.md): principles, workflow model, gates, checks, modes, 10 profiles | Draft v0 |
-| [Harness adapter](framework/adapters/claude-code.md) and [model profile](framework/adapters/claude-code/models/claude-5.yaml) | Full adapter. The model profile evals are not written yet. [OpenCode](framework/adapters/opencode.md) supports `stone eval` only. |
+| [Harness adapter](framework/adapters/claude-code.md) and [model profile](framework/adapters/claude-code/models/claude-5.yaml) | Full adapter. The model profile evals are not written yet. [OpenCode](framework/adapters/opencode.md) is a full adapter (v1): role files, CI triggers, shared checks, `stone usage`, and `stone eval`. |
 | [`stone`](stone/README.md) 0.9 | `stone check`, `stone check-writing` (K17), `stone check-evidence` (K14), `stone spec apply` and `sync`, `stone render` for the roles of all 10 profiles, and `stone eval`. Some profile checks and the triggers are not rendered yet. |
 | [`cornerstone` plugin](plugins/cornerstone/) 0.8.0 | Four skills. `setup` is the entry skill. |
 | This repo | Uses Cornerstone on itself: [`.cornerstone/config.yaml`](.cornerstone/config.yaml) and CI in [`stone.yml`](.github/workflows/stone.yml) |
@@ -106,8 +106,8 @@ The [guides](docs/guides/README.md) cover each situation: a new project, an exis
 migration from another framework, and the daily work after the setup. This section is the short
 version.
 
-You need Python 3.11 or later, `git`, the GitHub CLI (`gh`), and Claude Code. Claude Code is the
-only full harness adapter at this time. An adapter for OpenCode supports `stone eval` only.
+You need Python 3.11 or later, `git`, the GitHub CLI (`gh`), and Claude Code. Claude Code or
+OpenCode. Both have a full harness adapter. See the [OpenCode adapter](framework/adapters/opencode.md).
 
 1. Clone this repo and install the CLI:
 
