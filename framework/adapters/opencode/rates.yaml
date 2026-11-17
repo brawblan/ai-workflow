@@ -2,12 +2,15 @@
 # OpenCode reports a cost of 0 on the Go plan, so stone eval estimates the cost from these rates.
 # Reasoning tokens use the output rate. The start of a run selects the peak or the off-peak rate.
 # The docs give no cache write rate for the two flash models, so their cache_write is 0.
+# The model beam-free is free on the Go plan: all four rates are 0 (report docs/research/opencode-go-models.md).
 # A window gives the UTC start hours of the peak: hour 1 is 01:00 to 01:59.
 
 source: https://opencode.ai/docs/go
 read: 2026-11-09
 
 models:
+  opencode-go/beam-free:
+    rates: {input: 0, output: 0, cache_read: 0, cache_write: 0}
   opencode-go/glm-5.3-flash:
     rates: {input: 0.15, output: 0.50, cache_read: 0.03, cache_write: 0}
   opencode-go/deepseek-v4.1-flash:

@@ -119,7 +119,20 @@ class CostTest(ReaderTestCase):
         self.assertAlmostEqual(r["cost"], (0.15 * 8383 + 0.50 * 51 + 0.03 * 5440) / 1e6, places=6)
         self.assertEqual((r["peak_calls"], r["unrated_calls"]), (0, 0))
 
+    def test_free_model_session_costs_zero(self) -> None:
+        r = self.row(BEAM)
+        self.assertEqual(r["cost"], 0)
+        self.assertEqual(r["unrated_calls"], 0)
+        _, text = run(str(self.db))
+        line = next(x for x in text.splitlines() if BEAM in x)
+        self.assertNotIn("—", line)
+
     def test_unrated_session(self) -> None:
+        con = sqlite3.connect(self.db)
+        con.execute("UPDATE session_message SET data = replace(data, '\"id\":\"beam-free\"', "
+                    "'\"id\":\"beam-unrated\"') WHERE session_id = ?", (BEAM,))
+        con.commit()
+        con.close()
         r = self.row(BEAM)
         self.assertIsNone(r["cost"])
         self.assertEqual(r["unrated_calls"], 2)

@@ -38,10 +38,11 @@ def run(variant: str = "with", **usage) -> evals.Run:
 
 
 class RatesFile(unittest.TestCase):
-    def test_real_file_is_valid_and_has_three_models(self) -> None:
+    def test_real_file_is_valid_and_has_four_models(self) -> None:
         data = rates_data()
         self.assertEqual([], eval_rates.problems(data))
-        self.assertEqual({GLM, DEEP, "opencode-go/kimi-k3.1-pro"}, set(data["models"]))
+        self.assertEqual({GLM, DEEP, "opencode-go/kimi-k3.1-pro", "opencode-go/beam-free"},
+                         set(data["models"]))
         self.assertEqual(dt.date(2026, 11, 9), data["read"])
 
     def test_the_adapter_names_the_rates_file(self) -> None:
