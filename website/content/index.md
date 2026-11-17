@@ -28,7 +28,7 @@ The rest of your workflow stays the same.
 | [Roles](framework/workflow-model.md) | Six agent roles: shaper, planner, implementer, tester, reviewer, and investigator. Each role runs in its own session. |
 | [Profiles](framework/profiles/README.md) | Ten workflow types, from a spike to a full project. Each sets its plan form, roles, gates, and checks. |
 | [Gates](framework/gates.md) | Five stop points, G1 to G5. A human or CI must pass each one. |
-| [Checks](framework/checks.md) | 24 CI checks, K1 to K24: tests, protected paths, change size, secrets, PR evidence, and more. |
+| [Checks](framework/checks.md) | 25 CI checks, K1 to K25: tests, protected paths, change size, secrets, PR evidence, and more. |
 | [Hooks](framework/adapters/claude-code.md) | Local guards. For example, a hook stops the implementer when it tries to change a test. |
 | [Adapters and model profiles](framework/adapters/contract.md) | The only place for harness and model details. Claude Code is the full adapter. OpenCode supports eval runs. |
 | [`stone` CLI](stone/README.md) | Writes the roles, hooks, and CI checks into your repo. It also validates the framework and the writing. |
