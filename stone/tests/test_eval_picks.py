@@ -220,6 +220,86 @@ class LoadBaselinesTest(unittest.TestCase):
                     eval_picks.load_baselines(path)
 
 
+class QualityCeilingTest(unittest.TestCase):
+    """D125: the optional quality_cost_ceiling replaces the baseline cost as the quality limit."""
+
+    def entry(self, runs: list[evals.Run], ceiling: float | None) -> dict:
+        found = eval_picks.picks(runs, "h", {"tester": BASELINE}, ceiling)
+        return by_role(found)["tester"]
+
+    def free_base(self) -> list[evals.Run]:
+        return runs_of(BASELINE, "S1", flags(5, 10), 0.0)
+
+    def test_free_baseline_with_ceiling_picks_the_paid_model(self) -> None:
+        runs = self.free_base() + runs_of("paid", "S1", flags(9, 10), 0.10)  # 0.111 a pass
+        self.assertEqual(self.entry(runs, 0.5)["quality"]["model"], "h:paid")
+
+    def test_free_baseline_without_ceiling_is_the_quality_pick(self) -> None:
+        runs = self.free_base() + runs_of("paid", "S1", flags(9, 10), 0.10)
+        self.assertEqual(self.entry(runs, None)["quality"]["model"], f"h:{BASELINE}")
+        found = by_role(eval_picks.picks(runs, "h", {"tester": BASELINE}))["tester"]
+        self.assertEqual(found["quality"]["model"], f"h:{BASELINE}")
+
+    def test_model_above_the_ceiling_is_excluded(self) -> None:
+        runs = (self.free_base() + runs_of("best", "S1", flags(10, 10), 0.90)
+                + runs_of("good", "S1", flags(8, 10), 0.10))
+        self.assertEqual(self.entry(runs, 0.5)["quality"]["model"], "h:good")
+
+    def test_no_model_under_the_ceiling_gives_the_baseline(self) -> None:
+        runs = self.free_base() + runs_of("best", "S1", flags(10, 10), 0.90)
+        # the baseline costs 0 for each pass, which is under the ceiling, and has the only
+        # qualifying rate
+        self.assertEqual(self.entry(runs, 0.5)["quality"]["model"], f"h:{BASELINE}")
+
+    def test_ceiling_overrides_a_non_zero_baseline_cost(self) -> None:
+        runs = baseline_runs() + runs_of("pricey", "S1", flags(10, 10), 0.2)  # 0.2 a pass
+        self.assertEqual(self.entry(runs, None)["quality"]["model"], f"h:{BASELINE}")
+        self.assertEqual(self.entry(runs, 0.3)["quality"]["model"], "h:pricey")
+
+    def test_ceiling_lower_than_baseline_cost_excludes_pricier_models(self) -> None:
+        runs = baseline_runs() + runs_of("cheap", "S1", flags(10, 10), 0.05)
+        runs += runs_of("mid", "S1", flags(10, 10), 0.10)
+        self.assertEqual(self.entry(runs, 0.06)["quality"]["model"], "h:cheap")
+
+    def test_cost_equal_to_the_ceiling_qualifies(self) -> None:
+        runs = self.free_base() + runs_of("paid", "S1", flags(10, 10), 0.25)
+        self.assertEqual(self.entry(runs, 0.25)["quality"]["model"], "h:paid")
+
+    def test_economy_pick_is_unchanged_by_the_ceiling(self) -> None:
+        runs = (baseline_runs() + runs_of("cheap", "S1", flags(8, 10), 0.02)
+                + runs_of("best", "S1", flags(10, 10), 0.2))
+        self.assertEqual(self.entry(runs, None)["economy"], self.entry(runs, 0.3)["economy"])
+        self.assertEqual(self.entry(runs, 0.3)["economy"]["model"], "h:cheap")
+
+
+class LoadCeilingTest(unittest.TestCase):
+    def load(self, body: str | None) -> float | None:
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / ("missing.yaml" if body is None else "p.yaml")
+            if body is not None:
+                path.write_text(body)
+            return eval_picks.load_ceiling(path)
+
+    def test_no_key_is_none(self) -> None:
+        self.assertIsNone(self.load("harness: h\n"))
+        self.assertIsNone(self.load("quality_cost_ceiling:\n"))
+
+    def test_number(self) -> None:
+        self.assertEqual(self.load("quality_cost_ceiling: 0.5\n"), 0.5)
+        self.assertEqual(self.load("quality_cost_ceiling: 2\n"), 2.0)
+        self.assertEqual(self.load("quality_cost_ceiling: 0\n"), 0.0)
+
+    def test_bad_values_raise(self) -> None:
+        for body in ("quality_cost_ceiling: -1\n", "quality_cost_ceiling: cheap\n",
+                     "quality_cost_ceiling: true\n"):
+            with self.assertRaises(eval_picks.PicksError, msg=body):
+                self.load(body)
+
+    def test_unreadable_file_raises(self) -> None:
+        with self.assertRaises(eval_picks.PicksError):
+            self.load(None)
+
+
 class PicksCliTest(unittest.TestCase):
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory()
@@ -403,6 +483,27 @@ class ProblemsTest(unittest.TestCase):
         data = valid_profile()
         data["recommendations"]["tester"]["economy"] = "m"
         self.assertOneProblem(data, "economy", "mapping")
+
+    def test_ceiling_valid_values(self) -> None:
+        for value in (0, 0.5, 3, None):
+            data = valid_profile()
+            data["quality_cost_ceiling"] = value
+            self.assertEqual(eval_picks.problems(data), [], value)
+        self.assertEqual(eval_picks.problems(valid_profile()), [])
+
+    def test_ceiling_invalid_values(self) -> None:
+        for value in (-0.1, True, False, "1", [1]):
+            data = valid_profile()
+            data["quality_cost_ceiling"] = value
+            self.assertOneProblem(data, "quality_cost_ceiling")
+
+    def test_bad_ceiling_without_recommendations_is_reported(self) -> None:
+        self.assertOneProblem({"quality_cost_ceiling": -1}, "quality_cost_ceiling")
+
+    def test_bad_ceiling_and_bad_pick_give_two_problems(self) -> None:
+        data = self.mutate(cost_per_pass=-1)
+        data["quality_cost_ceiling"] = "x"
+        self.assertEqual(len(eval_picks.problems(data)), 2)
 
 
 class CheckModelProfilesTest(unittest.TestCase):

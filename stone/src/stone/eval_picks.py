@@ -6,7 +6,9 @@ role models of a profile. A human changes `defaults.role_models` at G4, in a PR 
 - Economy: the lowest cost for each passing run. A model counts only if its pass rate is not lower
   than the baseline by more than 1 standard error of the difference.
 - Quality: the highest pass rate, among the models whose cost for each passing run is not higher
-  than the baseline. If two are equal, the lower cost wins.
+  than the limit. The limit is the optional `quality_cost_ceiling` of the model profile (D125). If
+  the profile has no ceiling, the limit is the cost of the baseline. If two are equal, the lower
+  cost wins.
 
 The baseline of a role is its role model in the model profile. If no model meets a rule, the pick
 is the baseline. A pick needs 3 trials or more for each scenario of the baseline and of the pick.
@@ -27,6 +29,7 @@ from . import eval_matrix, eval_metrics
 MIN_TRIALS = 3
 ROLE_PREFIX = "role."
 KINDS = ("economy", "quality")
+CEILING_KEY = "quality_cost_ceiling"
 PICK_KEYS = ("model", "pass_rate", "cost_per_pass", "trials", "eval_version", "date", "review")
 EPSILON = 1e-9  # a pass rate or a cost that differs by less is equal
 
@@ -63,6 +66,20 @@ def load_baselines(path: Path) -> tuple[str, dict[str, str]]:
     return str(data.get("harness") or ""), {str(k): str(v) for k, v in roles.items() if v}
 
 
+def load_ceiling(path: Path) -> float | None:
+    """The `quality_cost_ceiling` of a model profile file, or None if it has none (D125)."""
+    try:
+        data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as error:
+        raise PicksError(f"cannot read the model profile {path} ({error}).") from None
+    value = data.get(CEILING_KEY) if isinstance(data, dict) else None
+    if value is None:
+        return None
+    if not (_number(value) and value >= 0):
+        raise PicksError(f"{path}: {CEILING_KEY} must be a number of 0 or more.")
+    return float(value)
+
+
 def _role_models(data: Any) -> dict[str, Any]:
     """The `defaults.role_models` of a loaded model profile, or an empty mapping."""
     defaults = data.get("defaults") if isinstance(data, dict) else None
@@ -84,15 +101,20 @@ def economy(candidates: list[Candidate], base: Candidate) -> Candidate:
     return min(near, key=lambda c: (_cost(c), -c.pass_rate, c.model), default=base)
 
 
-def quality(candidates: list[Candidate], base: Candidate) -> Candidate:
-    """The highest pass rate among the models that cost no more than the baseline."""
+def _best_within(candidates: list[Candidate], base: Candidate, limit: float) -> Candidate:
+    cheap = [c for c in candidates if c.cost is not None and c.cost <= limit + EPSILON]
+    return min(cheap, key=lambda c: (-round(c.pass_rate, 9), _cost(c), c.model), default=base)
+
+
+def quality(candidates: list[Candidate], base: Candidate, ceiling: float | None = None) -> Candidate:
+    """The highest pass rate among the models that cost no more than the limit. The limit is the
+    ceiling, if there is one, and if not, the cost of the baseline."""
+    if ceiling is not None:
+        return _best_within(candidates, base, ceiling)
     # A baseline that passes no run costs "infinity" for each passing run. A baseline with no rate
     # has an unknown cost, so no other model can be compared with it.
     limit = math.inf if base.cost is None and base.pass_rate == 0 else base.cost
-    if limit is None:
-        return base
-    cheap = [c for c in candidates if c.cost is not None and c.cost <= limit + EPSILON]
-    return min(cheap, key=lambda c: (-round(c.pass_rate, 9), _cost(c), c.model), default=base)
+    return base if limit is None else _best_within(candidates, base, limit)
 
 
 # The matrix --------------------------------------------------------------------------------
@@ -143,7 +165,8 @@ def _count_baseline_scenarios(base: Candidate, found: list[Candidate]) -> None:
             candidate.trials = min(candidate.scenarios.get(s, 0) for s in base.scenarios)
 
 
-def _role_entry(role: str, baseline: str, found: list[Candidate]) -> dict[str, Any]:
+def _role_entry(role: str, baseline: str, found: list[Candidate],
+                ceiling: float | None = None) -> dict[str, Any]:
     """The picks of one role. `found` holds each model that has rows for the role."""
     entry: dict[str, Any] = {"role": role, "baseline": baseline, "economy": None, "quality": None,
                              "skipped": [], "reason": ""}
@@ -158,11 +181,12 @@ def _role_entry(role: str, baseline: str, found: list[Candidate]) -> dict[str, A
         enough = [c for c in found if c.trials >= MIN_TRIALS]
         entry["skipped"] = [c.model for c in found if c.trials < MIN_TRIALS]
         entry["economy"], entry["quality"] = (_entry(economy(enough, base)),
-                                              _entry(quality(enough, base)))
+                                              _entry(quality(enough, base, ceiling)))
     return entry
 
 
-def picks(runs: list[Any], harness: str, baselines: dict[str, str]) -> list[dict[str, Any]]:
+def picks(runs: list[Any], harness: str, baselines: dict[str, str],
+          ceiling: float | None = None) -> list[dict[str, Any]]:
     """One entry for each role that the runs cover: its baseline, its two picks, and a reason if
     the entry has no pick. `baselines` maps each role to its role model in the model profile."""
     counts = scenario_counts(runs)
@@ -178,7 +202,7 @@ def picks(runs: list[Any], harness: str, baselines: dict[str, str]) -> list[dict
             candidate.scenarios = found
             candidate.baseline = _is_baseline(row["model"], harness, baselines.get(role, ""))
             roles[role].append(candidate)
-    return [_role_entry(role, baselines[role], found) if role in baselines
+    return [_role_entry(role, baselines[role], found, ceiling) if role in baselines
             else {"role": role, "baseline": "", "economy": None, "quality": None, "skipped": [],
                   "reason": "the model profile has no role model for this role."}
             for role, found in roles.items()]
@@ -294,13 +318,19 @@ def _role_problems(role: str, block: Any, roles: dict[str, Any]) -> list[str]:
 
 def problems(data: Any) -> list[str]:
     """The problems of the `recommendations` block of a loaded model profile. No block gives none."""
-    if not isinstance(data, dict) or "recommendations" not in data:
+    if not isinstance(data, dict):
         return []
+    found = []
+    ceiling = data.get(CEILING_KEY)
+    if ceiling is not None and not (_number(ceiling) and ceiling >= 0):
+        found.append(f"{CEILING_KEY} must be a number of 0 or more (USD for each passing run).")
+    if "recommendations" not in data:
+        return found
     block = data["recommendations"]
     if not isinstance(block, dict):
-        return ["recommendations must map each role to its economy pick and quality pick."]
+        return found + ["recommendations must map each role to its economy pick and quality pick."]
     roles = _role_models(data)
-    return [problem for role, value in block.items()
+    return found + [problem for role, value in block.items()
             for problem in _role_problems(str(role), value, roles)]
 
 

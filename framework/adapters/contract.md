@@ -100,6 +100,9 @@ only its model profile. Use [model-profile-template.yaml](model-profile-template
    `quality` pick. `stone eval --summary ... --by model --picks <profile>` prints the picks. A human
    writes them into the block. A pick has the model, the pass rate, the cost for each passing run, and the trials (3 or more). It also has
    the eval version, the date, and a review date. A pick never changes `defaults.role_models`.
+   An optional `quality_cost_ceiling` (D125) sets the cost limit of the quality pick, in USD for each
+   passing run. If it is not set, the limit is the cost of the baseline. A baseline with a cost of 0
+   needs a ceiling for a quality pick.
    A change of that key needs a human decision at G4, in its own PR. `stone check` validates the
    block. A new profile for a new model family has `status: proposed`. `stone check` warns when a pick
    is past its review date, or when its model is not in `models` (D124).

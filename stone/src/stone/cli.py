@@ -521,7 +521,7 @@ def _matrix(runs: list[evals.Run], as_json: bool, profile: Path | None = None) -
     chosen = None
     if profile:
         harness, baselines = eval_picks.load_baselines(profile)
-        chosen = eval_picks.picks(runs, harness, baselines)
+        chosen = eval_picks.picks(runs, harness, baselines, eval_picks.load_ceiling(profile))
     if as_json:
         return json.dumps(eval_matrix.as_json(found, counted, chosen), indent=2) + "\n"
     if chosen is None:

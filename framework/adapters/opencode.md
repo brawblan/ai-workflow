@@ -258,7 +258,10 @@ Unproven facts:
 
 `stone eval --summary <runs.jsonl> --by model --picks <model profile>` marks two picks for each role.
 The baseline of a role is its role model in the model profile. A pick needs 3 trials or more for
-each scenario. The picks change no role model. The candidate models come from
+each scenario. The picks change no role model. The quality pick uses the cost limit `quality_cost_ceiling`
+(D125), in USD for each passing run. The baseline `opencode-go/beam-free` costs 0, so a quality pick
+needs a ceiling. The profile sets none yet: the owner sets it after the matrix (#305) shows the
+costs. The candidate models come from
 [the OpenCode Go model research](../../docs/research/opencode-go-models.md).
 
 | Role | Economy pick | Quality pick | Date |
