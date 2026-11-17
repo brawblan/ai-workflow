@@ -1,4 +1,4 @@
-"""Tests for K25, the state type with no transition table check (D120), and `stone check-states`."""
+"""Tests for K25, the state type with no transition table check (D121), and `stone check-states`."""
 
 from __future__ import annotations
 

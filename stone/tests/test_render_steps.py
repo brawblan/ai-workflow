@@ -45,7 +45,7 @@ STEPS = {"K4": ("K4 integration tests", "test_integration"),
 K20_STEP = "K20 specialist findings"  # no command key: it renders only with a specialists section (D66)
 K23_STEP = "K23 new dependencies"  # no command key; it renders from framework 1.5.0 (D90)
 K24_STEP = "K24 unpinned tools"  # no command key; it renders from framework 1.5.0 (D93)
-K25_STEP = "K25 state machines"  # no command key; it renders from framework 1.8.0 (D120)
+K25_STEP = "K25 state machines"  # no command key; it renders from framework 1.8.0 (D121)
 STEP_NAMES = {name for name, _ in STEPS.values()} | {K20_STEP}
 LIMIT = "limits.mutation_score_changed_code"
 CHECK_WARNING = re.compile(r"\bK(4|5|8|10|11|12)\b|commands\.")
@@ -562,7 +562,7 @@ class K24GateTest(FrameworkCopy):
                     self.assertIn("K24", match.group(1))
 
 
-# K25 renders only from framework 1.8.0, the first tag with `stone check-states` (D120).
+# K25 renders only from framework 1.8.0, the first tag with `stone check-states` (D121).
 
 class K25GateTest(FrameworkCopy):
     names_with = K23GateTest.names_with
@@ -597,7 +597,7 @@ class AllStepsTest(FrameworkCopy):
         self.add_profile("every-check",
                          ["K4", "K5", "K6", "K8", "K10", "K11", "K12", "K14", "K20", "K23", "K24", "K25"])
         self.configure(["every-check"], CHECK_COMMANDS, {"mutation_score_changed_code": 0.6})
-        config = self.root / ".cornerstone" / "config.yaml"  # K23 needs 1.5.0 (D90), K25 needs 1.8.0 (D120)
+        config = self.root / ".cornerstone" / "config.yaml"  # K23 needs 1.5.0 (D90), K25 needs 1.8.0 (D121)
         config.write_text(config.read_text(encoding="utf-8").replace("0.8.0", "1.8.0"),
                           encoding="utf-8")
         with (self.root / ".cornerstone" / "config.yaml").open("a", encoding="utf-8") as config:
