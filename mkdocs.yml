@@ -80,6 +80,7 @@ nav:
       - docs/guides/README.md
       - Start a project: docs/guides/start-a-project.md
       - Add Cornerstone to a repo: docs/guides/add-to-a-repo.md
+      - Set up Cornerstone with OpenCode: docs/guides/set-up-opencode.md
       - Migrate to Cornerstone: docs/guides/migrate.md
       - Make a small change: docs/guides/small-change.md
       - Fix a bug: docs/guides/fix-a-bug.md

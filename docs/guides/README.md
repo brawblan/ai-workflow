@@ -15,6 +15,7 @@ the trigger workflows of each profile. Each guide has two parts:
 | --- | --- | --- | --- | --- |
 | I have an empty folder and an idea | [Start a project](start-a-project.md) | full-project | hybrid | Works today |
 | I have a repo with no agent framework | [Add Cornerstone to a repo](add-to-a-repo.md) | single-ticket | agent-centric | Works today |
+| I use OpenCode, not Claude Code | [Set up Cornerstone with OpenCode](set-up-opencode.md) | single-ticket | agent-centric | Works today |
 | I use Spec Kit, OpenSpec, BMAD, or rule files | [Migrate to Cornerstone](migrate.md) | (setup) | — | Partial |
 | I want to make one small, clear change | [Make a small change](small-change.md) | single-ticket | agent-centric | Works today |
 | I have a confirmed bug | [Fix a bug](fix-a-bug.md) | debugging | hybrid | Works today |
@@ -72,4 +73,4 @@ default, see [customization.md](../../framework/customization.md).
 | A clone of [this repo](https://github.com/brawblan/ai-workflow) | The framework files that `stone render` reads |
 | Python 3.11 or later, and `pip install ./stone` from the clone | The `stone` CLI |
 | `git` and the GitHub CLI (`gh`) | Branches, issues, and PRs |
-| Claude Code, with the `cornerstone` plugin | The full harness adapter. See the [install steps](../../README.md#install-the-plugin-for-claude-code). An adapter for OpenCode supports `stone eval` only. |
+| Claude Code, with the `cornerstone` plugin | The reference harness adapter. See the [install steps](../../README.md#install-the-plugin-for-claude-code). For OpenCode, see [Set up Cornerstone with OpenCode](set-up-opencode.md). |
