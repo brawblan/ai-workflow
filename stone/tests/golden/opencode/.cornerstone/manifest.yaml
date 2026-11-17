@@ -1,5 +1,109 @@
 framework_version: 0.8.0
 components:
+  - id: check.k15
+    kind: check
+    purpose: K15. Fail if the instruction file is over the line limit of the model profile.
+    principle:
+      - P4
+      - P6
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/checks/instruction_size.py
+    hash: f3f1a17d28fa5dc9dc7b3b3d6c633fd4a8ac90ccd3254f1a1e4210b847d76886
+  - id: check.k16
+    kind: ci-job
+    purpose: K16. Fail a pull request from a spike branch into the main or integration branch (D30, D33).
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .github/workflows/cornerstone-k16.yml
+    hash: bac6ded88fd656f15353a6430b312cd272dfea9721934426d9553c62571fac9f
+  - id: check.k22
+    kind: check
+    purpose: K22. Fail if a tracked instruction file has an install, a pipe to a shell, an override, an unknown host, or hidden text.
+    principle:
+      - P6
+      - P9
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/checks/instruction_text.py
+    hash: 112a009a7e8625823af68649aea853d765b1f71346f1bcfd6bcbc8819f3e6489
+  - id: check.k6
+    kind: check
+    purpose: K6. Fail if an implementer commit changes a protected path.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/checks/protected_paths.py
+    hash: 1aea1c9b65e5fc4c0c3647877e215dc4fef2a6fb786c28515d0b3e5d7ec433b9
+  - id: check.k7
+    kind: check
+    purpose: K7. Fail if the diff is over the size limit of the PR profile and has no waiver.
+    principle:
+      - P10
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/checks/change_size.py
+    hash: a133325ea1bfc3492816944f0827c4d77f013a599c0f62e46b95313e5465a795
+  - id: check.path-match
+    kind: check
+    purpose: Match a path against paths.tests and paths.checks. K6 imports it (D62). No hook uses it here.
+    principle:
+      - P2
+      - P6
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .cornerstone/lib/path_match.py
+    hash: f2f05f2a1c56c9e1a9534bff3111ee50c3836c43edd764af6d3975b8fbe92a65
+  - id: ci-job.checks
+    kind: ci-job
+    purpose: G3. Run K6, K7, K14, and the repo checks on each pull request.
+    principle:
+      - P1
+      - P6
+    source: framework
+    owner: octocat
+    eval: ""
+    models_tested: []
+    added: "2026-10-18"
+    review_by: "2027-04-18"
+    files:
+      - .github/workflows/cornerstone-checks.yml
+    hash: f34958ff9607dbc1889e7c9b02544c18a23f7a5697923b35a58d03bbd703224f
   - id: config.permissions
     kind: config
     purpose: Deny an edit of a harness path and a read outside the repo, for a session with no role.
