@@ -19,7 +19,7 @@ To run a role eval on OpenCode, follow the steps in
 config `opencode.json`. A profile can have a label, `ci:issue-opened`, or schedule trigger. For each
 one, render also writes a CI workflow and a read-only CI copy of the role file (see
 [CI triggers](#ci-triggers)). It also writes the shared checks K6, K7, K15, K16, and K22 and the G3
-workflow, for the profiles that need them (D122). It writes no hook: OpenCode has none. K6 in CI is
+workflow, for the profiles that need them (D123). It writes no hook: OpenCode has none. K6 in CI is
 the control on a protected path. The permission rules in the role files are a second layer.
 `stone eval` also uses the adapter.
 
@@ -37,12 +37,12 @@ the control on a protected path. The permission rules in the role files are a se
 | Select the role for a headless run | `opencode run --agent <role>` loads `.opencode/agents/<role>.md` | process or command | full | none. Tested on 2.2.6 (2026-11-08). |
 | Model for each role | `--model <provider>/<model>[#variant]`, or `model` in the role file | process or command | full | One model for all roles. |
 | Permissions | The ordered `permissions` list in the role file, and the list in `opencode.json` | Markdown with YAML frontmatter, JSON | partial | Run in a container with no secrets. The role file rules come after the config rules, so they win. |
-| Hook before a file edit | none | not applicable | none | K6 in CI is the control (D122). The `edit` path rules in each role file are a second layer. A path rule does not limit the shell (D39). |
-| Hook before the session ends | none | not applicable | none | Gate G3 in CI (D122). |
+| Hook before a file edit | none | not applicable | none | K6 in CI is the control (D123). The `edit` path rules in each role file are a second layer. A path rule does not limit the shell (D39). |
+| Hook before the session ends | none | not applicable | none | Gate G3 in CI (D123). |
 | CI trigger | Workflows `.github/workflows/cornerstone-<profile>-<trigger>.yml` for the label, `ci:issue-opened`, and schedule triggers. Each runs `opencode run --agent <role>-ci` | YAML (GitHub Actions) | partial | Run the role by hand. There is no `ci:dependency-pr` trigger. A role that needs the shell does not run in CI. |
 | Render the role files and the settings | `stone render` writes `.opencode/agents/<role>.md` and merges `opencode.json` | Markdown, JSON | full | none. |
 | Context guard hook (D115) | none | not applicable | none | Watch the context size by hand. Start a new session after a PR. |
-| Token report (`stone usage`, D114) | none | not applicable | none | No `usage.yaml` yet, so `stone usage` stops with an error. `opencode stats` shows some usage data. |
+| Token report (`stone usage`, D114) | [opencode/usage.yaml](opencode/usage.yaml): the session database `~/.local/share/opencode/opencode.db`, read-only, with the parser `sessions` function (D122) | YAML, SQLite | full | `stone usage` reads the input, output (with reasoning), and cache tokens of each call. The cost is an estimate from `rates.yaml` with the peak rules of D116, because OpenCode reports a cost of 0 on the Go plan. A PATH argument names another database file. |
 
 ## Role files
 
@@ -290,7 +290,7 @@ each scenario. The picks change no role model.
 | Review | 2027-05-10 |
 | Framework decision | D119 |
 
-### Shared checks and the G3 workflow (D122)
+### Shared checks and the G3 workflow (D123)
 
 | Field | Value |
 | --- | --- |
@@ -301,4 +301,4 @@ each scenario. The picks change no role model.
 | Risks | A change to a shared template changes the files of both adapters, so the golden files of both must pass. A shared file that names a harness breaks the rule that it is neutral. K6 protects `.opencode/`, `opencode.json`, and `.cornerstone/`. It does not stop a shell write in a session. It finds the write in the PR. |
 | Eval plan | The golden files of both adapters. A unit test that K6 fails an implementer commit that changes `.opencode/`. Run a rendered G3 workflow once in a private test repo before a release. |
 | Review | 2027-05-16 |
-| Framework decision | D122 |
+| Framework decision | D123 |
