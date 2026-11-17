@@ -5,7 +5,7 @@
 Use this guide to find the cheapest model that passes a role eval. `stone eval` can run more than one
 model and summarize the results by model.
 
-The OpenCode adapter supports role evals only (D112). See the
+The OpenCode adapter is full v1 (D118). `stone eval` runs role evals on it (D112). See the
 [OpenCode adapter](../../framework/adapters/opencode.md) for its support status.
 
 ## Steps
