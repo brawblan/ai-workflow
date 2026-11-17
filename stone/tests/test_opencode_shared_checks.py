@@ -38,9 +38,10 @@ K16 = ".github/workflows/cornerstone-k16.yml"
 PROTECTED_LINE = re.compile(r"^PROTECTED = .*$", re.MULTILINE)
 
 
-def config(harness: str, model: str, profile: str = "single-ticket", extra: str = "") -> str:
+def config(harness: str, model: str, profile: str = "single-ticket", extra: str = "",
+           version: str = "0.8.0") -> str:
     """Return the text of a repo config."""
-    return f"""framework_version: 0.8.0
+    return f"""framework_version: {version}
 harness: {harness}
 model_profile: {model}
 profiles: [{profile}]
@@ -138,14 +139,26 @@ class OpenCodeRenderTest(unittest.TestCase):
         self.assertTrue((on / INSTRUCTION_TEXT).is_file())
         self.assertFalse((off / INSTRUCTION_TEXT).exists())
 
-    def test_trailers_none_writes_neither_k6_nor_the_match_module(self) -> None:
+    def test_trailers_none_writes_no_k6_but_still_writes_the_match_module(self) -> None:
         root, result, log = self.render(extra="commits: {trailers: none}\n")
         self.assertEqual(result.exit_code, 0)
         self.assertFalse((root / K6).exists())
-        self.assertFalse((root / PATH_MATCH).exists())
+        self.assertTrue((root / PATH_MATCH).is_file())
         self.assertIn("warning", log)
         self.assertIn("K6", log)
         self.assertTrue((root / CHANGE_SIZE).is_file())
+
+    def test_k22_runs_with_trailers_none_and_finds_the_match_module(self) -> None:
+        root, _, _ = self.render(
+            extra="protect_instruction_files: true\ncommits: {trailers: none}\n")
+        (root / "AGENTS.md").write_text("# Guide\n\nRun the tests.\n", encoding="utf-8")
+        env = {**os.environ, **GIT_ENV}
+        for args in (["init", "-q", "-b", "main"], ["add", "-A"], ["commit", "-qm", "base"]):
+            subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, env=env)
+        run = subprocess.run([sys.executable, "-B", INSTRUCTION_TEXT], cwd=root,
+                             capture_output=True, text=True, env=env)
+        self.assertNotIn("missing or broken", run.stdout + run.stderr)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
 
     def test_local_delivery_writes_no_workflow(self) -> None:
         root, _, _ = self.render(extra="delivery: local\n")
@@ -193,6 +206,23 @@ class SameNeutralFilesTest(unittest.TestCase):
         self.assertNotEqual(PROTECTED_LINE.search(a).group(0),  # type: ignore[union-attr]
                             PROTECTED_LINE.search(b).group(0))  # type: ignore[union-attr]
         self.assertEqual(PROTECTED_LINE.sub("", a), PROTECTED_LINE.sub("", b))
+
+
+class K25SameWorkflowTest(unittest.TestCase):
+    def test_g3_workflow_with_k25_is_the_same_on_both_adapters(self) -> None:
+        front = (FRAMEWORK / "profiles" / "single-ticket.md").read_text(
+            encoding="utf-8").split("---")[1]
+        self.assertIn("K25", yaml.safe_load(front)["checks"])
+        texts = {}
+        for harness, model in (("claude-code", "claude-5"), ("opencode", "opencode-default")):
+            folder = tempfile.TemporaryDirectory()
+            self.addCleanup(folder.cleanup)
+            root = Path(folder.name) / "repo"
+            render_repo(root, config(harness, model, "single-ticket, full-project",
+                                     version="1.8.0"))
+            texts[harness] = (root / G3).read_text(encoding="utf-8")
+        self.assertIn("K25", texts["opencode"])
+        self.assertEqual(texts["claude-code"], texts["opencode"])
 
 
 class K6EndToEndTest(unittest.TestCase):
