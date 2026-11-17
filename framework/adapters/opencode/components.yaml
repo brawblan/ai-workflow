@@ -107,11 +107,9 @@ components:
 
   - id: check.path-match
     kind: check
-    purpose: Match a path against paths.tests and paths.checks. K6 imports it (D62). No hook uses it here.
+    purpose: Match a path against paths.tests and paths.checks. K6, K22, and the specialists import it (D62). No hook uses it here.
     principle: [P2, P6]
-    when: {check: K6}
-    needs_trailers: true                     # K6 is not rendered with commits.trailers: none, so this is not either
-    provides: path_match                     # stone check tests each glob with this module
+    provides: path_match                     # K6, K22, and stone check-specialists import it, so it always renders                     # stone check tests each glob with this module
     template: lib/path_match.py
     target: .cornerstone/lib/path_match.py
     eval: ""                                 # D99: the unit tests are the eval
@@ -179,6 +177,10 @@ components:
         name: K24 unpinned tools
         when: {check: K24}
         template: workflows/steps/k24-workflows.yml
+      - id: k25
+        name: K25 state machines
+        when: {check: K25}
+        template: workflows/steps/k25-states.yml
       - id: k4
         name: K4 integration tests
         when: {check: K4}

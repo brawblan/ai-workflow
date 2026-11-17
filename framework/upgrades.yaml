@@ -1,6 +1,24 @@
 # The record of each release. `stone upgrade` reads it, and `stone check` validates it.
 # Newest first. Rules and the form: framework/versioning.md.
 versions:
+  - version: 1.8.0
+    kind: minor
+    released: null
+    summary: A repo with harness opencode also gets the shared checks and the G3 workflow (D122). New command stone check-states (K25) warns on a new state type with 3 or more states and no transition table (D121). It is a warning in 1.x.
+    config:
+      added: []
+      renamed: []
+      removed: []
+    files:
+      - {path: .github/workflows/cornerstone-checks.yml, change: changed, note: "A K25 step, as a warning, for each profile with K25 (D121). A repo with harness opencode also gets this file (D122)."}
+      - {path: .cornerstone/lib/path_match.py, change: added, note: "Only with harness opencode: the match module that K6, K22, and the specialists import (D122)."}
+      - {path: .cornerstone/checks/protected_paths.py, change: added, note: "Only with harness opencode: K6, for each profile with K6 (D122)."}
+      - {path: .cornerstone/checks/change_size.py, change: added, note: "Only with harness opencode: K7, for each profile with K7 (D122)."}
+      - {path: .cornerstone/checks/instruction_size.py, change: added, note: "Only with harness opencode: K15, for each profile with K15 (D122)."}
+      - {path: .cornerstone/checks/instruction_text.py, change: added, note: "Only with harness opencode and protect_instruction_files true: K22 (D122)."}
+      - {path: .github/workflows/cornerstone-k16.yml, change: added, note: "Only with harness opencode: K16, for each profile with K16 (D122)."}
+    steps:
+      - "Then run stone render. Commit the generated files alone, with the trailers Role generator and Actor agent."
   - version: 1.7.0
     kind: minor
     released: 2026-11-09

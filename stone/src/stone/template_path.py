@@ -1,4 +1,4 @@
-"""Find the file of a template: in the adapter folder first, then in the shared folder (D120)."""
+"""Find the file of a template: in the adapter folder first, then in the shared folder (D122)."""
 
 from __future__ import annotations
 
