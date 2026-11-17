@@ -1,4 +1,4 @@
-      # K25 warns in 1.x (D120). A new state type with 3 or more states needs a transition table. A Waiver (K25) section passes it.
+      # K25 warns in 1.x (D121). A new state type with 3 or more states needs a transition table. A Waiver (K25) section passes it.
       - name: $step_name
 $gate_if
         env:

@@ -1,4 +1,4 @@
-"""K25: report a new state type that has no transition table (D120)."""
+"""K25: report a new state type that has no transition table (D121)."""
 
 from __future__ import annotations
 
