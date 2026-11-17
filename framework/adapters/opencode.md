@@ -41,7 +41,7 @@ are the only control on a protected path. A later issue adds the checks and the 
 | CI trigger | Workflows `.github/workflows/cornerstone-<profile>-<trigger>.yml` for the label, `ci:issue-opened`, and schedule triggers. Each runs `opencode run --agent <role>-ci` | YAML (GitHub Actions) | partial | Run the role by hand. There is no `ci:dependency-pr` trigger. A role that needs the shell does not run in CI. |
 | Render the role files and the settings | `stone render` writes `.opencode/agents/<role>.md` and merges `opencode.json` | Markdown, JSON | full | none. |
 | Context guard hook (D115) | none | not applicable | none | Watch the context size by hand. Start a new session after a PR. |
-| Token report (`stone usage`, D114) | none | not applicable | none | No `usage.yaml` yet, so `stone usage` stops with an error. `opencode stats` shows some usage data. |
+| Token report (`stone usage`, D114) | [opencode/usage.yaml](opencode/usage.yaml): the session database `~/.local/share/opencode/opencode.db`, read-only, with the parser `sessions` function (D122) | YAML, SQLite | full | `stone usage` reads the input, output (with reasoning), and cache tokens of each call. The cost is an estimate from `rates.yaml` with the peak rules of D116, because OpenCode reports a cost of 0 on the Go plan. A PATH argument names another database file. |
 
 ## Role files
 

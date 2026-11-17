@@ -1,0 +1,12 @@
+# How `stone usage` reads the sessions of this harness (issue #328, D122).
+# The core reads this file and holds no format of its own (P12). The parser opens the session
+# database read-only. One row of `session_v2` is one session. One row of `session_message` with
+# the type `assistant` is one model call. The cost is an estimate in USD from rates.yaml (D116),
+# because this harness reports a cost of 0 on the Go plan.
+
+reader:
+  parser: parsers/opencode.py   # the sessions function reads the database
+  databases:                    # the default session database. '~' is the home folder.
+    - ~/.local/share/opencode/opencode.db
+
+rates: rates.yaml               # the USD token rates of each model, with the peak windows (D116)
