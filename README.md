@@ -106,7 +106,7 @@ The [guides](docs/guides/README.md) cover each situation: a new project, an exis
 migration from another framework, and the daily work after the setup. This section is the short
 version.
 
-You need Python 3.11 or later, `git`, the GitHub CLI (`gh`), and Claude Code. Claude Code or
+You need Python 3.11 or later, `git`, the GitHub CLI (`gh`), and Claude Code or
 OpenCode. Both have a full harness adapter. See the [OpenCode adapter](framework/adapters/opencode.md).
 
 1. Clone this repo and install the CLI:
