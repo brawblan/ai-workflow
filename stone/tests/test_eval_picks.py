@@ -440,6 +440,98 @@ class CheckModelProfilesTest(unittest.TestCase):
         self.assertEqual(found, [])
 
 
+class StalePicksTest(unittest.TestCase):
+    """#306, D124: a pick past its review date, or with a model not in `models`, is a warning."""
+
+    TODAY = dt.date(2026, 12, 1)  # after date 2026-11-01 and before review 2027-02-01
+
+    def profile(self) -> dict:
+        data = valid_profile()
+        data["models"] = ["e", "q"]
+        return data
+
+    def folder(self, tmp: str, data: object) -> Path:
+        framework = Path(tmp) / "framework"
+        models = framework / "adapters" / "h" / "models"
+        models.mkdir(parents=True)
+        (models / "m.yaml").write_text(yaml.safe_dump(data))
+        return framework
+
+    def warnings(self, data: object, today: dt.date | None = None) -> list:
+        with tempfile.TemporaryDirectory() as tmp:
+            framework = self.folder(tmp, data)
+            return framework_check.check_model_picks(Path(tmp), framework, today or self.TODAY)
+
+    def test_current_pick_gives_no_finding(self) -> None:
+        self.assertEqual(self.warnings(self.profile()), [])
+        self.assertEqual(eval_picks.stale_problems(self.profile(), self.TODAY), [])
+
+    def test_pick_past_review_date_warns(self) -> None:
+        found = self.warnings(self.profile(), dt.date(2027, 2, 2))
+        self.assertEqual(len(found), 2)  # economy and quality
+        for finding in found:
+            self.assertIn("review date", finding.message)
+            self.assertIn("m.yaml", finding.path)
+
+    def test_review_date_itself_is_not_stale(self) -> None:
+        self.assertEqual(self.warnings(self.profile(), dt.date(2027, 2, 1)), [])
+
+    def test_pick_with_model_not_in_models_warns(self) -> None:
+        data = self.profile()
+        data["models"] = ["e"]
+        found = self.warnings(data)
+        self.assertEqual(len(found), 1)
+        self.assertIn("recommendations.tester.quality", found[0].message)
+        self.assertIn("not in the models", found[0].message)
+
+    def test_missing_models_list_warns_for_each_pick(self) -> None:
+        data = self.profile()
+        del data["models"]
+        self.assertEqual(len(self.warnings(data)), 2)
+
+    def test_pick_with_invalid_fields_is_skipped(self) -> None:
+        data = self.profile()
+        data["recommendations"]["tester"]["economy"]["trials"] = 1
+        data["models"] = ["q"]
+        found = self.warnings(data, dt.date(2027, 2, 2))
+        self.assertEqual(len(found), 1)  # only the valid quality pick
+        self.assertIn("quality", found[0].message)
+        self.assertNotIn("economy", found[0].message)
+
+    def test_profile_without_recommendations_gives_none(self) -> None:
+        data = self.profile()
+        del data["recommendations"]
+        self.assertEqual(self.warnings(data), [])
+        for bad in (None, [], "text", {"recommendations": []}):
+            self.assertEqual(eval_picks.stale_problems(bad, self.TODAY), [])
+
+    def test_severity_is_warning(self) -> None:
+        data = self.profile()
+        data["models"] = []
+        found = self.warnings(data, dt.date(2027, 2, 2))
+        self.assertTrue(found)
+        self.assertEqual({f.severity for f in found}, {"warning"})
+
+    def test_unreadable_profile_gives_no_picks_finding(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            framework = self.folder(tmp, "a: [\n")
+            self.assertEqual(framework_check.check_model_picks(Path(tmp), framework, self.TODAY), [])
+
+    def test_check_model_profiles_output_is_unchanged(self) -> None:
+        data = self.profile()
+        data["models"] = []  # stale and unlisted, but valid
+        with tempfile.TemporaryDirectory() as tmp:
+            framework = self.folder(tmp, data)
+            self.assertEqual(framework_check.check_model_profiles(Path(tmp), framework), [])
+        data["recommendations"]["tester"]["economy"]["trials"] = 1
+        with tempfile.TemporaryDirectory() as tmp:
+            framework = self.folder(tmp, data)
+            found = framework_check.check_model_profiles(Path(tmp), framework)
+        self.assertEqual(len(found), 1)
+        self.assertEqual(found[0].severity, "error")
+        self.assertIn("trials", found[0].message)
+
+
 class BaselineScenariosTest(unittest.TestCase):
     """The fixes of the review: a model counts only on the scenarios of the baseline."""
 

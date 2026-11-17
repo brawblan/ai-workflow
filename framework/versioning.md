@@ -59,6 +59,19 @@ installed `stone`.
 
 `dev` collects merged work. `main` holds only released code. Do the steps in this order.
 
+0. For each minor release, refresh the model picks (D124). Skip this step for a patch release.
+   1. List the current models of each harness. Use the command in its adapter doc. Compare the
+      list with the `models` of each model profile that has picks.
+   2. If a family that has picks has a new model, run the matrix for that model only. Use the
+      [adapter-refresh](profiles/adapter-refresh.md) profile.
+   3. Run a check eval with 3 trials on each current pick only. If a pick fails the rule of D120,
+      run the full matrix for that role. Do the same if its cost for each passing run grows by
+      more than 2 standard errors.
+   4. Run the full matrix for each stale role. A change to an eval or a template of a role makes
+      its picks stale.
+   5. `stone check` warns about a pick past its review date, and about a pick whose model is not
+      in `models`. A warning does not block the release.
+
 1. On a branch from `dev`, run `python -m unittest discover -s stone/tests`, `stone check`, and
    `stone check-writing --diff origin/dev`. In `indexer/`, run `cargo fmt --check`,
    `cargo clippy --locked --all-targets -- -D warnings`, and `cargo test --locked` (D104).

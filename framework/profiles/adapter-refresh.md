@@ -38,6 +38,8 @@ version (step 10).
 - A vendor changes the published token rates or the peak windows of a model that an adapter
   `rates` file lists. See [Token rates](#token-rates).
 
+- A minor release is near (D124). See [Model picks](#model-picks).
+
 ## Do not use when
 
 - Only the harness software changed (a new CLI flag, a new file path). Edit the harness adapter in a
@@ -69,6 +71,21 @@ version (step 10).
 
 > WARNING: The investigator reads web pages that the framework does not control. Give it no secrets
 > and no write access other than the PR branch (P9, lethal trifecta).
+
+## Model picks
+
+The picks of a model profile (D120) stay current with these triggers (D124). The weekly schedule is
+not used for the picks.
+
+| Trigger | Action |
+| --- | --- |
+| A minor release | List the current models of each harness. If a model family that has picks has a new model, run the matrix for that model only. |
+| A minor release | Run a check eval with 3 trials on each current pick only. If a pick fails the rule of D120, run the full matrix for that role. Do the same if its cost for each passing run grows by more than 2 standard errors. |
+| A change to an eval of a role, or to a template of a role | The picks of that role are stale. The next minor release runs the matrix for that role. |
+| `stone check` warns that a pick is past its review date, or that its model is not in `models` | Run the matrix for that role. |
+
+An eval run needs the plan key, which stays on the owner's computer. No CI job runs it. A human
+changes `defaults.role_models` at G4.
 
 ## Switching vendors
 

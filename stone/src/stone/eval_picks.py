@@ -302,3 +302,35 @@ def problems(data: Any) -> list[str]:
     roles = _role_models(data)
     return [problem for role, value in block.items()
             for problem in _role_problems(str(role), value, roles)]
+
+
+# The freshness of the picks (#306, D124) ----------------------------------------------------
+
+
+def _pick_stale(where: str, pick: dict[str, Any], listed: set[str], today: dt.date) -> list[str]:
+    """The warnings for one valid pick."""
+    found = []
+    if pick["review"] < today:
+        found.append(f"{where} is past its review date {pick['review']}. "
+                     "Run the matrix for this role.")
+    if pick["model"] not in listed:
+        found.append(f"{where} names {pick['model']}, which is not in the models of "
+                     "this profile. Run the matrix for this role, or update models.")
+    return found
+
+
+def stale_problems(data: Any, today: dt.date) -> list[str]:
+    """The warnings for the picks of a loaded model profile. A pick is stale if its review date
+    has passed, or if its model is not in the `models` of the profile. A pick that
+    `problems` rejects is skipped: `stone check` already fails on it."""
+    if not isinstance(data, dict) or not isinstance(data.get("recommendations"), dict):
+        return []
+    models = data.get("models")
+    listed = {str(m) for m in models} if isinstance(models, list) else set()
+    found = []
+    for role, block in data["recommendations"].items():
+        picks = block if isinstance(block, dict) else {}
+        for kind in KINDS:
+            if kind in picks and not pick_problems(picks[kind]):
+                found += _pick_stale(f"recommendations.{role}.{kind}", picks[kind], listed, today)
+    return found

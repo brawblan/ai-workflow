@@ -11,6 +11,10 @@ framework repo, not on a target repo.
 | Gates | G3 (CI checks), G4 (a human approves the PR). G1 and G2 are skipped. |
 | Status | Partly works today. A weekly CI run posts a reminder. You start each role by hand, and you run the evals by hand. |
 
+The model picks of a model profile do not use the weekly reminder. They refresh at each minor release,
+and when a role eval or a role template changes. See
+[Model picks](../../framework/profiles/adapter-refresh.md#model-picks).
+
 If only the harness software changed, for example a new CLI flag, do not use this guide. Edit the
 adapter in a [small change](small-change.md).
 

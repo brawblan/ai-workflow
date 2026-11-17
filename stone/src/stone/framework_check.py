@@ -681,6 +681,21 @@ def check_model_profiles(root: Path, framework: Path) -> list[Finding]:
     return findings
 
 
+def check_model_picks(root: Path, framework: Path, today: dt.date | None = None) -> list[Finding]:
+    """Warn about a pick past its review date, or with a model not in `models` (#306, D124)."""
+    today = today or dt.date.today()
+    findings = []
+    for file in sorted((framework / "adapters").glob("*/models/*.yaml")):
+        label = str(file.relative_to(root)) if file.is_relative_to(root) else str(file)
+        try:
+            found = eval_picks.stale_problems(yaml.safe_load(file.read_text(encoding="utf-8")),
+                                              today)
+        except (OSError, yaml.YAMLError):
+            continue  # check_model_profiles reports an unreadable file
+        findings += [Finding(label, 1, CHECK, message, "warning") for message in found]
+    return findings
+
+
 def check_version(root: Path) -> list[Finding]:
     """Warn if framework_version in the repo config is not the version of the installed stone."""
     path = root / ".cornerstone" / "config.yaml"
@@ -717,5 +732,6 @@ def run(root: Path, framework: Path | None = None, links: str = "default") -> li
             + check_config(root, framework) + check_overrides(root, framework)
             + check_components(root, framework)
             + check_upgrades(root, framework) + check_eval_rates(root, framework)
-            + check_model_profiles(root, framework) + check_version(root)
+            + check_model_profiles(root, framework) + check_model_picks(root, framework)
+            + check_version(root)
             + personas_check.run(root) + specs.check(root))

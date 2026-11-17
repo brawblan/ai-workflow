@@ -101,7 +101,10 @@ only its model profile. Use [model-profile-template.yaml](model-profile-template
    writes them into the block. A pick has the model, the pass rate, the cost for each passing run, and the trials (3 or more). It also has
    the eval version, the date, and a review date. A pick never changes `defaults.role_models`.
    A change of that key needs a human decision at G4, in its own PR. `stone check` validates the
-   block. A new profile for a new model family has `status: proposed`.
+   block. A new profile for a new model family has `status: proposed`. `stone check` warns when a pick
+   is past its review date, or when its model is not in `models` (D124).
+6. The harness adapter doc gives the command that lists the current models of the harness (D124).
+   The release checklist uses it to find a new model.
 
 Path: `framework/adapters/<harness>/models/<model-family>.yaml`. All vendor adapters and model
 profiles stay in the repo. A target repo selects one of each in its config.

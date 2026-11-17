@@ -265,6 +265,11 @@ each scenario. The picks change no role model. The candidate models come from
 | --- | --- | --- | --- |
 | None yet | The model profile has no `recommendations` block. | The model profile has no `recommendations` block. | None |
 
+### List the current models (D124)
+
+Run `opencode models`. It prints one `provider/model` ID for each line. Compare the list with the
+`models` of the model profile.
+
 ## Decision record
 
 | Field | Value |
