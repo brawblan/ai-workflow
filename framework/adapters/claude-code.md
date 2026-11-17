@@ -327,6 +327,16 @@ each scenario. The picks change no role model.
 | --- | --- | --- | --- |
 | None yet | The model profile has no `recommendations` block. | The model profile has no `recommendations` block. | None |
 
+### List the current models (D124)
+
+The `claude` CLI has no command that lists models. Use one of these:
+
+- `GET https://api.anthropic.com/v1/models` (the Models API). It needs an API key.
+- The `/model` picker in a session.
+
+Compare the list with the `models` of the model profile. `[TO CONFIRM]` the exact request on the
+next minor release: this adapter doc has no run of it yet.
+
 ## Modes
 
 | Driver | How it runs in Claude Code |

@@ -47,6 +47,7 @@ component with no result file has `models_tested: []`.
 | Trigger | Action |
 | --- | --- |
 | `review_by` date passes | Review the component (procedure below). |
+| A minor release, or a change to the eval or the template of a role | Refresh the model picks (D124). See [Model picks](profiles/adapter-refresh.md#model-picks). |
 | The model changes for a role | Run all evals for components that the role uses. |
 | A vendor releases a new model, or a model profile changes | Run the [adapter-refresh](profiles/adapter-refresh.md) profile. |
 | The harness version changes in a major way | Run all evals. |
