@@ -31,6 +31,8 @@ idioms:
     affects: [<component ids or kinds>]
     eval: <evals/<id>/ or empty>   # empty = not measured yet
 
+quality_cost_ceiling:              # optional (D125). USD for each passing run. Number of 0 or more. If unset, the quality limit is the baseline cost.
+
 recommendations:                   # optional (D120). The picks of `stone eval --summary ... --by model --picks`.
   <role>:                          # a role of defaults.role_models
     economy:                       # the lowest cost for each passing run, with a pass rate near the baseline

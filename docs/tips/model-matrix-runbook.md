@@ -37,7 +37,8 @@ Kimi cap on Go is $15 each month. Check your usage page before and after.
    start later. Weekends are always off-peak.
 2. Add rates for `beam-free` to `framework/adapters/opencode/rates.yaml` if you know them (zero if
    it is free). Without rates, its cost is "—". Then no model can get a quality pick, because the
-   rule needs the baseline cost. Do this in its own commit.
+   rule needs the baseline cost. Do this in its own commit. A baseline with a cost of 0 has the
+   same effect on quality: see "Read the picks".
 3. Make a private venv and a fresh worktree from `dev`. The Mac has no `python` command (see the
    eval notes), so put the venv first on PATH.
 
@@ -85,7 +86,10 @@ cd /Users/brandonblankenstein/Repos/ai-workflow-matrix && export PATH=/tmp/v-mat
 - Add `--json` for the data of each row.
 - The rule (D120): economy is the lowest cost for each passing run. The pass rate must be within 1
   standard error of the difference from the baseline. Quality is the highest pass rate, if the cost
-  for each passing run is not above the baseline. If no model meets a rule, the pick is the
+  for each passing run is not above the limit. The limit is `quality_cost_ceiling` of the model
+  profile (D125), in USD for each passing run. If the profile has no ceiling, the limit is the
+  baseline cost. A free baseline (cost 0) needs a ceiling: the owner sets the value from the
+  matrix results, then runs the same command again. If no model meets a rule, the pick is the
   baseline.
 - Read each failed run of a `with` variant before you trust a low pass rate. In past evals, most
   failures were grader or fixture errors. If a grader is wrong, fix it, then grade the kept
