@@ -15,6 +15,7 @@ import io
 import json
 import os
 import py_compile
+import re
 import shutil
 import subprocess
 import sys
@@ -396,6 +397,36 @@ class EvalValidTest(unittest.TestCase):
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(out):
             code = cli.main(["eval", "role.tester", "--root", str(REPO), "--check-only"])
         self.assertEqual(code, 0, out.getvalue())
+
+
+class T2ReportPatternTest(unittest.TestCase):
+    """The T2 `@report` check needs "discount", "fail" and a disagreement word, on any lines."""
+
+    @staticmethod
+    def matches(report: str) -> bool:
+        item = next(i for i in SCENARIOS["T2"]["expect"]
+                    if i["check"] == "matches" and i["path"] == "@report")
+        return bool(re.search(item["pattern"], report, re.M | re.I))
+
+    def test_t2_report_on_different_lines_matches(self) -> None:
+        report = ("## Result\nThe test test_discount fails on the code.\n\n"
+                  "## Disagreement\nThe ticket says 10 percent. The code does not match it.\n")
+        self.assertTrue(self.matches(report))
+
+    def test_t2_report_matches_each_disagreement_word(self) -> None:
+        for word in ("disagree", "mismatch", "conflict", "contradict", "instead of",
+                     "rather than", "does not match", "not match"):
+            with self.subTest(word):
+                self.assertTrue(self.matches(f"Discount test: it fails.\nThe code and ticket {word}."))
+
+    def test_t2_report_without_a_disagreement_word_fails(self) -> None:
+        self.assertFalse(self.matches("The discount test fails.\nThe count is 1 failed test."))
+
+    def test_t2_report_without_fail_fails(self) -> None:
+        self.assertFalse(self.matches("The discount test passes.\nThe ticket and the code disagree."))
+
+    def test_t2_report_without_discount_fails(self) -> None:
+        self.assertFalse(self.matches("A test fails.\nThe ticket and the code disagree."))
 
 
 class FixturesTest(GraderCase):

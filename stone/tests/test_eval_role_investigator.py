@@ -97,6 +97,22 @@ class InvestigatorCase(unittest.TestCase):
             ("confidence section only", False,
              topic + "## Confidence\nHigh, src/notes.py:20 is the line.")], in_file=True)
 
+    def test_finding_form_accepts_a_severity_section_with_a_rating(self) -> None:
+        topic = f"## Cause\nalpha is the cause at {LOC}\n\n"
+        self.expect("finding_form", {"path": "docs/reports/R.md", "topic": "alpha"}, [
+            ("severity section, high", True, topic + "## Severity\nHigh"),
+            ("severity field with rating", True, topic + "## Severity: medium\nThe fix is small."),
+            ("severity section, P1", True, topic + "## Severity\nP1"),
+            ("severity section, sev 2", True, topic + "## Severity\nSev 2"),
+            ("severity section, minor", True, topic + "## Severity\nMinor"),
+            ("severity section, none", False, topic + "## Severity\nSeverity: none"),
+            ("severity section, no rating word", False, topic + "## Severity\nTo be decided."),
+            ("no file and line in the topic section", False,
+             "## Cause\nalpha is the cause\n\n## Severity\nHigh"),
+            ("no severity section", False, topic + "## Evidence\nThe test fails."),
+            ("rating in a section that is not Severity", False, topic + "## Impact\nHigh")],
+            in_file=True)
+
     def test_finding_form_reads_only_the_file(self) -> None:
         args = {"path": "docs/reports/R.md", "topic": "alpha"}
         passed, detail = self.grade("finding_form", args, f"## F\nalpha high {LOC}")
