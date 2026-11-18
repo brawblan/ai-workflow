@@ -159,6 +159,25 @@ same picks. A value of 0.003 loses the planner pick of Haiku (0.0041 for each pa
 `deepseek-v4-pro` rows (0.011 to 0.04) and the `kimi-k3.1-pro` rows (0.076 to 0.11) cost more than the
 best new model in every role. Review the value when the `deepseek-v4-pro` tester and planner runs are in.
 
+### Ceiling for each role
+
+The schema allows one ceiling for the whole profile (D125). It has no override for a role. A ceiling
+for each role needs a new decision and a change of `eval_picks.py`, so it is out of scope here.
+
+If a later decision adds it, the data gives these lowest values that keep the best pick:
+
+| Role | Lowest ceiling | Pick |
+| --- | --- | --- |
+| Shaper | 0 | `beam-free` |
+| Planner | 0.0041 | `claude-haiku-5-5` |
+| Implementer | 0.0018 | `claude-haiku-5-5` |
+| Tester | 0.0025 | `claude-haiku-5-5` |
+| Reviewer | 0.0012 | `gpt-6-luna` |
+| Investigator | 0.0026 | `claude-haiku-5-5` |
+
+With the global value of 0.005, the picks are the same as with these values. A ceiling for each role
+adds no gain today. It gives a margin only if the cost of a role changes.
+
 ## 6. Proposed `recommendations` block
 
 The rules are D120 and D125 with a ceiling of 0.005. The `review` date is a proposal. The block is not in
