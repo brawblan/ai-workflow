@@ -577,13 +577,22 @@ def _trigger_post(run: Run, ws: Workspace, workflow: dict[str, Any] | None, stru
 # Checks ------------------------------------------------------------------------------------
 
 
+# The code index (`stone-index`) makes these files in the workspace. They are a side effect of a
+# read, not a change of the role, so a check does not count them.
+INDEX_FILES = (".cornerstone/index.db", ".cornerstone/index.db-shm", ".cornerstone/index.db-wal")
+
+
 def _changed(ws: Workspace) -> list[str]:
-    """Return each path that the run added, changed, or removed. A rename gives both paths."""
+    """Return each path that the run added, changed, or removed. A rename gives both paths.
+
+    The files of the code index are not in the list (issue #305).
+    """
     committed = _git(ws.path, "diff", "--name-only", "--no-renames", "-z", ws.setup, "HEAD")
     # No strip: the first entry can start with a space (" M path" is a change not in the index).
     status = _git(ws.path, "status", "--porcelain=v1", "-z", "--no-renames",
                   "--untracked-files=all", strip=False)
-    return sorted(set(committed.split("\0") + [item[3:] for item in status.split("\0")]) - {""})
+    paths = set(committed.split("\0") + [item[3:] for item in status.split("\0")])
+    return sorted(paths - {""} - set(INDEX_FILES))
 
 
 def under(path: str, prefixes: list[str]) -> bool:
