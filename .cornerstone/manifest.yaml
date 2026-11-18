@@ -134,8 +134,11 @@ components:
     eval: evals/role-implementer/
     models_tested:
       - claude-sonnet-5-5
+      - opencode-go/claude-haiku-5-5
+      - opencode-go/deepseek-v4-pro
       - opencode-go/deepseek-v4.1-flash
       - opencode-go/glm-5.3-flash
+      - opencode-go/gpt-6-luna
     added: "2026-10-17"
     review_by: "2027-04-17"
     files:
@@ -152,6 +155,9 @@ components:
     eval: evals/role-reviewer/
     models_tested:
       - claude-opus-5-5
+      - opencode-go/claude-haiku-5-5
+      - opencode-go/deepseek-v4-pro
+      - opencode-go/gpt-6-luna
     added: "2026-10-17"
     review_by: "2027-04-17"
     files:
@@ -167,6 +173,9 @@ components:
     eval: evals/role-shaper/
     models_tested:
       - claude-opus-5-5
+      - opencode-go/claude-haiku-5-5
+      - opencode-go/deepseek-v4-pro
+      - opencode-go/gpt-6-luna
     added: "2026-10-17"
     review_by: "2027-04-17"
     files:
@@ -183,8 +192,10 @@ components:
     models_tested:
       - claude-opus-5-5
       - claude-sonnet-5-5
+      - opencode-go/claude-haiku-5-5
       - opencode-go/deepseek-v4.1-flash
       - opencode-go/glm-5.3-flash
+      - opencode-go/gpt-6-luna
     added: "2026-10-17"
     review_by: "2027-04-17"
     files:

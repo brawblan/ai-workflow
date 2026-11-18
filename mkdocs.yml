@@ -134,6 +134,7 @@ nav:
   - Research:
       - Evidence dossier: docs/research/dossier.md
       - OpenCode Go models: docs/research/opencode-go-models.md
+      - Premium model matrix: docs/research/premium-model-matrix.md
   - Tips:
       - docs/tips/README.md
       - Spec-driven development: docs/tips/spec-driven-development.md
