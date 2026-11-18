@@ -16,6 +16,7 @@ UTC = dt.timezone.utc
 REAL = Path(__file__).resolve().parents[2] / "framework" / "adapters" / "opencode" / "rates.yaml"
 DEEP = "opencode-go/deepseek-v4.1-flash"
 GLM = "opencode-go/glm-5.3-flash"
+NEW_MODELS = ("opencode-go/deepseek-v4-pro", "opencode-go/gpt-6-luna", "opencode-go/claude-haiku-5-5")
 MON = dt.datetime(2026, 11, 9, tzinfo=UTC)  # a Monday
 SAT = dt.datetime(2026, 11, 14, tzinfo=UTC)  # a Saturday
 
@@ -38,12 +39,24 @@ def run(variant: str = "with", **usage) -> evals.Run:
 
 
 class RatesFile(unittest.TestCase):
-    def test_real_file_is_valid_and_has_four_models(self) -> None:
+    def test_real_file_is_valid_and_has_seven_models(self) -> None:
         data = rates_data()
         self.assertEqual([], eval_rates.problems(data))
-        self.assertEqual({GLM, DEEP, "opencode-go/kimi-k3.1-pro", "opencode-go/beam-free"},
+        self.assertEqual({GLM, DEEP, "opencode-go/kimi-k3.1-pro", "opencode-go/beam-free", *NEW_MODELS},
                          set(data["models"]))
+        self.assertEqual(7, len(data["models"]))
         self.assertEqual(dt.date(2026, 11, 9), data["read"])
+
+    def test_the_three_models_of_issue_346_have_numeric_rates(self) -> None:
+        models = rates_data()["models"]
+        for name in NEW_MODELS:
+            rates = models[name]["rates"]
+            for key in ("input", "output", "cache_read", "cache_write"):
+                self.assertIn(key, rates, f"{name} {key}")
+                self.assertIsInstance(rates[key], (int, float), f"{name} {key}")
+                self.assertNotIsInstance(rates[key], bool, f"{name} {key}")
+        peak = models["opencode-go/deepseek-v4-pro"]["peak"]
+        self.assertTrue(peak["windows"])
 
     def test_the_adapter_names_the_rates_file(self) -> None:
         folder = REAL.parent.parent
