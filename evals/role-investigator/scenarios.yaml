@@ -72,4 +72,4 @@ scenarios:
       - {check: matches, path: docs/reports/BUG-33.md, pattern: "confiden", kind: contract}
       - {check: matches, path: docs/reports/BUG-33.md, pattern: "recommend", kind: contract}
       - {check: matches, path: docs/reports/BUG-33.md, kind: contract,
-         pattern: "(not|n't) (check|verif|test|run|look|review|cover|inspect|examin)|unchecked|unverified|out of scope|not in scope|limitation"}
+         pattern: "(not|n't) (check|verif|test|run|look|review|cover|inspect|examin)|unchecked|unverified|no [^.\\n]{0,60} (was|were) (checked|verified|examined|inspected)|out of scope|not in scope|limitation"}
