@@ -25,6 +25,9 @@ _S = r"(critical|blocker|blocking|high|major|medium|moderate)\b"
 SERIOUS = re.compile(rf"\b{_S}", re.I)
 LOCATION = re.compile(r"\.py\S*:\d+|\.py\W{0,4}(lines?|L)\s*\d+|\blines?\s+\d+|#L\d+|\bL\d+\b",
                       re.I)
+# A line range after the file name, such as "tests/test_notes.py` (`:18-23`)". Only finding_form
+# uses it: no_finding keeps the strict pattern, so a wider pattern does not add findings there.
+FILE_THEN_LINE = re.compile(r"\.py\b[^\n]{0,120}?:\d+", re.I)
 # Words that rate the review or deny a finding, not a finding: "Confidence: high", "risk is
 # low", "no high or medium findings", "Severity: none".
 NOT_FINDING = re.compile(
@@ -63,7 +66,8 @@ def finding_form(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
     hits = _matching([args["topic"]])
     if not hits:
         return False, "no section names the topic"
-    good = [s for s in hits if SEVERITY.search(s) and LOCATION.search(s)]
+    good = [s for s in hits
+            if SEVERITY.search(s) and (LOCATION.search(s) or FILE_THEN_LINE.search(s))]
     if good:
         return True, "severity and location: " + " ".join(good[0].split())[:160]
     return False, (f"{len(hits)} section(s) name the topic, none with a severity and a "

@@ -27,6 +27,12 @@ LOCATION = re.compile(r"\.py\S*:\d+|\.py\W{0,4}(lines?|L)\s*\d+|\blines?\s+\d+|#
 # section above names, at the same file and line.
 FILE_LINE = re.compile(r"[\w./-]+\.py:\d+")
 RATING = re.compile(r"^\W*confiden", re.I)  # "Confidence: high" rates the report, not a finding
+# A section "## Severity" with a rating gives the severity of the report. The file and line of the
+# finding can be in a section above it, as the role contract allows: the file and line, the
+# evidence, and the severity.
+SEVERITY_HEAD = re.compile(r"^\W*severity\b", re.I)
+SEVERITY_LEVEL = re.compile(r"\b(critical|blocker|blocking|high|major|medium|moderate|low|minor|"
+                            r"P[0-3]|sev\s*\d)\b", re.I)
 
 
 def _sections(text: str) -> list[str]:
@@ -66,7 +72,8 @@ def finding(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
 
 def finding_form(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
     """A section of the file `path` that matches `topic` gives a severity and a file and line, or
-    another section gives a severity at the same file and line."""
+    another section gives a severity at the same file and line, or the section gives a file and
+    line and a "Severity" section gives a rating."""
     if not (workspace / args["path"]).is_file():
         return False, f"no file {args['path']}"
     hits = _matching(workspace, args, [args["topic"]])
@@ -76,6 +83,11 @@ def finding_form(workspace: Path, args: dict[str, Any]) -> tuple[bool, str]:
     places = {m for s in hits for m in FILE_LINE.findall(s)}
     good += [s for s in _matching(workspace, args, [SEVERITY.pattern])
              if places & set(FILE_LINE.findall(s)) and not RATING.match(s)]
+    located = [s for s in hits if LOCATION.search(s)]
+    rated = [s for s in _matching(workspace, args, [SEVERITY.pattern])
+             if SEVERITY_HEAD.match(s.lstrip("#*-| ")) and SEVERITY_LEVEL.search(s)]
+    if not good and located and rated:
+        good = located
     if good:
         return True, "severity and location: " + " ".join(good[0].split())[:160]
     return False, (f"{len(hits)} section(s) name the topic, none with a severity and a "

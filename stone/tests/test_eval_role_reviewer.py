@@ -87,6 +87,29 @@ class ReviewerCase(unittest.TestCase):
             ("form in other section", False, f"## F\nalpha\n## G\nhigh {loc}"),
             ("no topic", False, f"## F\nbeta high {loc}")])
 
+    def test_finding_form_accepts_a_line_range_after_the_file_name(self) -> None:
+        near = "## F\nMedium: alpha. `tests/test_notes.py` \u2014 the only test (`:18-23`)"
+        far_text = "x" * 130
+        self.expect("finding_form", {"topic": "alpha"}, [
+            ("line range after the file name", True, near),
+            ("line after the file name", True, "## F\nHigh: alpha in `src/notes.py` (`:18`)"),
+            ("no line number", False, "## F\nMedium: alpha in `tests/test_notes.py`"),
+            ("line number far from the file name", False,
+             f"## F\nMedium: alpha in `tests/test_notes.py` {far_text} :18"),
+            ("line number on another line", False,
+             "## F\nMedium: alpha in `tests/test_notes.py`\nThe range is `:18-23`."),
+            ("line range but no severity", False,
+             "## F\nalpha. `tests/test_notes.py` \u2014 the only test (`:18-23`)")])
+
+    def test_no_finding_keeps_the_strict_location_pattern(self) -> None:
+        for label, expected, report in [
+                ("medium, file name and a loose line", True,
+                 "## Medium\n`tests/test_notes.py` \u2014 the only test (`:18`)"),
+                ("medium, strict location", False, "## Medium\nsrc/notes.py:18")]:
+            with self.subTest(label):
+                passed, detail = self.grade("no_finding", {}, report)
+                self.assertEqual(passed, expected, detail)
+
     def test_finding_form_evidence_field(self) -> None:
         report = "**1. Major: scope drift (`src/notes.py:20-22`)**\n\n- **Evidence:** adds `def clear(self)`."
         self.assertTrue(self.grade("finding_form", check_args("R2", "finding_form"), report)[0])

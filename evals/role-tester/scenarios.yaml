@@ -43,9 +43,10 @@ scenarios:
     expect:
       - {check: unchanged, paths: [src/]}
       - {check: grader, name: passes_with_patch, patch: fixtures/prices-fix.diff}
-      # The report names the discount failure on one line. The role commits the failing test
-      # and reports the disagreement (D42).
-      - {check: matches, path: "@report", pattern: "discount[^\\n]*\\bfail|\\bfail[^\\n]*discount"}
+      # The report names the discount failure and the disagreement between the ticket and the
+      # code. The words can be on different lines. The role commits the failing test and reports
+      # the disagreement (D42).
+      - {check: matches, path: "@report", pattern: "(?is)(?=.*discount)(?=.*\\bfail)(?=.*(disagree|mismatch|conflict|contradict|instead of|rather than|does not match|not match))"}
       - {check: commit_trailer, trailer: "Role: tester", kind: contract}
 
   - id: T3
