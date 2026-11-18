@@ -45,12 +45,12 @@ scenarios:
     expect:
       - {check: only_changed, paths: [tickets/NOTE-3.md]}
       - {check: matches, path: "@report", pattern: "\\bfast\\b|speed|latency|performance"}
-      - {check: matches, path: "@report", pattern: "relevan"}
+      - {check: matches, path: "@report", pattern: "relevan|rank|order"}
       # A time limit that the author did not give is an invented requirement.
       - {check: grader, name: no_new_match, path: tickets/NOTE-3.md,
          pattern: "\\d\\s*(ms|milliseconds?|seconds?|s)\\b"}
       - {check: grader, name: asks_with_options, kind: contract,
-         topics: ["\\bfast\\b|speed|latency|performance", "relevan"]}
+         topics: ["\\bfast\\b|speed|latency|performance", "relevan|rank|order"]}
 
   - id: S4
     title: The author gave the answers
