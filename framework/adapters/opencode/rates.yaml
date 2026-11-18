@@ -22,3 +22,19 @@ models:
         - {weekdays: [mon, tue, wed, thu, fri], hours: [6, 7, 8, 9]}
   opencode-go/kimi-k3.1-pro:
     rates: {input: 2.00, output: 10.00, cache_read: 0.20, cache_write: 2.00}
+  # Issue #346. Source: the models.dev catalog (provider opencode-go), read 2026-11-18. It agrees with
+  # the Go docs table of the research file (docs/research/opencode-go-models.md, read 2026-11-09).
+  # The stone rate file has no context tiers. Above 100K tokens of context, claude-haiku-5-5 costs
+  # 0.50 / 2.50 / 0.05 / 0.625, and above 272K tokens, gpt-6-luna costs 0.20 / 0.75 / 0.02 / 0.25.
+  # The role evals stay under these sizes, so the base rates apply.
+  opencode-go/deepseek-v4-pro:
+    rates: {input: 0.66, output: 1.98, cache_read: 0.022, cache_write: 0}
+    peak:   # The docs give 0.66 to 1.32 and 1.98 to 3.96. The peak cache_read is 2 times the base (an inference, as for the flash model).
+      rates: {input: 1.32, output: 3.96, cache_read: 0.044, cache_write: 0}
+      windows:
+        - {weekdays: [mon, tue, wed, thu, fri], hours: [1, 2, 3]}
+        - {weekdays: [mon, tue, wed, thu, fri], hours: [6, 7, 8, 9]}
+  opencode-go/gpt-6-luna:
+    rates: {input: 0.10, output: 0.50, cache_read: 0.01, cache_write: 0.125}
+  opencode-go/claude-haiku-5-5:
+    rates: {input: 0.10, output: 0.50, cache_read: 0.01, cache_write: 0.125}
