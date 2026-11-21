@@ -766,7 +766,7 @@ class RenderTest(unittest.TestCase):
                 self.render_log(version)
                 install = self.step("Install stone")
                 self.assertEqual(install["env"]["STONE_REF"], f"v{version}")
-                self.assertIn("git+https://github.com/brawblan/ai-workflow@${STONE_REF}"
+                self.assertIn("git+https://github.com/brawblan/cornerstone@${STONE_REF}"
                               "#subdirectory=stone", install["run"])
                 self.assertNotIn("$framework_version", self.workflow_text())
                 self.assertNotIn("$stone_ref", self.workflow_text())

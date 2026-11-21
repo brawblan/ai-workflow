@@ -43,7 +43,7 @@ components:
     review_by: "2027-04-18"
     files:
       - .github/workflows/cornerstone-checks.yml
-    hash: 0c39227dd50565ee1090fd2870d599bfb3fe65afaf2ff8c9b4ff853303a89f0a
+    hash: a1605553124310f46cff4aa09169834447069aef4ad208910bb6bfdb744e515c
   - id: hook.context-guard
     kind: hook
     purpose: Tell the agent when the session context passes the limit, and after it opens a PR.

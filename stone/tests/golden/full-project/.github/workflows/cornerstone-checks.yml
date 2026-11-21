@@ -58,7 +58,7 @@ jobs:
           "${RUNNER_TEMP}/stone/bin/pip" install --quiet --require-hashes --only-binary :all: \
             -r "${RUNNER_TEMP}/stone-requirements.txt"
           "${RUNNER_TEMP}/stone/bin/pip" install --quiet --no-deps --no-build-isolation \
-            "cornerstone-stone @ git+https://github.com/brawblan/ai-workflow@${STONE_REF}#subdirectory=stone"
+            "cornerstone-stone @ git+https://github.com/brawblan/cornerstone@${STONE_REF}#subdirectory=stone"
 
       # K14 blocks (D45, D49). The PR body needs the Evidence, Decision log, Review findings, and Confidence sections.
       - name: K14 PR evidence
