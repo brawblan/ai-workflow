@@ -11,7 +11,7 @@ CLI writes all other files. Do not write role files, hooks, or CI workflows by h
 
 ## 0. Find the framework and the CLI
 
-1. Find a local clone of `brawblan/ai-workflow`. Ask the user for the path if you cannot find it.
+1. Find a local clone of `brawblan/cornerstone`. Ask the user for the path if you cannot find it.
    If there is no clone, ask before you clone it.
 2. Use the framework at the tag that the repo config pins (`framework_version`). For a new config,
    use the latest tag, or `main` if the user says so.
