@@ -22,7 +22,7 @@ Issue #112, Decision [D79](../../framework/README.md#decisions). Date of the rev
 
 ## Findings
 
-A run link is `https://github.com/brawblan/ai-workflow/actions/runs/<run>`.
+A run link is `https://github.com/brawblan/cornerstone/actions/runs/<run>`.
 
 | PR | Check | Class | Cause | Run |
 | --- | --- | --- | --- | --- |

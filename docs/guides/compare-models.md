@@ -52,5 +52,5 @@ When the plan page changes, update the rates and the read date in `rates.yaml`. 
 The [first matrix](../reports/2026-11-09-opencode-role-eval-costs.md) had one trial for each cell and
 saturated scenarios, so it cannot rank the models yet.
 
-The model picks come later in [#305](https://github.com/brawblan/ai-workflow/issues/305) and
-[#306](https://github.com/brawblan/ai-workflow/issues/306).
+The model picks come later in [#305](https://github.com/brawblan/cornerstone/issues/305) and
+[#306](https://github.com/brawblan/cornerstone/issues/306).

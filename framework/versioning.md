@@ -1,7 +1,7 @@
 # Versioning and releases
 
 Cornerstone uses version numbers in the form `X.Y.Z`. A release is a git tag `vX.Y.Z` of
-`brawblan/ai-workflow`. A repo sets `framework_version` in its [repo config](customization.md) to
+`brawblan/cornerstone`. A repo sets `framework_version` in its [repo config](customization.md) to
 the tag that it uses. It sets `framework_commit` to the commit of that tag. The G3 workflow
 installs `stone` from that commit, or from the tag if the key is not set (D92).
 

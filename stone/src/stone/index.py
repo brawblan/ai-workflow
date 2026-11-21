@@ -9,7 +9,7 @@ import sys
 from stone import __version__
 
 BINARY = "stone-index"
-REPO_URL = "https://github.com/brawblan/ai-workflow"
+REPO_URL = "https://github.com/brawblan/cornerstone"
 
 
 def install_help() -> str:

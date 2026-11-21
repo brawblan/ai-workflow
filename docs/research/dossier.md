@@ -201,7 +201,7 @@ the workflow profiles where it applies, and the framework principle that it supp
 | 9 | Controlled language such as ASD-STE100 removes ambiguity [S1] **against** explicit text has limited, model-tied effects [S1] [S4]. | STE applies to human-facing text, where the reader is a person. Agent-facing text uses STE only where an eval shows a gain. Review time, rework, and a quarterly blind A/B decide if STE stays. See [writing.md](../../framework/writing.md). |
 | 10 | Role-based frameworks give agents personas such as analyst or product manager [S30] **against** a persona in a prompt does not improve results [S33]. | Personas describe the users of the product, not the agents. Roles stay plain jobs with instructions, tools, and permissions. See [workflow-model.md](../../framework/workflow-model.md#personas). |
 
-## 3. Gap analysis of this repo (brawblan/ai-workflow, v0.2.1)
+## 3. Gap analysis of this repo (brawblan/cornerstone, v0.2.1)
 
 | Current item | Maps to framework stage | Gap |
 | --- | --- | --- |

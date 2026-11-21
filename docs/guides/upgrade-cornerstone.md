@@ -7,7 +7,7 @@ For what a patch, minor, or major version means, see [Versioning](../../framewor
 
 ## Before you start
 
-1. Update your clone of `brawblan/ai-workflow` to the tag that you want, and install `stone` from
+1. Update your clone of `brawblan/cornerstone` to the tag that you want, and install `stone` from
    it: `pip install <clone>/stone`.
 2. Make a branch: `git switch -c chore/cornerstone-upgrade`.
 3. Run `stone check --framework <clone>/framework`. Fix each error first. Ignore a warning that says

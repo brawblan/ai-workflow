@@ -13,9 +13,9 @@ me, the owner: it keeps all my devices on the same version. Git is the source of
 
 ```mermaid
 flowchart LR
-  GH[(GitHub: brawblan/ai-workflow)]
+  GH[(GitHub: brawblan/cornerstone)]
   subgraph Device[Each of my devices]
-    Clone[~/Repos/ai-workflow] -- symlinks --> Cfg[~/.claude/CLAUDE.md, AGENTS.md, settings.json]
+    Clone[~/Repos/cornerstone] -- symlinks --> Cfg[~/.claude/CLAUDE.md, AGENTS.md, settings.json]
     Plugin[cornerstone plugin]
   end
   Clone -- git push --> GH
@@ -32,13 +32,13 @@ needs only the clone and `install.sh`.
 1. Clone the repo:
 
    ```bash
-   git clone https://github.com/brawblan/ai-workflow.git ~/Repos/ai-workflow
+   git clone https://github.com/brawblan/cornerstone.git ~/Repos/cornerstone
    ```
 
 2. Link the global files. The script backs up each file that it replaces.
 
    ```bash
-   ~/Repos/ai-workflow/install.sh
+   ~/Repos/cornerstone/install.sh
    ```
 
 3. Start Claude Code. It reads the marketplace from the linked `settings.json`.
@@ -50,7 +50,7 @@ needs only the clone and `install.sh`.
 
 ## Change the workflow
 
-1. Edit the files in `~/Repos/ai-workflow`.
+1. Edit the files in `~/Repos/cornerstone`.
 2. If you changed a skill, increase `version` in
    [`plugins/cornerstone/.claude-plugin/plugin.json`](../plugins/cornerstone/.claude-plugin/plugin.json).
 3. Run `claude plugin validate .` from the repo root.
@@ -60,7 +60,7 @@ needs only the clone and `install.sh`.
 
 ## Get changes on another device
 
-1. Run `git -C ~/Repos/ai-workflow pull`.
+1. Run `git -C ~/Repos/cornerstone pull`.
 2. In Claude Code, run `/plugin marketplace update brawblan`.
 3. Restart Claude Code.
 

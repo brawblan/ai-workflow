@@ -24,8 +24,8 @@ Use this guide when a repo has code but no agent framework. A repo with only an 
 1. Clone this repo and install the CLI:
 
    ```bash
-   git clone https://github.com/brawblan/ai-workflow.git ~/Repos/ai-workflow
-   pip install ~/Repos/ai-workflow/stone
+   git clone https://github.com/brawblan/cornerstone.git ~/Repos/cornerstone
+   pip install ~/Repos/cornerstone/stone
    ```
 
 2. Install the `cornerstone` plugin. See the [install steps](../../README.md#install-the-plugin-for-claude-code).

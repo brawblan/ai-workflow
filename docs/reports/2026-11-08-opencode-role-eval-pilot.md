@@ -1,7 +1,7 @@
 # Pilot of the role evals on OpenCode Go models
 
-Issue [#302](https://github.com/brawblan/ai-workflow/issues/302), part of
-[#301](https://github.com/brawblan/ai-workflow/issues/301). Date: 2026-11-08. Profile: `spike`.
+Issue [#302](https://github.com/brawblan/cornerstone/issues/302), part of
+[#301](https://github.com/brawblan/cornerstone/issues/301). Date: 2026-11-08. Profile: `spike`.
 
 ## Result
 

@@ -43,13 +43,13 @@ pip install ./stone
 ### uv
 
 ```bash
-uv tool install "git+https://github.com/brawblan/ai-workflow.git@vX.Y.Z#subdirectory=stone"
+uv tool install "git+https://github.com/brawblan/cornerstone.git@vX.Y.Z#subdirectory=stone"
 ```
 
 ### pipx
 
 ```bash
-pipx install "git+https://github.com/brawblan/ai-workflow.git@vX.Y.Z#subdirectory=stone"
+pipx install "git+https://github.com/brawblan/cornerstone.git@vX.Y.Z#subdirectory=stone"
 ```
 
 ### zipapp
@@ -58,7 +58,7 @@ Each release from 1.6.0 has two files: `stone.pyz` and `stone.pyz.sha256`. Downl
 checksum, and run the file with Python 3.11 or later:
 
 ```bash
-base=https://github.com/brawblan/ai-workflow/releases/download/vX.Y.Z
+base=https://github.com/brawblan/cornerstone/releases/download/vX.Y.Z
 curl -fsSL --remote-name-all "$base/stone.pyz" "$base/stone.pyz.sha256"
 sha256sum -c stone.pyz.sha256   # on macOS: shasum -a 256 -c stone.pyz.sha256
 python3 stone.pyz --version

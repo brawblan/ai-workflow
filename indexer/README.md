@@ -22,7 +22,7 @@ The Linux files need glibc 2.28 or later. Use one of these four options.
 | --- | --- |
 | Archive | Download `stone-index-vX.Y.Z-<target>.tar.gz` (`.zip` for Windows) and `SHA256SUMS` from the release. Test the checksum, extract the archive, and put `stone-index` on your `PATH`. |
 | Wheel | `uv tool install <wheel URL>` or `pipx install <wheel URL>`. The wheel holds only the binary. `pip install <wheel URL>` also works. |
-| Cargo | `cargo install --locked --git https://github.com/brawblan/ai-workflow --tag vX.Y.Z stone-index` |
+| Cargo | `cargo install --locked --git https://github.com/brawblan/cornerstone --tag vX.Y.Z stone-index` |
 | Clone | `cargo build --release --locked` in `indexer/`. The binary is `target/release/stone-index`. |
 
 To test the checksum of a download, run this command in the download folder:

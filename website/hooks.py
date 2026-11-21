@@ -11,7 +11,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-REPO_URL = "https://github.com/brawblan/ai-workflow"
+REPO_URL = "https://github.com/brawblan/cornerstone"
 BRANCH = "main"
 LINK = re.compile(r"(\]\()([^)\s]+)(\))")
 EVALS_MARKER = "<!-- evals-index -->"

@@ -17,7 +17,7 @@ Cornerstone, a tool-neutral framework for agent-assisted delivery with its `ston
 | `docs/tips/` | How the owner works, and why |
 | `stone/` | The `stone` CLI (Python 3.11+, PyYAML only) and its tests |
 | `indexer/` | The `stone-index` code indexer (Rust, D104). Its tests are in `indexer/tests/`. |
-| `mkdocs.yml`, `website/` | The docs site, https://brawblan.github.io/ai-workflow/. `website/content/` mirrors the repo folders with symlinks. |
+| `mkdocs.yml`, `website/` | The docs site, https://brawblan.github.io/cornerstone/. `website/content/` mirrors the repo folders with symlinks. |
 | `.github/workflows/stone.yml` | CI: unit tests, `stone check`, and K17 |
 | `.github/workflows/indexer.yml` | CI: the Rust checks of `indexer/`, on Linux and macOS |
 

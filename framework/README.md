@@ -61,7 +61,7 @@ writing check, and the first part of `stone render`. See [generator/design.md](g
 
 | # | Decision | Where |
 | --- | --- | --- |
-| D1 | The framework name is Cornerstone. The CLI is `stone`. The repo stays `ai-workflow`. | This file, [generator/design.md](generator/design.md) |
+| D1 | The framework name is Cornerstone. The CLI is `stone`. The repo is `cornerstone`. | This file, [generator/design.md](generator/design.md) |
 | D2 | A repo MAY add a waiver to skip G4 for dependency patch versions. Minor and major versions always need G4. The waiver file is not built yet (D51). | [profiles/dependency-upgrade.md](profiles/dependency-upgrade.md) |
 | D3 | `setup` is the entry skill. It runs `project-setup` as its Shape step. `project-setup` stays usable alone. | [generator/design.md](generator/design.md) |
 | D4 | Default limits: 600 changed lines for a PR, 300 lines for the instruction file. A profile can tighten them. | [principles.md](principles.md), [customization.md](customization.md) |
@@ -193,7 +193,7 @@ Do these items in order. Each item is one PR or more.
 2. Done in stone 0.2: `stone render` for the first harness adapter and the single-ticket profile.
    It writes the role files, the protected-path hook and check K6, a CI workflow, and the manifest.
 3. Update the plugin skills from the
-   [gap analysis](../docs/research/dossier.md#3-gap-analysis-of-this-repo-brawblanai-workflow-v021).
+   [gap analysis](../docs/research/dossier.md#3-gap-analysis-of-this-repo-brawblancornerstone-v021).
    `stone render` writes the role files, so the plugin has no tester or reviewer skill (D14).
    - 3a0. Done in plugin 0.4.1 and stone 0.3: user personas and job stories (D15 to D17). K18 is an
      error since 2026-10-21 (D53).
@@ -287,5 +287,5 @@ Do these items in order. Each item is one PR or more.
 ## Relation to the plugin in this repo
 
 The `cornerstone` plugin skills are the first harness implementation of parts of this framework.
-The [gap analysis](../docs/research/dossier.md#3-gap-analysis-of-this-repo-brawblanai-workflow-v021)
+The [gap analysis](../docs/research/dossier.md#3-gap-analysis-of-this-repo-brawblancornerstone-v021)
 shows what must change.

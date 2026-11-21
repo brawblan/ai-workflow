@@ -123,15 +123,15 @@ selects the gates that apply. See the [workflow model](framework/workflow-model.
 1. Install the CLI from a clone of the repo:
 
     ```bash
-    git clone https://github.com/brawblan/ai-workflow.git
-    pip install ./ai-workflow/stone
+    git clone https://github.com/brawblan/cornerstone.git
+    pip install ./cornerstone/stone
     ```
 
 2. Install the plugin in Claude Code. Use the newest release tag for `vX.Y.Z`, so that the tag pins
    the plugin ([how to move the pin](framework/adapters/claude-code.md#install-the-plugin-from-a-pinned-ref)):
 
     ```text
-    /plugin marketplace add brawblan/ai-workflow#vX.Y.Z
+    /plugin marketplace add brawblan/cornerstone#vX.Y.Z
     /plugin install cornerstone@brawblan
     ```
 

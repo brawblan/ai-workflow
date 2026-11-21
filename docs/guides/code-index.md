@@ -47,7 +47,7 @@ arm64, and Windows x86-64. `SHA256SUMS` has the checksum of each file.
 | --- | --- |
 | Archive | Download `stone-index-vX.Y.Z-<target>.tar.gz` (`.zip` for Windows) and `SHA256SUMS`. Test the checksum, extract the archive, and put `stone-index` on your `PATH`. |
 | Wheel | `uv tool install <wheel URL>` or `pipx install <wheel URL>` |
-| Cargo | `cargo install --locked --git https://github.com/brawblan/ai-workflow --tag vX.Y.Z stone-index` |
+| Cargo | `cargo install --locked --git https://github.com/brawblan/cornerstone --tag vX.Y.Z stone-index` |
 | Clone | `cargo build --release --locked` in `indexer/` |
 
 If `stone-index` is not on `PATH`, `stone index` prints the install commands and exits with code 2.

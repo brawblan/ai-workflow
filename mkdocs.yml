@@ -2,9 +2,9 @@
 # website/content/ mirrors the repo folders with symlinks, so the relative links in the docs work.
 site_name: Cornerstone
 site_description: A tool-neutral framework for agent-assisted software delivery
-site_url: https://brawblan.github.io/ai-workflow/
-repo_url: https://github.com/brawblan/ai-workflow
-repo_name: brawblan/ai-workflow
+site_url: https://brawblan.github.io/cornerstone/
+repo_url: https://github.com/brawblan/cornerstone
+repo_name: brawblan/cornerstone
 edit_uri: ""
 
 docs_dir: website/content

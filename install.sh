@@ -6,7 +6,7 @@ set -euo pipefail
 
 repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 target_dir="${CLAUDE_CONFIG_DIR:-$HOME/.claude}"
-backup_dir="$target_dir/backups/ai-workflow-$(date +%Y%m%d-%H%M%S)"
+backup_dir="$target_dir/backups/cornerstone-$(date +%Y%m%d-%H%M%S)"
 files=(CLAUDE.md AGENTS.md settings.json)
 
 mkdir -p "$target_dir"

@@ -28,7 +28,7 @@ class RewriteLinksTest(unittest.TestCase):
 
     def test_file_off_the_site_goes_to_github_blob(self) -> None:
         text = "[install](../../README.md#install-the-plugin-for-claude-code)"
-        self.assertEqual(rewrite(text), "[install](https://github.com/brawblan/ai-workflow/blob/main/"
+        self.assertEqual(rewrite(text), "[install](https://github.com/brawblan/cornerstone/blob/main/"
                                         "README.md#install-the-plugin-for-claude-code)")
 
     def test_folder_off_the_site_goes_to_github_tree(self) -> None:
@@ -36,7 +36,7 @@ class RewriteLinksTest(unittest.TestCase):
             (Path(root) / "plugins" / "cornerstone").mkdir(parents=True)
             text = "[skills](../../plugins/cornerstone/)"
             self.assertEqual(rewrite(text, root),
-                             "[skills](https://github.com/brawblan/ai-workflow/tree/main/plugins/cornerstone)")
+                             "[skills](https://github.com/brawblan/cornerstone/tree/main/plugins/cornerstone)")
 
     def test_external_and_anchor_links_stay(self) -> None:
         for text in ("[a](https://example.com/x.md)", "[b](#pick-a-guide)", "[c](mailto:a@b.c)",
@@ -50,7 +50,7 @@ class RewriteLinksTest(unittest.TestCase):
     def test_mirrored_page_uses_its_repo_path(self) -> None:
         text = "[config](../.cornerstone/config.yaml)"
         result = rewrite_links(text, "stone/README.md", "stone/README.md", "/repo", lambda _: False)
-        self.assertEqual(result, "[config](https://github.com/brawblan/ai-workflow/blob/main/"
+        self.assertEqual(result, "[config](https://github.com/brawblan/cornerstone/blob/main/"
                                  ".cornerstone/config.yaml)")
 
 

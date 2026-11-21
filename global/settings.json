@@ -29,7 +29,7 @@
     "brawblan": {
       "source": {
         "source": "github",
-        "repo": "brawblan/ai-workflow"
+        "repo": "brawblan/cornerstone"
       }
     }
   },

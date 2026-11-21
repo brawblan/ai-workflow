@@ -18,7 +18,7 @@ CONFIG = Path(".cornerstone/config.yaml")
 KINDS = ("major", "minor", "patch")
 FILE_CHANGES = ("added", "changed", "removed")
 VERSION = re.compile(r"^\d+\.\d+\.\d+$")
-REPO_URL = "https://github.com/brawblan/ai-workflow"  # the G3 workflow installs stone from it
+REPO_URL = "https://github.com/brawblan/cornerstone"  # the G3 workflow installs stone from it
 
 
 class UpgradeError(Exception):

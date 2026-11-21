@@ -12,7 +12,7 @@ readme = "README.md"
 dynamic = ["version"]
 
 [project.urls]
-Repository = "https://github.com/brawblan/ai-workflow"
+Repository = "https://github.com/brawblan/cornerstone"
 
 [tool.maturin]
 bindings = "bin"

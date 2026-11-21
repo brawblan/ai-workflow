@@ -1,7 +1,7 @@
 # The first stone eval runs on OpenCode, and their cost
 
-Part of [#301](https://github.com/brawblan/ai-workflow/issues/301). Date: 2026-11-09. The cost fix
-is [#315](https://github.com/brawblan/ai-workflow/issues/315).
+Part of [#301](https://github.com/brawblan/cornerstone/issues/301). Date: 2026-11-09. The cost fix
+is [#315](https://github.com/brawblan/cornerstone/issues/315).
 
 ## Result
 

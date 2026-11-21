@@ -216,7 +216,7 @@ table shows the state of each pin. Issue #225 closes the gaps.
 | `anthropics/claude-code-action` | Trigger workflows | Commit SHA (v1.0.252) | None |
 | Claude Code CLI | Trigger workflows | The action SHA fixes the version: v1.0.252 installs 2.1.302. | The action gets the CLI through `curl -fsSL https://claude.ai/install.sh \| bash -s -- <version>`. The script is not pinned or hashed. |
 | `stone` | G3 workflow | The commit SHA in `framework_commit`, else the tag `v<framework_version>` (D92). PyYAML and setuptools have a version and hashes. | A repo with no `framework_commit` still installs from the tag. |
-| Cornerstone plugin | Developer machines | The marketplace at a release tag, `brawblan/ai-workflow#vX.Y.Z` (D94). The plugin files come from that tag. | A tag, not a commit: the marketplace source has no `sha` field. Tag protection keeps the tag fixed. An add with no `#ref` follows `main`. |
+| Cornerstone plugin | Developer machines | The marketplace at a release tag, `brawblan/cornerstone#vX.Y.Z` (D94). The plugin files come from that tag. | A tag, not a commit: the marketplace source has no `sha` field. Tag protection keeps the tag fixed. An add with no `#ref` follows `main`. |
 | Release tags `v*` | GitHub repo | Two tag rulesets (D94): no update or deletion for anyone, and creation by an admin only. | The owner applies the rulesets. Until then, each tag can move. |
 | Claude Code CLI and editor extension | Developer machines | An exact version, with auto-update off, from the [local hardening guide](claude-code/local-hardening.md) (D95). | Each machine applies the guide by hand. No check tests a machine. A pin does not stop a malicious build that a human approves. |
 
@@ -228,18 +228,18 @@ marketplace to a release tag also pins the plugin (dossier F21).
 
 | Step | Command |
 | --- | --- |
-| Add the marketplace at a release tag | `/plugin marketplace add brawblan/ai-workflow#vX.Y.Z` |
+| Add the marketplace at a release tag | `/plugin marketplace add brawblan/cornerstone#vX.Y.Z` |
 | Install the plugin | `/plugin install cornerstone@brawblan` |
 | Check the pin | `claude plugin marketplace list --json` shows `"ref": "vX.Y.Z"` for `brawblan`. |
 
 For a team repo, put the pin in `.claude/settings.json`, so that a change to it is a reviewed diff.
-`claude plugin marketplace add brawblan/ai-workflow#vX.Y.Z --scope project` writes the declaration.
+`claude plugin marketplace add brawblan/cornerstone#vX.Y.Z --scope project` writes the declaration.
 
 ```json
 {
   "extraKnownMarketplaces": {
     "brawblan": {
-      "source": { "source": "github", "repo": "brawblan/ai-workflow", "ref": "vX.Y.Z" }
+      "source": { "source": "github", "repo": "brawblan/cornerstone", "ref": "vX.Y.Z" }
     }
   },
   "enabledPlugins": { "cornerstone@brawblan": true }
@@ -289,13 +289,13 @@ a ruleset of their own.
 The owner applies them once. It is a repo settings change, not a reviewed PR:
 
 ```bash
-gh api -X POST repos/brawblan/ai-workflow/rulesets --input - <<'EOF'
+gh api -X POST repos/brawblan/cornerstone/rulesets --input - <<'EOF'
 {"name": "release-tags-fixed", "target": "tag", "enforcement": "active", "bypass_actors": [],
  "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
  "rules": [{"type": "update", "parameters": {"update_allows_fetch_and_merge": false}},
            {"type": "deletion"}, {"type": "non_fast_forward"}]}
 EOF
-gh api -X POST repos/brawblan/ai-workflow/rulesets --input - <<'EOF'
+gh api -X POST repos/brawblan/cornerstone/rulesets --input - <<'EOF'
 {"name": "release-tags-create", "target": "tag", "enforcement": "active",
  "bypass_actors": [{"actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always"}],
  "conditions": {"ref_name": {"include": ["refs/tags/v*"], "exclude": []}},
@@ -306,8 +306,8 @@ EOF
 To check them, read them back. Both must show `enforcement: active` and the include `refs/tags/v*`:
 
 ```bash
-gh api repos/brawblan/ai-workflow/rulesets --jq '.[] | select(.target == "tag") | {id, name, enforcement}'
-gh api repos/brawblan/ai-workflow/rulesets/<id> --jq '{rules: [.rules[].type], include: .conditions.ref_name.include, bypass: .bypass_actors}'
+gh api repos/brawblan/cornerstone/rulesets --jq '.[] | select(.target == "tag") | {id, name, enforcement}'
+gh api repos/brawblan/cornerstone/rulesets/<id> --jq '{rules: [.rules[].type], include: .conditions.ref_name.include, bypass: .bypass_actors}'
 ```
 
 Do not test the rules with a push to an existing tag. If a ruleset is missing, that push moves the

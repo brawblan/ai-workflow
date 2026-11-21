@@ -28,7 +28,7 @@ A later layer wins over an earlier layer, with these limits:
 For the harness adapters and their statuses, see [Adapter status](adapters/contract.md#adapter-status).
 
 ```yaml
-framework_version: 1.2.0           # tag of brawblan/ai-workflow. G3 installs stone from it. See versioning.md.
+framework_version: 1.2.0           # tag of brawblan/cornerstone. G3 installs stone from it. See versioning.md.
 framework_commit: "<40-hex SHA>"   # optional. The commit of that tag. G3 installs stone from it (see below).
 harness: <harness-adapter-name>    # a file name in framework/adapters/
 model_profile: <model-family>      # a file in framework/adapters/<harness>/models/

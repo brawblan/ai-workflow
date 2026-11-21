@@ -1,4 +1,4 @@
-# ai-workflow
+# Cornerstone
 
 **Cornerstone: a framework for agent-assisted software delivery, where checks decide that work is
 done.**
@@ -6,7 +6,7 @@ done.**
 Version 1.7.0. All 10 profiles are supported, and each generated check blocks.
 
 This repo holds Cornerstone, its `stone` CLI, the `cornerstone` plugin skills, my personal agent
-rules, and tips. Read the docs at [brawblan.github.io/ai-workflow](https://brawblan.github.io/ai-workflow/).
+rules, and tips. Read the docs at [brawblan.github.io/cornerstone](https://brawblan.github.io/cornerstone/).
 
 ## What Cornerstone is
 
@@ -112,8 +112,8 @@ only full harness adapter at this time. An adapter for OpenCode supports `stone 
 1. Clone this repo and install the CLI:
 
    ```bash
-   git clone https://github.com/brawblan/ai-workflow.git
-   pip install ./ai-workflow/stone
+   git clone https://github.com/brawblan/cornerstone.git
+   pip install ./cornerstone/stone
    ```
 
 2. Install the `cornerstone` plugin (see [Install the plugin](#install-the-plugin-for-claude-code)).
@@ -158,10 +158,10 @@ and `gh`.
 ## Install the plugin for Claude Code
 
 1. In Claude Code, add the marketplace at a release tag. Use the newest tag from
-   [Releases](https://github.com/brawblan/ai-workflow/releases) for `vX.Y.Z`:
+   [Releases](https://github.com/brawblan/cornerstone/releases) for `vX.Y.Z`:
 
    ```
-   /plugin marketplace add brawblan/ai-workflow#vX.Y.Z
+   /plugin marketplace add brawblan/cornerstone#vX.Y.Z
    ```
 
 2. Install the plugin:
@@ -185,7 +185,7 @@ The skills use the open `SKILL.md` format. `stone render` has no adapter for oth
 2. To set up a repo without the plugin, tell your agent:
 
    ```text
-   Follow plugins/cornerstone/skills/project-setup/SKILL.md from github.com/brawblan/ai-workflow.
+   Follow plugins/cornerstone/skills/project-setup/SKILL.md from github.com/brawblan/cornerstone.
    Use the templates next to it.
    ```
 
@@ -203,7 +203,7 @@ The skills use the open `SKILL.md` format. `stone render` has no adapter for oth
 | [`docs/research/`](docs/research/dossier.md) | The cited evidence for the framework |
 | [`docs/guides/`](docs/guides/README.md) | How to use Cornerstone, one situation at a time |
 | [`docs/tips/`](docs/tips/README.md) | How I work with agents, and why |
-| [`website/`](website/), [`mkdocs.yml`](mkdocs.yml) | The [docs site](https://brawblan.github.io/ai-workflow/), built with MkDocs Material |
+| [`website/`](website/), [`mkdocs.yml`](mkdocs.yml) | The [docs site](https://brawblan.github.io/cornerstone/), built with MkDocs Material |
 | [`global/`](global/README.md) | My personal agent rules and settings, and how I sync them across devices |
 | [`AGENTS.md`](AGENTS.md) | How agents work in this repo: commands, rules, branches, and writing |
 
